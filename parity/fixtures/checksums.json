@@ -1,0 +1,156 @@
+{
+  "alpha_step1": {
+    "synthetic_alpha.mov": {
+      "sha256": "68ce83e69dafe0c723a4787a80e8bd9c0b365b3ba1307ffd4e5ec546a45a8675",
+      "size": 17145518,
+      "source": null
+    }
+  },
+  "cuts_step2": {
+    "synthetic_cuts.csv": {
+      "sha256": "1b141b0c7e510afd55a43bf0dac0851d94cb03a62b4bbe7913224bfc9d99ab6c",
+      "size": 194,
+      "source": null
+    }
+  },
+  "face_step4": {
+    "face_pan.json": {
+      "sha256": "7a09b1d5c997cb5c79d2837ec183befd23bdc739772049dbce4c78ef54a4b97e",
+      "size": 476122,
+      "source": null
+    }
+  },
+  "interlaced_step1": {
+    "synthetic_interlaced.mp4": {
+      "sha256": "dd8ca06e5459d5d93da7cdf7c9625509170fe2002e235ad9666a317afc89565b",
+      "size": 3007774,
+      "source": null
+    }
+  },
+  "real_244_step2": {
+    "real_244.csv": {
+      "sha256": "60a6ce6e02c0fbe0760263e696b0c34f6ba23ca0790030db53c89cf9167ebf83",
+      "size": 3122,
+      "source": "/mnt/cache/244 Cvmille/docs/Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !.csv"
+    }
+  },
+  "real_244_step3": {
+    "real_244_audio.json": {
+      "sha256": "c76b93818bf2f3776e9b086d5b10f44a77990fa30b41ebd88ed63512439cde44",
+      "size": 913787,
+      "source": "/mnt/cache/244 Cvmille/docs/Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !_audio.json"
+    }
+  },
+  "real_244_step4": {
+    "real_244.json": {
+      "sha256": "b4f96a2aa96ceef4ee3fca1cd99fffb0e4a42dac13f7307b80ca3d8fc6a18cbb",
+      "size": 8910661,
+      "source": "/mnt/cache/244 Cvmille/docs/Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !.json"
+    }
+  },
+  "real_244_step5": {
+    "real_244_tracking.json": {
+      "sha256": "af7c8a96e48a1a9078040f2c9ce05a01157483fb0d10599b9cc5316ac47a425d",
+      "size": 2317100,
+      "source": "/mnt/cache/244 Cvmille/docs/Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !_tracking.json"
+    }
+  },
+  "real_244_step6": {
+    "real_244_ae.json": {
+      "sha256": "7772fe4f1e8e7e9c3220d6bf9eb8097e8b9840eae5b6da963ad27cf1003df613",
+      "size": 2634719,
+      "source": "/mnt/cache/244 Cvmille/docs/Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !_ae.json"
+    }
+  },
+  "real_245_step2": {
+    "real_245.csv": {
+      "sha256": "1e289a9840758e04b335068163d3a74a1874b08f982d91464ed6b91841c65e32",
+      "size": 2172,
+      "source": "/mnt/cache/245 Cvmille/docs/Ils proposent un menu à 13,50€ !.csv"
+    }
+  },
+  "real_245_step3": {
+    "real_245_audio.json": {
+      "sha256": "2dfc7123c6d9014eebe87c0e8df65e621e32b650ead7c8b8b9cdc25515ebb09f",
+      "size": 888833,
+      "source": "/mnt/cache/245 Cvmille/docs/Ils proposent un menu à 13,50€ !_audio.json"
+    }
+  },
+  "real_245_step4": {
+    "real_245.json": {
+      "sha256": "9160d5371a2ff8b6b80ebc1c76cb0c90a12cc0fe8f69d90626e214f5a47e52b8",
+      "size": 6619930,
+      "source": "/mnt/cache/245 Cvmille/docs/Ils proposent un menu à 13,50€ !.json"
+    }
+  },
+  "real_245_step5": {
+    "real_245_tracking.json": {
+      "sha256": "5b5ad48c5fbd620e6a28019d81efd05e109e890588687039423bba5e8e3e9dea",
+      "size": 2357023,
+      "source": "/mnt/cache/245 Cvmille/docs/Ils proposent un menu à 13,50€ !_tracking.json"
+    }
+  },
+  "real_245_step6": {
+    "real_245_ae.json": {
+      "sha256": "ed6e72cc8a6637620168ff4dabf8fd92ae34a0f71c8bdc9efd72abc07a37ed70",
+      "size": 2165915,
+      "source": "/mnt/cache/245 Cvmille/docs/Ils proposent un menu à 13,50€ !_ae.json"
+    }
+  },
+  "real_249_step5": {
+    "real_249_tracking.json": {
+      "sha256": "f1282dc3efbd3277c1044c407637dbf976a11d062353c7f3f644a81031aa1ed9",
+      "size": 2519345,
+      "source": "/mnt/cache/249 Cvmille/docs/EXTRAIT POSTDIFF 1 – Elle a accusé son frère de violence à tort et aimerait s’excuser_tracking.json"
+    }
+  },
+  "real_249_step6": {
+    "real_249_ae.json": {
+      "sha256": "004b770cc540800d86bf673a3d7991190ea0728b3a246a428795a369de219186",
+      "size": 3433303,
+      "source": "/mnt/cache/249 Cvmille/docs/EXTRAIT POSTDIFF 1 – Elle a accusé son frère de violence à tort et aimerait s’excuser_ae.json"
+    }
+  },
+  "real_250_step5": {
+    "real_250_tracking.json": {
+      "sha256": "a91427b238b1eed833274b92297b750789c83ad4962b56416fa388087be6d4ee",
+      "size": 1360573,
+      "source": "/mnt/cache/250 Cvmille/docs/M6 - WANTED - Le top départ est donné, les Fugitifs s’enfuient !_tracking.json"
+    }
+  },
+  "real_250_step6": {
+    "real_250_ae.json": {
+      "sha256": "b9c09c0dccde98cbed926af71428dc28f74aa61cfa3d7aab5e2d1a8846bf88ec",
+      "size": 1809560,
+      "source": "/mnt/cache/250 Cvmille/docs/M6 - WANTED - Le top départ est donné, les Fugitifs s’enfuient !_ae.json"
+    }
+  },
+  "short_2997_step1": {
+    "short_2997.mp4": {
+      "sha256": "c35f86dc30cec41a9fba9fc9930776bb8f9f73121bc801af5b880c647ced0c27",
+      "size": 71482,
+      "source": null
+    }
+  },
+  "short_2997_step2": {
+    "short_2997.csv": {
+      "sha256": "abc638eb097424bc5d0368ecf5b5dcc518516f1d9ce8b98619d5f430edad961a",
+      "size": 82,
+      "source": null
+    }
+  },
+  "vfr_step1": {
+    "synthetic_vfr.mp4": {
+      "sha256": "c48a344548dddfa4b8a171ab2831f6070b72e89187909e9934eb985b5622f1a2",
+      "size": 997860,
+      "source": null
+    }
+  },
+  "vox_step3": {
+    "vox_2spk_audio.json": {
+      "sha256": "22a6478343ff7d0fbfd46631a4ff913cb82f73c1710a8a97e4a5d7f76bc7c813",
+      "size": 121460,
+      "source": null
+    }
+  }
+}

@@ -1,0 +1,15 @@
+/target
+/vendor/*.so
+/vendor/*.so.*
+
+__pycache__/
+*.py[cod]
+
+# Corpus de parité : médias dérivés de productions et sorties volumineuses.
+/parity/cases/*
+!/parity/cases/corpus.lock.json
+/parity/work/
+/parity/baseline/
+/parity/fixtures/*
+!/parity/fixtures/README.md
+!/parity/fixtures/checksums.json

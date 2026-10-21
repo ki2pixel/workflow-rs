@@ -1,0 +1,410 @@
+# Manifeste du corpus de parité.
+#
+# Chaque cas exécute une seule étape sur une copie isolée. Les cas `real_244`
+# référencent le projet finalisé `/mnt/cache/244 Cvmille/docs` en lecture seule ;
+# la vidéo est liée par symlink, les artefacts sont copiés.
+#
+# Les cas `synthetic` sont générés par `build-corpus` dans `parity/cases/`.
+
+[project]
+old_base = "/home/kidpixel/workflow_mediapipe"
+new_base = "/home/kidpixel/workflow-rs"
+
+[project.python]
+step1 = "/mnt/venv_ext4/env/bin/python"
+step2 = "/mnt/venv_ext4/transnet_cv5_env/bin/python"
+step3 = "/home/kidpixel/workflow_mediapipe/coral_env/bin/python"
+step4 = "/home/kidpixel/workflow_mediapipe/coral_env/bin/python"
+step5 = "/mnt/venv_ext4/env/bin/python"
+step6 = "/mnt/venv_ext4/env/bin/python"
+step7 = "/mnt/venv_ext4/env/bin/python"
+step8 = "/mnt/venv_ext4/env/bin/python"
+
+[steps.STEP1]
+name = "Normalisation média"
+command = [
+  "{python.step1}",
+  "{new_base}/tools/parity/normalize_case.py",
+  "{case_dir}",
+  "--force",
+]
+cwd = "{old_base}"
+timeout_s = 900
+hardware = true
+outputs = ["{stem}.mp4"]
+
+[steps.STEP2]
+name = "Détection de scènes"
+command = [
+  "{python.step2}",
+  "workflow_scripts/step2/run_transnet_cv5.py",
+  "--input_dir", "{docs_dir}",
+  "--force",
+]
+cwd = "{old_base}"
+timeout_s = 1800
+hardware = true
+outputs = ["{stem}.csv"]
+env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
+
+[steps.STEP3]
+name = "Analyse audio"
+command = [
+  "{python.step3}",
+  "{old_base}/workflow_scripts/step3/run_audio_diarization_tpu.py",
+  "--log_dir", "{logs}",
+]
+cwd = "{docs_dir}"
+timeout_s = 1800
+hardware = true
+outputs = ["{stem}_audio.json"]
+env = { PYTORCH_CUDA_ALLOC_CONF = "max_split_size_mb:32", AUDIO_PARTIAL_SUCCESS_OK = "1", AUDIO_GPU_ISOLATION = "1" }
+
+[steps.STEP4]
+name = "Tracking visage"
+command = [
+  "{python.step4}",
+  "{old_base}/workflow_scripts/step4/run_tracking_tpu.py",
+]
+cwd = "{docs_dir}"
+timeout_s = 1800
+hardware = true
+outputs = ["{stem}.json"]
+
+[steps.STEP5]
+name = "Réduction JSON"
+command = [
+  "{python.step5}",
+  "workflow_scripts/step5/json_reducer.py",
+  "--work_dir", "{case_dir}",
+  "--log_dir", "{logs}",
+]
+cwd = "{old_base}"
+timeout_s = 1800
+hardware = false
+outputs = ["{stem}_tracking.json"]
+
+[steps.STEP6]
+name = "Pré-traitement AE"
+command = [
+  "{python.step6}",
+  "workflow_scripts/step6/preprocess_ae_json.py",
+  "--work_dir", "{case_dir}",
+  "--log_dir", "{logs}",
+]
+cwd = "{old_base}"
+timeout_s = 1800
+hardware = false
+outputs = ["{stem}_ae.json"]
+
+[families.real_244]
+source_dir = "/mnt/cache/244 Cvmille/docs"
+source_stem = "Extrait post-diff 1 – Les Orange remportent une nouvelle fois l’expédition !"
+project = "244 Camille parity"
+layout = "docs"
+keyword = "Camille"
+
+# --- Projet réel 244 : chaque étape comparée à la sortie de production ------
+
+[[case]]
+id = "real_244_step2"
+family = "real_244"
+step = "STEP2"
+stem = "real_244"
+tags = ["real", "real_244", "step2"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+]
+expected_source = "{source_dir}/{source_stem}.csv"
+outputs = ["{stem}.csv"]
+
+[[case]]
+id = "real_244_step3"
+family = "real_244"
+step = "STEP3"
+stem = "real_244"
+tags = ["real", "real_244", "step3", "long"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+]
+expected_source = "{source_dir}/{source_stem}_audio.json"
+outputs = ["{stem}_audio.json"]
+postprocess = "step5_reduce_audio"
+
+[[case]]
+id = "real_244_step4"
+family = "real_244"
+step = "STEP4"
+stem = "real_244"
+tags = ["real", "real_244", "step4", "long"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}.json"
+outputs = ["{stem}.json"]
+ignore_keys = ["video_path"]
+
+[[case]]
+id = "real_244_step5"
+family = "real_244"
+step = "STEP5"
+stem = "real_244"
+tags = ["real", "real_244", "step5"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.json", as = "{stem}.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}_tracking.json"
+outputs = ["{stem}_tracking.json"]
+transform = "step5_raw_audio"
+
+[[case]]
+id = "real_244_step6"
+family = "real_244"
+step = "STEP6"
+stem = "real_244"
+tags = ["real", "real_244", "step6"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}_tracking.json", as = "{stem}_tracking.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+]
+expected_source = "{source_dir}/{source_stem}_ae.json"
+outputs = ["{stem}_ae.json"]
+
+# --- Projet réel 245 : chaîne complète --------------------------------------
+
+[families.real_245]
+source_dir = "/mnt/cache/245 Cvmille/docs"
+source_stem = "Ils proposent un menu à 13,50€ !"
+project = "245 Camille parity"
+layout = "docs"
+keyword = "Camille"
+
+[[case]]
+id = "real_245_step2"
+family = "real_245"
+step = "STEP2"
+stem = "real_245"
+tags = ["real", "real_245", "step2"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+]
+expected_source = "{source_dir}/{source_stem}.csv"
+outputs = ["{stem}.csv"]
+
+[[case]]
+id = "real_245_step3"
+family = "real_245"
+step = "STEP3"
+stem = "real_245"
+tags = ["real", "real_245", "step3", "long"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+]
+expected_source = "{source_dir}/{source_stem}_audio.json"
+outputs = ["{stem}_audio.json"]
+postprocess = "step5_reduce_audio"
+
+[[case]]
+id = "real_245_step4"
+family = "real_245"
+step = "STEP4"
+stem = "real_245"
+tags = ["real", "real_245", "step4", "long"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}.json"
+outputs = ["{stem}.json"]
+ignore_keys = ["video_path"]
+
+[[case]]
+id = "real_245_step5"
+family = "real_245"
+step = "STEP5"
+stem = "real_245"
+tags = ["real", "real_245", "step5"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.json", as = "{stem}.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}_tracking.json"
+outputs = ["{stem}_tracking.json"]
+transform = "step5_raw_audio"
+
+[[case]]
+id = "real_245_step6"
+family = "real_245"
+step = "STEP6"
+stem = "real_245"
+tags = ["real", "real_245", "step6"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}_tracking.json", as = "{stem}_tracking.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+]
+expected_source = "{source_dir}/{source_stem}_ae.json"
+outputs = ["{stem}_ae.json"]
+
+# --- Projet réel 249 : STEP5/6 sur un long extrait --------------------------
+
+[families.real_249]
+source_dir = "/mnt/cache/249 Cvmille/docs"
+source_stem = "EXTRAIT POSTDIFF 1 – Elle a accusé son frère de violence à tort et aimerait s’excuser"
+project = "249 Camille parity"
+layout = "docs"
+keyword = "Camille"
+
+[[case]]
+id = "real_249_step5"
+family = "real_249"
+step = "STEP5"
+stem = "real_249"
+tags = ["real", "real_249", "step5"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.json", as = "{stem}.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}_tracking.json"
+outputs = ["{stem}_tracking.json"]
+transform = "step5_raw_audio"
+
+[[case]]
+id = "real_249_step6"
+family = "real_249"
+step = "STEP6"
+stem = "real_249"
+tags = ["real", "real_249", "step6"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}_tracking.json", as = "{stem}_tracking.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+]
+expected_source = "{source_dir}/{source_stem}_ae.json"
+outputs = ["{stem}_ae.json"]
+
+# --- Projet réel 250 : STEP5/6 sur un format court --------------------------
+
+[families.real_250]
+source_dir = "/mnt/cache/250 Cvmille/docs"
+source_stem = "M6 - WANTED - Le top départ est donné, les Fugitifs s’enfuient !"
+project = "250 Camille parity"
+layout = "docs"
+keyword = "Camille"
+
+[[case]]
+id = "real_250_step5"
+family = "real_250"
+step = "STEP5"
+stem = "real_250"
+tags = ["real", "real_250", "step5"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}.json", as = "{stem}.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+]
+expected_source = "{source_dir}/{source_stem}_tracking.json"
+outputs = ["{stem}_tracking.json"]
+transform = "step5_raw_audio"
+
+[[case]]
+id = "real_250_step6"
+family = "real_250"
+step = "STEP6"
+stem = "real_250"
+tags = ["real", "real_250", "step6"]
+inputs = [
+  { source = "{source_dir}/{source_stem}.mp4", as = "{stem}.mp4", mode = "link" },
+  { source = "{source_dir}/{source_stem}_tracking.json", as = "{stem}_tracking.json" },
+  { source = "{source_dir}/{source_stem}_audio.json", as = "{stem}_audio.json" },
+  { source = "{source_dir}/{source_stem}.csv", as = "{stem}.csv" },
+]
+expected_source = "{source_dir}/{source_stem}_ae.json"
+outputs = ["{stem}_ae.json"]
+
+# --- Cas synthétiques -------------------------------------------------------
+
+[[case]]
+id = "short_2997_step1"
+step = "STEP1"
+stem = "short_2997"
+tags = ["synthetic", "step1", "normalize", "fast"]
+inputs = [{ source = "cases/short_2997.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.mp4"]
+
+[[case]]
+id = "short_2997_step2"
+step = "STEP2"
+stem = "short_2997"
+tags = ["synthetic", "step2", "fast"]
+inputs = [{ source = "cases/short_2997.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.csv"]
+
+[[case]]
+id = "cuts_step2"
+step = "STEP2"
+stem = "synthetic_cuts"
+tags = ["synthetic", "step2", "fast"]
+inputs = [{ source = "cases/synthetic_cuts.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.csv"]
+
+[[case]]
+id = "vfr_step1"
+step = "STEP1"
+stem = "synthetic_vfr"
+tags = ["synthetic", "step1", "normalize", "fast"]
+inputs = [{ source = "cases/synthetic_vfr.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.mp4"]
+
+[[case]]
+id = "interlaced_step1"
+step = "STEP1"
+stem = "synthetic_interlaced"
+tags = ["synthetic", "step1", "normalize", "fast"]
+inputs = [{ source = "cases/synthetic_interlaced.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.mp4"]
+
+[[case]]
+id = "alpha_step1"
+step = "STEP1"
+stem = "synthetic_alpha"
+tags = ["synthetic", "step1", "normalize", "fast"]
+inputs = [{ source = "cases/synthetic_alpha.mov", as = "{stem}.mov" }]
+outputs = ["{stem}.mov"]
+
+[[case]]
+id = "silent_step3"
+step = "STEP3"
+stem = "synthetic_silent"
+tags = ["synthetic", "step3", "long"]
+inputs = [{ source = "cases/synthetic_silent.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}_audio.json"]
+allow_empty_outputs = true
+note = "Sans piste audio, STEP3 sort en 0 après une traceback ffmpeg et ne produit rien."
+
+[[case]]
+id = "face_step4"
+step = "STEP4"
+stem = "face_pan"
+tags = ["synthetic", "step4", "fast"]
+inputs = [{ source = "cases/face_pan.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}.json"]
+
+[[case]]
+id = "vox_step3"
+step = "STEP3"
+stem = "vox_2spk"
+tags = ["synthetic", "step3", "long"]
+inputs = [{ source = "cases/vox_2spk.mp4", as = "{stem}.mp4" }]
+outputs = ["{stem}_audio.json"]

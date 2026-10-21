@@ -1,0 +1,13 @@
+[package]
+name = "workflow-tpu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "workflow_tpu"
+path = "src/lib.rs"
+
+[[bin]]
+name = "workflow-tpu-spike"
+path = "src/bin/spike.rs"

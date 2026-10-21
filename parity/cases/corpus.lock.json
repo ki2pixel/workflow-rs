@@ -1,0 +1,218 @@
+{
+  "generated_at": "2026-10-21T23:13:24.553494+00:00",
+  "files": {
+    "short_2997.mp4": {
+      "size": 715060,
+      "sha256": "28da849e67ac9a5d91f510bae7a29cf40d33c1b13ec6b031179883047d701045",
+      "probe": {
+        "format": {
+          "duration": "3.003000",
+          "size": "715060",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 480,
+            "height": 270,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "30000/1001",
+            "avg_frame_rate": "30000/1001",
+            "nb_frames": "90",
+            "duration": "3.003000"
+          }
+        ]
+      }
+    },
+    "synthetic_cuts.mp4": {
+      "size": 5877971,
+      "sha256": "4742df1639b3a000ad9f8eb4b5b155bb2883c8ccda83a676d16b9f1d96af2099",
+      "probe": {
+        "format": {
+          "duration": "20.000000",
+          "size": "5877971",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "nb_frames": "500",
+            "duration": "20.000000"
+          },
+          {
+            "codec_type": "audio",
+            "codec_name": "aac",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "nb_frames": "937",
+            "sample_rate": "48000",
+            "channels": 1,
+            "duration": "19.968000"
+          }
+        ]
+      }
+    },
+    "synthetic_vfr.mp4": {
+      "size": 2683709,
+      "sha256": "470485a7e013c9600c89d37dfef3cd50197303d6220e6ebb08afdff09a63a91c",
+      "probe": {
+        "format": {
+          "duration": "12.500000",
+          "size": "2683709",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 640,
+            "height": 360,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "24/1",
+            "avg_frame_rate": "108/5",
+            "nb_frames": "270",
+            "duration": "12.500000"
+          }
+        ]
+      }
+    },
+    "synthetic_interlaced.mp4": {
+      "size": 27295125,
+      "sha256": "5516147754b0ec9958348bd3615f1ae969114c952544a748c6f079efdaac1546",
+      "probe": {
+        "format": {
+          "duration": "10.000000",
+          "size": "27295125",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 1920,
+            "height": 1080,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "nb_frames": "250",
+            "duration": "10.000000"
+          }
+        ]
+      }
+    },
+    "synthetic_silent.mp4": {
+      "size": 1306825,
+      "sha256": "d57b944f1c8b08290058ac5d6080ecfc9c55d37c454e5531a5e37eb87d6bfebf",
+      "probe": {
+        "format": {
+          "duration": "5.000000",
+          "size": "1306825",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 640,
+            "height": 360,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "nb_frames": "125",
+            "duration": "5.000000"
+          }
+        ]
+      }
+    },
+    "synthetic_alpha.mov": {
+      "size": 17145518,
+      "sha256": "68ce83e69dafe0c723a4787a80e8bd9c0b365b3ba1307ffd4e5ec546a45a8675",
+      "probe": {
+        "format": {
+          "duration": "2.000000",
+          "size": "17145518",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "prores",
+            "width": 640,
+            "height": 360,
+            "pix_fmt": "yuva444p12le",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "field_order": "progressive",
+            "nb_frames": "50",
+            "duration": "2.000000"
+          }
+        ]
+      }
+    },
+    "face_pan.mp4": {
+      "size": 1075657,
+      "sha256": "19554286c99bc6a5c7f3b1283300fd3464808b59121a730f7ba66c8ab9bda689",
+      "probe": {
+        "format": {
+          "duration": "10.000000",
+          "size": "1075657",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 720,
+            "height": 960,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "nb_frames": "250",
+            "duration": "10.000000"
+          }
+        ]
+      }
+    },
+    "vox_2spk.mp4": {
+      "size": 7040354,
+      "sha256": "3e1bacd8c820f7b2f3feef164d3f63898ba1a1171da972be51515f6172018b27",
+      "probe": {
+        "format": {
+          "duration": "30.000000",
+          "size": "7040354",
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        },
+        "streams": [
+          {
+            "codec_type": "video",
+            "codec_name": "h264",
+            "width": 640,
+            "height": 360,
+            "pix_fmt": "yuv420p",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "nb_frames": "750",
+            "duration": "30.000000"
+          },
+          {
+            "codec_type": "audio",
+            "codec_name": "aac",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "nb_frames": "470",
+            "sample_rate": "16000",
+            "channels": 1,
+            "duration": "30.000000"
+          }
+        ]
+      }
+    }
+  }
+}

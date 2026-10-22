@@ -2,6 +2,7 @@
 
 pub mod error;
 pub mod retention;
+pub mod step2;
 pub mod step5;
 pub mod step6;
 pub mod step7;

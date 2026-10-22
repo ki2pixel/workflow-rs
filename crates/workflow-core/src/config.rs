@@ -77,6 +77,21 @@ impl Config {
                 "steps.step2.threshold doit être dans [0, 1]".into(),
             ));
         }
+        if self.steps.step2.batch_size == 0
+            || self.steps.step2.window == 0
+            || self.steps.step2.stride == 0
+            || self.steps.step2.padding * 2 >= self.steps.step2.window
+        {
+            return Err(ConfigError::Invalid(
+                "steps.step2: batch_size, window et stride doivent être > 0 et padding*2 < window"
+                    .into(),
+            ));
+        }
+        if !matches!(self.steps.step2.device.as_str(), "cuda" | "cpu") {
+            return Err(ConfigError::Invalid(
+                "steps.step2.device doit être cuda ou cpu".into(),
+            ));
+        }
         if !(0.0..=1.0).contains(&self.steps.step3.adaptive_threshold) {
             return Err(ConfigError::Invalid(
                 "steps.step3.adaptive_threshold doit être dans [0, 1]".into(),
@@ -318,7 +333,23 @@ pub struct Step2Config {
     pub batch_size: u32,
     pub window: u32,
     pub stride: u32,
+    pub padding: u32,
     pub threshold: f64,
+    /// `cuda` (nominal) ou `cpu` (tests et dépannage).
+    pub device: String,
+    /// Chemin relatif à `paths.models`.
+    pub model: PathBuf,
+    /// Bibliothèque ONNX Runtime à charger dynamiquement. Vide : nom système.
+    pub onnxruntime: Option<PathBuf>,
+    /// Répertoires CUDA/cuDNN à ajouter à `LD_LIBRARY_PATH`.
+    pub cuda_lib_dirs: Vec<PathBuf>,
+    /// Ajoute automatiquement les répertoires `nvidia/*/lib` voisins de
+    /// `onnxruntime` dans un site-packages Python.
+    pub auto_cuda_libs: bool,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
+    pub ffmpeg_threads: u32,
+    pub use_tf32: bool,
 }
 
 impl Default for Step2Config {
@@ -328,7 +359,17 @@ impl Default for Step2Config {
             batch_size: 8,
             window: 100,
             stride: 50,
+            padding: 25,
             threshold: 0.5,
+            device: "cuda".into(),
+            model: PathBuf::from("step2/transnetv2.onnx"),
+            onnxruntime: None,
+            cuda_lib_dirs: Vec::new(),
+            auto_cuda_libs: true,
+            ffmpeg: PathBuf::from("ffmpeg"),
+            ffprobe: PathBuf::from("ffprobe"),
+            ffmpeg_threads: 0,
+            use_tf32: false,
         }
     }
 }

@@ -300,6 +300,14 @@ Points d'attention :
 
 Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYTHONUTF8=1`, `PYTHONUNBUFFERED=1`, `ROOT_SCAN_DIR`, `FOLDER_KEYWORD`, `SUBFOLDER_NAME`, `TRACKING_DISABLE_GPU`, `TRACKING_CPU_WORKERS`, `LD_LIBRARY_PATH` (incluant les répertoires `nvidia/*/lib` du venv), `PYTORCH_CUDA_ALLOC_CONF` (STEP2 et STEP3), `AUDIO_PARTIAL_SUCCESS_OK=1`, `AUDIO_GPU_ISOLATION`.
 
+> Lot 2 : le port Rust de STEP2 est lancé par
+> `workflow-cli step2 detect --input-dir <docs>`. Il écrit le même
+> `<stem>.csv`, avec les mêmes lignes `PROCESSING_VIDEO`,
+> `INTERNAL_PROGRESS: <n>/<total> frames (<p>%) - <nom>` et `Succès:`. Il prend
+> le verrou matériel et charge ONNX Runtime CUDA depuis
+> `steps.step2.onnxruntime`. Ce chemin n'est pas encore branché à
+> l'orchestrateur ; le contrat Python reste la référence jusqu'au cutover.
+
 STEP4 reçoit en plus `--videos_json_path <temp.json>` : la liste des vidéos sans `<stem>.json` voisin, produite par l'orchestrateur avant lancement. Si la liste est vide, l'étape se termine immédiatement en succès sans lancer de processus.
 
 STEP3 sans piste audio est un cas limite dangereux : le worker lève une traceback ffmpeg, le parent compte 0/1 réussite, sort en code 0 et ne produit aucun `_audio.json`. Le portage doit transformer ce succès silencieux en skip explicite ou en erreur, jamais en étape « completed » sans artefact. Voir `parity/DRIFT.md`, D-002.

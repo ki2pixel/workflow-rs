@@ -79,3 +79,20 @@ reports_days = 90
 tpu_device = "/dev/apex_0"
 gpu_mem_limit_mb = 4096
 require_tpu = true
+
+[steps.step2]
+cudnn_algo_search = true
+batch_size = 8
+window = 100
+stride = 50
+padding = 25
+threshold = 0.5
+device = "cuda"
+model = "step2/transnetv2.onnx"
+onnxruntime = "/mnt/venv_ext4/transnet_cv5_env/lib/python3.10/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
+cuda_lib_dirs = []
+auto_cuda_libs = true
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"
+ffmpeg_threads = 0
+use_tf32 = false

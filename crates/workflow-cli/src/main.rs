@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
+use workflow_steps::step2::{run_step2, Step2Options};
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
 use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
@@ -28,6 +29,8 @@ struct Cli {
 enum Command {
     /// Vérifie ou affiche la configuration.
     Config(ConfigArgs),
+    /// Détection de scènes STEP2 (TransNetV2 ONNX Runtime).
+    Step2(Step2Args),
     /// Sous-commandes de STEP5 (réduction JSON).
     Step5(Step5Args),
     /// Sous-commandes de STEP6 (pré-traitement AE).
@@ -52,6 +55,54 @@ enum ConfigCommand {
     Check,
     /// Affiche la configuration en JSON, secrets masqués.
     Show,
+}
+
+#[derive(Debug, Args)]
+struct Step2Args {
+    #[command(subcommand)]
+    command: Step2Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Step2Command {
+    /// Analyse récursivement un dossier et écrit un CSV à côté de chaque vidéo.
+    Detect {
+        /// Dossier contenant les vidéos (obligatoire, pas de cwd implicite).
+        #[arg(long)]
+        input_dir: PathBuf,
+        /// Re-traite même si le CSV existe déjà.
+        #[arg(long)]
+        force: bool,
+        /// Modèle ONNX (défaut : `steps.step2.model` sous `paths.models`).
+        #[arg(long)]
+        model: Option<PathBuf>,
+        /// `cuda` (nominal) ou `cpu` (tests/dépannage).
+        #[arg(long)]
+        device: Option<String>,
+        /// Bibliothèque ONNX Runtime à charger dynamiquement.
+        #[arg(long)]
+        onnxruntime: Option<PathBuf>,
+        /// Répertoires CUDA/cuDNN supplémentaires (répétable).
+        #[arg(long = "cuda-lib-dir")]
+        cuda_lib_dirs: Vec<PathBuf>,
+        /// Désactive la découverte automatique des `nvidia/*/lib` voisins.
+        #[arg(long)]
+        no_auto_cuda_libs: bool,
+        #[arg(long)]
+        batch_size: Option<usize>,
+        #[arg(long)]
+        window: Option<usize>,
+        #[arg(long)]
+        stride: Option<usize>,
+        #[arg(long)]
+        padding: Option<usize>,
+        #[arg(long)]
+        threshold: Option<f32>,
+        #[arg(long)]
+        ffmpeg: Option<PathBuf>,
+        #[arg(long)]
+        ffmpeg_threads: Option<u32>,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -359,7 +410,7 @@ fn main() {
 fn run() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,ort=error")),
         )
         .with_writer(std::io::stderr)
         .init();
@@ -391,6 +442,67 @@ fn run() -> Result<()> {
                     }
                 }
                 println!("{}", serde_json::to_string_pretty(&value)?);
+            }
+        },
+        Command::Step2(args) => match args.command {
+            Step2Command::Detect {
+                input_dir,
+                force,
+                model,
+                device,
+                onnxruntime,
+                cuda_lib_dirs,
+                no_auto_cuda_libs,
+                batch_size,
+                window,
+                stride,
+                padding,
+                threshold,
+                ffmpeg,
+                ffmpeg_threads,
+            } => {
+                let mut options = Step2Options::from_config(&config, input_dir)?;
+                options.force = force;
+                if let Some(model) = model {
+                    options.model = model;
+                }
+                if let Some(device) = device {
+                    options.device =
+                        workflow_steps::step2::engine::ExecutionDevice::parse(&device)?;
+                }
+                if let Some(runtime) = onnxruntime {
+                    options.onnxruntime = Some(runtime);
+                }
+                options.cuda_lib_dirs.extend(cuda_lib_dirs);
+                if no_auto_cuda_libs {
+                    options.auto_cuda_libs = false;
+                }
+                if let Some(value) = batch_size {
+                    options.batch_size = value;
+                }
+                if let Some(value) = window {
+                    options.window = value;
+                }
+                if let Some(value) = stride {
+                    options.stride = value;
+                }
+                if let Some(value) = padding {
+                    options.padding = value;
+                }
+                if let Some(value) = threshold {
+                    options.threshold = value;
+                }
+                if let Some(value) = ffmpeg {
+                    options.ffmpeg = value;
+                }
+                if let Some(value) = ffmpeg_threads {
+                    options.ffmpeg_threads = value;
+                }
+                let report = run_step2(&options)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!("STEP2: {} vidéo(s) en échec", report.failures.len());
+                }
             }
         },
         Command::Step5(args) => match args.command {

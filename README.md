@@ -4,12 +4,13 @@ Réécriture Rust du pipeline `workflow_mediapipe`.
 
 Le dépôt Python reste la référence de production jusqu'au cutover. Le lot 0 a
 validé le pont matériel Coral, le contrat d'environnement et le harnais de
-parité. Le lot 1 est en cours : le socle Rust, la configuration TOML, STEP5
+parité. Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
-`effectcraft-cli`) sont opérationnels. La compilation Windows du pont, le
-basculement du JSX et la validation STEP8 sur la machine Windows restent à
-faire.
+`effectcraft-cli`) sont opérationnels. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
+Runtime CUDA, avec un CSV identique à la production sur les quatre cas du
+corpus. La compilation Windows du pont, le basculement du JSX et la validation
+STEP8 sur la machine Windows restent à faire.
 
 ## État
 
@@ -43,6 +44,11 @@ faire.
   `effectcraft-cli`, sans pont Python ni application. Le projet 250 a produit
   un `.ecproj` ouvrable (82 segments, 1080×1920, 25 fps, 133 s) et la
   progression `MS_BATCH_*` est relayée en direct.
+- Lot 2 terminé : STEP2 TransNetV2 en `ort` CUDA, FFmpeg `rawvideo` via
+  `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
+  `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
+  sur les quatre cas ; VRAM pic sous la baseline. Détail dans
+  `docs/LOT-2-STEP2.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -60,6 +66,7 @@ faire.
 - `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
 - `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
+- `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/RETENTION.md` : politique de rétention après cutover et commande de nettoyage.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
@@ -70,6 +77,10 @@ faire.
 ```sh
 cargo run -p workflow-cli -- config check
 cargo run -p workflow-cli -- config show
+cargo run -p workflow-cli -- step2 detect \
+  --input-dir path/to/docs \
+  --force
+
 cargo run -p workflow-cli -- step5 audio \
   --input path/to/audio.json \
   --output path/to/audio_reduced.json
@@ -126,9 +137,10 @@ coral_env/bin/python tools/parity/parity.py report
 ```
 
 Les étapes réelles STEP2 à STEP6 des projets `244` et `245` sont identiques à la
-production, ainsi que STEP5 et STEP6 de `249` et `250`. STEP2 mesure 12,2 s et
-2,2 GiB de VRAM ; STEP4 mesure 40,5 s sur 4 920 frames. STEP5 et STEP6 prennent
-moins d'une seconde.
+production, ainsi que STEP5 et STEP6 de `249` et `250`. Le port Rust STEP2
+reproduit les quatre CSV du corpus ; le processus complet prend 2,3–10,9 s
+selon le cas, pour une VRAM pic de 2,1–2,2 GiB. STEP4 mesure 40,5 s sur 4 920
+frames. STEP5 et STEP6 prennent moins d'une seconde.
 
 ## Prérequis
 
@@ -136,6 +148,8 @@ moins d'une seconde.
 - `python3 scripts/import-models.py` pour copier les modèles de production.
 - `libtensorflowlite_c.so`, produit par `scripts/build-tflite-c.sh`.
 - `libedgetpu.so.1` (paquet Coral) et un `/dev/apex_0` accessible.
+- ONNX Runtime 1.23 (CUDA) et `ffmpeg`/`ffprobe` dans le `PATH` pour STEP2.
+  Le chemin de la bibliothèque ONNX Runtime se règle dans `config/config.toml`.
 
 ## Spike
 

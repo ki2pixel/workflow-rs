@@ -1271,6 +1271,7 @@ dependencies = [
  "walkdir",
  "workflow-core",
  "workflow-schema",
+ "workflow-tpu",
 ]
 
 [[package]]

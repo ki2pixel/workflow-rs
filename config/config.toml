@@ -40,8 +40,36 @@ expression_summary = false
 expression_keys = ["jawOpen"]
 
 [steps.step4]
-object_detector = "efficientdet_lite2"
-object_detector_path = "step4/efficientdet_lite2_int8_mediapipe.tflite"
+enabled = true
+device = "tpu"
+cocompiled = true
+tflite = "/home/kidpixel/workflow-rs/vendor/libtensorflowlite_c.so"
+# Paquet Coral installé sur le système. Pour un paquet extrait localement,
+# utiliser --edgetpu (et --tflite si nécessaire) au lancement.
+edgetpu = "/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"
+blazeface = "step4/blazeface_front_quantized_edgetpu.tflite"
+facemesh = "step4/facemesh_quantized_edgetpu.tflite"
+blendshapes = "step4/face_blendshapes.tflite"
+object_detector = "detect_edgetpu"
+object_detector_path = "step4/detect_edgetpu.tflite"
+blazeface_cpu = "step4/blazeface_front_quantized.tflite"
+facemesh_cpu = "step4/facemesh_quantized.tflite"
+object_detector_cpu = "step4/detect.tflite"
+object_detection = true
+object_min_missing = 25
+face_reset_frames = 1
+object_score_threshold = 0.3
+object_max = 5
+fast = true
+cpu_threads = 1
+blendshapes_profile = "full"
+blendshapes_export = ["jawOpen"]
+blendshapes_include_tongue = false
+jaw_open_threshold = 0.08
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"
+decode_width = 0
+decode_height = 0
 
 [steps.step6]
 spread_threshold = 200

@@ -6,6 +6,8 @@ use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step2::{run_step2, Step2Options};
+#[cfg(unix)]
+use workflow_steps::step4::{run_step4, Step4Options};
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
 use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
@@ -31,6 +33,9 @@ enum Command {
     Config(ConfigArgs),
     /// Détection de scènes STEP2 (TransNetV2 ONNX Runtime).
     Step2(Step2Args),
+    /// Tracking facial et objets STEP4 (BlazeFace, FaceMesh, Coral).
+    #[cfg(unix)]
+    Step4(Step4Args),
     /// Sous-commandes de STEP5 (réduction JSON).
     Step5(Step5Args),
     /// Sous-commandes de STEP6 (pré-traitement AE).
@@ -102,6 +107,54 @@ enum Step2Command {
         ffmpeg: Option<PathBuf>,
         #[arg(long)]
         ffmpeg_threads: Option<u32>,
+    },
+}
+
+#[cfg(unix)]
+#[derive(Debug, Args)]
+struct Step4Args {
+    #[command(subcommand)]
+    command: Step4Command,
+}
+
+#[cfg(unix)]
+#[derive(Debug, Subcommand)]
+enum Step4Command {
+    /// Analyse les vidéos d'un dossier et écrit un JSON à côté de chacune.
+    Track {
+        /// Dossier contenant les vidéos.
+        #[arg(long)]
+        input_dir: PathBuf,
+        /// `tpu` (nominal) ou `cpu` (tests/dépannage).
+        #[arg(long)]
+        device: Option<String>,
+        /// Désactive EfficientDet et ne conserve que les visages.
+        #[arg(long)]
+        no_object_detection: bool,
+        /// Nombre de frames sans visage avant d'activer les objets.
+        #[arg(long)]
+        object_min_missing: Option<u32>,
+        /// Nombre de frames consécutives avec visage avant réinitialisation.
+        #[arg(long)]
+        face_reset_frames: Option<u32>,
+        /// Force une largeur de décodage (0 = résolution source).
+        #[arg(long)]
+        decode_width: Option<u32>,
+        /// Force une hauteur de décodage (0 = résolution source).
+        #[arg(long)]
+        decode_height: Option<u32>,
+        /// Remplace le répertoire des journaux STEP4.
+        #[arg(long)]
+        logs_dir: Option<PathBuf>,
+        /// Surcharge la bibliothèque TFLite C.
+        #[arg(long)]
+        tflite: Option<PathBuf>,
+        /// Surcharge la bibliothèque Edge TPU.
+        #[arg(long)]
+        edgetpu: Option<PathBuf>,
+        /// Autorise un JSON partiel si le CSV ou l'audio manquent (tests).
+        #[arg(long)]
+        allow_partial_speaking: bool,
     },
 }
 
@@ -502,6 +555,59 @@ fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
                     anyhow::bail!("STEP2: {} vidéo(s) en échec", report.failures.len());
+                }
+            }
+        },
+        #[cfg(unix)]
+        Command::Step4(args) => match args.command {
+            Step4Command::Track {
+                input_dir,
+                device,
+                no_object_detection,
+                object_min_missing,
+                face_reset_frames,
+                decode_width,
+                decode_height,
+                logs_dir,
+                tflite,
+                edgetpu,
+                allow_partial_speaking,
+            } => {
+                let mut options = Step4Options::from_config(&config, input_dir)?;
+                options.allow_partial_speaking = allow_partial_speaking;
+                if let Some(path) = tflite {
+                    options.models.tflite = path;
+                }
+                if let Some(path) = edgetpu {
+                    options.models.edgetpu = path;
+                }
+                if let Some(device) = device {
+                    let device = workflow_steps::step4::engine::ExecutionDevice::parse(&device)?;
+                    options.set_device(&config, device);
+                }
+                if no_object_detection {
+                    options.object_detection = false;
+                    options.models.object_detector = None;
+                }
+                if let Some(value) = object_min_missing {
+                    options.object_min_missing = value;
+                }
+                if let Some(value) = face_reset_frames {
+                    options.face_reset_frames = value;
+                }
+                if let Some(value) = decode_width {
+                    options.decode_width = value;
+                }
+                if let Some(value) = decode_height {
+                    options.decode_height = value;
+                }
+                if let Some(dir) = logs_dir {
+                    options.logs_dir = Some(dir);
+                }
+                let report = run_step4(&options)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!("STEP4: {} vidéo(s) en échec", report.failures.len());
                 }
             }
         },

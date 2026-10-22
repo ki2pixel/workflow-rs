@@ -19,6 +19,7 @@ python3 scripts/import-models.py
 | STEP4 | `step4/face_blendshapes.tflite` |
 | STEP4 | `step4/cocompiled/*.tflite` |
 | STEP4 | `step4/efficientdet_lite2_int8_mediapipe.tflite`, `step4/detect_edgetpu.tflite` |
+| STEP4 CPU (tests) | `step4/blazeface_front_quantized.tflite`, `step4/facemesh_quantized.tflite`, `step4/detect.tflite` |
 
 Les originaux restent la référence de production. Toute modification de modèle
 doit être répercutée dans `manifest.toml` et dans le contrat.

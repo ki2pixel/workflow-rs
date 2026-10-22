@@ -99,3 +99,27 @@ source = "workflow_scripts/step4/models/object_detectors/tflite/efficientdet_lit
 size = 7515971
 sha256 = "b3f50554cb0ea559e90328845f7d9ba4d13c8bff372914d24e06bc8bb72fa896"
 purpose = "EfficientDet-Lite2 INT8"
+
+[[model]]
+role = "step4.blazeface_cpu"
+path = "step4/blazeface_front_quantized.tflite"
+source = "assets/blazeface_front_quantized.tflite"
+size = 201648
+sha256 = "afdb06a8463268d60bfc0b8d3ecfb3d59bbd09ded2cfbd1438253b8f5b2a25e0"
+purpose = "BlazeFace CPU/XNNPACK (tests)"
+
+[[model]]
+role = "step4.facemesh_cpu"
+path = "step4/facemesh_quantized.tflite"
+source = "assets/facemesh_quantized.tflite"
+size = 795952
+sha256 = "3de55e3642698a29a2ca27590be1a13d9371a9dd1afdd90bba5afb28b1638789"
+purpose = "FaceMesh CPU/XNNPACK (tests)"
+
+[[model]]
+role = "step4.object_detector_cpu"
+path = "step4/detect.tflite"
+source = "assets/detect.tflite"
+size = 4183312
+sha256 = "e4b118e5e4531945de2e659742c7c590f7536f8d0ed26d135abcfe83b4779d13"
+purpose = "SSD MobileNet CPU (tests)"

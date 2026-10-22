@@ -308,6 +308,16 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > `steps.step2.onnxruntime`. Ce chemin n'est pas encore branché à
 > l'orchestrateur ; l'application Python reste le workflow legacy actif et le
 > contrat observable de référence.
+>
+> Lot 3 : le port Rust de STEP4 est lancé par
+> `workflow-cli step4 track --input-dir <docs>`. Il écrit le même
+> `<stem>.json` (même schéma, IDs, bbox, blendshapes et champs de parole) via
+> un fichier temporaire puis un renommage. Le chemin nominal exige le Coral
+> (`device = "tpu"`) ; `--device cpu` est un mode de test explicite, pas un
+> fallback. `<stem>.csv` et `<stem>_audio.json` sont requis par défaut ;
+> `--allow-partial-speaking` est réservé aux fixtures sans ces entrées. Le
+> module est compilé sous Unix uniquement, la cible de production restant
+> Linux. Il n'est pas encore branché à l'orchestrateur.
 
 STEP4 reçoit en plus `--videos_json_path <temp.json>` : la liste des vidéos sans `<stem>.json` voisin, produite par l'orchestrateur avant lancement. Si la liste est vide, l'étape se termine immédiatement en succès sans lancer de processus.
 

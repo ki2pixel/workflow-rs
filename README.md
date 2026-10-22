@@ -11,8 +11,11 @@ audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
 `effectcraft-cli`) sont opérationnels. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
 Runtime CUDA, avec un CSV identique à la production sur les quatre cas du
-corpus. La compilation Windows du pont, le basculement du JSX et la validation
-STEP8 sur la machine Windows restent à faire.
+corpus. Le lot 3 porte STEP4 sur Coral Edge TPU : BlazeFace, FaceMesh,
+blendshapes, EfficientDet, suivi et détection de parole, avec un JSON identique
+à la production sur `face_pan`, `real_244` et `real_245`. La compilation Windows
+du pont, le basculement du JSX et la validation STEP8 sur la machine Windows
+restent à faire.
 
 ## État
 
@@ -51,6 +54,12 @@ STEP8 sur la machine Windows restent à faire.
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
   sur les quatre cas ; VRAM pic sous la baseline. Détail dans
   `docs/LOT-2-STEP2.md`.
+- Lot 3 terminé : STEP4 Coral Edge TPU avec modèles co-compilés BlazeFace et
+  FaceMesh, crop affine 192×192, 52 blendshapes filtrées One-Euro, EfficientDet
+  avec hystérésis, suivi `obj_N`, détection de parole et JSON en streaming
+  atomique. Parité complète à `1e-6` sur `face_pan`, `real_244` et `real_245` ;
+  blendshapes à `5,96e-7`, objets IoU 1,0, RSS 199,5 Mio sur `real_244`.
+  Détail dans `docs/LOT-3-STEP4.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -69,6 +78,7 @@ STEP8 sur la machine Windows restent à faire.
 - `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
 - `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
+- `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -83,6 +93,11 @@ cargo run -p workflow-cli -- config show
 cargo run -p workflow-cli -- step2 detect \
   --input-dir path/to/docs \
   --force
+
+cargo run --release -p workflow-cli -- step4 track \
+  --config config/config.toml \
+  --input-dir path/to/docs \
+  --device tpu
 
 cargo run -p workflow-cli -- step5 audio \
   --input path/to/audio.json \
@@ -142,8 +157,10 @@ coral_env/bin/python tools/parity/parity.py report
 Les étapes réelles STEP2 à STEP6 des projets `244` et `245` sont identiques à la
 production, ainsi que STEP5 et STEP6 de `249` et `250`. Le port Rust STEP2
 reproduit les quatre CSV du corpus ; le processus complet prend 2,3–10,9 s
-selon le cas, pour une VRAM pic de 2,1–2,2 GiB. STEP4 mesure 40,5 s sur 4 920
-frames. STEP5 et STEP6 prennent moins d'une seconde.
+selon le cas, pour une VRAM pic de 2,1–2,2 GiB. Le port Rust STEP4 reproduit le
+JSON complet de `face_pan`, `real_244` et `real_245` à `1e-6` près, avec les
+mêmes IDs, bbox et champs de parole ; il mesure 44,2 s sur `real_244` et
+41,0 s sur `real_245`. STEP5 et STEP6 prennent moins d'une seconde.
 
 ## Prérequis
 
@@ -151,6 +168,9 @@ frames. STEP5 et STEP6 prennent moins d'une seconde.
 - `python3 scripts/import-models.py` pour copier les modèles de production.
 - `libtensorflowlite_c.so`, produit par `scripts/build-tflite-c.sh`.
 - `libedgetpu.so.1` (paquet Coral) et un `/dev/apex_0` accessible.
+- Les modèles STEP4 co-compilés et `detect_edgetpu.tflite` pour le chemin TPU ;
+  les trois modèles CPU du même manifeste ne servent qu'aux tests
+  `--device cpu`.
 - ONNX Runtime 1.23 (CUDA) et `ffmpeg`/`ffprobe` dans le `PATH` pour STEP2.
   Le chemin de la bibliothèque ONNX Runtime se règle dans `config/config.toml`.
 

@@ -190,7 +190,7 @@ unsafe fn read_spec(api: &TfliteApi, tensor: *const TfLiteTensor) -> TensorSpec 
 
 unsafe fn release(
     tflite: &TfliteApi,
-    edgetpu: &EdgetpuApi,
+    edgetpu: Option<&EdgetpuApi>,
     model: *mut TfLiteModel,
     options: *mut TfLiteInterpreterOptions,
     interpreter: *mut TfLiteInterpreter,
@@ -206,7 +206,9 @@ unsafe fn release(
         unsafe { (tflite.model_delete)(model) };
     }
     if !delegate.is_null() {
-        unsafe { (edgetpu.free_delegate)(delegate) };
+        if let Some(edgetpu) = edgetpu {
+            unsafe { (edgetpu.free_delegate)(delegate) };
+        }
     }
 }
 
@@ -232,7 +234,7 @@ pub fn verify_edgetpu_model(path: &Path) -> Result<(), TpuError> {
 /// après libération.
 pub struct Session {
     tflite: TfliteApi,
-    edgetpu: EdgetpuApi,
+    edgetpu: Option<EdgetpuApi>,
     model: *mut TfLiteModel,
     options: *mut TfLiteInterpreterOptions,
     interpreter: *mut TfLiteInterpreter,
@@ -245,6 +247,7 @@ pub struct Session {
 }
 
 impl Session {
+    /// Ouvre un modèle compilé pour l'Edge TPU avec un delegate Coral neuf.
     pub fn open(
         model_path: &Path,
         tflite_path: &Path,
@@ -260,18 +263,48 @@ impl Session {
             return Err(TpuError::DelegateUnavailable);
         }
 
-        let tflite = match TfliteApi::load(tflite_path) {
-            Ok(api) => api,
+        match Self::open_common(
+            model_path,
+            tflite_path,
+            Some(&edgetpu),
+            delegate,
+            num_threads,
+        ) {
+            Ok(mut session) => {
+                session.edgetpu = Some(edgetpu);
+                Ok(session)
+            }
             Err(error) => {
                 unsafe { (edgetpu.free_delegate)(delegate) };
-                return Err(error);
+                Err(error)
             }
-        };
+        }
+    }
+
+    /// Ouvre un modèle TFLite sur le backend CPU (XNNPACK/TFLite), sans Coral.
+    ///
+    /// Ce chemin est réservé aux tests et au dépannage ; le delegate TPU reste
+    /// le backend nominal de production.
+    pub fn open_cpu(
+        model_path: &Path,
+        tflite_path: &Path,
+        num_threads: i32,
+    ) -> Result<Self, TpuError> {
+        Self::open_common(model_path, tflite_path, None, ptr::null_mut(), num_threads)
+    }
+
+    fn open_common(
+        model_path: &Path,
+        tflite_path: &Path,
+        edgetpu: Option<&EdgetpuApi>,
+        delegate: *mut TfLiteDelegate,
+        num_threads: i32,
+    ) -> Result<Self, TpuError> {
+        let tflite = TfliteApi::load(tflite_path)?;
 
         let cpath = CString::new(model_path.as_os_str().as_bytes())?;
         let model = unsafe { (tflite.model_create_from_file)(cpath.as_ptr()) };
         if model.is_null() {
-            unsafe { (edgetpu.free_delegate)(delegate) };
             return Err(TpuError::TfLite {
                 context: "TfLiteModelCreateFromFile",
                 status: -1,
@@ -282,7 +315,6 @@ impl Session {
         if options.is_null() {
             unsafe {
                 (tflite.model_delete)(model);
-                (edgetpu.free_delegate)(delegate);
             }
             return Err(TpuError::TfLite {
                 context: "TfLiteInterpreterOptionsCreate",
@@ -292,12 +324,23 @@ impl Session {
 
         unsafe {
             (tflite.options_set_num_threads)(options, num_threads);
-            (tflite.options_add_delegate)(options, delegate);
+            if !delegate.is_null() {
+                (tflite.options_add_delegate)(options, delegate);
+            }
         }
 
         let interpreter = unsafe { (tflite.interpreter_create)(model, options) };
         if interpreter.is_null() {
-            unsafe { release(&tflite, &edgetpu, model, options, ptr::null_mut(), delegate) };
+            unsafe {
+                release(
+                    &tflite,
+                    edgetpu,
+                    model,
+                    options,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                )
+            };
             return Err(TpuError::TfLite {
                 context: "TfLiteInterpreterCreate",
                 status: -1,
@@ -306,7 +349,16 @@ impl Session {
 
         let status = unsafe { (tflite.allocate_tensors)(interpreter) };
         if status != TFLITE_OK {
-            unsafe { release(&tflite, &edgetpu, model, options, interpreter, delegate) };
+            unsafe {
+                release(
+                    &tflite,
+                    edgetpu,
+                    model,
+                    options,
+                    interpreter,
+                    ptr::null_mut(),
+                )
+            };
             return Err(TpuError::TfLite {
                 context: "TfLiteInterpreterAllocateTensors",
                 status,
@@ -316,7 +368,16 @@ impl Session {
         let input_count = unsafe { (tflite.input_count)(interpreter) };
         let output_count = unsafe { (tflite.output_count)(interpreter) };
         if input_count <= 0 || output_count <= 0 {
-            unsafe { release(&tflite, &edgetpu, model, options, interpreter, delegate) };
+            unsafe {
+                release(
+                    &tflite,
+                    edgetpu,
+                    model,
+                    options,
+                    interpreter,
+                    ptr::null_mut(),
+                )
+            };
             return Err(TpuError::TfLite {
                 context: "comptage des tenseurs",
                 status: -1,
@@ -328,7 +389,16 @@ impl Session {
         for index in 0..input_count {
             let tensor = unsafe { (tflite.input_tensor)(interpreter, index) };
             if tensor.is_null() {
-                unsafe { release(&tflite, &edgetpu, model, options, interpreter, delegate) };
+                unsafe {
+                    release(
+                        &tflite,
+                        edgetpu,
+                        model,
+                        options,
+                        interpreter,
+                        ptr::null_mut(),
+                    )
+                };
                 return Err(TpuError::NullTensor {
                     context: "TfLiteInterpreterGetInputTensor",
                     index,
@@ -343,7 +413,16 @@ impl Session {
         for index in 0..output_count {
             let tensor = unsafe { (tflite.output_tensor)(interpreter, index) };
             if tensor.is_null() {
-                unsafe { release(&tflite, &edgetpu, model, options, interpreter, delegate) };
+                unsafe {
+                    release(
+                        &tflite,
+                        edgetpu,
+                        model,
+                        options,
+                        interpreter,
+                        ptr::null_mut(),
+                    )
+                };
                 return Err(TpuError::NullTensor {
                     context: "TfLiteInterpreterGetOutputTensor",
                     index,
@@ -357,7 +436,7 @@ impl Session {
 
         Ok(Self {
             tflite,
-            edgetpu,
+            edgetpu: None,
             model,
             options,
             interpreter,
@@ -379,7 +458,8 @@ impl Session {
     }
 
     pub fn edgetpu_version(&self) -> Option<String> {
-        let ptr = unsafe { (self.edgetpu.version)() };
+        let edgetpu = self.edgetpu.as_ref()?;
+        let ptr = unsafe { (edgetpu.version)() };
         if ptr.is_null() {
             None
         } else {
@@ -389,8 +469,11 @@ impl Session {
     }
 
     pub fn device_paths(&self) -> Vec<String> {
+        let Some(edgetpu) = self.edgetpu.as_ref() else {
+            return Vec::new();
+        };
         let mut count = 0usize;
-        let devices = unsafe { (self.edgetpu.list_devices)(&mut count) };
+        let devices = unsafe { (edgetpu.list_devices)(&mut count) };
         if devices.is_null() {
             return Vec::new();
         }
@@ -404,7 +487,7 @@ impl Session {
             }
         }
 
-        unsafe { (self.edgetpu.free_devices)(devices) };
+        unsafe { (edgetpu.free_devices)(devices) };
         paths
     }
 
@@ -489,7 +572,7 @@ impl Drop for Session {
         unsafe {
             release(
                 &self.tflite,
-                &self.edgetpu,
+                self.edgetpu.as_ref(),
                 self.model,
                 self.options,
                 self.interpreter,

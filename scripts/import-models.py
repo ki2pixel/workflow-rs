@@ -44,6 +44,12 @@ MODELS = [
     ("step4.object_detector_efficientdet_lite2",
      "workflow_scripts/step4/models/object_detectors/tflite/efficientdet_lite2_int8_mediapipe.tflite",
      "step4/efficientdet_lite2_int8_mediapipe.tflite", "EfficientDet-Lite2 INT8"),
+    ("step4.blazeface_cpu", "assets/blazeface_front_quantized.tflite",
+     "step4/blazeface_front_quantized.tflite", "BlazeFace CPU/XNNPACK (tests)"),
+    ("step4.facemesh_cpu", "assets/facemesh_quantized.tflite",
+     "step4/facemesh_quantized.tflite", "FaceMesh CPU/XNNPACK (tests)"),
+    ("step4.object_detector_cpu", "assets/detect.tflite",
+     "step4/detect.tflite", "SSD MobileNet CPU (tests)"),
 ]
 
 

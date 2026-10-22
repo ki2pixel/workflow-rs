@@ -102,6 +102,58 @@ impl Config {
                 "hardware.gpu_mem_limit_mb doit être strictement positif".into(),
             ));
         }
+        if !matches!(
+            self.steps.step4.device.to_ascii_lowercase().as_str(),
+            "tpu" | "coral" | "cpu" | "xnnpack"
+        ) {
+            return Err(ConfigError::Invalid(
+                "steps.step4.device doit être tpu ou cpu".into(),
+            ));
+        }
+        if self.steps.step4.object_min_missing == 0 || self.steps.step4.face_reset_frames == 0 {
+            return Err(ConfigError::Invalid(
+                "steps.step4.object_min_missing et face_reset_frames doivent être > 0".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.steps.step4.object_score_threshold) {
+            return Err(ConfigError::Invalid(
+                "steps.step4.object_score_threshold doit être dans [0, 1]".into(),
+            ));
+        }
+        if self.steps.step4.object_max == 0 {
+            return Err(ConfigError::Invalid(
+                "steps.step4.object_max doit être strictement positif".into(),
+            ));
+        }
+        let profile = self.steps.step4.blendshapes_profile.to_ascii_lowercase();
+        if !matches!(
+            profile.as_str(),
+            "full"
+                | "all"
+                | ""
+                | "none"
+                | "off"
+                | "0"
+                | "false"
+                | "no"
+                | "mouth"
+                | "mediapipe"
+                | "custom"
+        ) {
+            return Err(ConfigError::Invalid(
+                "steps.step4.blendshapes_profile invalide".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.steps.step4.jaw_open_threshold) {
+            return Err(ConfigError::Invalid(
+                "steps.step4.jaw_open_threshold doit être dans [0, 1]".into(),
+            ));
+        }
+        if (self.steps.step4.decode_width == 0) != (self.steps.step4.decode_height == 0) {
+            return Err(ConfigError::Invalid(
+                "steps.step4.decode_width et decode_height doivent être tous deux 0 ou > 0".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -404,38 +456,78 @@ impl Default for Step3Config {
 #[serde(default, deny_unknown_fields)]
 pub struct Step4Config {
     pub enabled: bool,
-    pub object_detection: bool,
+    /// `tpu` (nominal) ou `cpu` (tests/dépannage, même chemin de code).
+    pub device: String,
+    /// Utilise la paire BlazeFace/FaceMesh co-compilée pour partager la SRAM.
+    pub cocompiled: bool,
+    pub tflite: PathBuf,
+    pub edgetpu: PathBuf,
+    pub blazeface: PathBuf,
+    pub facemesh: PathBuf,
+    pub blendshapes: PathBuf,
     pub object_detector: String,
     pub object_detector_path: PathBuf,
+    pub blazeface_cpu: PathBuf,
+    pub facemesh_cpu: PathBuf,
+    pub object_detector_cpu: PathBuf,
+    pub object_detection: bool,
     pub object_min_missing: u32,
     pub face_reset_frames: u32,
+    pub object_score_threshold: f64,
+    pub object_max: u32,
     pub fast: bool,
     pub cpu_threads: u32,
     pub blendshapes_profile: String,
     pub blendshapes_export: Vec<String>,
+    pub blendshapes_include_tongue: bool,
+    /// Conservé pour compatibilité avec les anciens TOML ; le chemin TPU
+    /// calcule les blendshapes à chaque frame, comme le script Python.
     pub blendshapes_throttle: u32,
     pub voluminous_exports: bool,
-    pub jaw_open_threshold: f64,
     pub test_cpu_workers: u32,
+    pub jaw_open_threshold: f64,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
+    /// Largeur de décodage ; 0 conserve la résolution source.
+    pub decode_width: u32,
+    /// Hauteur de décodage ; 0 conserve la résolution source.
+    pub decode_height: u32,
 }
 
 impl Default for Step4Config {
     fn default() -> Self {
         Self {
             enabled: true,
+            device: "tpu".into(),
+            cocompiled: true,
+            tflite: PathBuf::from("vendor/libtensorflowlite_c.so"),
+            edgetpu: PathBuf::from("/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"),
+            blazeface: PathBuf::from("step4/blazeface_front_quantized_edgetpu.tflite"),
+            facemesh: PathBuf::from("step4/facemesh_quantized_edgetpu.tflite"),
+            blendshapes: PathBuf::from("step4/face_blendshapes.tflite"),
+            object_detector: "detect_edgetpu".into(),
+            object_detector_path: PathBuf::from("step4/detect_edgetpu.tflite"),
+            blazeface_cpu: PathBuf::from("step4/blazeface_front_quantized.tflite"),
+            facemesh_cpu: PathBuf::from("step4/facemesh_quantized.tflite"),
+            object_detector_cpu: PathBuf::from("step4/detect.tflite"),
             object_detection: true,
-            object_detector: "efficientdet_lite2".into(),
-            object_detector_path: PathBuf::new(),
-            object_min_missing: 5,
-            face_reset_frames: 30,
-            fast: false,
-            cpu_threads: 4,
+            object_min_missing: 25,
+            face_reset_frames: 1,
+            object_score_threshold: 0.3,
+            object_max: 5,
+            fast: true,
+            cpu_threads: 1,
             blendshapes_profile: "full".into(),
             blendshapes_export: vec!["jawOpen".into()],
+            blendshapes_include_tongue: false,
             blendshapes_throttle: 2,
             voluminous_exports: false,
-            jaw_open_threshold: 0.08,
             test_cpu_workers: 1,
+            jaw_open_threshold: 0.08,
+            ffmpeg: PathBuf::from("ffmpeg"),
+            ffprobe: PathBuf::from("ffprobe"),
+            decode_width: 0,
+            decode_height: 0,
         }
     }
 }

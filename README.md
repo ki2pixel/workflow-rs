@@ -26,6 +26,10 @@ audio/vidéo et STEP6 (`_ae.json`) sont opérationnels ; le mode
 - Lot 1.3 terminé : STEP6 `_ae.json` avec index tracking/audio, enrichissement
   `is_speaking`/`tier`, parse CSV et recommandations de segments. Identique à la
   production sur les quatre projets ; 0,108 s et 44 Mio sur 244.
+- Shadow STEP5/6 : 12/12 vérifications identiques sur les quatre projets de
+  production disponibles (244, 245, 249, 250), sans écriture dans `/mnt/cache`.
+  La cible de dix projets reste ouverte, faute de projets complets sur la
+  machine à cette date.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -39,6 +43,7 @@ audio/vidéo et STEP6 (`_ae.json`) sont opérationnels ; le mode
 - `assets/models/manifest.toml` : rôles, tailles et SHA-256 des modèles copiés.
 - `docs/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
 - `docs/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
+- `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.

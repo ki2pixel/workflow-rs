@@ -207,6 +207,11 @@ pub fn write_scenes_csv(path: &Path, scenes: &[Scene], fps: f64) -> Result<()> {
     }
     let temp = path.with_extension("csv.tmp");
     fs::write(&temp, text).with_context(|| format!("écriture de {}", temp.display()))?;
+    // `rename` remplace la cible sous Unix, mais pas sous Windows.
+    #[cfg(windows)]
+    if path.exists() {
+        fs::remove_file(path).with_context(|| format!("remplacement de {}", path.display()))?;
+    }
     fs::rename(&temp, path).with_context(|| format!("publication de {}", path.display()))?;
     Ok(())
 }

@@ -306,7 +306,8 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > `INTERNAL_PROGRESS: <n>/<total> frames (<p>%) - <nom>` et `Succès:`. Il prend
 > le verrou matériel et charge ONNX Runtime CUDA depuis
 > `steps.step2.onnxruntime`. Ce chemin n'est pas encore branché à
-> l'orchestrateur ; le contrat Python reste la référence jusqu'au cutover.
+> l'orchestrateur ; l'application Python reste le workflow legacy actif et le
+> contrat observable de référence.
 
 STEP4 reçoit en plus `--videos_json_path <temp.json>` : la liste des vidéos sans `<stem>.json` voisin, produite par l'orchestrateur avant lancement. Si la liste est vide, l'étape se termine immédiatement en succès sans lancer de processus.
 

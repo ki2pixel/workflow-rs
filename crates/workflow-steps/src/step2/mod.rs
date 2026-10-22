@@ -15,9 +15,12 @@ use crate::step2::windows::{
     FRAME_WIDTH,
 };
 use anyhow::{bail, Context, Result};
+use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeSet;
-use std::io::Write;
+use std::fmt;
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{mpsc, Arc, Mutex};
@@ -49,6 +52,8 @@ pub struct Step2Options {
     pub ffmpeg_threads: u32,
     pub cudnn_algo_search: bool,
     pub use_tf32: bool,
+    /// Répertoire du journal STEP2. `None` désactive le fichier (tests).
+    pub logs_dir: Option<PathBuf>,
     pub skip_preserved_mov: bool,
     pub preserved_mov_names: Vec<String>,
 }
@@ -88,6 +93,7 @@ impl Step2Options {
             ffmpeg_threads: step.ffmpeg_threads,
             cudnn_algo_search: step.cudnn_algo_search,
             use_tf32: step.use_tf32,
+            logs_dir: Some(config.paths.resolve().logs.join("step2")),
             skip_preserved_mov: config.steps.step1.skip_preserved_mov,
             preserved_mov_names,
         })
@@ -121,9 +127,58 @@ struct VideoResult {
     elapsed: std::time::Duration,
 }
 
+struct Step2Logger {
+    file: Option<Mutex<BufWriter<File>>>,
+}
+
+impl Step2Logger {
+    fn new(dir: Option<&Path>) -> Result<Self> {
+        let file = if let Some(dir) = dir {
+            fs::create_dir_all(dir)
+                .with_context(|| format!("création du journal STEP2: {}", dir.display()))?;
+            let name = format!(
+                "transnet_pytorch_{}.log",
+                Local::now().format("%Y%m%d_%H%M%S")
+            );
+            let file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join(&name))
+                .with_context(|| format!("ouverture du journal STEP2: {name}"))?;
+            Some(Mutex::new(BufWriter::new(file)))
+        } else {
+            None
+        };
+        Ok(Self { file })
+    }
+
+    fn line(&self, args: fmt::Arguments<'_>) {
+        println!("{args}");
+        let _ = std::io::stdout().flush();
+        if let Some(file) = &self.file {
+            if let Ok(mut writer) = file.lock() {
+                let stamp = Local::now().format("%Y-%m-%d %H:%M:%S");
+                let _ = writeln!(writer, "{stamp} - INFO - {args}");
+                let _ = writer.flush();
+            }
+        }
+    }
+}
+
 /// Exécute STEP2 sur `options.input_dir`.
 pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
     validate_options(options)?;
+    let logger = Arc::new(Step2Logger::new(options.logs_dir.as_deref())?);
+    logger.line(format_args!(
+        "CONFIG_EFFECTIVE: threshold={}, window={}, stride={}, padding={}, ffmpeg_threads={}, batch_size={}, use_tf32={}",
+        options.threshold,
+        options.window,
+        options.stride,
+        options.padding,
+        options.ffmpeg_threads,
+        options.batch_size,
+        options.use_tf32
+    ));
 
     let mut total_videos = 0;
     let mut skipped_existing = 0;
@@ -132,19 +187,19 @@ pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
     for video in discover_videos(options)? {
         let csv = video.with_extension("csv");
         if csv.exists() && !options.force {
-            println!("SKIP_EXISTING: {}", video.display());
+            logger.line(format_args!("SKIP_EXISTING: {}", video.display()));
             skipped_existing += 1;
             continue;
         }
         if is_preserved_media(&video, options) {
-            println!("SKIP_PRESERVED: {}", video.display());
+            logger.line(format_args!("SKIP_PRESERVED: {}", video.display()));
             skipped_preserved += 1;
             continue;
         }
         total_videos += 1;
         videos.push(video);
     }
-    println!("TOTAL_VIDEOS_TO_PROCESS: {total_videos}");
+    logger.line(format_args!("TOTAL_VIDEOS_TO_PROCESS: {total_videos}"));
     let mut report = Step2Report {
         total_videos,
         processed: 0,
@@ -153,10 +208,10 @@ pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
         failures: Vec::new(),
     };
     if videos.is_empty() {
-        println!(
+        logger.line(format_args!(
             "Analyse terminée: 0 réussie(s), 0 échec(s), {} ignorée(s).",
             skipped_existing + skipped_preserved
-        );
+        ));
         return Ok(report);
     }
 
@@ -185,7 +240,13 @@ pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
         cudnn_algo_search: options.cudnn_algo_search,
         use_tf32: options.use_tf32,
     };
-    let engine = Arc::new(Mutex::new(TransNetEngine::load(&engine_config)?));
+    let engine = match TransNetEngine::load(&engine_config) {
+        Ok(engine) => Arc::new(Mutex::new(engine)),
+        Err(error) => {
+            logger.line(format_args!("Échec: initialisation TransNetV2: {error:#}"));
+            return Err(error);
+        }
+    };
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -193,26 +254,33 @@ pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
 
     for (index, video) in videos.iter().enumerate() {
         let csv = video.with_extension("csv");
-        println!(
+        check_fps_conformance(video, options, &logger);
+        logger.line(format_args!(
             "PROCESSING_VIDEO: {}/{}: {}",
             index + 1,
             videos.len(),
             video.file_name().unwrap_or_default().to_string_lossy()
-        );
-        match runtime.block_on(process_video(video, &csv, Arc::clone(&engine), options)) {
+        ));
+        match runtime.block_on(process_video(
+            video,
+            &csv,
+            Arc::clone(&engine),
+            options,
+            Arc::clone(&logger),
+        )) {
             Ok(result) => {
-                println!(
+                logger.line(format_args!(
                     "Succès: {} créé avec {} scènes ({} trames, {:.2} s)",
                     csv.file_name().unwrap_or_default().to_string_lossy(),
                     result.scenes,
                     result.frames,
                     result.elapsed.as_secs_f64()
-                );
+                ));
                 report.processed += 1;
             }
             Err(error) => {
                 let message = format!("{error:#}");
-                println!("Échec: {}: {message}", video.display());
+                logger.line(format_args!("Échec: {}: {message}", video.display()));
                 report.failures.push(Step2Failure {
                     video: video.clone(),
                     error: message,
@@ -221,12 +289,12 @@ pub fn run_step2(options: &Step2Options) -> Result<Step2Report> {
         }
     }
 
-    println!(
+    logger.line(format_args!(
         "Analyse terminée: {} réussie(s), {} échec(s), {} ignorée(s).",
         report.processed,
         report.failures.len(),
         report.skipped_existing + report.skipped_preserved
-    );
+    ));
     Ok(report)
 }
 
@@ -286,6 +354,7 @@ async fn process_video(
     csv: &Path,
     engine: Arc<Mutex<TransNetEngine>>,
     options: &Step2Options,
+    logger: Arc<Step2Logger>,
 ) -> Result<VideoResult> {
     let started = std::time::Instant::now();
     let mut child = ffmpeg_command(video, options)
@@ -360,6 +429,7 @@ async fn process_video(
                         windows_emitted,
                         options.stride,
                         &video_name,
+                        &logger,
                     );
                 }
             }
@@ -427,8 +497,9 @@ async fn process_video(
         predictions.extend(result.map_err(|error| anyhow::anyhow!(error))?);
     }
     let total_frames = stream.raw_frames();
-    println!("INTERNAL_PROGRESS: {total_frames}/{total_frames} frames (100%) - {video_name}");
-    let _ = std::io::stdout().flush();
+    logger.line(format_args!(
+        "INTERNAL_PROGRESS: {total_frames}/{total_frames} frames (100%) - {video_name}"
+    ));
     let total_frames_usize =
         usize::try_from(total_frames).context("nombre de trames trop grand")?;
     if predictions.len() < total_frames_usize {
@@ -474,14 +545,111 @@ fn ffmpeg_command(video: &Path, options: &Step2Options) -> Command {
     command
 }
 
-fn log_progress(read_frames: u64, windows: u64, stride: usize, video_name: &str) {
+fn log_progress(
+    read_frames: u64,
+    windows: u64,
+    stride: usize,
+    video_name: &str,
+    logger: &Step2Logger,
+) {
     let processed = (windows * stride as u64).min(read_frames);
     let percent = processed
         .saturating_mul(100)
         .checked_div(read_frames)
         .unwrap_or(0);
-    println!("INTERNAL_PROGRESS: {processed}/{read_frames} frames ({percent}%) - {video_name}");
-    let _ = std::io::stdout().flush();
+    logger.line(format_args!(
+        "INTERNAL_PROGRESS: {processed}/{read_frames} frames ({percent}%) - {video_name}"
+    ));
+}
+
+const FPS_TOLERANCE: f64 = 0.1;
+
+fn check_fps_conformance(video: &Path, options: &Step2Options, logger: &Step2Logger) {
+    let name = video
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    match probe_frame_rate(video, &options.ffprobe) {
+        Ok(Some(fps)) if (fps - FPS_TARGET).abs() > FPS_TOLERANCE => {
+            logger.line(format_args!(
+                "WARNING: Fichier non normalisé détecté: {name} ({fps:.2} fps au lieu de {FPS_TARGET:.2}). Risque de désynchronisation frame/timecode en aval — lancer `extract_archives.py --normalize-only`."
+            ));
+        }
+        Ok(_) => {}
+        Err(error) => {
+            logger.line(format_args!(
+                "WARNING: Framerate indéterminable pour {name}: {error}"
+            ));
+        }
+    }
+}
+
+fn probe_frame_rate(video: &Path, ffprobe: &Path) -> Result<Option<f64>> {
+    let output = std::process::Command::new(ffprobe)
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=avg_frame_rate,r_frame_rate,nb_frames,duration",
+            "-of",
+            "json",
+        ])
+        .arg(video)
+        .output()
+        .with_context(|| format!("ffprobe pour {}", video.display()))?;
+    if !output.status.success() {
+        bail!(
+            "ffprobe a échoué: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let payload: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("lecture du JSON ffprobe")?;
+    let stream = payload
+        .get("streams")
+        .and_then(|value| value.as_array())
+        .and_then(|streams| streams.first())
+        .context("aucun flux vidéo ffprobe")?;
+    let nb_frames = stream
+        .get("nb_frames")
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| *value > 0.0);
+    let duration = stream
+        .get("duration")
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| *value > 0.0);
+    let from_counts = nb_frames
+        .zip(duration)
+        .map(|(frames, duration)| frames / duration);
+    let avg = stream
+        .get("avg_frame_rate")
+        .and_then(|value| value.as_str())
+        .and_then(parse_frame_rate);
+    let nominal = stream
+        .get("r_frame_rate")
+        .and_then(|value| value.as_str())
+        .and_then(parse_frame_rate);
+    for candidate in [from_counts, avg, nominal].into_iter().flatten() {
+        if candidate > 0.0 && candidate <= 240.0 {
+            return Ok(Some(candidate));
+        }
+    }
+    Ok(None)
+}
+
+fn parse_frame_rate(raw: &str) -> Option<f64> {
+    let (numerator, denominator) = raw.split_once('/')?;
+    let numerator: f64 = numerator.trim().parse().ok()?;
+    let denominator: f64 = denominator.trim().parse().ok()?;
+    if numerator <= 0.0 || denominator <= 0.0 {
+        return None;
+    }
+    Some(numerator / denominator)
 }
 
 /// Détection conservatrice des `.mov` préservés (alpha ou nom configuré).
@@ -597,9 +765,19 @@ mod tests {
             ffmpeg_threads: 0,
             cudnn_algo_search: true,
             use_tf32: false,
+            logs_dir: None,
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
         }
+    }
+
+    #[test]
+    fn frame_rate_parser_handles_rationals_and_invalid_values() {
+        assert_eq!(parse_frame_rate("25/1"), Some(25.0));
+        assert!((parse_frame_rate("30000/1001").unwrap() - 29.970_029).abs() < 1e-5);
+        assert_eq!(parse_frame_rate("0/0"), None);
+        assert_eq!(parse_frame_rate("25"), None);
+        assert_eq!(parse_frame_rate("x/1"), None);
     }
 
     #[test]

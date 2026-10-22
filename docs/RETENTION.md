@@ -1,7 +1,8 @@
-# Rétention après cutover
+# Rétention des données de travail
 
-Cette politique couvre les données de travail du pipeline Rust et la sortie de
-l'ancienne application Python. Elle ne supprime jamais un livrable finalisé.
+Cette politique couvre uniquement les données de travail du pipeline Rust. Elle
+ne supprime jamais un livrable finalisé et ne cible jamais l'application Python
+legacy, qui reste active et fonctionnelle.
 
 ## Règles par jeu de données
 
@@ -15,6 +16,7 @@ l'ancienne application Python. Elle ne supprime jamais un livrable finalisé.
 | Téléchargements | `runtime/downloads` | Manuel (désactivé par défaut) | `--downloads-days` explicite |
 | Sorties finalisées | `/mnt/cache` | Conservation indéfinie | Manuelle uniquement |
 | Base d'historique | `runtime/download_history.sqlite3` | Conservation indéfinie | Manuelle uniquement |
+| Application Python legacy | Racines Python | Hors-scope | Jamais par `retention` |
 
 Les seuils sont configurables dans `[retention]` de `config/config.toml`. Le
 seuil des orphelins reste `steps.step7.cleanup_threshold_hours`. Une valeur
@@ -101,35 +103,37 @@ supprimer ; un fichier modifié entre le plan et l'application est conservé.
    plan est conforme.
 3. Ne jamais planifier `apply` pendant une extraction, un tracking ou un batch
    STEP8.
-4. Après le cutover, désactiver le moniteur de nettoyage Python
-   (`cleanup_monitor`) pour éviter deux politiques concurrentes.
+4. Ne jamais lancer `retention apply` sur les racines de l'application Python
+   legacy. Son moniteur de nettoyage (`cleanup_monitor`) reste actif pour son
+   propre périmètre ; les deux politiques ne doivent pas partager les mêmes
+   répertoires de travail.
 
-## Ancienne application Python
+## Application Python legacy
 
-Laisser l'application Python installée et redémarrable pendant la fenêtre de
-retour arrière :
+La migration Rust ne décommissionne pas l'application Python. Elle reste
+installée, active et redémarrable comme workflow legacy, avec son code, ses
+venvs, sa base SQLite, ses archives et son moniteur de nettoyage.
 
-- **minimum 30 jours** et **au moins deux batches de production réussis** avec
-  Rust, la durée la plus longue des deux s'appliquant ;
-- pendant cette fenêtre, ne pas modifier la base SQLite, les archives ni les
-  venvs Python ;
-- à la fin de la fenêtre, arrêter le service Python et son moniteur de
-  nettoyage, puis conserver le code, les venvs et la base en lecture seule
-  pendant **90 jours** ;
-- après accord explicite, exporter la base SQLite, conserver l'export et les
-  archives Python pendant **90 jours**, puis retirer les venvs et l'ancienne
-  application ;
-- les sorties de `/mnt/cache` ne sont jamais concernées par cette
-  désinstallation.
-
-Le retour arrière ne doit pas lancer Python et Rust en parallèle sur les mêmes
-vidéos : le verrou matériel Coral/GPU reste obligatoire.
+- Aucun retrait de l'application Python n'est planifié, et aucune fenêtre de
+  30 ou 90 jours ne conditionne sa suppression.
+- La période de deux batches + 30 jours reste une fenêtre d'observation de la
+  stabilité Rust ; elle ne déclenche aucun retrait.
+- `retention` Rust ne cible que les racines Rust configurées. Les données
+  Python restent la propriété du workflow legacy et ne sont jamais supprimées
+  par cette commande.
+- Les deux workflows doivent rester isolés : bases, répertoires de travail et
+  ports distincts. Le verrou matériel Coral/GPU reste obligatoire pour éviter
+  deux traitements lourds simultanés.
+- Si un répertoire de travail devait être partagé, suspendre explicitement le
+  nettoyage de l'un des deux workflows ; ne jamais laisser deux politiques de
+  rétention actives sur la même racine.
 
 ## État au 2026-10-22
 
 - Archives Python : 239 répertoires, environ 1,8 Gio, du 2026-08-03 au
-  2026-10-22.
-- Journaux Python : environ 55 Mio.
+  2026-10-22. Elles restent gérées par le workflow legacy et ne sont pas
+  candidates à `retention`.
+- Journaux Python : environ 55 Mio, conservés par le workflow legacy.
 - Sorties finalisées : 7 projets, environ 3,2 Gio dans `/mnt/cache`.
 - Les seuils proposés tiennent dans l'espace disque actuel ; ils restent des
   valeurs de départ, à ajuster après quelques semaines d'exploitation Rust.

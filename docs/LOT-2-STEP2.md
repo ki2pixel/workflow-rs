@@ -92,7 +92,7 @@ modèle compris), comparées à `parity/BASELINE.md` :
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `short_2997_step2` | 2,32 s | 3,27 s | ~879 Mio | ~2 132 Mio | 2 224 Mio |
 | `cuts_step2` | 2,96 s | 3,83 s | ~883 Mio | ~2 131 Mio | 2 226 Mio |
-| `real_244_step2` | 10,92 s | 12,15 s | ~881 Mio | ~2 203 Mio | 2 224 Mio |
+| `real_244_step2` | 10,95 s | 12,15 s | ~884 Mio | ~2 203 Mio | 2 224 Mio |
 | `real_245_step2` | 10,66 s | 12,11 s | ~882 Mio | ~2 127 Mio | 2 224 Mio |
 
 La VRAM est mesurée avec `nvidia-smi` (total GPU moins le bureau, 524–527 Mio),
@@ -102,18 +102,21 @@ baseline sur les quatre cas et la VRAM pic reste sous la baseline.
 
 ## Limites connues
 
-- La validation CUDA est faite sous Linux uniquement. Le chemin Windows
-  (`PATH`, provider CUDA) n'est pas encore exercé.
+- La validation CUDA est faite sous Linux uniquement. La compilation croisée
+  Windows passe (`x86_64-pc-windows-msvc`), mais le protocole de
+  `docs/STEP2-WINDOWS.md` n'a pas encore été exécuté sur une machine Windows
+  avec GPU NVIDIA.
 - Le préchargement CUDA est spécifique au loader Linux. Sur une installation
   système classique, renseigner `cuda_lib_dirs` ou laisser le système résoudre
   les bibliothèques.
 - Le fallback MediaInfo de détection alpha n'est pas porté ; si `ffprobe` ne
   donne pas de `pix_fmt`, le `.mov` est préservé par précaution (comme Python
   en cas d'indétermination).
-- Le contrôle non bloquant de framerate (`check_fps_conformance`) n'émet pas
-  encore le warning Python. Il ne change pas le CSV : FFmpeg force 25 fps.
-- Le port Rust écrit la progression sur stdout/stderr, mais ne crée pas encore
-  le fichier `logs/step2/transnet_*.log` ni la ligne `CONFIG_EFFECTIVE` du
-  script Python. Le branchement à l'orchestrateur les ajoutera.
+- Le warning de framerate est reproduit via `ffprobe` ; il ne change pas le
+  CSV, FFmpeg forçant 25 fps. La ligne `CONFIG_EFFECTIVE` est également écrite.
+- Le journal `runtime/logs/step2/transnet_pytorch_*.log` est écrit avec un
+  horodatage, comme le fichier Python. Les lignes sont aussi envoyées sur
+  stdout pour la progression temps réel.
 - STEP2 n'est pas encore branché à l'orchestrateur Flask ; la double exécution
-  shadow et le cutover restent au lot 5.
+  shadow et le branchement à l'orchestrateur restent au lot 5 ; l'application
+  Python legacy reste active en parallèle.

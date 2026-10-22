@@ -331,7 +331,9 @@ Le cache est valable `WEBHOOK_CACHE_TTL` secondes. Trois tentatives avec backoff
 
 Téléchargement : R2 en priorité, Dropbox en repli. Le nom de fichier vient de `Content-Disposition`, puis de l'URL, puis de `original_filename`. Les conflits sont résolus par suffixe. Un fichier `.part` permet la reprise. La taille minimale d'un ZIP est `DOWNLOAD_MIN_ZIP_SIZE_BYTES`, et `DOWNLOAD_VALIDATE_ZIP` active la vérification. Les échecs alimentent `download_failures` et déclenchent le cooldown décrit plus haut.
 
-EffectCraft : STEP8 appelle `effectcraft-cli script` (ou le bridge TCP 9877), avec `scripts/MediaSolution-EC/MediaSolution.jsx`, pour produire les `.ecproj`.
+EffectCraft : STEP8 appelle `effectcraft-cli` en headless, dans une session
+`run prefs.set … file.runScript` (aucun bridge TCP, aucune application lancée),
+avec `scripts/MediaSolution-EC/MediaSolution.jsx`, pour produire les `.ecproj`.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` doivent être conservés jusqu'au remplacement par `workflow-bridge.exe`.
 

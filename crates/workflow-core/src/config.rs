@@ -444,12 +444,18 @@ impl Default for Step6Config {
 #[serde(default, deny_unknown_fields)]
 pub struct Step7Config {
     pub cleanup_threshold_hours: f64,
+    pub mode: String,
+    pub restore_archives: bool,
+    pub delete_source: bool,
 }
 
 impl Default for Step7Config {
     fn default() -> Self {
         Self {
             cleanup_threshold_hours: 48.0,
+            mode: "lenient".into(),
+            restore_archives: false,
+            delete_source: true,
         }
     }
 }
@@ -461,25 +467,19 @@ pub struct Step8Config {
     pub cli: PathBuf,
     pub panel_jsx: PathBuf,
     pub panel_config: PathBuf,
-    pub mode: String,
-    pub bridge_port: u16,
-    pub auto_launch: bool,
-    pub app: PathBuf,
-    pub app_launch_timeout_s: u64,
+    pub docs_subfolder: String,
+    pub max_drivers_kept: usize,
 }
 
 impl Default for Step8Config {
     fn default() -> Self {
         Self {
-            timeout_s: 1_800,
+            timeout_s: 14_400,
             cli: PathBuf::from("effectcraft-cli"),
-            panel_jsx: PathBuf::from("scripts/MediaSolution-EC/MediaSolution.jsx"),
+            panel_jsx: PathBuf::from("assets/effectcraft/MediaSolution.jsx"),
             panel_config: PathBuf::new(),
-            mode: "headless".into(),
-            bridge_port: 9877,
-            auto_launch: false,
-            app: PathBuf::new(),
-            app_launch_timeout_s: 60,
+            docs_subfolder: "docs".into(),
+            max_drivers_kept: 10,
         }
     }
 }

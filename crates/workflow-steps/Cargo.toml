@@ -7,8 +7,13 @@ rust-version.workspace = true
 [dependencies]
 workflow-core = { path = "../workflow-core" }
 workflow-schema = { path = "../workflow-schema" }
+anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+walkdir.workspace = true
+regex.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

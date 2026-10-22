@@ -7,6 +7,10 @@ use workflow_core::Config;
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
 use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
+use workflow_steps::step7::{
+    finalize_work_dir, find_projects_to_finalize, FinalizeMode, Step7Options,
+};
+use workflow_steps::step8::{run_step8, Step8Options};
 
 #[derive(Debug, Parser)]
 #[command(name = "workflow-cli", version, about = "CLI du pipeline Rust")]
@@ -27,6 +31,10 @@ enum Command {
     Step5(Step5Args),
     /// Sous-commandes de STEP6 (pré-traitement AE).
     Step6(Step6Args),
+    /// Finalisation STEP7 et archivage des analyses.
+    Step7(Step7Args),
+    /// Génération des projets EffectCraft (STEP8, effectcraft-cli headless).
+    Step8(Step8Args),
 }
 
 #[derive(Debug, Args)]
@@ -100,6 +108,80 @@ enum Step6Command {
         /// Par défaut : `<stem>.csv` à côté du tracking.
         #[arg(long)]
         csv: Option<PathBuf>,
+    },
+}
+
+#[derive(Debug, Args)]
+struct Step7Args {
+    #[command(subcommand)]
+    command: Step7Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Step7Command {
+    /// Archive, copie et publie les projets prêts vers la destination finale.
+    Finalize {
+        /// Par défaut : `paths.projects`.
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        /// Par défaut : `paths.finalized` (`/mnt/cache`).
+        #[arg(long)]
+        output_dir: Option<PathBuf>,
+        /// Par défaut : `paths.archives`.
+        #[arg(long)]
+        archives_dir: Option<PathBuf>,
+        /// Par défaut : `paths.logs`.
+        #[arg(long)]
+        logs_dir: Option<PathBuf>,
+        /// `lenient` (défaut), `strict` ou `videos`.
+        #[arg(long)]
+        mode: Option<String>,
+        /// Ne traiter qu'un seul projet.
+        #[arg(long)]
+        project: Option<String>,
+        /// Conserve le dossier source après publication.
+        #[arg(long)]
+        no_delete: bool,
+        /// Restaure les analyses archivées dans `docs/` après la copie.
+        #[arg(long)]
+        restore_archives: bool,
+        /// Liste les projets sans archiver, copier ni supprimer.
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct Step8Args {
+    #[command(subcommand)]
+    command: Step8Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Step8Command {
+    /// Exécute le panel MediaSolution via `effectcraft-cli` en headless.
+    Run {
+        /// Manifeste STEP7. Par défaut : le plus récent de `logs/step7`.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        /// Dossier projet à traiter (répétable ; court-circuite le manifeste).
+        #[arg(long = "folder")]
+        folders: Vec<PathBuf>,
+        /// Exécutable effectcraft-cli (défaut : configuration STEP8).
+        #[arg(long)]
+        cli: Option<PathBuf>,
+        /// Panel `MediaSolution.jsx` (défaut : configuration STEP8).
+        #[arg(long)]
+        panel_jsx: Option<PathBuf>,
+        /// Fichier `mediasolution_ec.json` du panel.
+        #[arg(long)]
+        config_json: Option<PathBuf>,
+        /// Par défaut : `paths.logs`.
+        #[arg(long)]
+        logs_dir: Option<PathBuf>,
+        /// Génère le driver et affiche les dossiers sans lancer EffectCraft.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -241,6 +323,112 @@ fn run() -> Result<()> {
                         "written": payload.is_some()
                     })
                 );
+            }
+        },
+        Command::Step7(args) => match args.command {
+            Step7Command::Finalize {
+                work_dir,
+                output_dir,
+                archives_dir,
+                logs_dir,
+                mode,
+                project,
+                no_delete,
+                restore_archives,
+                dry_run,
+            } => {
+                let resolved = config.paths.resolve();
+                let work_dir = work_dir.unwrap_or(resolved.projects);
+                let output_dir = output_dir.unwrap_or(resolved.finalized);
+                let archives_dir = archives_dir.unwrap_or(resolved.archives);
+                let logs_dir = logs_dir.unwrap_or(resolved.logs);
+                let mode_text = mode.unwrap_or_else(|| config.steps.step7.mode.clone());
+                let mode = mode_text
+                    .parse::<FinalizeMode>()
+                    .map_err(|error| anyhow::anyhow!(error))?;
+
+                if dry_run {
+                    let projects = find_projects_to_finalize(&work_dir, mode, project.as_deref())
+                        .with_context(|| format!("analyse de {}", work_dir.display()))?;
+                    let names: Vec<String> = projects
+                        .iter()
+                        .filter_map(|path| path.file_name())
+                        .map(|name| name.to_string_lossy().to_string())
+                        .collect();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "dry_run": true,
+                            "work_dir": work_dir,
+                            "output_dir": output_dir,
+                            "archives_dir": archives_dir,
+                            "mode": mode.as_str(),
+                            "projects": names,
+                        }))?
+                    );
+                    return Ok(());
+                }
+
+                let options = Step7Options {
+                    work_dir,
+                    output_dir,
+                    archives_dir,
+                    logs_dir,
+                    fallback_output_dir: resolved.finalized_fallback,
+                    mode,
+                    restore_archives: restore_archives || config.steps.step7.restore_archives,
+                    delete_source: !no_delete && config.steps.step7.delete_source,
+                    project_filter: project,
+                };
+                let report = finalize_work_dir(&options)
+                    .with_context(|| format!("finalisation de {}", options.work_dir.display()))?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.failures.is_empty() {
+                    anyhow::bail!(
+                        "{} projet(s) non finalisé(s): {}",
+                        report.failures.len(),
+                        report.failures.join(", ")
+                    );
+                }
+            }
+        },
+        Command::Step8(args) => match args.command {
+            Step8Command::Run {
+                manifest,
+                folders,
+                cli,
+                panel_jsx,
+                config_json,
+                logs_dir,
+                dry_run,
+            } => {
+                let resolved = config.paths.resolve();
+                let logs_dir = logs_dir.unwrap_or(resolved.logs);
+                let cli = cli.unwrap_or_else(|| config.steps.step8.cli.clone());
+                let panel_jsx = panel_jsx.unwrap_or_else(|| config.steps.step8.panel_jsx.clone());
+                let configured_panel_config = &config.steps.step8.panel_config;
+                let panel_config = config_json.or_else(|| {
+                    (!configured_panel_config.as_os_str().is_empty())
+                        .then(|| configured_panel_config.clone())
+                });
+                let cwd = std::env::current_dir().context("répertoire courant introuvable")?;
+                let options = Step8Options {
+                    manifest,
+                    folders,
+                    cli,
+                    panel_jsx,
+                    panel_config,
+                    docs_subfolder: config.steps.step8.docs_subfolder.clone(),
+                    logs_dir,
+                    cwd,
+                    dry_run,
+                    max_drivers_kept: config.steps.step8.max_drivers_kept,
+                };
+                let outcome = run_step8(&options).context("exécution de STEP8")?;
+                println!("{}", serde_json::to_string_pretty(&outcome)?);
+                if !outcome.success {
+                    anyhow::bail!("STEP8 en échec");
+                }
             }
         },
     }

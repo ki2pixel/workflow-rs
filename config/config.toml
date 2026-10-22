@@ -51,6 +51,19 @@ label_high_spread = 12
 label_stable = 3
 label_fallback_center = 1
 
+[steps.step7]
+mode = "lenient"
+restore_archives = false
+delete_source = true
+
+[steps.step8]
+timeout_s = 14400
+cli = "effectcraft-cli"
+panel_jsx = "assets/effectcraft/MediaSolution.jsx"
+panel_config = "assets/effectcraft/mediasolution_ec.json"
+docs_subfolder = "docs"
+max_drivers_kept = 10
+
 [hardware]
 tpu_device = "/dev/apex_0"
 gpu_mem_limit_mb = 4096

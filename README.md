@@ -5,9 +5,11 @@ Réécriture Rust du pipeline `workflow_mediapipe`.
 Le dépôt Python reste la référence de production jusqu'au cutover. Le lot 0 a
 validé le pont matériel Coral, le contrat d'environnement et le harnais de
 parité. Le lot 1 est en cours : le socle Rust, la configuration TOML, STEP5
-audio/vidéo, STEP6 (`_ae.json`) et le pont After Effects (`cuts` et
-`analyze_manifest`) sont opérationnels. La compilation Windows du pont, le
-basculement du JSX, STEP7 et STEP8 restent à faire.
+audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
+`analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
+`effectcraft-cli`) sont opérationnels. La compilation Windows du pont, le
+basculement du JSX et la validation STEP8 sur la machine Windows restent à
+faire.
 
 ## État
 
@@ -34,6 +36,13 @@ basculement du JSX, STEP7 et STEP8 restent à faire.
 - Lot 1.4 terminé : `workflow-bridge` pour les cuts CSV et `analyze_manifest`.
   Parité sur 273 calques, les quatre entrées `_ae.json` et les overrides de
   configuration ; cuts 21× plus rapide que Python.
+- Lot 1.5 terminé : STEP7 archive par SHA-256, copie vers `/mnt/cache`,
+  normalisation `docs/`, manifeste lu par STEP8. Test réel sur une copie du
+  projet 250 : `docs/` identique, empreinte vidéo identique.
+- Lot 1.6 terminé : STEP8 pilote `MediaSolution.jsx` en headless avec
+  `effectcraft-cli`, sans pont Python ni application. Le projet 250 a produit
+  un `.ecproj` ouvrable (82 segments, 1080×1920, 25 fps, 133 s) et la
+  progression `MS_BATCH_*` est relayée en direct.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -49,6 +58,8 @@ basculement du JSX, STEP7 et STEP8 restent à faire.
 - `docs/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
 - `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
 - `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
+- `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
+- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft et gate scripting.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -72,6 +83,14 @@ cargo run -p workflow-cli -- step6 build \
   --audio path/to/real_244_audio.json \
   --csv path/to/real_244.csv \
   --output path/to/real_244_ae.json
+
+cargo run -p workflow-cli -- step7 finalize --dry-run
+cargo run -p workflow-cli -- step7 finalize --no-delete \
+  --work-dir /tmp/work --output-dir /tmp/out \
+  --archives-dir /tmp/archives --logs-dir /tmp/logs
+
+cargo run -p workflow-cli -- step8 run --dry-run
+cargo run -p workflow-cli -- step8 run --folder /tmp/projet
 ```
 
 Sans `--output` audio, le fichier d'entrée est réécrit de façon atomique, comme

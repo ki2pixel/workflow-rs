@@ -1,0 +1,947 @@
+//! STEP8 : génération des projets EffectCraft via `effectcraft-cli`.
+//!
+//! Le panel `MediaSolution.jsx` est concaténé à un driver puis exécuté en
+//! headless. Aucun bridge, aucun lancement d'application : le préflight
+//! `prefs.set` est exécuté par le CLI, dans la même session que le driver.
+
+use anyhow::{bail, Context, Result};
+use chrono::Local;
+use regex::Regex;
+use serde::Serialize;
+use serde_json::{json, Value};
+use std::collections::HashSet;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime};
+use workflow_schema::round::round2;
+
+#[derive(Debug, Clone)]
+pub struct Step8Options {
+    pub manifest: Option<PathBuf>,
+    pub folders: Vec<PathBuf>,
+    pub cli: PathBuf,
+    pub panel_jsx: PathBuf,
+    /// Fichier `mediasolution_ec.json`. Vide ou absent : valeurs du panel.
+    pub panel_config: Option<PathBuf>,
+    pub docs_subfolder: String,
+    pub logs_dir: PathBuf,
+    pub cwd: PathBuf,
+    pub dry_run: bool,
+    pub max_drivers_kept: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Step8Outcome {
+    pub success: bool,
+    pub processed: usize,
+    pub dry_run: bool,
+    pub report: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct Step8Report {
+    schema: u32,
+    timestamp: String,
+    manifest: Option<String>,
+    output_dir: Option<String>,
+    folders: Vec<String>,
+    panel_jsx: String,
+    cli: String,
+    mode: &'static str,
+    bridge_port: Value,
+    app_launched: bool,
+    cli_version: Option<String>,
+    driver: String,
+    config_json: Option<String>,
+    result: Value,
+    cli_return_code: i32,
+    duration_s: f64,
+    success: bool,
+}
+
+pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
+    let started = Instant::now();
+    let step7_dir = options.logs_dir.join("step7");
+    let requested_manifest = options.manifest.as_ref().map(|path| expand_tilde(path));
+    let manifest_path = if options.folders.is_empty() {
+        let path = requested_manifest
+            .clone()
+            .or_else(|| latest_manifest(&step7_dir))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Aucun manifeste de l'étape 7 trouvé dans {} (lancez STEP7 ou passez --folder).",
+                    step7_dir.display()
+                )
+            })?;
+        if !path.is_file() {
+            bail!("Manifeste introuvable: {}", path.display());
+        }
+        Some(path)
+    } else {
+        requested_manifest
+    };
+
+    let manifest = match manifest_path.as_deref() {
+        Some(path) if path.is_file() => Some(load_manifest(path)?),
+        _ => None,
+    };
+
+    let candidate_count = if options.folders.is_empty() {
+        manifest_project_count(manifest.as_ref())
+    } else {
+        options.folders.len()
+    };
+
+    let config_path = resolve_config_path(options, manifest.as_ref());
+    let (config_json, docs_subfolder) =
+        load_panel_config(config_path.as_deref(), &options.docs_subfolder);
+    let folders = select_folders(manifest.as_ref(), &options.folders, &docs_subfolder);
+    if folders.is_empty() {
+        if candidate_count == 0 {
+            return Ok(Step8Outcome {
+                success: true,
+                processed: 0,
+                dry_run: options.dry_run,
+                report: None,
+            });
+        }
+        bail!(
+            "Aucun dossier exploitable parmi {} projet(s) listés.",
+            candidate_count
+        );
+    }
+
+    let panel_jsx = resolve_panel_jsx(&options.panel_jsx)
+        .context("Panel MediaSolution.jsx introuvable (dépôt et copie installée)")?;
+    let cli_path = resolve_cli(&options.cli).with_context(|| {
+        format!(
+            "Exécutable EffectCraft introuvable: {}",
+            options.cli.display()
+        )
+    })?;
+    let version = cli_version(&cli_path);
+
+    tracing::info!(
+        "Manifeste: {}",
+        manifest_path
+            .as_ref()
+            .map_or_else(|| "aucun".into(), |path| path.display().to_string())
+    );
+    tracing::info!(
+        "Mode d'exécution: headless (effectcraft-cli {})",
+        version.as_deref().unwrap_or("version inconnue")
+    );
+    tracing::info!("{} dossier(s) à traiter:", folders.len());
+    for folder in &folders {
+        tracing::info!("  - {folder}");
+    }
+    tracing::info!("Panel: {}", panel_jsx.display());
+    tracing::info!("CLI: {}", cli_path.display());
+
+    let step8_dir = options.logs_dir.join("step8");
+    let drivers_dir = step8_dir.join("drivers");
+    fs::create_dir_all(&drivers_dir)
+        .with_context(|| format!("création de {}", drivers_dir.display()))?;
+    let stamp = Local::now().format("%Y%m%d_%H%M%S");
+    let driver_path = drivers_dir.join(format!("step8_driver_{stamp}.jsx"));
+    let progress_path = drivers_dir.join(format!("step8_progress_{stamp}.log"));
+    let panel = fs::read_to_string(&panel_jsx)
+        .with_context(|| format!("lecture du panel {}", panel_jsx.display()))?;
+    let driver = build_driver_js(&panel, &folders, config_json.as_deref(), &progress_path);
+    fs::write(&driver_path, driver)
+        .with_context(|| format!("écriture du driver {}", driver_path.display()))?;
+    tracing::info!("Driver généré: {}", driver_path.display());
+
+    if options.dry_run {
+        tracing::info!("--dry-run: exécution EffectCraft ignorée.");
+        println!("MS_BATCH_TOTAL: {}", folders.len());
+        for (index, folder) in folders.iter().enumerate() {
+            let name = Path::new(folder)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(folder);
+            println!(
+                "MS_BATCH_PROGRESS: {}/{} - {name}",
+                index + 1,
+                folders.len()
+            );
+        }
+        return Ok(Step8Outcome {
+            success: true,
+            processed: folders.len(),
+            dry_run: true,
+            report: None,
+        });
+    }
+
+    let (return_code, result) = run_cli(&cli_path, &driver_path, &progress_path, &options.cwd)?;
+    let duration = started.elapsed().as_secs_f64();
+    let success = evaluate_result(result.as_ref());
+    if result.is_none() {
+        tracing::error!("Aucun résultat MS_BATCH_RESULT reçu du CLI (code {return_code}).");
+    } else if !success {
+        if let Some(error) = result.as_ref().and_then(|value| value.get("error")) {
+            tracing::error!("Batch en échec: {error}");
+        }
+        if let Some(errors) = result
+            .as_ref()
+            .and_then(|value| value.get("errors"))
+            .and_then(Value::as_array)
+        {
+            for error in errors {
+                tracing::error!("Échec projet: {error}");
+            }
+        }
+    }
+    if success && return_code != 0 {
+        tracing::warn!("MS_BATCH_RESULT valide mais code de sortie CLI non nul ({return_code}).");
+    }
+
+    let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let report = Step8Report {
+        schema: 1,
+        timestamp,
+        manifest: manifest_path
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string()),
+        output_dir: manifest
+            .as_ref()
+            .and_then(|value| value.get("output_dir"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        folders: folders.clone(),
+        panel_jsx: panel_jsx.to_string_lossy().to_string(),
+        cli: cli_path.to_string_lossy().to_string(),
+        mode: "headless",
+        bridge_port: Value::Null,
+        app_launched: false,
+        cli_version: version.clone(),
+        driver: driver_path.to_string_lossy().to_string(),
+        config_json: config_json
+            .as_ref()
+            .and(config_path.as_ref())
+            .map(|path| path.to_string_lossy().to_string()),
+        result: result.unwrap_or(Value::Null),
+        cli_return_code: return_code,
+        duration_s: round2(duration),
+        success,
+    };
+    let report_path = write_report(&step8_dir, &report)?;
+    tracing::info!("Rapport écrit: {}", report_path.display());
+    cleanup_drivers(&drivers_dir, options.max_drivers_kept);
+    tracing::info!(
+        "--- Étape 8 terminée: {} ({:.1} s) ---",
+        if success { "succès" } else { "échec" },
+        duration
+    );
+
+    Ok(Step8Outcome {
+        success,
+        processed: folders.len(),
+        dry_run: false,
+        report: Some(report_path.to_string_lossy().to_string()),
+    })
+}
+
+fn expand_tilde(path: &Path) -> PathBuf {
+    let Some(value) = path.to_str() else {
+        return path.to_path_buf();
+    };
+    let Some(rest) = value.strip_prefix("~/") else {
+        return path.to_path_buf();
+    };
+    std::env::var_os("HOME")
+        .map(|home| PathBuf::from(home).join(rest))
+        .unwrap_or_else(|| path.to_path_buf())
+}
+
+fn resolve_config_path(options: &Step8Options, manifest: Option<&Value>) -> Option<PathBuf> {
+    if let Some(path) = options
+        .panel_config
+        .as_ref()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
+        return Some(expand_tilde(path));
+    }
+    let output_dir = manifest
+        .and_then(|value| value.get("output_dir"))
+        .and_then(Value::as_str)
+        .map(PathBuf::from)?;
+    let candidate = output_dir.join("mediasolution_ec.json");
+    candidate.is_file().then_some(candidate)
+}
+
+fn load_panel_config(path: Option<&Path>, fallback_docs: &str) -> (Option<String>, String) {
+    let Some(path) = path else {
+        return (None, fallback_docs.to_string());
+    };
+    if !path.is_file() {
+        return (None, fallback_docs.to_string());
+    }
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            tracing::warn!(
+                "Config panel illisible '{}' ({error}) — valeurs par défaut.",
+                path.display()
+            );
+            return (None, fallback_docs.to_string());
+        }
+    };
+    let value: Value = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!(
+                "Config panel invalide '{}' ({error}) — valeurs par défaut.",
+                path.display()
+            );
+            return (None, fallback_docs.to_string());
+        }
+    };
+    let docs = value
+        .get("docsSubFolderName")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback_docs)
+        .to_string();
+    match serde_json::to_string(&value) {
+        Ok(json) => (Some(json), docs),
+        Err(error) => {
+            tracing::warn!(
+                "Config panel non sérialisable '{}' ({error}).",
+                path.display()
+            );
+            (None, fallback_docs.to_string())
+        }
+    }
+}
+
+fn select_folders(
+    manifest: Option<&Value>,
+    manual: &[PathBuf],
+    docs_subfolder: &str,
+) -> Vec<String> {
+    let candidates: Vec<PathBuf> = if !manual.is_empty() {
+        manual.iter().map(|path| expand_tilde(path)).collect()
+    } else {
+        manifest
+            .and_then(|value| value.get("projects"))
+            .and_then(Value::as_array)
+            .map(|projects| {
+                projects
+                    .iter()
+                    .filter_map(|entry| entry.get("path").and_then(Value::as_str))
+                    .map(PathBuf::from)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let mut folders = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for candidate in candidates {
+        if !candidate.is_dir() {
+            tracing::warn!("Dossier ignoré (introuvable): {}", candidate.display());
+            continue;
+        }
+        if !candidate.join(docs_subfolder).is_dir() {
+            tracing::warn!(
+                "Dossier ignoré (pas de '{}'): {}",
+                docs_subfolder,
+                candidate.display()
+            );
+            continue;
+        }
+        let Ok(resolved) = candidate.canonicalize() else {
+            tracing::warn!(
+                "Dossier ignoré (chemin non résolu): {}",
+                candidate.display()
+            );
+            continue;
+        };
+        let resolved_string = resolved.to_string_lossy().to_string();
+        if !seen.insert(resolved_string.clone()) {
+            tracing::warn!("Dossier ignoré (doublon): {resolved_string}");
+            continue;
+        }
+        folders.push(resolved_string);
+    }
+    folders
+}
+
+fn latest_manifest(step7_dir: &Path) -> Option<PathBuf> {
+    if !step7_dir.is_dir() {
+        return None;
+    }
+    let mut candidates: Vec<(SystemTime, PathBuf)> = fs::read_dir(step7_dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        name.starts_with("finalized_projects_") && name.ends_with(".json")
+                    })
+        })
+        .map(|path| {
+            let modified = fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            (modified, path)
+        })
+        .collect();
+    candidates.sort_by_key(|(modified, _)| *modified);
+    candidates.pop().map(|(_, path)| path)
+}
+
+fn load_manifest(path: &Path) -> Result<Value> {
+    let bytes =
+        fs::read(path).with_context(|| format!("lecture du manifeste {}", path.display()))?;
+    let value: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("manifeste JSON invalide {}", path.display()))?;
+    if !value.is_object() {
+        bail!(
+            "Manifeste invalide (objet JSON attendu): {}",
+            path.display()
+        );
+    }
+    Ok(value)
+}
+
+fn manifest_project_count(manifest: Option<&Value>) -> usize {
+    manifest
+        .and_then(|value| value.get("projects"))
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len)
+}
+
+fn resolve_panel_jsx(candidate: &Path) -> Option<PathBuf> {
+    let candidate = expand_tilde(candidate);
+    let installed = std::env::var_os("HOME").map(|home| {
+        PathBuf::from(home)
+            .join(".config")
+            .join("effectcraft")
+            .join("Scripts")
+            .join("ScriptUI Panels")
+            .join("MediaSolution.jsx")
+    });
+    [Some(candidate), installed]
+        .into_iter()
+        .flatten()
+        .find(|path| path.is_file())
+}
+
+fn resolve_cli(candidate: &Path) -> Option<PathBuf> {
+    if candidate.as_os_str().is_empty() {
+        return None;
+    }
+    let candidate = expand_tilde(candidate);
+    let raw = candidate.to_string_lossy();
+    if candidate.is_absolute() || raw.contains('/') || raw.contains('\\') {
+        return candidate.is_file().then(|| candidate.to_path_buf());
+    }
+    let path = std::env::var_os("PATH")?;
+    for directory in std::env::split_paths(&path) {
+        let direct = directory.join(&candidate);
+        if direct.is_file() {
+            return Some(direct);
+        }
+        let with_suffix = directory.join(format!(
+            "{}{}",
+            candidate.to_string_lossy(),
+            std::env::consts::EXE_SUFFIX
+        ));
+        if with_suffix.is_file() {
+            return Some(with_suffix);
+        }
+    }
+    None
+}
+
+fn cli_version(cli: &Path) -> Option<String> {
+    let output = Command::new(cli).arg("--version").output().ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    re_version()
+        .find(&text)
+        .map(|matched| matched.as_str().to_string())
+}
+
+fn build_driver_js(
+    panel_js: &str,
+    folders: &[String],
+    config_json: Option<&str>,
+    progress_path: &Path,
+) -> String {
+    let progress_literal =
+        serde_json::to_string(&progress_path.to_string_lossy()).expect("sérialisation du chemin");
+    let mut lines = vec![
+        panel_js.trim_end().to_string(),
+        String::new(),
+        "// ---------------------------------------------------------------------------".to_string(),
+        "// Driver headless généré par l'étape 8 du workflow (mode « Tout exécuter »).".to_string(),
+        "// ---------------------------------------------------------------------------".to_string(),
+        "// Le CLI active la préférence scripting avant `file.runScript` ; un script".to_string(),
+        "// ne peut pas s'octroyer lui-même cette permission.".to_string(),
+        format!("var __msProgressPath = {progress_literal};"),
+        "(function () {".to_string(),
+        "  var __msOriginalWriteLn = $.writeln;".to_string(),
+        "  $.writeln = function (text) {".to_string(),
+        "    try {".to_string(),
+        "      var __msProgressFile = new File(__msProgressPath);".to_string(),
+        "      __msProgressFile.encoding = \"UTF-8\";".to_string(),
+        "      if (__msProgressFile.open(\"a\")) { __msProgressFile.writeln(text); __msProgressFile.close(); }".to_string(),
+        "    } catch (__msProgressError) { }".to_string(),
+        "    try { __msOriginalWriteLn(text); } catch (__msWriteError) { }".to_string(),
+        "  };".to_string(),
+        "})();".to_string(),
+        String::new(),
+    ];
+    if let Some(config_json) = config_json {
+        lines.push(format!(
+            "mediasolutionEC.applyConfig({});",
+            serde_json::to_string(config_json).expect("sérialisation d'une chaîne JSON")
+        ));
+        lines.push(String::new());
+    }
+    lines.extend([
+        format!(
+            "var MS_FOLDERS = {};",
+            serde_json::to_string(folders).expect("sérialisation des dossiers")
+        ),
+        "var msResult = JSON.parse(mediasolutionEC.runBatch(JSON.stringify(MS_FOLDERS), null, 0));"
+            .to_string(),
+        "writeLn(\"MS_BATCH_RESULT: \" + JSON.stringify(msResult));".to_string(),
+        "if (!msResult.ok || (msResult.errors && msResult.errors.length > 0)) {".to_string(),
+        "  throw new Error(\"Batch Media Solution en échec\");".to_string(),
+        "}".to_string(),
+        "\"step8-ok\";".to_string(),
+    ]);
+    format!("{}\n", lines.join("\n"))
+}
+
+pub fn parse_panel_line(line: &str) -> Vec<String> {
+    let mut emitted = Vec::new();
+    if let Some(captures) = re_total().captures(line) {
+        emitted.push(format!("MS_BATCH_TOTAL: {}", &captures[1]));
+    }
+    if let Some(captures) = re_progress().captures(line) {
+        emitted.push(format!(
+            "MS_BATCH_PROGRESS: {}/{} - {}",
+            &captures[1], &captures[2], &captures[3]
+        ));
+    }
+    if let Some(captures) = re_saved().captures(line) {
+        emitted.push(format!("MS_BATCH_OK: {}", &captures[1]));
+    }
+    if let Some(captures) = re_unit_error().captures(line) {
+        emitted.push(format!("MS_BATCH_FAIL: {}", &captures[1]));
+    }
+    if let Some(captures) = re_batch_end().captures(line) {
+        emitted.push(format!("MS_BATCH_END: {}", &captures[1]));
+    }
+    emitted
+}
+
+fn evaluate_result(result: Option<&Value>) -> bool {
+    result.is_some_and(|value| {
+        value.get("ok").and_then(Value::as_bool) == Some(true)
+            && value
+                .get("errors")
+                .and_then(Value::as_array)
+                .is_none_or(Vec::is_empty)
+    })
+}
+
+fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i32, Option<Value>)> {
+    if let Some(parent) = progress.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(progress, b"").with_context(|| format!("création de {}", progress.display()))?;
+    let prefs_params = json!({
+        "key": "scripting.allowScriptsWriteFiles",
+        "value": true
+    });
+    let script_params = json!({
+        "path": driver.to_string_lossy(),
+    });
+    let child = Command::new(cli)
+        .arg("--empty")
+        .arg("--json")
+        .arg("run")
+        .arg("prefs.set")
+        .arg(serde_json::to_string(&prefs_params)?)
+        .arg("file.runScript")
+        .arg(serde_json::to_string(&script_params)?)
+        .current_dir(cwd)
+        .env("NO_COLOR", "1")
+        .env("TERM", "dumb")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("lancement de {}", cli.display()))?;
+
+    let seen = Arc::new(Mutex::new(HashSet::new()));
+    let tail_result = Arc::new(Mutex::new(None));
+    let (stop_tail, tail_handle) = spawn_progress_tail(
+        progress.to_path_buf(),
+        Arc::clone(&seen),
+        Arc::clone(&tail_result),
+    );
+    let output = child
+        .wait_with_output()
+        .context("attente d'effectcraft-cli")?;
+    stop_tail.store(true, Ordering::Relaxed);
+    let _ = tail_handle.join();
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.trim().is_empty() {
+        println!("{stderr}");
+        let _ = std::io::stdout().flush();
+    }
+
+    let payload: Value = serde_json::from_slice(&output.stdout).with_context(|| {
+        format!(
+            "réponse JSON invalide d'effectcraft-cli (code {}): {}",
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stdout)
+        )
+    })?;
+    let results = payload
+        .as_array()
+        .context("effectcraft-cli run: tableau JSON attendu")?;
+    let prefs_ok = results
+        .iter()
+        .find(|entry| entry.get("command").and_then(Value::as_str) == Some("prefs.set"))
+        .and_then(|entry| entry.get("result"))
+        .and_then(|result| result.get("scripting.allowScriptsWriteFiles"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    if !prefs_ok {
+        bail!("effectcraft-cli n'a pas activé scripting.allowScriptsWriteFiles");
+    }
+
+    let script_result = results
+        .iter()
+        .find(|entry| entry.get("command").and_then(Value::as_str) == Some("file.runScript"))
+        .and_then(|entry| entry.get("result"))
+        .context("effectcraft-cli run: résultat file.runScript absent")?;
+    if let Some(error) = script_result.get("error").filter(|error| !error.is_null()) {
+        tracing::error!("file.runScript en échec: {error}");
+    }
+
+    let mut result = None;
+    if let Some(script_output) = script_result.get("output").and_then(Value::as_str) {
+        for line in script_output.lines() {
+            let inserted = {
+                let mut seen = seen.lock().expect("verrou lignes");
+                seen.insert(line.to_string())
+            };
+            if inserted {
+                println!("{line}");
+                for normalized in parse_panel_line(line) {
+                    println!("{normalized}");
+                }
+            }
+            if let Some(value) = parse_result_line(line) {
+                result = Some(value);
+            }
+        }
+        let _ = std::io::stdout().flush();
+    }
+    let result = result.or_else(|| tail_result.lock().expect("verrou résultat").clone());
+    Ok((output.status.code().unwrap_or(1), result))
+}
+
+fn spawn_progress_tail(
+    path: PathBuf,
+    seen: Arc<Mutex<HashSet<String>>>,
+    result: Arc<Mutex<Option<Value>>>,
+) -> (Arc<AtomicBool>, std::thread::JoinHandle<()>) {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_thread = Arc::clone(&stop);
+    let handle = std::thread::spawn(move || {
+        let mut offset = 0_usize;
+        let mut pending = String::new();
+        let emit = |line: &str| {
+            if line.is_empty() {
+                return;
+            }
+            let inserted = {
+                let mut seen = seen.lock().expect("verrou lignes");
+                seen.insert(line.to_string())
+            };
+            if inserted {
+                println!("{line}");
+                for normalized in parse_panel_line(line) {
+                    println!("{normalized}");
+                }
+                let _ = std::io::stdout().flush();
+            }
+            if let Some(value) = parse_result_line(line) {
+                *result.lock().expect("verrou résultat") = Some(value);
+            }
+        };
+        loop {
+            match fs::read(&path) {
+                Ok(bytes) => {
+                    if bytes.len() < offset {
+                        offset = 0;
+                        pending.clear();
+                    }
+                    if bytes.len() > offset {
+                        pending.push_str(&String::from_utf8_lossy(&bytes[offset..]));
+                        offset = bytes.len();
+                    }
+                }
+                Err(_) => {
+                    if stop_thread.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+            }
+            while let Some(position) = pending.find('\n') {
+                let line: String = pending.drain(..=position).collect();
+                emit(line.trim_end_matches(['\n', '\r']));
+            }
+            if stop_thread.load(Ordering::Relaxed) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if !pending.trim().is_empty() {
+            emit(pending.trim_end_matches(['\n', '\r']));
+        }
+    });
+    (stop, handle)
+}
+
+fn parse_result_line(line: &str) -> Option<Value> {
+    let captures = re_result().captures(line)?;
+    serde_json::from_str(&captures[1]).ok()
+}
+
+fn write_report(log_dir: &Path, report: &Step8Report) -> Result<PathBuf> {
+    fs::create_dir_all(log_dir).with_context(|| format!("création de {}", log_dir.display()))?;
+    let path = log_dir.join(format!(
+        "step8_run_{}.json",
+        Local::now().format("%Y%m%d_%H%M%S")
+    ));
+    let temp_path = path.with_extension("json.tmp");
+    fs::write(&temp_path, serde_json::to_vec_pretty(report)?)
+        .with_context(|| format!("écriture de {}", temp_path.display()))?;
+    fs::rename(&temp_path, &path).with_context(|| format!("publication de {}", path.display()))?;
+    Ok(path)
+}
+
+fn cleanup_drivers(drivers_dir: &Path, keep: usize) {
+    let Ok(entries) = fs::read_dir(drivers_dir) else {
+        return;
+    };
+    let mut drivers: Vec<(SystemTime, PathBuf)> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        (name.starts_with("step8_driver_") && name.ends_with(".jsx"))
+                            || (name.starts_with("step8_progress_") && name.ends_with(".log"))
+                    })
+        })
+        .map(|path| {
+            let modified = fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            (modified, path)
+        })
+        .collect();
+    drivers.sort_by_key(|(modified, _)| *modified);
+    for (_, stale) in drivers.into_iter().rev().skip(keep) {
+        if let Err(error) = fs::remove_file(&stale) {
+            tracing::warn!(
+                "Nettoyage du driver {} impossible: {error}",
+                stale.display()
+            );
+        }
+    }
+}
+
+fn re_total() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"Batch démarré\s*:\s*(\d+)\s+projet\(s\)").expect("regex total"))
+}
+
+fn re_progress() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"---\s*(\d+)/(\d+)\s*:\s*(.+?)\s*$").expect("regex progression"))
+}
+
+fn re_saved() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"Projet enregistré\s*:\s*(.+?)\s*\(").expect("regex projet"))
+}
+
+fn re_unit_error() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"Erreur sur\s+(.+?)\s*:").expect("regex erreur"))
+}
+
+fn re_batch_end() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"Batch terminé\s*:\s*(.+?)\s*$").expect("regex fin"))
+}
+
+fn re_result() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"MS_BATCH_RESULT:\s*(\{.*\})\s*$").expect("regex résultat"))
+}
+
+fn re_version() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"\d+\.\d+(?:\.\d+)?").expect("regex version"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parses_panel_lines() {
+        assert_eq!(
+            parse_panel_line("[INFO] 12:34:56 | Batch démarré : 12 projet(s) sur 3 dossier(s)"),
+            vec!["MS_BATCH_TOTAL: 12"]
+        );
+        assert_eq!(
+            parse_panel_line("[INFO] 12:34:57 | --- 3/12 : clip1.mp4"),
+            vec!["MS_BATCH_PROGRESS: 3/12 - clip1.mp4"]
+        );
+        assert_eq!(
+            parse_panel_line("[INFO] Projet enregistré : clip1_9x16.ecproj (12.3s)"),
+            vec!["MS_BATCH_OK: clip1_9x16.ecproj"]
+        );
+        assert_eq!(
+            parse_panel_line("[ERREUR] Erreur sur clip2.mp4 : media absent"),
+            vec!["MS_BATCH_FAIL: clip2.mp4"]
+        );
+        assert!(parse_panel_line("[INFO] Batch terminé : 2 ok / 0 erreur")
+            .iter()
+            .any(|line| line == "MS_BATCH_END: 2 ok / 0 erreur"));
+    }
+
+    #[test]
+    fn builds_driver_with_config_and_folders() {
+        let driver = build_driver_js(
+            "var mediasolutionEC = {};\n",
+            &["/tmp/a".to_string(), "/tmp/b".to_string()],
+            Some("{\"docsSubFolderName\":\"docs\"}"),
+            Path::new("/tmp/step8-progress.log"),
+        );
+        assert!(driver.contains("mediasolutionEC.applyConfig("));
+        assert!(driver.contains("var MS_FOLDERS = [\"/tmp/a\",\"/tmp/b\"];"));
+        assert!(driver.contains("runBatch(JSON.stringify(MS_FOLDERS), null, 0)"));
+        assert!(driver.contains("var __msProgressPath = \"/tmp/step8-progress.log\";"));
+        assert!(!driver.contains("app.run(\"prefs.set\""));
+        assert!(driver.ends_with("\"step8-ok\";\n"));
+    }
+
+    #[test]
+    fn result_requires_ok_and_no_errors() {
+        assert!(evaluate_result(Some(&json!({"ok": true, "errors": []}))));
+        assert!(!evaluate_result(Some(
+            &json!({"ok": true, "errors": ["boom"]})
+        )));
+        assert!(!evaluate_result(Some(&json!({"ok": false}))));
+        assert!(!evaluate_result(None));
+    }
+
+    #[test]
+    fn empty_manifest_finishes_without_report() {
+        let dir = tempfile::tempdir().unwrap();
+        let step7 = dir.path().join("logs").join("step7");
+        fs::create_dir_all(&step7).unwrap();
+        fs::write(
+            step7.join("finalized_projects_20261022_120000.json"),
+            "{\"schema\":1,\"output_dir\":\"/tmp/out\",\"projects\":[]}",
+        )
+        .unwrap();
+        let options = Step8Options {
+            manifest: None,
+            folders: Vec::new(),
+            cli: PathBuf::from("effectcraft-cli"),
+            panel_jsx: PathBuf::from("assets/effectcraft/MediaSolution.jsx"),
+            panel_config: None,
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert_eq!(outcome.processed, 0);
+        assert!(outcome.report.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runs_effectcraft_cli_and_writes_report() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("projet");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        fs::write(
+            &cli,
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi
+printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles":true}},{"command":"file.runScript","result":{"ok":true,"error":null,"result":"step8-ok","output":"[INFO] 12:00:00 | Batch démarré : 1 projet(s)\n[INFO] 12:00:01 | --- 1/1 : projet\n[INFO] 12:00:02 | Projet enregistré : projet_9x16.ecproj (0.1s)\nMS_BATCH_RESULT: {\"ok\": true, \"errors\": []}"}}]'
+"#,
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&cli).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&cli, permissions).unwrap();
+
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert_eq!(outcome.processed, 1);
+        let report_path = PathBuf::from(outcome.report.unwrap());
+        let report: Value = serde_json::from_slice(&fs::read(report_path).unwrap()).unwrap();
+        assert_eq!(report["success"], true);
+        assert_eq!(report["mode"], "headless");
+        assert_eq!(report["bridge_port"], Value::Null);
+        assert_eq!(report["app_launched"], false);
+        assert_eq!(report["cli_version"], "0.13.0");
+        assert_eq!(report["result"]["ok"], true);
+        assert_eq!(report["folders"].as_array().unwrap().len(), 1);
+    }
+}

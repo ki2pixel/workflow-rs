@@ -1,0 +1,18 @@
+[package]
+name = "workflow-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "workflow-bridge"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+workflow-steps = { path = "../workflow-steps" }
+
+[dev-dependencies]
+tempfile.workspace = true

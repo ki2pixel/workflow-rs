@@ -5,6 +5,7 @@ members = [
     "crates/workflow-schema",
     "crates/workflow-steps",
     "crates/workflow-cli",
+    "crates/workflow-bridge",
     "crates/workflow-tpu",
 ]
 

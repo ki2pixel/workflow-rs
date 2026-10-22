@@ -181,6 +181,450 @@ pub fn build_ae_payload(
     Ok(Some(Value::Object(output)))
 }
 
+#[derive(Debug, Clone)]
+struct AnalyzerConfig {
+    spread_threshold: f64,
+    enable_confidence_weighting: bool,
+    confidence_weight: f64,
+    label_high_spread: i64,
+    label_stable: i64,
+    #[allow(dead_code)]
+    label_fallback_center: i64,
+}
+
+impl Default for AnalyzerConfig {
+    fn default() -> Self {
+        Self {
+            spread_threshold: 200.0,
+            enable_confidence_weighting: true,
+            confidence_weight: 0.35,
+            label_high_spread: 12,
+            label_stable: 3,
+            label_fallback_center: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct LayerStats {
+    id: String,
+    source: Option<String>,
+    label: Option<String>,
+    x_values: Vec<f64>,
+    bbox_count: u64,
+    confidence_count: u64,
+    audio_confirm_count: u64,
+    total_bbox_surface: f64,
+    total_confidence: f64,
+    avg_bbox_surface: f64,
+    avg_confidence: f64,
+}
+
+#[derive(Debug, Clone)]
+struct LoadedIndex {
+    tracking: TrackingIndex,
+    audio: AudioIndex,
+}
+
+fn empty_tracking() -> TrackingIndex {
+    TrackingIndex {
+        data_by_frame: BTreeMap::new(),
+        max_frame: 0,
+        fps: None,
+        meta: Map::new(),
+    }
+}
+
+fn empty_audio() -> AudioIndex {
+    AudioIndex {
+        by_frame: BTreeMap::new(),
+        max_frame: None,
+    }
+}
+
+/// Mode `analyze_manifest` du panneau AE : pour chaque calque, choisit le
+/// meilleur visage/personne et calcule son centre et sa dispersion.
+pub fn analyze_manifest_value(manifest: &Value) -> Result<Value, StepError> {
+    let object = manifest
+        .as_object()
+        .ok_or_else(|| StepError::Schema("Manifest invalide (doit être un objet JSON)".into()))?;
+    let layers = object
+        .get("layers")
+        .and_then(Value::as_object)
+        .ok_or_else(|| StepError::Schema("manifest.layers doit être un objet".into()))?;
+    let config = parse_analyzer_config(object);
+    let comp_max_frame = object
+        .get("comp_max_frame")
+        .and_then(as_i64_loose)
+        .unwrap_or(0);
+    let mut cache: HashMap<String, LoadedIndex> = HashMap::new();
+    let mut results = Map::new();
+
+    for (layer_id, layer_info) in layers {
+        let Some(layer_info) = layer_info.as_object() else {
+            continue;
+        };
+        let json_path = layer_info
+            .get("json_path")
+            .or_else(|| object.get("json_path"))
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty());
+        let Some(json_path) = json_path else {
+            continue;
+        };
+        if !cache.contains_key(json_path) {
+            cache.insert(json_path.to_string(), load_index(Path::new(json_path)));
+        }
+        let loaded = cache.get(json_path).expect("index chargé");
+        let reference_max_frame = loaded.audio.max_frame.unwrap_or(comp_max_frame);
+        let frame_scale = if reference_max_frame > 0 {
+            compute_video_frame_scale(loaded.tracking.max_frame, reference_max_frame)
+        } else {
+            1.0
+        };
+        if let Some(result) = analyze_layer(
+            layer_info,
+            &loaded.tracking.data_by_frame,
+            &loaded.audio.by_frame,
+            &config,
+            frame_scale,
+            loaded.tracking.max_frame,
+        ) {
+            results.insert(layer_id.clone(), result);
+        }
+    }
+
+    Ok(Value::Object(results))
+}
+
+fn parse_analyzer_config(manifest: &Map<String, Value>) -> AnalyzerConfig {
+    let mut config = AnalyzerConfig::default();
+    let Some(raw) = manifest.get("config").and_then(Value::as_object) else {
+        return config;
+    };
+    if let Some(value) = raw.get("SPREAD_THRESHOLD").and_then(as_f64_loose) {
+        config.spread_threshold = value;
+    }
+    if let Some(value) = raw.get("ENABLE_CONFIDENCE_WEIGHTING") {
+        config.enable_confidence_weighting = value_truthy(value);
+    }
+    if let Some(value) = raw.get("CONFIDENCE_WEIGHT").and_then(as_f64_loose) {
+        config.confidence_weight = value;
+    }
+    if let Some(value) = raw.get("LABEL_HIGH_SPREAD").and_then(as_i64_loose) {
+        config.label_high_spread = value;
+    }
+    if let Some(value) = raw.get("LABEL_STABLE").and_then(as_i64_loose) {
+        config.label_stable = value;
+    }
+    if let Some(value) = raw.get("LABEL_FALLBACK_CENTER").and_then(as_i64_loose) {
+        config.label_fallback_center = value;
+    }
+    config
+}
+
+fn load_index(path: &Path) -> LoadedIndex {
+    let Some(root) = read_json(path).ok() else {
+        return LoadedIndex {
+            tracking: empty_tracking(),
+            audio: empty_audio(),
+        };
+    };
+    let tracking = parse_tracking(&root)
+        .ok()
+        .flatten()
+        .unwrap_or_else(empty_tracking);
+    let has_embedded_audio = root.get("schema").and_then(Value::as_str) == Some("ae_preprocessed")
+        && root
+            .get("audioByFrame")
+            .and_then(Value::as_object)
+            .is_some();
+    let audio = if has_embedded_audio {
+        parse_embedded_audio(&root)
+    } else {
+        default_audio_path(path)
+            .filter(|audio_path| audio_path.exists())
+            .and_then(|audio_path| read_json(&audio_path).ok())
+            .and_then(|audio_root| parse_audio(&audio_root).ok())
+            .unwrap_or_else(empty_audio)
+    };
+    LoadedIndex { tracking, audio }
+}
+
+fn parse_embedded_audio(root: &Value) -> AudioIndex {
+    let mut by_frame = BTreeMap::new();
+    if let Some(audio) = root.get("audioByFrame").and_then(Value::as_object) {
+        for (frame, value) in audio {
+            if let Ok(frame) = frame.parse::<i64>() {
+                by_frame.insert(frame, value.clone());
+            }
+        }
+    }
+    AudioIndex {
+        by_frame,
+        max_frame: root.get("audioMaxFrame").and_then(as_i64_loose),
+    }
+}
+
+fn compute_video_frame_scale(video_max_frame: i64, reference_max_frame: i64) -> f64 {
+    if video_max_frame <= 0 || reference_max_frame <= 0 {
+        return 1.0;
+    }
+    let ratio = (video_max_frame - reference_max_frame).abs() as f64 / reference_max_frame as f64;
+    if ratio > 0.05 {
+        video_max_frame as f64 / reference_max_frame as f64
+    } else {
+        1.0
+    }
+}
+
+fn analyze_layer(
+    layer_info: &Map<String, Value>,
+    data_by_frame: &BTreeMap<i64, Vec<Value>>,
+    audio_by_frame: &BTreeMap<i64, Value>,
+    config: &AnalyzerConfig,
+    video_frame_scale: f64,
+    video_max_frame: i64,
+) -> Option<Value> {
+    let min_frame = layer_info.get("in_frame").and_then(as_i64_loose)?;
+    let max_frame = layer_info.get("out_frame").and_then(as_i64_loose)?;
+    let layer_scale = layer_info
+        .get("video_scale")
+        .and_then(as_f64_loose)
+        .unwrap_or(1.0);
+    let layer_scale = if layer_scale <= 0.0 { 1.0 } else { layer_scale };
+    let effective_frame_scale = video_frame_scale * layer_scale;
+    let mut objects: Vec<LayerStats> = Vec::new();
+    let mut index: HashMap<String, usize> = HashMap::new();
+
+    for frame in min_frame..=max_frame {
+        let video_frame = if effective_frame_scale != 1.0 {
+            let mapped = round_to(frame as f64 * effective_frame_scale, 0) as i64;
+            let mut mapped = mapped.max(1);
+            if video_max_frame > 0 {
+                mapped = mapped.min(video_max_frame);
+            }
+            mapped
+        } else {
+            frame
+        };
+        let Some(frame_objects) = data_by_frame.get(&video_frame) else {
+            continue;
+        };
+        let audio_info = audio_by_frame.get(&frame).and_then(Value::as_object);
+
+        for object in frame_objects {
+            let Some(object) = object.as_object() else {
+                continue;
+            };
+            let Some(id) = object
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+            else {
+                continue;
+            };
+            let source = object.get("source").and_then(Value::as_str);
+            let label = object.get("label").and_then(Value::as_str);
+            let Some(centroid_x) = object.get("centroid_x").and_then(as_f64_loose) else {
+                continue;
+            };
+            let bbox_surface = object
+                .get("bbox_surface")
+                .and_then(as_f64_loose)
+                .unwrap_or(0.0)
+                .max(0.0);
+            let confidence = object
+                .get("confidence")
+                .and_then(as_f64_loose)
+                .map(|value| value.clamp(0.0, 1.0))
+                .unwrap_or(0.0);
+            let speakers = object_speakers(object);
+
+            let stats_index = if let Some(index) = index.get(id).copied() {
+                index
+            } else {
+                let stats_index = objects.len();
+                objects.push(LayerStats {
+                    id: id.to_string(),
+                    source: source.map(str::to_string),
+                    label: label.map(str::to_string),
+                    x_values: Vec::new(),
+                    bbox_count: 0,
+                    confidence_count: 0,
+                    audio_confirm_count: 0,
+                    total_bbox_surface: 0.0,
+                    total_confidence: 0.0,
+                    avg_bbox_surface: 0.0,
+                    avg_confidence: 0.0,
+                });
+                index.insert(id.to_string(), stats_index);
+                stats_index
+            };
+            let stats = &mut objects[stats_index];
+            stats.x_values.push(centroid_x);
+            stats.bbox_count += 1;
+            stats.total_bbox_surface += bbox_surface;
+            stats.confidence_count += 1;
+            stats.total_confidence += confidence;
+
+            let eligible = source == Some("face_landmarker")
+                || (source == Some("object_detector") && label == Some("person"));
+            if eligible {
+                if let Some(audio_info) = audio_info {
+                    let is_speech = audio_info
+                        .get("is_speech_present")
+                        .is_some_and(value_truthy);
+                    if is_speech && !speakers.is_empty() {
+                        let active_labels =
+                            normalize_str_list(audio_info.get("active_speaker_labels"));
+                        if !active_labels.is_empty()
+                            && active_labels
+                                .iter()
+                                .any(|speaker| speakers.contains(speaker))
+                        {
+                            stats.audio_confirm_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if objects.is_empty() {
+        return None;
+    }
+    for stats in &mut objects {
+        stats.avg_bbox_surface = if stats.bbox_count > 0 {
+            stats.total_bbox_surface / stats.bbox_count as f64
+        } else {
+            0.0
+        };
+        stats.avg_confidence = if stats.confidence_count > 0 {
+            stats.total_confidence / stats.confidence_count as f64
+        } else {
+            0.0
+        };
+    }
+
+    let mut best_audio_face: Option<usize> = None;
+    let mut best_audio_person: Option<usize> = None;
+    let mut best_face: Option<usize> = None;
+    let mut best_person: Option<usize> = None;
+    let mut best_fallback: Option<usize> = None;
+    let mut max_audio_face_confirm = 0_u64;
+    let mut max_audio_person_confirm = 0_u64;
+    let mut max_face_presence = -1.0;
+    let mut max_person_presence = -1.0;
+    let mut max_fallback_presence = -1.0;
+    let mut max_audio_face_bbox = 0.0;
+    let mut max_face_bbox = 0.0;
+
+    for (index, stats) in objects.iter().enumerate() {
+        let presence = stats.x_values.len() as u64;
+        if presence == 0 {
+            continue;
+        }
+        let score = presence_score(presence, stats.avg_confidence, config);
+        let source = stats.source.as_deref();
+        let label = stats.label.as_deref();
+
+        if source == Some("face_landmarker") {
+            if stats.audio_confirm_count > 0 {
+                let current_best_score = best_audio_face
+                    .map(|best_index| {
+                        let best = &objects[best_index];
+                        presence_score(best.x_values.len() as u64, best.avg_confidence, config)
+                    })
+                    .unwrap_or(-1.0);
+                if stats.audio_confirm_count > max_audio_face_confirm
+                    || (stats.audio_confirm_count == max_audio_face_confirm
+                        && score > current_best_score)
+                    || (stats.audio_confirm_count == max_audio_face_confirm
+                        && is_close(score, current_best_score, 1e-9)
+                        && stats.avg_bbox_surface > max_audio_face_bbox)
+                {
+                    best_audio_face = Some(index);
+                    max_audio_face_confirm = stats.audio_confirm_count;
+                    max_audio_face_bbox = stats.avg_bbox_surface;
+                }
+            }
+            if score > max_face_presence
+                || (is_close(score, max_face_presence, 1e-9)
+                    && stats.avg_bbox_surface > max_face_bbox)
+            {
+                best_face = Some(index);
+                max_face_presence = score;
+                max_face_bbox = stats.avg_bbox_surface;
+            }
+        } else if source == Some("object_detector") && label == Some("person") {
+            if stats.audio_confirm_count > 0 {
+                let current_best_score = best_audio_person
+                    .map(|best_index| {
+                        let best = &objects[best_index];
+                        presence_score(best.x_values.len() as u64, best.avg_confidence, config)
+                    })
+                    .unwrap_or(-1.0);
+                if stats.audio_confirm_count > max_audio_person_confirm
+                    || (stats.audio_confirm_count == max_audio_person_confirm
+                        && score > current_best_score)
+                {
+                    best_audio_person = Some(index);
+                    max_audio_person_confirm = stats.audio_confirm_count;
+                }
+            }
+            if score > max_person_presence {
+                best_person = Some(index);
+                max_person_presence = score;
+            }
+        }
+
+        if score > max_fallback_presence {
+            best_fallback = Some(index);
+            max_fallback_presence = score;
+        }
+    }
+
+    let target = best_audio_face
+        .or(best_audio_person)
+        .or(best_face)
+        .or(best_person)
+        .or(best_fallback)?;
+    let target_stats = &objects[target];
+    let (_, _, spread, average) = trimmed_stats(&target_stats.x_values);
+    let label_color = if spread > config.spread_threshold {
+        config.label_high_spread
+    } else {
+        config.label_stable
+    };
+    let reason = if best_audio_face == Some(target) {
+        "audio_confirm_face"
+    } else if best_audio_person == Some(target) {
+        "audio_confirm_person"
+    } else if best_face == Some(target) {
+        "face_presence"
+    } else if best_person == Some(target) {
+        "person_presence"
+    } else {
+        "fallback"
+    };
+
+    let mut output = Map::new();
+    output.insert("center_x".into(), json_number(average));
+    output.insert("spread".into(), json_number(spread));
+    output.insert("label_color".into(), Value::from(label_color));
+    output.insert("selected_id".into(), Value::String(target_stats.id.clone()));
+    output.insert("reason".into(), Value::String(reason.into()));
+    Some(Value::Object(output))
+}
+
+fn presence_score(presence: u64, avg_confidence: f64, config: &AnalyzerConfig) -> f64 {
+    if !config.enable_confidence_weighting {
+        return presence as f64;
+    }
+    presence as f64 * (1.0 + avg_confidence.clamp(0.0, 1.0) * config.confidence_weight.max(0.0))
+}
+
 fn parse_tracking(root: &Value) -> Result<Option<TrackingIndex>, StepError> {
     let Some(object) = root.as_object() else {
         return Ok(None);
@@ -956,6 +1400,82 @@ mod tests {
         assert_eq!(payload["dataByFrame"]["1"][0]["is_speaking"], json!(true));
         assert_eq!(payload["dataByFrame"]["1"][0]["tier"], json!(4));
         assert_eq!(payload["tracking_analytics"]["schema_version"], json!(1));
+    }
+
+    #[test]
+    fn analyze_layer_selects_face_presence() {
+        let data = BTreeMap::from([(
+            1,
+            vec![json!({
+                "id": "obj_1", "source": "face_landmarker", "label": "face",
+                "centroid_x": 10.0, "bbox_surface": 100.0, "confidence": 0.9,
+                "video_speakers": []
+            })],
+        )]);
+        let audio = BTreeMap::from([(
+            1,
+            json!({"is_speech_present": false, "active_speaker_labels": []}),
+        )]);
+        let layer = json!({"in_frame": 1, "out_frame": 1, "video_scale": 1.0});
+        let result = analyze_layer(
+            layer.as_object().unwrap(),
+            &data,
+            &audio,
+            &AnalyzerConfig::default(),
+            1.0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(result["selected_id"], json!("obj_1"));
+        assert_eq!(result["center_x"], json!(10.0));
+        assert_eq!(result["spread"], json!(0.0));
+        assert_eq!(result["label_color"], json!(3));
+        assert_eq!(result["reason"], json!("face_presence"));
+    }
+
+    #[test]
+    fn analyze_layer_prefers_audio_confirmed_face() {
+        let data = BTreeMap::from([(
+            1,
+            vec![
+                json!({
+                    "id": "obj_1", "source": "face_landmarker", "label": "face",
+                    "centroid_x": 10.0, "bbox_surface": 100.0, "confidence": 0.9,
+                    "video_speakers": ["SPEAKER_00"]
+                }),
+                json!({
+                    "id": "obj_2", "source": "face_landmarker", "label": "face",
+                    "centroid_x": 100.0, "bbox_surface": 200.0, "confidence": 0.9,
+                    "video_speakers": []
+                }),
+            ],
+        )]);
+        let audio = BTreeMap::from([(
+            1,
+            json!({
+                "is_speech_present": true,
+                "active_speaker_labels": ["SPEAKER_00"]
+            }),
+        )]);
+        let layer = json!({"in_frame": 1, "out_frame": 1, "video_scale": 1.0});
+        let result = analyze_layer(
+            layer.as_object().unwrap(),
+            &data,
+            &audio,
+            &AnalyzerConfig::default(),
+            1.0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(result["selected_id"], json!("obj_1"));
+        assert_eq!(result["reason"], json!("audio_confirm_face"));
+    }
+
+    #[test]
+    fn video_scale_uses_five_percent_tolerance() {
+        assert_eq!(compute_video_frame_scale(100, 102), 1.0);
+        assert!((compute_video_frame_scale(100, 80) - 1.25).abs() < 1e-12);
+        assert_eq!(compute_video_frame_scale(0, 100), 1.0);
     }
 
     #[test]

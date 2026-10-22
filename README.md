@@ -5,8 +5,9 @@ Réécriture Rust du pipeline `workflow_mediapipe`.
 Le dépôt Python reste la référence de production jusqu'au cutover. Le lot 0 a
 validé le pont matériel Coral, le contrat d'environnement et le harnais de
 parité. Le lot 1 est en cours : le socle Rust, la configuration TOML, STEP5
-audio/vidéo et STEP6 (`_ae.json`) sont opérationnels ; le mode
-`analyze_manifest`, le pont Windows, STEP7 et STEP8 restent à porter.
+audio/vidéo, STEP6 (`_ae.json`) et le pont After Effects (`cuts` et
+`analyze_manifest`) sont opérationnels. La compilation Windows du pont, le
+basculement du JSX, STEP7 et STEP8 restent à faire.
 
 ## État
 
@@ -30,6 +31,9 @@ audio/vidéo et STEP6 (`_ae.json`) sont opérationnels ; le mode
   production disponibles (244, 245, 249, 250), sans écriture dans `/mnt/cache`.
   La cible de dix projets reste ouverte, faute de projets complets sur la
   machine à cette date.
+- Lot 1.4 terminé : `workflow-bridge` pour les cuts CSV et `analyze_manifest`.
+  Parité sur 273 calques, les quatre entrées `_ae.json` et les overrides de
+  configuration ; cuts 21× plus rapide que Python.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -44,6 +48,7 @@ audio/vidéo et STEP6 (`_ae.json`) sont opérationnels ; le mode
 - `docs/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
 - `docs/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
 - `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
+- `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -74,6 +79,19 @@ dans la production. Sans `--output` vidéo, la CLI écrit
 `<stem>_tracking.json` (ou réécrit un fichier déjà nommé `_tracking.json`).
 L'en-tête `fps` / `total_frames` est écrit avant `frames_analysis` ; une seconde
 réduction conserve donc les métadonnées.
+
+## Pont After Effects
+
+```sh
+cargo build --release -p workflow-bridge
+./target/release/workflow-bridge \
+  --manifest_path /tmp/ms_manifest.json \
+  --output_path /tmp/ms_results.json
+```
+
+Le binaire traite `mode = "cuts"` (CSV de scènes) et les manifestes de tracking
+(`layers`). Le format de sortie direct ou `{"error": ...}` est conservé ; le JSX
+de production n'est pas modifié dans ce lot.
 
 ## Parité
 

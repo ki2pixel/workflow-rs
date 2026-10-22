@@ -634,6 +634,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "workflow-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde_json",
+ "tempfile",
+ "workflow-steps",
+]
+
+[[package]]
 name = "workflow-cli"
 version = "0.1.0"
 dependencies = [

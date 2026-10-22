@@ -16,6 +16,7 @@ pub struct Config {
     pub webhook: WebhookConfig,
     pub download: DownloadConfig,
     pub steps: StepsConfig,
+    pub retention: RetentionConfig,
     pub hardware: HardwareConfig,
 }
 
@@ -484,6 +485,34 @@ impl Default for Step8Config {
     }
 }
 
+/// Politique de rétention des données de travail. Les sorties finalisées
+/// (`paths.finalized`) en sont volontairement exclues : elles ne sont jamais
+/// supprimées automatiquement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RetentionConfig {
+    /// Archives d'analyses conservées, en jours. 0 désactive le nettoyage.
+    pub archives_days: u64,
+    /// Journaux `.log` conservés, en jours. 0 désactive le nettoyage.
+    pub logs_days: u64,
+    /// Téléchargements conservés, en jours. 0 désactive le nettoyage.
+    /// Le nettoyage n'est autorisé que sous `paths.base`.
+    pub downloads_days: u64,
+    /// Manifestes et rapports JSON conservés, en jours. 0 désactive.
+    pub reports_days: u64,
+}
+
+impl Default for RetentionConfig {
+    fn default() -> Self {
+        Self {
+            archives_days: 90,
+            logs_days: 30,
+            downloads_days: 0,
+            reports_days: 90,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct HardwareConfig {
@@ -522,6 +551,15 @@ mod tests {
     fn unknown_key_is_rejected() {
         let error = Config::from_toml("[server]\ninconnu = 1\n").unwrap_err();
         assert!(error.to_string().contains("inconnu"));
+    }
+
+    #[test]
+    fn retention_section_is_typed() {
+        let config = Config::from_toml("[retention]\narchives_days = 12\nlogs_days = 7\n").unwrap();
+        assert_eq!(config.retention.archives_days, 12);
+        assert_eq!(config.retention.logs_days, 7);
+        assert_eq!(config.retention.downloads_days, 0);
+        assert_eq!(config.retention.reports_days, 90);
     }
 
     #[test]

@@ -15,7 +15,9 @@ Le wrapper :
 - concatène le panel et un driver `runBatch(..., null, 0)` (« Tout exécuter ») ;
 - active la préférence d'écriture par le CLI, pas par le script ;
 - relaie les lignes du panel et les lignes normalisées `MS_BATCH_*` ;
-- écrit `logs/step8/step8_run_<timestamp>.json` et purge les anciens drivers.
+- écrit `logs/step8/step8_run_<timestamp>.json` et purge les anciens drivers ;
+- applique un timeout interne et arrête le groupe de processus sur
+  SIGTERM/SIGINT.
 
 ## Point important : le gate scripting headless
 
@@ -91,20 +93,42 @@ workflow-cli step8 run --folder "/tmp/projet"
 
 # Après STEP7 : dernier manifeste de logs/step7.
 workflow-cli step8 run
+
+# Timeout interne explicite (0 désactive le timeout).
+workflow-cli step8 run --timeout-s 3600
 ```
 
 Options : `--manifest`, `--folder` (répétable), `--cli`, `--panel-jsx`,
-`--config-json`, `--logs-dir`, `--dry-run`.
+`--config-json`, `--logs-dir`, `--timeout-s`, `--dry-run`.
+
+## Annulation et timeout
+
+Le wrapper place `effectcraft-cli` dans son propre groupe de processus. Sur
+SIGTERM ou SIGINT, il envoie SIGTERM au groupe, attend jusqu'à 5 secondes, puis
+envoie SIGKILL. Le wrapper sort avec le code `143`, comme le script Python.
+Aucun rapport n'est écrit dans ce cas, puisque l'arrêt est demandé de
+l'extérieur.
+
+Le timeout interne est actif par défaut via `steps.step8.timeout_s` (14 400 s).
+`--timeout-s` permet de le surcharger ; `0` le désactive. À l'expiration, le
+groupe est arrêté de la même manière, un rapport est écrit avec
+`timed_out: true`, `timeout_s` et `cli_return_code: 124`, et le wrapper sort
+avec le code `124`. Ce timeout est une protection du wrapper, indépendante du
+timeout du futur exécuteur de workflow.
+
+Validation locale sur un faux CLI qui dort : SIGTERM arrête le groupe,
+le wrapper sort avec `143` et l'enfant n'est plus présent. Un timeout de 1 s
+écrit un rapport `timed_out: true` et sort avec `124`.
 
 ## Limites
 
 - `effectcraft-cli` 0.13 est requis pour `run prefs.set file.runScript` et pour
   l'ouverture des `.ecproj` produits.
-- `steps.step8.timeout_s` reste une valeur destinée au futur exécuteur de
-  workflow ; le wrapper ne tue pas encore un batch trop long.
 - Le driver contient le panel complet (environ 82 Kio) ; les anciens drivers et
   fichiers de progression sont purgés au-delà de `max_drivers_kept`.
 - La validation Windows/After Effects du pont CEP reste hors-scope de ce lot.
+- Le timeout et l'arrêt de groupe sont testés sous Linux ; la branche Windows
+  utilise `taskkill /T /F` mais n'a pas été validée dans ce lot.
 
 ## Tests
 

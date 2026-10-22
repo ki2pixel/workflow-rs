@@ -14,10 +14,16 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
 use workflow_schema::round::round2;
+
+const TERMINATION_GRACE: Duration = Duration::from_secs(5);
+static CURRENT_CHILD_PID: AtomicI32 = AtomicI32::new(0);
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static SIGNAL_DONE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
 pub struct Step8Options {
@@ -32,6 +38,8 @@ pub struct Step8Options {
     pub cwd: PathBuf,
     pub dry_run: bool,
     pub max_drivers_kept: usize,
+    /// 0 désactive le timeout interne.
+    pub timeout_s: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -39,6 +47,8 @@ pub struct Step8Outcome {
     pub success: bool,
     pub processed: usize,
     pub dry_run: bool,
+    pub timed_out: bool,
+    pub exit_code: i32,
     pub report: Option<String>,
 }
 
@@ -59,6 +69,8 @@ struct Step8Report {
     config_json: Option<String>,
     result: Value,
     cli_return_code: i32,
+    timeout_s: u64,
+    timed_out: bool,
     duration_s: f64,
     success: bool,
 }
@@ -106,6 +118,8 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
                 success: true,
                 processed: 0,
                 dry_run: options.dry_run,
+                timed_out: false,
+                exit_code: 0,
                 report: None,
             });
         }
@@ -174,14 +188,31 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             success: true,
             processed: folders.len(),
             dry_run: true,
+            timed_out: false,
+            exit_code: 0,
             report: None,
         });
     }
 
-    let (return_code, result) = run_cli(&cli_path, &driver_path, &progress_path, &options.cwd)?;
+    let timeout = (options.timeout_s > 0).then(|| Duration::from_secs(options.timeout_s));
+    let cli_outcome = run_cli(
+        &cli_path,
+        &driver_path,
+        &progress_path,
+        &options.cwd,
+        timeout,
+    )?;
     let duration = started.elapsed().as_secs_f64();
-    let success = evaluate_result(result.as_ref());
-    if result.is_none() {
+    let return_code = cli_outcome.return_code;
+    let result = cli_outcome.result;
+    let timed_out = cli_outcome.timed_out;
+    let success = !timed_out && evaluate_result(result.as_ref());
+    if timed_out {
+        tracing::error!(
+            "Batch interrompu après le timeout interne de {} s.",
+            options.timeout_s
+        );
+    } else if result.is_none() {
         tracing::error!("Aucun résultat MS_BATCH_RESULT reçu du CLI (code {return_code}).");
     } else if !success {
         if let Some(error) = result.as_ref().and_then(|value| value.get("error")) {
@@ -227,6 +258,8 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             .map(|path| path.to_string_lossy().to_string()),
         result: result.unwrap_or(Value::Null),
         cli_return_code: return_code,
+        timeout_s: options.timeout_s,
+        timed_out,
         duration_s: round2(duration),
         success,
     };
@@ -243,6 +276,14 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         success,
         processed: folders.len(),
         dry_run: false,
+        timed_out,
+        exit_code: if success {
+            0
+        } else if timed_out {
+            124
+        } else {
+            1
+        },
         report: Some(report_path.to_string_lossy().to_string()),
     })
 }
@@ -559,11 +600,24 @@ fn evaluate_result(result: Option<&Value>) -> bool {
     })
 }
 
-fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i32, Option<Value>)> {
+struct CliOutcome {
+    return_code: i32,
+    result: Option<Value>,
+    timed_out: bool,
+}
+
+fn run_cli(
+    cli: &Path,
+    driver: &Path,
+    progress: &Path,
+    cwd: &Path,
+    timeout: Option<Duration>,
+) -> Result<CliOutcome> {
     if let Some(parent) = progress.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(progress, b"").with_context(|| format!("création de {}", progress.display()))?;
+    install_signal_handler();
     let prefs_params = json!({
         "key": "scripting.allowScriptsWriteFiles",
         "value": true
@@ -571,7 +625,8 @@ fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i3
     let script_params = json!({
         "path": driver.to_string_lossy(),
     });
-    let child = Command::new(cli)
+    let mut command = Command::new(cli);
+    command
         .arg("--empty")
         .arg("--json")
         .arg("run")
@@ -583,9 +638,35 @@ fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i3
         .env("NO_COLOR", "1")
         .env("TERM", "dumb")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let child = command
         .spawn()
         .with_context(|| format!("lancement de {}", cli.display()))?;
+    let child_pid = i32::try_from(child.id()).unwrap_or(i32::MAX);
+    CURRENT_CHILD_PID.store(child_pid, Ordering::SeqCst);
+
+    let finished = Arc::new(AtomicBool::new(false));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let watchdog = timeout.map(|duration| {
+        let (done_tx, done_rx) = mpsc::channel();
+        let finished_thread = Arc::clone(&finished);
+        let timed_out_thread = Arc::clone(&timed_out);
+        let handle = std::thread::spawn(move || {
+            if done_rx.recv_timeout(duration).is_err() && !finished_thread.load(Ordering::SeqCst) {
+                timed_out_thread.store(true, Ordering::SeqCst);
+                terminate_process_group(child_pid, false);
+                if done_rx.recv_timeout(TERMINATION_GRACE).is_err() {
+                    terminate_process_group(child_pid, true);
+                }
+            }
+        });
+        (done_tx, handle)
+    });
 
     let seen = Arc::new(Mutex::new(HashSet::new()));
     let tail_result = Arc::new(Mutex::new(None));
@@ -594,11 +675,22 @@ fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i3
         Arc::clone(&seen),
         Arc::clone(&tail_result),
     );
-    let output = child
-        .wait_with_output()
-        .context("attente d'effectcraft-cli")?;
+    let output = child.wait_with_output();
+    finished.store(true, Ordering::SeqCst);
+    CURRENT_CHILD_PID.store(0, Ordering::SeqCst);
+    if let Some((done_tx, handle)) = watchdog {
+        let _ = done_tx.send(());
+        let _ = handle.join();
+    }
     stop_tail.store(true, Ordering::Relaxed);
     let _ = tail_handle.join();
+    let output = output.context("attente d'effectcraft-cli")?;
+    if INTERRUPTED.load(Ordering::SeqCst) {
+        while !SIGNAL_DONE.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        std::process::exit(143);
+    }
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !stderr.trim().is_empty() {
@@ -606,20 +698,30 @@ fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i3
         let _ = std::io::stdout().flush();
     }
 
-    let payload: Value = serde_json::from_slice(&output.stdout).with_context(|| {
+    let payload: Option<Value> = serde_json::from_slice(&output.stdout).ok();
+    let mut result = payload
+        .as_ref()
+        .and_then(|payload| consume_payload_output(payload, &seen));
+    if result.is_none() {
+        result = tail_result.lock().expect("verrou résultat").clone();
+    }
+    let timed_out = timed_out.load(Ordering::SeqCst);
+    if timed_out {
+        return Ok(CliOutcome {
+            return_code: 124,
+            result,
+            timed_out: true,
+        });
+    }
+
+    let payload = payload.with_context(|| {
         format!(
             "réponse JSON invalide d'effectcraft-cli (code {}): {}",
             output.status.code().unwrap_or(1),
             String::from_utf8_lossy(&output.stdout)
         )
     })?;
-    let results = payload
-        .as_array()
-        .context("effectcraft-cli run: tableau JSON attendu")?;
-    let prefs_ok = results
-        .iter()
-        .find(|entry| entry.get("command").and_then(Value::as_str) == Some("prefs.set"))
-        .and_then(|entry| entry.get("result"))
+    let prefs_ok = command_result(&payload, "prefs.set")
         .and_then(|result| result.get("scripting.allowScriptsWriteFiles"))
         .and_then(Value::as_bool)
         == Some(true);
@@ -627,37 +729,103 @@ fn run_cli(cli: &Path, driver: &Path, progress: &Path, cwd: &Path) -> Result<(i3
         bail!("effectcraft-cli n'a pas activé scripting.allowScriptsWriteFiles");
     }
 
-    let script_result = results
-        .iter()
-        .find(|entry| entry.get("command").and_then(Value::as_str) == Some("file.runScript"))
-        .and_then(|entry| entry.get("result"))
+    let script_result = command_result(&payload, "file.runScript")
         .context("effectcraft-cli run: résultat file.runScript absent")?;
     if let Some(error) = script_result.get("error").filter(|error| !error.is_null()) {
         tracing::error!("file.runScript en échec: {error}");
     }
 
+    Ok(CliOutcome {
+        return_code: output.status.code().unwrap_or(1),
+        result,
+        timed_out: false,
+    })
+}
+
+fn command_result<'a>(payload: &'a Value, command: &str) -> Option<&'a Value> {
+    payload
+        .as_array()?
+        .iter()
+        .find(|entry| entry.get("command").and_then(Value::as_str) == Some(command))?
+        .get("result")
+}
+
+fn consume_payload_output(payload: &Value, seen: &Arc<Mutex<HashSet<String>>>) -> Option<Value> {
+    let script_output = command_result(payload, "file.runScript")
+        .and_then(|result| result.get("output"))
+        .and_then(Value::as_str)?;
     let mut result = None;
-    if let Some(script_output) = script_result.get("output").and_then(Value::as_str) {
-        for line in script_output.lines() {
-            let inserted = {
-                let mut seen = seen.lock().expect("verrou lignes");
-                seen.insert(line.to_string())
-            };
-            if inserted {
-                println!("{line}");
-                for normalized in parse_panel_line(line) {
-                    println!("{normalized}");
-                }
-            }
-            if let Some(value) = parse_result_line(line) {
-                result = Some(value);
+    for line in script_output.lines() {
+        let inserted = {
+            let mut seen = seen.lock().expect("verrou lignes");
+            seen.insert(line.to_string())
+        };
+        if inserted {
+            println!("{line}");
+            for normalized in parse_panel_line(line) {
+                println!("{normalized}");
             }
         }
-        let _ = std::io::stdout().flush();
+        if let Some(value) = parse_result_line(line) {
+            result = Some(value);
+        }
     }
-    let result = result.or_else(|| tail_result.lock().expect("verrou résultat").clone());
-    Ok((output.status.code().unwrap_or(1), result))
+    let _ = std::io::stdout().flush();
+    result
 }
+
+#[cfg(unix)]
+fn install_signal_handler() {
+    static ONCE: OnceLock<()> = OnceLock::new();
+    ONCE.get_or_init(|| {
+        if let Err(error) = ctrlc::set_handler(|| {
+            INTERRUPTED.store(true, Ordering::SeqCst);
+            let pid = CURRENT_CHILD_PID.load(Ordering::SeqCst);
+            if pid > 0 {
+                terminate_process_group(pid, false);
+                for _ in 0..50 {
+                    if !process_group_exists(pid) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                terminate_process_group(pid, true);
+            }
+            SIGNAL_DONE.store(true, Ordering::SeqCst);
+            if pid == 0 {
+                std::process::exit(143);
+            }
+        }) {
+            tracing::warn!("Installation du gestionnaire SIGTERM/SIGINT impossible: {error}");
+        }
+    });
+}
+
+#[cfg(not(unix))]
+fn install_signal_handler() {}
+
+#[cfg(unix)]
+fn process_group_exists(pid: i32) -> bool {
+    unsafe { libc::kill(-pid, 0) == 0 }
+}
+
+#[cfg(unix)]
+fn terminate_process_group(pid: i32, force: bool) {
+    let signal = if force { libc::SIGKILL } else { libc::SIGTERM };
+    unsafe {
+        libc::kill(-pid, signal);
+    }
+}
+
+#[cfg(windows)]
+fn terminate_process_group(pid: i32, _force: bool) {
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .status();
+}
+
+#[cfg(not(any(unix, windows)))]
+fn terminate_process_group(_pid: i32, _force: bool) {}
 
 fn spawn_progress_tail(
     path: PathBuf,
@@ -887,11 +1055,59 @@ mod tests {
             cwd: dir.path().to_path_buf(),
             dry_run: false,
             max_drivers_kept: 10,
+            timeout_s: 0,
         };
         let outcome = run_step8(&options).unwrap();
         assert!(outcome.success);
         assert_eq!(outcome.processed, 0);
         assert!(outcome.report.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_terminates_effectcraft_cli_and_writes_failure_report() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("projet");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        fs::write(
+            &cli,
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi\nsleep 20\nprintf '%s' '[]'\n",
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&cli).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&cli, permissions).unwrap();
+
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 1,
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(!outcome.success);
+        assert!(outcome.timed_out);
+        assert_eq!(outcome.exit_code, 124);
+        let report_path = PathBuf::from(outcome.report.unwrap());
+        let report: Value = serde_json::from_slice(&fs::read(report_path).unwrap()).unwrap();
+        assert_eq!(report["success"], false);
+        assert_eq!(report["timed_out"], true);
+        assert_eq!(report["timeout_s"], 1);
+        assert_eq!(report["cli_return_code"], 124);
     }
 
     #[cfg(unix)]
@@ -930,10 +1146,13 @@ printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles
             cwd: dir.path().to_path_buf(),
             dry_run: false,
             max_drivers_kept: 10,
+            timeout_s: 0,
         };
         let outcome = run_step8(&options).unwrap();
         assert!(outcome.success);
         assert_eq!(outcome.processed, 1);
+        assert!(!outcome.timed_out);
+        assert_eq!(outcome.exit_code, 0);
         let report_path = PathBuf::from(outcome.report.unwrap());
         let report: Value = serde_json::from_slice(&fs::read(report_path).unwrap()).unwrap();
         assert_eq!(report["success"], true);

@@ -1,0 +1,135 @@
+# Rétention après cutover
+
+Cette politique couvre les données de travail du pipeline Rust et la sortie de
+l'ancienne application Python. Elle ne supprime jamais un livrable finalisé.
+
+## Règles par jeu de données
+
+| Donnée | Emplacement par défaut | Rétention | Nettoyage |
+| --- | --- | --- | --- |
+| Projets sources | `runtime/projets_extraits` | Supprimés après STEP7 réussi ; orphelins après 48 h d'inactivité | `retention apply` |
+| Archives d'analyses | `runtime/archives` | 90 jours | `retention apply` |
+| Journaux `.log` | `runtime/logs` | 30 jours | `retention apply` |
+| Rapports STEP7/STEP8 | `runtime/logs/step7`, `runtime/logs/step8` | 90 jours | `retention apply` |
+| Drivers STEP8 | `runtime/logs/step8/drivers` | 10 derniers fichiers | STEP8 |
+| Téléchargements | `runtime/downloads` | Manuel (désactivé par défaut) | `--downloads-days` explicite |
+| Sorties finalisées | `/mnt/cache` | Conservation indéfinie | Manuelle uniquement |
+| Base d'historique | `runtime/download_history.sqlite3` | Conservation indéfinie | Manuelle uniquement |
+
+Les seuils sont configurables dans `[retention]` de `config/config.toml`. Le
+seuil des orphelins reste `steps.step7.cleanup_threshold_hours`. Une valeur
+`0` désactive le nettoyage correspondant. Le manifeste STEP7 le plus récent et
+le dernier rapport STEP8 sont toujours conservés, même au-delà de 90 jours.
+
+Le nettoyage des téléchargements est désactivé par défaut (`downloads_days =
+0`). Le dossier `~/Téléchargements` de l'utilisateur n'est jamais considéré
+comme géré : `retention` refuse un `--downloads-days` positif hors de
+`paths.base`. Pour activer ce nettoyage, utiliser un répertoire dédié sous
+`runtime/downloads`.
+
+### Pourquoi les sorties finalisées sont exclues
+
+`paths.finalized` contient les `.ecproj` et les médias livrés. Le pipeline ne
+connaît ni la date de validation client ni la date de livraison : une
+suppression automatique serait irréversible et dangereuse. Le nettoyage de
+`/mnt/cache` reste une décision humaine, après validation et archivage.
+
+### Pourquoi les archives peuvent être purgées
+
+STEP7 archive les analyses pour permettre une reconstruction, puis copie les
+`docs/` dans la sortie finalisée. Après 90 jours, la copie de sécurité n'est
+plus nécessaire au fonctionnement courant ; les livrables restent la référence.
+
+## Commande
+
+Le plan est toujours calculé sans suppression :
+
+```sh
+cd /home/kidpixel/workflow-rs
+workflow-cli retention plan
+```
+
+L'application est explicite :
+
+```sh
+workflow-cli retention apply
+```
+
+Les deux commandes acceptent des surcharges de chemins et de seuils :
+
+```sh
+workflow-cli retention plan \
+  --projects-dir /chemin/projets \
+  --archives-dir /chemin/archives \
+  --logs-dir /chemin/logs \
+  --downloads-dir /chemin/downloads \
+  --orphan-hours 48 \
+  --archives-days 90 \
+  --logs-days 30 \
+  --downloads-days 0 \
+  --reports-days 90
+```
+
+Le rapport JSON liste les candidats, les suppressions effectuées, les éléments
+ignorés et les erreurs. `apply` revalide chaque candidat juste avant de le
+supprimer ; un fichier modifié entre le plan et l'application est conservé.
+
+## Garde-fous
+
+- Seuls les répertoires configurés sont inspectés ; les sorties finalisées et
+  la base d'historique ne sont jamais candidates.
+- Les projets sources et les archives ne sont supprimés que s'ils sont des
+  enfants directs du répertoire racine, des répertoires réels (pas des liens
+  symboliques), et non protégés.
+- Les noms `archives`, `logs`, `docs`, `static`, `templates`, `.git`,
+  `_finalized_output`, `venv`, `env`, `models`, `downloads`, `runtime`,
+  `projets_extraits`, ainsi que les préfixes `_temp_` et `.`, sont protégés.
+- Une archive doit contenir `metadata.json`, un `*_audio.json`, un
+  `*_tracking.json` ou un `*_scenes.csv` pour être éligible. Un répertoire
+  inconnu dans `archives/` est conservé.
+- Les journaux ne sont reconnus que sous la forme `*.log` ou `*.log.<numéro>`.
+  Les rapports ne sont reconnus que sous les préfixes `step7`/`step8` attendus.
+- Le nettoyage des téléchargements n'est accepté que sous `paths.base` ; le
+  dossier personnel `~/Téléchargements` reste hors-scope.
+- `apply` doit être lancé hors batch actif. Le seuil de 48 h protège les
+  projets en cours, mais ne remplace pas cette règle d'exploitation.
+
+## Calendrier recommandé
+
+1. Chaque semaine : lancer `retention plan` et vérifier les candidats.
+2. Chaque mois, ou après validation d'un lot : lancer `retention apply` si le
+   plan est conforme.
+3. Ne jamais planifier `apply` pendant une extraction, un tracking ou un batch
+   STEP8.
+4. Après le cutover, désactiver le moniteur de nettoyage Python
+   (`cleanup_monitor`) pour éviter deux politiques concurrentes.
+
+## Ancienne application Python
+
+Laisser l'application Python installée et redémarrable pendant la fenêtre de
+retour arrière :
+
+- **minimum 30 jours** et **au moins deux batches de production réussis** avec
+  Rust, la durée la plus longue des deux s'appliquant ;
+- pendant cette fenêtre, ne pas modifier la base SQLite, les archives ni les
+  venvs Python ;
+- à la fin de la fenêtre, arrêter le service Python et son moniteur de
+  nettoyage, puis conserver le code, les venvs et la base en lecture seule
+  pendant **90 jours** ;
+- après accord explicite, exporter la base SQLite, conserver l'export et les
+  archives Python pendant **90 jours**, puis retirer les venvs et l'ancienne
+  application ;
+- les sorties de `/mnt/cache` ne sont jamais concernées par cette
+  désinstallation.
+
+Le retour arrière ne doit pas lancer Python et Rust en parallèle sur les mêmes
+vidéos : le verrou matériel Coral/GPU reste obligatoire.
+
+## État au 2026-10-22
+
+- Archives Python : 239 répertoires, environ 1,8 Gio, du 2026-08-03 au
+  2026-10-22.
+- Journaux Python : environ 55 Mio.
+- Sorties finalisées : 7 projets, environ 3,2 Gio dans `/mnt/cache`.
+- Les seuils proposés tiennent dans l'espace disque actuel ; ils restent des
+  valeurs de départ, à ajuster après quelques semaines d'exploitation Rust.

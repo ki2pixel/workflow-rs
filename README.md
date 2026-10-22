@@ -59,7 +59,8 @@ faire.
 - `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
 - `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
 - `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
-- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft et gate scripting.
+- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
+- `docs/RETENTION.md` : politique de rétention après cutover et commande de nettoyage.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -91,6 +92,9 @@ cargo run -p workflow-cli -- step7 finalize --no-delete \
 
 cargo run -p workflow-cli -- step8 run --dry-run
 cargo run -p workflow-cli -- step8 run --folder /tmp/projet
+
+cargo run -p workflow-cli -- retention plan
+cargo run -p workflow-cli -- retention apply
 ```
 
 Sans `--output` audio, le fichier d'entrée est réécrit de façon atomique, comme

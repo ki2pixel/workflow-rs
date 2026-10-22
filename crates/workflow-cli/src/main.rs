@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
+use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
 use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
@@ -35,6 +36,8 @@ enum Command {
     Step7(Step7Args),
     /// Génération des projets EffectCraft (STEP8, effectcraft-cli headless).
     Step8(Step8Args),
+    /// Planifie ou applique la rétention des données de travail.
+    Retention(RetentionArgs),
 }
 
 #[derive(Debug, Args)]
@@ -157,6 +160,51 @@ struct Step8Args {
     command: Step8Command,
 }
 
+#[derive(Debug, Args)]
+struct RetentionArgs {
+    #[command(subcommand)]
+    command: RetentionCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum RetentionCommand {
+    /// Liste les candidats sans supprimer.
+    Plan(RetentionOverrides),
+    /// Supprime les candidats retenus (action explicite).
+    Apply(RetentionOverrides),
+}
+
+#[derive(Debug, Args, Clone)]
+struct RetentionOverrides {
+    /// Par défaut : `paths.projects`.
+    #[arg(long)]
+    projects_dir: Option<PathBuf>,
+    /// Par défaut : `paths.archives`.
+    #[arg(long)]
+    archives_dir: Option<PathBuf>,
+    /// Par défaut : `paths.logs`.
+    #[arg(long)]
+    logs_dir: Option<PathBuf>,
+    /// Par défaut : `paths.downloads`.
+    #[arg(long)]
+    downloads_dir: Option<PathBuf>,
+    /// Seuil d'inactivité des projets sources, en heures (0 désactive).
+    #[arg(long)]
+    orphan_hours: Option<f64>,
+    /// Rétention des archives d'analyses, en jours (0 désactive).
+    #[arg(long)]
+    archives_days: Option<u64>,
+    /// Rétention des journaux, en jours (0 désactive).
+    #[arg(long)]
+    logs_days: Option<u64>,
+    /// Rétention des téléchargements, en jours (0 désactive).
+    #[arg(long)]
+    downloads_days: Option<u64>,
+    /// Rétention des rapports JSON, en jours (0 désactive).
+    #[arg(long)]
+    reports_days: Option<u64>,
+}
+
 #[derive(Debug, Subcommand)]
 enum Step8Command {
     /// Exécute le panel MediaSolution via `effectcraft-cli` en headless.
@@ -179,6 +227,9 @@ enum Step8Command {
         /// Par défaut : `paths.logs`.
         #[arg(long)]
         logs_dir: Option<PathBuf>,
+        /// Timeout interne en secondes (0 désactive ; défaut : configuration STEP8).
+        #[arg(long)]
+        timeout_s: Option<u64>,
         /// Génère le driver et affiche les dossiers sans lancer EffectCraft.
         #[arg(long)]
         dry_run: bool,
@@ -217,6 +268,85 @@ fn default_video_output(input: &std::path::Path) -> PathBuf {
         .and_then(|stem| stem.to_str())
         .unwrap_or("tracking");
     input.with_file_name(format!("{stem}_tracking.json"))
+}
+
+fn retention_options(
+    config: &Config,
+    overrides: RetentionOverrides,
+    dry_run: bool,
+) -> RetentionOptions {
+    let resolved = config.paths.resolve();
+    let downloads_dir = overrides.downloads_dir.unwrap_or(resolved.downloads);
+    let downloads_managed =
+        normalized_path(&downloads_dir).starts_with(normalized_path(&resolved.base));
+    RetentionOptions {
+        projects_dir: overrides.projects_dir.unwrap_or(resolved.projects),
+        archives_dir: overrides.archives_dir.unwrap_or(resolved.archives),
+        logs_dir: overrides.logs_dir.unwrap_or(resolved.logs),
+        downloads_dir,
+        downloads_managed,
+        orphan_hours: overrides
+            .orphan_hours
+            .unwrap_or(config.steps.step7.cleanup_threshold_hours),
+        archives_days: overrides
+            .archives_days
+            .unwrap_or(config.retention.archives_days),
+        logs_days: overrides.logs_days.unwrap_or(config.retention.logs_days),
+        downloads_days: overrides
+            .downloads_days
+            .unwrap_or(config.retention.downloads_days),
+        reports_days: overrides
+            .reports_days
+            .unwrap_or(config.retention.reports_days),
+        dry_run,
+    }
+}
+
+fn normalized_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn validate_retention_paths(options: &RetentionOptions, config: &Config) -> Result<()> {
+    let resolved = config.paths.resolve();
+    let cwd = std::env::current_dir().context("répertoire courant introuvable")?;
+    let mut protected = vec![
+        normalized_path(&resolved.base),
+        normalized_path(&resolved.finalized),
+        normalized_path(&resolved.cache_root),
+        normalized_path(&cwd),
+    ];
+    if let Some(home) = std::env::var_os("HOME") {
+        protected.push(normalized_path(Path::new(&home)));
+    }
+    let deliverables = [
+        normalized_path(&resolved.finalized),
+        normalized_path(&resolved.cache_root),
+    ];
+    let roots = [
+        ("projets", &options.projects_dir),
+        ("archives", &options.archives_dir),
+        ("journaux", &options.logs_dir),
+        ("téléchargements", &options.downloads_dir),
+    ];
+    for (label, root) in roots {
+        let root = normalized_path(root);
+        if root == Path::new("/")
+            || protected.iter().any(|guard| guard.starts_with(&root))
+            || deliverables.iter().any(|guard| root.starts_with(guard))
+        {
+            anyhow::bail!(
+                "rétention refusée pour les {label}: {} est un répertoire racine, un parent du runtime ou un livrable",
+                root.display()
+            );
+        }
+    }
+    if options.downloads_days > 0 && !options.downloads_managed {
+        anyhow::bail!(
+            "nettoyage des téléchargements refusé: {} est hors du runtime ; utilisez 0 ou un répertoire dédié sous paths.base",
+            options.downloads_dir.display()
+        );
+    }
+    Ok(())
 }
 
 fn main() {
@@ -400,6 +530,7 @@ fn run() -> Result<()> {
                 panel_jsx,
                 config_json,
                 logs_dir,
+                timeout_s,
                 dry_run,
             } => {
                 let resolved = config.paths.resolve();
@@ -423,11 +554,29 @@ fn run() -> Result<()> {
                     cwd,
                     dry_run,
                     max_drivers_kept: config.steps.step8.max_drivers_kept,
+                    timeout_s: timeout_s.unwrap_or(config.steps.step8.timeout_s),
                 };
                 let outcome = run_step8(&options).context("exécution de STEP8")?;
                 println!("{}", serde_json::to_string_pretty(&outcome)?);
                 if !outcome.success {
-                    anyhow::bail!("STEP8 en échec");
+                    std::process::exit(outcome.exit_code);
+                }
+            }
+        },
+        Command::Retention(args) => match args.command {
+            RetentionCommand::Plan(overrides) => {
+                let options = retention_options(&config, overrides, true);
+                validate_retention_paths(&options, &config)?;
+                let report = plan_retention(&options).context("calcul du plan de rétention")?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            RetentionCommand::Apply(overrides) => {
+                let options = retention_options(&config, overrides, false);
+                validate_retention_paths(&options, &config)?;
+                let report = apply_retention(&options).context("application de la rétention")?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.errors.is_empty() {
+                    anyhow::bail!("{} suppression(s) en échec", report.errors.len());
                 }
             }
         },

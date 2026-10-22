@@ -5,6 +5,11 @@
 __pycache__/
 *.py[cod]
 
+# Modèles copiés : binaires locaux, manifeste versionné.
+/assets/models/*
+!/assets/models/README.md
+!/assets/models/manifest.toml
+
 # Corpus de parité : médias dérivés de productions et sorties volumineuses.
 /parity/cases/*
 !/parity/cases/corpus.lock.json

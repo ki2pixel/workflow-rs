@@ -1,0 +1,101 @@
+# Manifeste des modèles copiés dans workflow-rs.
+# Les binaires sont ignorés par git ; ce fichier et les SHA-256 sont versionnés.
+
+version = 1
+source_root = "/home/kidpixel/workflow_mediapipe"
+
+[[model]]
+role = "step2.transnet"
+path = "step2/transnetv2.onnx"
+source = "assets/models/onnx/transnetv2.onnx"
+size = 30528037
+sha256 = "63d1647380b992b44230c2acc1d7f5fea65ffd42148469cb7b5ee2506aeaf7dd"
+purpose = "TransNetV2 ONNX Runtime CUDA"
+
+[[model]]
+role = "step3.yamnet"
+path = "step3/yamnet_split_edgetpu_compiled.tflite"
+source = "assets/yamnet_split_edgetpu_compiled.tflite"
+size = 4145888
+sha256 = "8478a9a96ac2c61b783b3474ee5fa94ed115c46ea87a63ebb9cf9dbfd5fa989b"
+purpose = "YAMNet split Edge TPU"
+
+[[model]]
+role = "step3.yamnet_fallback"
+path = "step3/yamnet_split_quantized.tflite"
+source = "assets/yamnet_split_quantized.tflite"
+size = 4054984
+sha256 = "d496f20fb57bfa46454e841460bf1df619ce32fe4c45088b4935b8cd9ff5d546"
+purpose = "YAMNet split quantifié, repli"
+
+[[model]]
+role = "step3.ecapa"
+path = "step3/ecapa_tdnn_speaker_float.onnx"
+source = "assets/ecapa_tdnn_speaker_float.onnx"
+size = 579601
+sha256 = "f5ea476699771a76c0b987a802e98b0cf7a5a622362b29e1ff13ead6c93cb346"
+purpose = "ECAPA-TDNN ONNX Runtime CPU"
+
+[[model]]
+role = "step3.ecapa_data"
+path = "step3/ecapa_tdnn_speaker_float.onnx.data"
+source = "assets/ecapa_tdnn_speaker_float.onnx.data"
+size = 83230720
+sha256 = "34157af522b5af3efd04960011f6753ed082f2ebccbe31585be82d38f04888e4"
+purpose = "Données externes ECAPA"
+
+[[model]]
+role = "step4.blazeface"
+path = "step4/blazeface_front_quantized_edgetpu.tflite"
+source = "assets/blazeface_front_quantized_edgetpu.tflite"
+size = 406480
+sha256 = "ee0a04c9e7bd24808309495a99b5e7dc96d107c018dcbd94eb1d062f239abb2c"
+purpose = "BlazeFace Edge TPU"
+
+[[model]]
+role = "step4.facemesh"
+path = "step4/facemesh_quantized_edgetpu.tflite"
+source = "assets/facemesh_quantized_edgetpu.tflite"
+size = 1020944
+sha256 = "f9ac4cff437e62e5ed5ebf919244135e46858bc5cc61f31a4e5159f7faa53cf3"
+purpose = "FaceMesh Edge TPU"
+
+[[model]]
+role = "step4.blendshapes"
+path = "step4/face_blendshapes.tflite"
+source = "assets/face_blendshapes.tflite"
+size = 955312
+sha256 = "4f36dded049db18d76048567439b2a7f58f1daabc00d78bfe8f3ad396a2d2082"
+purpose = "Blendshapes TFLite"
+
+[[model]]
+role = "step4.cocompiled.blazeface"
+path = "step4/cocompiled/blazeface_front_quantized_edgetpu.tflite"
+source = "assets/cocompiled/blazeface_front_quantized_edgetpu.tflite"
+size = 394336
+sha256 = "7401465967a016816192c88abec13070c243f6b34e5b5d9e014b5b0051b1540c"
+purpose = "BlazeFace co-compilé"
+
+[[model]]
+role = "step4.cocompiled.facemesh"
+path = "step4/cocompiled/facemesh_quantized_edgetpu.tflite"
+source = "assets/cocompiled/facemesh_quantized_edgetpu.tflite"
+size = 996448
+sha256 = "8609dbf983a311948212825583d7091954a5e8f27b13e41fbca4fb1ad521705e"
+purpose = "FaceMesh co-compilé"
+
+[[model]]
+role = "step4.object_detector_fallback"
+path = "step4/detect_edgetpu.tflite"
+source = "assets/detect_edgetpu.tflite"
+size = 4625312
+sha256 = "2351103a16c0af7735dc667ed38576a96b6137477134a3d9cb2b13798712e664"
+purpose = "Détecteur d'objets Edge TPU, repli"
+
+[[model]]
+role = "step4.object_detector_efficientdet_lite2"
+path = "step4/efficientdet_lite2_int8_mediapipe.tflite"
+source = "workflow_scripts/step4/models/object_detectors/tflite/efficientdet_lite2_int8_mediapipe.tflite"
+size = 7515971
+sha256 = "b3f50554cb0ea559e90328845f7d9ba4d13c8bff372914d24e06bc8bb72fa896"
+purpose = "EfficientDet-Lite2 INT8"

@@ -35,10 +35,11 @@ restent à faire.
 - Lot 1.3 terminé : STEP6 `_ae.json` avec index tracking/audio, enrichissement
   `is_speaking`/`tier`, parse CSV et recommandations de segments. Identique à la
   production sur les quatre projets ; 0,108 s et 44 Mio sur 244.
-- Shadow STEP5/6 : 12/12 vérifications identiques sur les quatre projets de
-  production disponibles (244, 245, 249, 250), sans écriture dans `/mnt/cache`.
-  La cible de dix projets reste ouverte, faute de projets complets sur la
-  machine à cette date.
+- Shadow STEP5/6 : cible de dix projets atteinte, 57/57 vérifications
+  identiques sur 19 vidéos (148, 151, 152, 244, 245, 249, 250, 253, 254, 257),
+  sans écriture dans `/mnt/cache`. Le passage `--prefer-raw` reproduit aussi les
+  19 `_tracking.json` depuis les STEP4 bruts. Détail dans
+  `docs/LOT-1-SHADOW.md`.
 - Lot 1.4 terminé : `workflow-bridge` pour les cuts CSV et `analyze_manifest`.
   Parité sur 273 calques, les quatre entrées `_ae.json` et les overrides de
   configuration ; cuts 21× plus rapide que Python.

@@ -84,6 +84,11 @@ def main() -> int:
     parser.add_argument("--cli", type=Path, default=ROOT / "target/release/workflow-cli")
     parser.add_argument("--projects", nargs="*", default=None)
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument(
+        "--prefer-raw",
+        action="store_true",
+        help="réduit le STEP4 brut <stem>.json au lieu du _tracking.json déjà réduit",
+    )
     args = parser.parse_args()
 
     root = args.root.resolve()
@@ -99,9 +104,15 @@ def main() -> int:
         return 2
 
     candidates: list[tuple[str, Path]] = []
-    for docs in sorted(root.glob("*/docs")):
-        if not docs.is_dir():
-            continue
+    # Les projets récents sont à la racine ; /mnt/cache/old/ contient les
+    # archives de production. Les deux dispositions sont acceptées.
+    docs_dirs = {
+        docs.resolve()
+        for pattern in ("*/docs", "*/*/docs")
+        for docs in root.glob(pattern)
+        if docs.is_dir()
+    }
+    for docs in sorted(docs_dirs):
         if not list(docs.glob("*_tracking.json")):
             continue
         if not list(docs.glob("*_ae.json")):
@@ -137,6 +148,12 @@ def main() -> int:
             shadow_audio = shadow / f"{stem}_audio.json"
             shadow_tracking = shadow / f"{stem}_tracking.json"
             shadow_ae = shadow / f"{stem}_ae.json"
+            raw_tracking = docs / f"{stem}.json"
+            video_input = (
+                raw_tracking
+                if args.prefer_raw and raw_tracking.exists()
+                else tracking
+            )
 
             checks = [
                 check_file(
@@ -153,7 +170,7 @@ def main() -> int:
                         "step5",
                         "video",
                         "--input",
-                        str(tracking),
+                        str(video_input),
                         "--output",
                         str(shadow_tracking),
                         "--audio",

@@ -3,37 +3,66 @@
 ## Commande
 
 ```sh
-python3 scripts/shadow-step56.py --limit 10
+python3 scripts/shadow-step56.py --root /mnt/cache --limit 10
 ```
 
-Le script lit `/mnt/cache/<projet>/docs`, écrit dans `/tmp/workflow-shadow`
+Le script lit les `docs/` de production, écrit dans `/tmp/workflow-shadow`
 (ou `--out`) et compare chaque sortie au fichier de production avec le
 comparateur sémantique du harnais. Il refuse d'écrire sous `/mnt/cache`.
 
+Depuis le déplacement des anciens projets dans `/mnt/cache/old/`, la découverte
+accepte `*/docs` et `*/*/docs`. L'option `--prefer-raw` remplace l'entrée
+`<stem>_tracking.json` par le STEP4 brut `<stem>.json` pour tester le réducteur
+STEP5 complet, pas seulement son idempotence.
+
 ## Résultat du 2026-10-22
 
-Quatre projets de production contiennent actuellement un `docs/` complet :
-244, 245, 249 et 250. Les douze vérifications sont identiques :
+La cible de dix projets est atteinte. Les dix projets sélectionnés couvrent
+19 vidéos et 57 vérifications :
 
-| Projet | STEP5 audio | STEP5 vidéo | STEP6 |
-| --- | --- | --- | --- |
-| 244 | OK | OK | OK |
-| 245 | OK | OK | OK |
-| 249 | OK | OK | OK |
-| 250 | OK | OK | OK |
+| Projet | Vidéos | STEP5 audio | STEP5 vidéo | STEP6 |
+| --- | ---: | ---: | ---: | ---: |
+| 148 Camille | 2 | OK | OK | OK |
+| 151 Camille | 5 | OK | OK | OK |
+| 152 Camille | 5 | OK | OK | OK |
+| 244 Cvmille | 1 | OK | OK | OK |
+| 245 Cvmille | 1 | OK | OK | OK |
+| 249 Cvmille | 1 | OK | OK | OK |
+| 250 Cvmille | 1 | OK | OK | OK |
+| 253 Cvmille | 1 | OK | OK | OK |
+| 254 Cvmille | 1 | OK | OK | OK |
+| 257 Cvmille | 1 | OK | OK | OK |
+| **Total** | **19** | **19/19** | **19/19** | **19/19** |
 
-Chaque projet enchaîne le shadow STEP5 (audio + tracking) puis STEP6 à partir
-des sorties shadow, et compare :
+Les 57 vérifications sont identiques. Le second passage avec `--prefer-raw`
+réduit les 19 fichiers STEP4 bruts et compare aux 19 `_tracking.json` de
+production : 57/57 identiques également. Les entrées brutes et réduites sont
+structurellement différentes (`frames` contre `frames_analysis`) ; le résultat
+n'est donc pas une comparaison de fichier à lui-même.
+
+Chaque projet enchaîne le shadow STEP5 audio, STEP5 vidéo puis STEP6 à partir
+des sorties shadow et compare :
 
 - `_audio.json` au fichier de production ;
-- `_tracking.json` au fichier de production (idempotence) ;
+- `_tracking.json` au fichier de production ;
 - `_ae.json` au fichier de production.
 
-Aucune écriture n'a été faite dans `/mnt/cache`.
+Aucune écriture n'a été faite dans `/mnt/cache` ; les manifestes de taille et
+de mtime avant/après sont identiques.
 
-## Limite
+## Couverture disponible
 
-La cible du plan est de dix projets. Seuls quatre projets complets sont
-disponibles sur la machine à cette date ; le script est prêt à traiter les
-suivants dès qu'ils apparaissent (`--limit 10`). La cible « dix projets » reste
-donc ouverte et ne doit pas être déclarée acquise.
+`/mnt/cache` contient 14 projets complets, soit 23 vidéos avec les six artefacts
+STEP1 à STEP6. Le shadow en couvre dix. Les quatre projets restants
+(`260`, `262`, `263`, `265`) peuvent être ajoutés avec `--limit 14`.
+
+Le dossier `153 Camille` n'est pas utilisable pour ce shadow : il n'existe que
+sous forme de ZIP de sources, sans `docs/` ni artefacts STEP2 à STEP6. Il devra
+d'abord passer par STEP1 à STEP4. Les trois dossiers complets à la racine sont
+`148`, `151` et `152` ; ils totalisent 12 vidéos.
+
+## Limite restante
+
+La validation Windows/After Effects et le branchement de l'orchestrateur Rust
+restent hors de ce shadow. Le script ne prouve pas les chemins d'échec du
+comparateur ; il compare des sorties de production valides.

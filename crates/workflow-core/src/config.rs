@@ -92,9 +92,43 @@ impl Config {
                 "steps.step2.device doit être cuda ou cpu".into(),
             ));
         }
-        if !(0.0..=1.0).contains(&self.steps.step3.adaptive_threshold) {
+        if !matches!(self.steps.step3.device.as_str(), "tpu" | "coral" | "cpu") {
             return Err(ConfigError::Invalid(
-                "steps.step3.adaptive_threshold doit être dans [0, 1]".into(),
+                "steps.step3.device doit être tpu ou cpu".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.steps.step3.vad_threshold) {
+            return Err(ConfigError::Invalid(
+                "steps.step3.vad_threshold doit être dans [0, 1]".into(),
+            ));
+        }
+        if !(0.0..1.0).contains(&self.steps.step3.hop_overlap) {
+            return Err(ConfigError::Invalid(
+                "steps.step3.hop_overlap doit être dans [0, 1[".into(),
+            ));
+        }
+        if self.steps.step3.median_filter_size == 0
+            || self.steps.step3.embedding_stride == 0
+            || self.steps.step3.adaptive_threshold == 0
+            || self.steps.step3.max_workers == 0
+            || self.steps.step3.max_speakers == 0
+            || self.steps.step3.min_cluster_embeddings == 0
+            || self.steps.step3.ecapa_batch_size == 0
+        {
+            return Err(ConfigError::Invalid(
+                "steps.step3: les tailles et seuils doivent être > 0".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.steps.step3.clustering_threshold) {
+            return Err(ConfigError::Invalid(
+                "steps.step3.clustering_threshold doit être dans [0, 1]".into(),
+            ));
+        }
+        if self.steps.step3.hangover_sec < 0.0 || self.steps.step3.min_speaker_speech_duration < 0.0
+        {
+            return Err(ConfigError::Invalid(
+                "steps.step3.hangover_sec et min_speaker_speech_duration doivent être positifs"
+                    .into(),
             ));
         }
         if self.hardware.gpu_mem_limit_mb == 0 {
@@ -432,10 +466,38 @@ pub struct Step3Config {
     pub enabled: bool,
     pub yamnet_split: bool,
     pub require_edgetpu: bool,
+    /// `tpu` (nominal) ou `cpu` (tests explicites uniquement).
+    pub device: String,
     pub embedding_stride: u32,
     pub adaptive_stride: bool,
-    pub adaptive_threshold: f64,
+    /// Nombre de fenêtres de parole à partir duquel le stride adaptatif vaut 2.
+    pub adaptive_threshold: u32,
     pub max_workers: u32,
+    /// Modèle YAMNet Split compilé pour l'Edge TPU.
+    pub yamnet: PathBuf,
+    /// Modèle YAMNet Split quantifié, utilisé uniquement par `device = "cpu"`.
+    pub yamnet_fallback: PathBuf,
+    /// Matrice mel YAMNet (257, 64) au format NPY.
+    pub mel_matrix: PathBuf,
+    /// ECAPA-TDNN float32 exécuté sur CPU via ONNX Runtime.
+    pub ecapa: PathBuf,
+    pub tflite: PathBuf,
+    pub edgetpu: PathBuf,
+    /// Bibliothèque ONNX Runtime à charger dynamiquement. Vide : nom système.
+    pub onnxruntime: Option<PathBuf>,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
+    pub ffmpeg_threads: u32,
+    pub cpu_threads: u32,
+    pub vad_threshold: f64,
+    pub hop_overlap: f64,
+    pub median_filter_size: u32,
+    pub hangover_sec: f64,
+    pub max_speakers: u32,
+    pub clustering_threshold: f64,
+    pub min_speaker_speech_duration: f64,
+    pub min_cluster_embeddings: u32,
+    pub ecapa_batch_size: u32,
 }
 
 impl Default for Step3Config {
@@ -444,10 +506,31 @@ impl Default for Step3Config {
             enabled: true,
             yamnet_split: true,
             require_edgetpu: true,
+            device: "tpu".into(),
             embedding_stride: 1,
-            adaptive_stride: true,
-            adaptive_threshold: 0.5,
+            adaptive_stride: false,
+            adaptive_threshold: 500,
             max_workers: 4,
+            yamnet: PathBuf::from("step3/yamnet_split_edgetpu_compiled.tflite"),
+            yamnet_fallback: PathBuf::from("step3/yamnet_split_quantized.tflite"),
+            mel_matrix: PathBuf::from("step3/yamnet_mel_matrix.npy"),
+            ecapa: PathBuf::from("step3/ecapa_tdnn_speaker_float.onnx"),
+            tflite: PathBuf::from("vendor/libtensorflowlite_c.so"),
+            edgetpu: PathBuf::from("/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"),
+            onnxruntime: None,
+            ffmpeg: PathBuf::from("ffmpeg"),
+            ffprobe: PathBuf::from("ffprobe"),
+            ffmpeg_threads: 0,
+            cpu_threads: 1,
+            vad_threshold: 0.2,
+            hop_overlap: 0.5,
+            median_filter_size: 5,
+            hangover_sec: 1.0,
+            max_speakers: 5,
+            clustering_threshold: 0.32,
+            min_speaker_speech_duration: 7.0,
+            min_cluster_embeddings: 4,
+            ecapa_batch_size: 32,
         }
     }
 }
@@ -699,6 +782,16 @@ mod tests {
     fn worker_token_default_is_rejected_for_server() {
         let config = Config::default();
         assert!(config.validate_server().is_err());
+    }
+
+    #[test]
+    fn step3_thresholds_are_validated() {
+        let mut config = Config::default();
+        config.steps.step3.vad_threshold = 1.5;
+        assert!(config.validate_common().is_err());
+        let mut config = Config::default();
+        config.steps.step3.adaptive_threshold = 0;
+        assert!(config.validate_common().is_err());
     }
 
     #[test]

@@ -39,6 +39,36 @@ tracking_analytics = true
 expression_summary = false
 expression_keys = ["jawOpen"]
 
+[steps.step3]
+enabled = true
+yamnet_split = true
+require_edgetpu = true
+device = "tpu"
+embedding_stride = 1
+adaptive_stride = false
+adaptive_threshold = 500
+max_workers = 1
+yamnet = "step3/yamnet_split_edgetpu_compiled.tflite"
+yamnet_fallback = "step3/yamnet_split_quantized.tflite"
+mel_matrix = "step3/yamnet_mel_matrix.npy"
+ecapa = "step3/ecapa_tdnn_speaker_float.onnx"
+tflite = "/home/kidpixel/workflow-rs/vendor/libtensorflowlite_c.so"
+edgetpu = "/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"
+onnxruntime = "/home/kidpixel/workflow_mediapipe/coral_env/lib/python3.11/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"
+ffmpeg_threads = 0
+cpu_threads = 1
+vad_threshold = 0.2
+hop_overlap = 0.5
+median_filter_size = 5
+hangover_sec = 1.0
+max_speakers = 5
+clustering_threshold = 0.32
+min_speaker_speech_duration = 7.0
+min_cluster_embeddings = 4
+ecapa_batch_size = 32
+
 [steps.step4]
 enabled = true
 device = "tpu"

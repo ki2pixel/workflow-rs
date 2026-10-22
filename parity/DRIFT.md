@@ -7,14 +7,14 @@ est mis à jour à chaque mesure de parité.
 | ID | Sévérité | Étape | Constat | Décision pour le portage |
 | --- | --- | --- | --- | --- |
 | D-001 | moyenne | STEP2/6 | STEP2 écrit `<stem>.csv` ; l'archive ajoute `_scenes.csv`. STEP6 lit `<stem>.csv` uniquement. | Corrigé dans le contrat. Le portage conserve `<stem>.csv` et nomme l'archive `_scenes.csv` à la finalisation. |
-| D-002 | haute | STEP3 | Sans piste audio, le worker lève une traceback ffmpeg, le parent compte 0/1 réussite mais sort en code 0 et ne produit aucun `_audio.json`. | Ne pas reproduire le succès silencieux. Le portage journalise un skip structuré et sort en 0 sans artefact, ou en erreur selon la politique du lot 1. |
+| D-002 | haute | STEP3 | Sans piste audio, le worker lève une traceback ffmpeg, le parent compte 0/1 réussite mais sort en code 0 et ne produit aucun `_audio.json`. | Ne pas reproduire le succès silencieux. Le portage journalise un skip structuré et sort en 0 sans artefact, ou en erreur selon la politique du lot 1. Implémenté au lot 4 : `SKIP_NO_AUDIO`, aucune sortie, code 0 et `skipped_no_audio = 1`. |
 | D-003 | haute | STEP5 | `_extract_metadata_streaming` s'arrête au début de `frames_analysis`. STEP5 écrit `fps`/`total_frames` après le tableau : une seconde passe perd `audio_fps` et `temporal_alignment`. | Écrire l'en-tête avant le tableau, ou rendre le parseur indépendant de l'ordre. Le harnais reconstruit l'ordre brut pour le fixture. |
 | D-004 | haute | STEP4 | `EnhancedSpeakingDetector` charge implicitement `<stem>.csv` et `<stem>_audio.json`. Sans eux, STEP4 sort en 0 mais omet `speaking_sources.audio` et `.segment`. | Déclarer ces dépendances dans le DAG Rust. Un STEP4 sans CSV/audio doit être un mode explicite, pas un succès partiel silencieux. Implémenté au lot 3 : les deux fichiers sont requis par défaut, `--allow-partial-speaking` est réservé aux fixtures. |
 | D-005 | basse | STEP4 | `metadata.video_path` contient le chemin absolu de production. | Le comparateur l'ignore. Le portage peut conserver le champ pour compatibilité, ou stocker un chemin relatif ; décision au lot 3 : le chemin absolu observé est conservé. |
 | D-006 | moyenne | Config | Les `.env` contiennent des commentaires inline (`STEP5_INCLUDE_TRACKING_ANALYTICS=1  # ...`). `python-dotenv` les retire, un parseur naïf non. | Le chargeur Rust retire les commentaires hors guillemets, ou passe à TOML. |
 | D-007 | moyenne | STEP3/5 | STEP3 produit `speaker_stats` par locuteur (`total_time_sec`, `percentage`) ; STEP5 le remplace par `unique_speakers` et `speaker_frame_counts`. | Définir un schéma unique ou documenter la transition. Le harnais applique la projection STEP5 avant comparaison. |
 | D-008 | basse | STEP4 | Le JSON est écrit en streaming directement dans le fichier final ; une interruption laisse un fichier tronqué. | Écriture atomique dans le portage (temporaire + rename), format inchangé. Implémenté au lot 3. |
-| D-009 | info | STEP2-6 | Sur les projets 244 et 245, les sorties STEP2, STEP3 (après projection), STEP4, STEP5 et STEP6 sont identiques à la production ; 249 et 250 sont identiques sur STEP5/6. | Aucun écart de comportement à corriger ; ces sorties servent de fixtures. |
+| D-009 | info | STEP2-6 | Sur les projets 244 et 245, les sorties STEP2, STEP3 (après projection), STEP4, STEP5 et STEP6 sont identiques à la production ; 249 et 250 sont identiques sur STEP5/6. Au lot 4, le JSON STEP3 brut de 244 et 245 est aussi identique au script Python relancé sur copie isolée. | Aucun écart de comportement à corriger ; ces sorties servent de fixtures. |
 | D-010 | info | STEP1 | Un MOV avec alpha est préservé à l'octet près, sans réencodage (`skipped=1`). | Conserver la détection alpha et la liste `PRESERVED_MOV_NAMES`. |
 | D-011 | basse | Harnais | La VRAM globale n'est pas imputable à une étape ; le harnais distingue désormais `gpu_memory_peak_mb` (processus) et `gpu_total_peak_mb` (carte). | Utiliser la colonne « GPU étape » pour les comparaisons. |
 | D-012 | haute | Isolation | L'application Python n'utilise pas `workflow-hw.lock`. Le harnais le prend, mais l'ancienne application peut démarrer STEP1-4 pendant un test. | Le portage et les scripts de test prennent le verrou. Pendant la transition, vérifier `/sequence/status` et `pgrep` avant toute mesure. |
@@ -39,7 +39,8 @@ coral_env/bin/python tools/parity/parity.py run --case silent_step3
 Le code de sortie est 0, `outputs` est vide, et la console contient
 `CalledProcessError` puis `0/1 réussie(s)`. Le cas est marqué
 `allow_empty_outputs = true` dans le manifeste pour ne pas le confondre avec
-une régression.
+une régression. Le port Rust produit `SKIP_NO_AUDIO` et
+`skipped_no_audio = 1`, sans supprimer une éventuelle sortie existante.
 
 ### D-003 — Ordre des clés et réduction audio
 

@@ -29,6 +29,14 @@ sha256 = "d496f20fb57bfa46454e841460bf1df619ce32fe4c45088b4935b8cd9ff5d546"
 purpose = "YAMNet split quantifié, repli"
 
 [[model]]
+role = "step3.mel_matrix"
+path = "step3/yamnet_mel_matrix.npy"
+source = "assets/yamnet_mel_matrix.npy"
+size = 65920
+sha256 = "253beb8f25f39dbedd7f338f81208412b5b14b18ed75195b73ebcd985117c377"
+purpose = "Matrice mel YAMNet Split (257, 64)"
+
+[[model]]
 role = "step3.ecapa"
 path = "step3/ecapa_tdnn_speaker_float.onnx"
 source = "assets/ecapa_tdnn_speaker_float.onnx"

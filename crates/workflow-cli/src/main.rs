@@ -7,6 +7,8 @@ use workflow_core::Config;
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step2::{run_step2, Step2Options};
 #[cfg(unix)]
+use workflow_steps::step3::{run_step3, Step3Options};
+#[cfg(unix)]
 use workflow_steps::step4::{run_step4, Step4Options};
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
@@ -33,6 +35,9 @@ enum Command {
     Config(ConfigArgs),
     /// Détection de scènes STEP2 (TransNetV2 ONNX Runtime).
     Step2(Step2Args),
+    /// Diarisation audio STEP3 (YAMNet Split Coral, ECAPA-TDNN, AHC).
+    #[cfg(unix)]
+    Step3(Step3Args),
     /// Tracking facial et objets STEP4 (BlazeFace, FaceMesh, Coral).
     #[cfg(unix)]
     Step4(Step4Args),
@@ -107,6 +112,54 @@ enum Step2Command {
         ffmpeg: Option<PathBuf>,
         #[arg(long)]
         ffmpeg_threads: Option<u32>,
+    },
+}
+
+#[cfg(unix)]
+#[derive(Debug, Args)]
+struct Step3Args {
+    #[command(subcommand)]
+    command: Step3Command,
+}
+
+#[cfg(unix)]
+#[derive(Debug, Subcommand)]
+enum Step3Command {
+    /// Analyse récursivement un dossier et écrit `<stem>_audio.json`.
+    Diarize {
+        /// Dossier contenant les vidéos.
+        #[arg(long)]
+        input_dir: PathBuf,
+        /// Re-traite même si le JSON audio existe déjà.
+        #[arg(long)]
+        force: bool,
+        /// `tpu` (nominal) ou `cpu` (tests explicites).
+        #[arg(long)]
+        device: Option<String>,
+        /// Surcharge le modèle YAMNet Split compilé.
+        #[arg(long)]
+        yamnet: Option<PathBuf>,
+        /// Surcharge le modèle YAMNet quantifié de test CPU.
+        #[arg(long)]
+        yamnet_fallback: Option<PathBuf>,
+        /// Surcharge le modèle ECAPA-TDNN.
+        #[arg(long)]
+        ecapa: Option<PathBuf>,
+        /// Surcharge la matrice mel YAMNet.
+        #[arg(long)]
+        mel_matrix: Option<PathBuf>,
+        /// Surcharge la bibliothèque TFLite C.
+        #[arg(long)]
+        tflite: Option<PathBuf>,
+        /// Surcharge la bibliothèque Edge TPU.
+        #[arg(long)]
+        edgetpu: Option<PathBuf>,
+        /// Surcharge ONNX Runtime.
+        #[arg(long)]
+        onnxruntime: Option<PathBuf>,
+        /// Remplace le répertoire des journaux STEP3.
+        #[arg(long)]
+        logs_dir: Option<PathBuf>,
     },
 }
 
@@ -555,6 +608,57 @@ fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
                     anyhow::bail!("STEP2: {} vidéo(s) en échec", report.failures.len());
+                }
+            }
+        },
+        #[cfg(unix)]
+        Command::Step3(args) => match args.command {
+            Step3Command::Diarize {
+                input_dir,
+                force,
+                device,
+                yamnet,
+                yamnet_fallback,
+                ecapa,
+                mel_matrix,
+                tflite,
+                edgetpu,
+                onnxruntime,
+                logs_dir,
+            } => {
+                let mut options = Step3Options::from_config(&config, input_dir)?;
+                options.force = force;
+                if let Some(value) = device {
+                    options.device = workflow_steps::step3::Step3Device::parse(&value)?;
+                }
+                if let Some(path) = yamnet {
+                    options.yamnet = path;
+                }
+                if let Some(path) = yamnet_fallback {
+                    options.yamnet_fallback = path;
+                }
+                if let Some(path) = ecapa {
+                    options.ecapa = path;
+                }
+                if let Some(path) = mel_matrix {
+                    options.mel_matrix = path;
+                }
+                if let Some(path) = tflite {
+                    options.tflite = path;
+                }
+                if let Some(path) = edgetpu {
+                    options.edgetpu = path;
+                }
+                if let Some(path) = onnxruntime {
+                    options.onnxruntime = Some(path);
+                }
+                if let Some(dir) = logs_dir {
+                    options.logs_dir = Some(dir);
+                }
+                let report = run_step3(&options)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!("STEP3: {} vidéo(s) en échec", report.failures.len());
                 }
             }
         },

@@ -13,9 +13,11 @@ audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 Runtime CUDA, avec un CSV identique à la production sur les quatre cas du
 corpus. Le lot 3 porte STEP4 sur Coral Edge TPU : BlazeFace, FaceMesh,
 blendshapes, EfficientDet, suivi et détection de parole, avec un JSON identique
-à la production sur `face_pan`, `real_244` et `real_245`. La compilation Windows
-du pont, le basculement du JSX et la validation STEP8 sur la machine Windows
-restent à faire.
+à la production sur `face_pan`, `real_244` et `real_245`. Le lot 4 porte STEP3
+sur Coral Edge TPU : VAD YAMNet Split, embeddings ECAPA-TDNN et AHC, avec un
+`_audio.json` identique à la production sur `vox`, `real_244` et `real_245`.
+La compilation Windows du pont, le basculement du JSX et la validation STEP8
+sur la machine Windows restent à faire.
 
 ## État
 
@@ -61,6 +63,12 @@ restent à faire.
   atomique. Parité complète à `1e-6` sur `face_pan`, `real_244` et `real_245` ;
   blendshapes à `5,96e-7`, objets IoU 1,0, RSS 199,5 Mio sur `real_244`.
   Détail dans `docs/LOT-3-STEP4.md`.
+- Lot 4 terminé : STEP3 YAMNet Split Coral, frontend log-mel NPY, VAD médian
+  avec hangover, ECAPA-TDNN ONNX CPU, AHC average et writer JSON atomique.
+  JSON brut identique sur `vox_2spk`, `real_244` et `real_245` ; projection
+  STEP5 audio identique sur les deux projets. Le chemin CPU YAMNet reste un
+  mode de test explicite. Détail, performance et limites dans
+  `docs/LOT-4-STEP3.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -80,6 +88,7 @@ restent à faire.
 - `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
 - `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
+- `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -94,6 +103,11 @@ cargo run -p workflow-cli -- config show
 cargo run -p workflow-cli -- step2 detect \
   --input-dir path/to/docs \
   --force
+
+cargo run --release -p workflow-cli -- step3 diarize \
+  --config config/config.toml \
+  --input-dir path/to/docs \
+  --edgetpu /path/to/libedgetpu.so.1
 
 cargo run --release -p workflow-cli -- step4 track \
   --config config/config.toml \

@@ -4,6 +4,8 @@ pub mod error;
 pub mod retention;
 pub mod step2;
 #[cfg(unix)]
+pub mod step3;
+#[cfg(unix)]
 pub mod step4;
 pub mod step5;
 pub mod step6;

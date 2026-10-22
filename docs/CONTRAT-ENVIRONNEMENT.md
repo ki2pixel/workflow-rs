@@ -318,6 +318,16 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > `--allow-partial-speaking` est réservé aux fixtures sans ces entrées. Le
 > module est compilé sous Unix uniquement, la cible de production restant
 > Linux. Il n'est pas encore branché à l'orchestrateur.
+>
+> Lot 4 : le port Rust de STEP3 est lancé par
+> `workflow-cli step3 diarize --input-dir <docs>`. Il écrit le même
+> `<stem>_audio.json` brut (en-tête, `speaker_stats`, une entrée par frame) via
+> temporaire puis renommage. Le chemin nominal exige YAMNet Split compilé et le
+> Coral (`device = "tpu"`, `require_edgetpu = true`) ; `--device cpu` utilise
+> le modèle quantifié et reste un mode de test explicite. ECAPA-TDNN tourne sur
+> CPU via ONNX Runtime. Le traitement des vidéos est séquentiel et le module
+> n'est pas encore branché à l'orchestrateur. Détail et mesures dans
+> `docs/LOT-4-STEP3.md`.
 
 STEP4 reçoit en plus `--videos_json_path <temp.json>` : la liste des vidéos sans `<stem>.json` voisin, produite par l'orchestrateur avant lancement. Si la liste est vide, l'étape se termine immédiatement en succès sans lancer de processus.
 

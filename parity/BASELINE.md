@@ -40,3 +40,7 @@ Généré le 2026-10-21T23:39:20.584767+00:00.
 ## Notes
 
 - `silent_step3` : Sans piste audio, STEP3 sort en 0 après une traceback ffmpeg et ne produit rien.
+- Lot 4 : le port Rust de STEP3 reproduit le JSON brut de `vox_step3`,
+  `real_244_step3` et `real_245_step3` à 0 différence (références Python
+  régénérées sur copies isolées pour les deux projets). Les mesures Rust sont
+  consignées dans `docs/LOT-4-STEP3.md`.

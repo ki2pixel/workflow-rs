@@ -6,6 +6,7 @@ use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
+use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
 
 #[derive(Debug, Parser)]
 #[command(name = "workflow-cli", version, about = "CLI du pipeline Rust")]
@@ -24,6 +25,8 @@ enum Command {
     Config(ConfigArgs),
     /// Sous-commandes de STEP5 (réduction JSON).
     Step5(Step5Args),
+    /// Sous-commandes de STEP6 (pré-traitement AE).
+    Step6(Step6Args),
 }
 
 #[derive(Debug, Args)]
@@ -74,6 +77,49 @@ enum Step5Command {
         #[arg(long, value_delimiter = ',')]
         expression_keys: Option<Vec<String>>,
     },
+}
+
+#[derive(Debug, Args)]
+struct Step6Args {
+    #[command(subcommand)]
+    command: Step6Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Step6Command {
+    /// Construit `<stem>_ae.json` à partir du tracking, de l'audio et du CSV.
+    Build {
+        #[arg(long)]
+        tracking: PathBuf,
+        /// Par défaut : `<stem>_ae.json`.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Par défaut : `<stem>_audio.json` à côté du tracking.
+        #[arg(long)]
+        audio: Option<PathBuf>,
+        /// Par défaut : `<stem>.csv` à côté du tracking.
+        #[arg(long)]
+        csv: Option<PathBuf>,
+    },
+}
+
+fn default_ae_output(tracking: &std::path::Path) -> PathBuf {
+    let name = tracking
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with("_ae.json") {
+        return tracking.to_path_buf();
+    }
+    let stem = if lower.ends_with("_tracking.json") {
+        &name[..name.len() - "_tracking.json".len()]
+    } else if lower.ends_with(".json") {
+        &name[..name.len() - ".json".len()]
+    } else {
+        name
+    };
+    tracking.with_file_name(format!("{stem}_ae.json"))
 }
 
 fn default_video_output(input: &std::path::Path) -> PathBuf {
@@ -168,6 +214,33 @@ fn run() -> Result<()> {
                 let meta = reduce_video_file(&input, &output, &options)
                     .with_context(|| format!("réduction vidéo de {}", input.display()))?;
                 println!("{}", serde_json::to_string(&meta)?);
+            }
+        },
+        Command::Step6(args) => match args.command {
+            Step6Command::Build {
+                tracking,
+                output,
+                audio,
+                csv,
+            } => {
+                let output = output.unwrap_or_else(|| default_ae_output(&tracking));
+                let options = AeOptions {
+                    audio,
+                    csv,
+                    config: SegmentConfig {
+                        spread_threshold: f64::from(config.steps.step6.spread_threshold),
+                        confidence_weight: config.steps.step6.confidence_weight,
+                    },
+                };
+                let payload = build_ae_payload_file(&tracking, &output, &options)
+                    .with_context(|| format!("pré-traitement AE de {}", tracking.display()))?;
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "output": output,
+                        "written": payload.is_some()
+                    })
+                );
             }
         },
     }

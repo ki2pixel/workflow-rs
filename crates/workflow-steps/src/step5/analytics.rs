@@ -2,7 +2,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use workflow_schema::round::{round2, round4};
 
-use super::util::{as_f64_loose, json_number};
+use crate::value::{as_f64_loose, json_number};
 
 const CONFIDENCE_BUCKETS: [(f64, f64); 5] = [
     (0.0, 0.25),

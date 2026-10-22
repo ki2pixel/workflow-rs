@@ -5,8 +5,8 @@
 //! donc bornée par la frame courante, pas par le document complet.
 
 use super::analytics::{ExpressionCollector, TrackingAnalyticsBuilder};
-use super::util::{as_i64_loose, json_number};
 use crate::error::StepError;
+use crate::value::{as_i64_loose, json_number};
 use serde::de::{DeserializeSeed, Error as DeError, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Number, Value};

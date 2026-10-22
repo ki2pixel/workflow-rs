@@ -1,0 +1,19 @@
+[package]
+name = "workflow-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "workflow-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+workflow-core = { path = "../workflow-core" }
+workflow-schema = { path = "../workflow-schema" }
+workflow-steps = { path = "../workflow-steps" }

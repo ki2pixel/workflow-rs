@@ -1,0 +1,57 @@
+# Configuration de workflow-rs
+#
+# Les secrets ne sont pas écrits dans ce fichier. Ils sont lus depuis
+# l'environnement, avec priorité aux noms WORKFLOW_* :
+#
+# - WORKFLOW_SERVER_SECRET_KEY ;
+# - WORKFLOW_SERVER_WORKER_TOKEN ;
+# - WORKFLOW_SERVER_PORT (optionnel) ;
+# - WORKFLOW_PATHS_BASE (optionnel) ;
+# - WORKFLOW_WEBHOOK_URL (optionnel).
+#
+# Les anciens noms FLASK_SECRET_KEY et INTERNAL_WORKER_COMMS_TOKEN restent
+# acceptés pour la période de transition. Les autres clés viennent uniquement
+# de ce TOML, qui refuse toute clé inconnue.
+
+[server]
+host = "127.0.0.1"
+port = 5004
+debug = false
+secret_key = ""
+worker_token = ""
+
+[paths]
+base = "/home/kidpixel/workflow-rs/runtime"
+models = "/home/kidpixel/workflow-rs/assets/models"
+downloads = "/home/kidpixel/workflow-rs/runtime/downloads"
+cache_root = "/mnt/cache"
+finalized = "/mnt/cache"
+
+[webhook]
+url = "https://webhook.kidpixel.fr/webhook_proxy.php"
+
+[steps.filter]
+keyword = "Camille"
+docs_subfolder = "docs"
+
+[steps.step5]
+tracking_analytics = true
+expression_summary = false
+expression_keys = ["jawOpen"]
+
+[steps.step4]
+object_detector = "efficientdet_lite2"
+object_detector_path = "step4/efficientdet_lite2_int8_mediapipe.tflite"
+
+[steps.step6]
+spread_threshold = 200
+enable_confidence_weighting = true
+confidence_weight = 0.35
+label_high_spread = 12
+label_stable = 3
+label_fallback_center = 1
+
+[hardware]
+tpu_device = "/dev/apex_0"
+gpu_mem_limit_mb = 4096
+require_tpu = true

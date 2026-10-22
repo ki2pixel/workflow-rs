@@ -1,0 +1,15 @@
+[package]
+name = "workflow-steps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+workflow-core = { path = "../workflow-core" }
+workflow-schema = { path = "../workflow-schema" }
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -4,9 +4,9 @@ Réécriture Rust du pipeline `workflow_mediapipe`.
 
 Le dépôt Python reste la référence de production jusqu'au cutover. Le lot 0 a
 validé le pont matériel Coral, le contrat d'environnement et le harnais de
-parité. Le lot 1 est en cours : le socle Rust, la configuration TOML et la
-réduction audio de STEP5 sont opérationnels ; la réduction vidéo de STEP5,
-STEP6 et le pont Windows restent à porter.
+parité. Le lot 1 est en cours : le socle Rust, la configuration TOML, STEP5
+audio et STEP5 vidéo sont opérationnels ; STEP6 et le pont Windows restent à
+porter.
 
 ## État
 
@@ -16,9 +16,13 @@ STEP6 et le pont Windows restent à porter.
 - Lot 1.1 terminé : workspace `workflow-core` / `workflow-schema` /
   `workflow-steps` / `workflow-cli`, configuration TOML typée, CLI de
   validation, réducteur audio STEP5 avec en-tête avant le tableau.
-- Le réducteur audio est identique à la production sur les quatre projets
-  (244, 245, 249, 250), y compris lorsque `fps` et `total_frames` sont placés
-  après `frames_analysis`.
+- Lot 1.2 terminé : réducteur vidéo STEP5 en streaming, analytics et alignement
+  temporel, chemin rapide typé pour les STEP4 bruts.
+- STEP5 audio et vidéo sont identiques à la production sur les quatre projets
+  (244, 245, 249, 250). STEP4 brut pour 244/245 ; idempotence sur 249/250.
+- Performance release : 0,096 s (5,9×) sur 244, 0,101 s sur 245, 0,072 s sur
+  249, 0,039 s sur 250, RSS 16 Mio. Détail et décision ouverte dans
+  `docs/LOT-1-STEP5.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -30,6 +34,7 @@ STEP6 et le pont Windows restent à porter.
 - `config/config.toml` : configuration typée ; secrets par variables d'environnement.
 - `config/env.map.toml` : correspondance entre l'ancien `.env` et le futur `config.toml`.
 - `assets/models/manifest.toml` : rôles, tailles et SHA-256 des modèles copiés.
+- `docs/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -42,11 +47,18 @@ cargo run -p workflow-cli -- config show
 cargo run -p workflow-cli -- step5 audio \
   --input path/to/audio.json \
   --output path/to/audio_reduced.json
+
+cargo run -p workflow-cli -- step5 video \
+  --input path/to/real_244.json \
+  --output path/to/real_244_tracking.json \
+  --audio path/to/real_244_audio.json
 ```
 
-Sans `--output`, le fichier d'entrée est réécrit de façon atomique, comme dans
-la production. L'en-tête `fps` / `total_frames` est écrit avant
-`frames_analysis` ; une seconde réduction conserve donc les métadonnées.
+Sans `--output` audio, le fichier d'entrée est réécrit de façon atomique, comme
+dans la production. Sans `--output` vidéo, la CLI écrit
+`<stem>_tracking.json` (ou réécrit un fichier déjà nommé `_tracking.json`).
+L'en-tête `fps` / `total_frames` est écrit avant `frames_analysis` ; une seconde
+réduction conserve donc les métadonnées.
 
 ## Parité
 

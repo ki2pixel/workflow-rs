@@ -16,6 +16,8 @@ pub enum StepError {
     },
     #[error("JSON invalide: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("I/O: {0}")]
+    Io(#[from] std::io::Error),
     #[error("schéma inattendu: {0}")]
     Schema(String),
 }

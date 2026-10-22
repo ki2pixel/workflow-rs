@@ -4,7 +4,8 @@ use serde_json::json;
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
-use workflow_steps::step5::audio::reduce_audio_file;
+use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
+use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
 
 #[derive(Debug, Parser)]
 #[command(name = "workflow-cli", version, about = "CLI du pipeline Rust")]
@@ -55,6 +56,39 @@ enum Step5Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Réduit un fichier de tracking STEP4 (ou un tracking déjà réduit).
+    Video {
+        #[arg(long)]
+        input: PathBuf,
+        /// Par défaut : `<stem>_tracking.json` (ou réécriture si le nom le contient déjà).
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Audio réduit ou brut, utilisé pour `temporal_alignment`.
+        #[arg(long)]
+        audio: Option<PathBuf>,
+        #[arg(long)]
+        no_tracking_analytics: bool,
+        #[arg(long)]
+        expression_summary: bool,
+        /// Clés séparées par des virgules, par exemple `jawOpen,eyeBlinkLeft`.
+        #[arg(long, value_delimiter = ',')]
+        expression_keys: Option<Vec<String>>,
+    },
+}
+
+fn default_video_output(input: &std::path::Path) -> PathBuf {
+    let name = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if name.ends_with("_tracking.json") {
+        return input.to_path_buf();
+    }
+    let stem = input
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("tracking");
+    input.with_file_name(format!("{stem}_tracking.json"))
 }
 
 fn main() {
@@ -106,6 +140,33 @@ fn run() -> Result<()> {
                 let output = output.unwrap_or_else(|| input.clone());
                 let meta = reduce_audio_file(&input, &output)
                     .with_context(|| format!("réduction audio de {}", input.display()))?;
+                println!("{}", serde_json::to_string(&meta)?);
+            }
+            Step5Command::Video {
+                input,
+                output,
+                audio,
+                no_tracking_analytics,
+                expression_summary,
+                expression_keys,
+            } => {
+                let output = output.unwrap_or_else(|| default_video_output(&input));
+                let audio = match audio {
+                    Some(path) => Some(read_audio_meta(&path).with_context(|| {
+                        format!("lecture des métadonnées audio {}", path.display())
+                    })?),
+                    None => None,
+                };
+                let options = VideoOptions {
+                    tracking_analytics: config.steps.step5.tracking_analytics
+                        && !no_tracking_analytics,
+                    expression_summary: config.steps.step5.expression_summary || expression_summary,
+                    expression_keys: expression_keys
+                        .unwrap_or_else(|| config.steps.step5.expression_keys.clone()),
+                    audio,
+                };
+                let meta = reduce_video_file(&input, &output, &options)
+                    .with_context(|| format!("réduction vidéo de {}", input.display()))?;
                 println!("{}", serde_json::to_string(&meta)?);
             }
         },

@@ -40,6 +40,20 @@ pub fn reduce_audio_file(input: &Path, output: &Path) -> Result<AudioMeta, StepE
     Ok(meta)
 }
 
+/// Lit un audio et retourne ses métadonnées sans réécrire le fichier.
+///
+/// Utilisé par STEP5 vidéo pour alimenter `temporal_alignment` sans modifier
+/// l'audio de production.
+pub fn read_audio_meta(input: &Path) -> Result<AudioMeta, StepError> {
+    let bytes = fs::read(input).map_err(|source| StepError::Read {
+        path: input.to_path_buf(),
+        source,
+    })?;
+    let root: Value = serde_json::from_slice(&bytes)?;
+    let (_, meta) = reduce_audio_value(&root)?;
+    Ok(meta)
+}
+
 /// Variante sans I/O, utilisée par les tests et le mode shadow.
 pub fn reduce_audio_value(root: &Value) -> Result<(Value, AudioMeta), StepError> {
     let object = root

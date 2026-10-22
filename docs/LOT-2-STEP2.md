@@ -102,10 +102,9 @@ baseline sur les quatre cas et la VRAM pic reste sous la baseline.
 
 ## Limites connues
 
-- La validation CUDA est faite sous Linux uniquement. La compilation croisée
-  Windows passe (`x86_64-pc-windows-msvc`), mais le protocole de
-  `docs/STEP2-WINDOWS.md` n'a pas encore été exécuté sur une machine Windows
-  avec GPU NVIDIA.
+- La cible de production est Linux. La compilation croisée Windows passe
+  (`x86_64-pc-windows-msvc`), mais la validation runtime est différée et non
+  bloquante ; le protocole optionnel est dans `docs/STEP2-WINDOWS.md`.
 - Le préchargement CUDA est spécifique au loader Linux. Sur une installation
   système classique, renseigner `cuda_lib_dirs` ou laisser le système résoudre
   les bibliothèques.

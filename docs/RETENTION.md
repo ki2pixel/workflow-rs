@@ -110,9 +110,10 @@ supprimer ; un fichier modifié entre le plan et l'application est conservé.
 
 ## Application Python legacy
 
-La migration Rust ne décommissionne pas l'application Python. Elle reste
-installée, active et redémarrable comme workflow legacy, avec son code, ses
-venvs, sa base SQLite, ses archives et son moniteur de nettoyage.
+La migration Rust ne décommissionne pas et ne modifie pas l'application
+Python. Elle reste installée, active et redémarrable comme workflow legacy, avec
+son code, ses routes, ses venvs, sa base SQLite, ses archives et son moniteur de
+nettoyage, sans changement imposé par les lots Rust.
 
 - Aucun retrait de l'application Python n'est planifié, et aucune fenêtre de
   30 ou 90 jours ne conditionne sa suppression.

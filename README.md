@@ -3,7 +3,8 @@
 Réécriture Rust du pipeline `workflow_mediapipe`.
 
 Le dépôt Python reste la référence de production et le workflow legacy actif ;
-la bascule du workflow principal vers Rust ne l'arrête pas. Le lot 0 a
+la bascule du workflow principal vers Rust ne l'arrête pas et ne le modifie pas.
+Le lot 0 a
 validé le pont matériel Coral, le contrat d'environnement et le harnais de
 parité. Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
@@ -68,7 +69,7 @@ STEP8 sur la machine Windows restent à faire.
 - `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
 - `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
-- `docs/STEP2-WINDOWS.md` : protocole de validation STEP2 CUDA sous Windows.
+- `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.

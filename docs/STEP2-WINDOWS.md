@@ -1,9 +1,12 @@
-# Validation STEP2 sous Windows
+# Validation STEP2 sous Windows (optionnelle)
 
-État au 2026-10-22 : **compilation croisée validée, exécution non validée**.
+État au 2026-10-22 : **hors périmètre immédiat**. La cible de production est
+Linux uniquement ; la validation Windows est différée et non bloquante.
 `cargo check --target x86_64-pc-windows-msvc -p workflow-cli` passe depuis
-Linux ; aucune session Windows avec GPU NVIDIA n'a encore été exécutée. Ce
-document sert de protocole de recette, pas de preuve de fonctionnement.
+Linux, mais aucune session Windows avec GPU NVIDIA n'a encore été exécutée.
+
+Ce document conserve le protocole de recette pour une validation externe
+ultérieure ; il ne constitue pas une preuve de fonctionnement.
 
 ## Prérequis
 
@@ -84,6 +87,6 @@ Get-FileHash .\parity\fixtures\short_2997_step2\expected\short_2997.csv -Algorit
 - Comportement de `fs::rename` avec un CSV existant : le code supprime
   explicitement la cible sous Windows avant publication.
 
-La validation doit être exécutée sur la machine Windows cible, puis consignée
-dans ce document avec la version d'ONNX Runtime, le pilote NVIDIA, le résultat
-SHA-256 et les mesures.
+Si une validation Windows est demandée ultérieurement, l'exécuter sur la
+machine cible puis consigner dans ce document la version d'ONNX Runtime, le
+pilote NVIDIA, le résultat SHA-256 et les mesures.

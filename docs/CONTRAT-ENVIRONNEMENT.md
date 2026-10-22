@@ -59,8 +59,8 @@ Blueprint API, préfixe `/api` :
 | GET | `/api/csv_downloads_status` | non | Téléchargements actifs et récents |
 | GET | `/api/stats/dashboard` | non | Tableau de bord |
 | GET | `/api/stats/history?type=&limit=` | non | Historique, `type ∈ {api, system, all}`, `1 ≤ limit ≤ 500` |
-| POST | `/api/audio/lemonfox` | oui | Supprimé au cutover |
-| POST | `/api/audio/deepinfra` | oui | Supprimé au cutover |
+| POST | `/api/audio/lemonfox` | oui | Conservé dans le legacy Python ; non repris par le workflow Rust |
+| POST | `/api/audio/deepinfra` | oui | Conservé dans le legacy Python ; non repris par le workflow Rust |
 
 Blueprint workflow, sans préfixe :
 
@@ -77,9 +77,9 @@ Blueprint workflow, sans préfixe :
 | GET | `/get_specific_log/<step_key>/<index>` | non | Extrait d'un log spécifique |
 | GET | `/get_specific_log_test/<step_key>/<index>` | oui | Variante, uniquement en debug |
 | GET | `/sound-design/<filename>` | non | Sert un fichier de `sound-design/` ; **requis** par `static/soundManager.js` |
-| GET | `/test-sound` | non | Page de test audio, aucun appel interne : à retirer |
+| GET | `/test-sound` | non | Page de test audio conservée dans le legacy Python ; non reprise par le workflow Rust |
 
-Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-fixes` lit un fichier HTML du répertoire courant et n'est référencé nulle part : à retirer. Les fichiers statiques sont servis sous `/static/`.
+Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-fixes` lit un fichier HTML du répertoire courant et n'est référencé nulle part. Cette page reste dans l'application Python legacy et n'est pas reprise par le workflow Rust. Les fichiers statiques sont servis sous `/static/`.
 
 ### 2.3 Formes de réponse
 
@@ -384,7 +384,7 @@ Corrections assumées dans la version Rust :
 - STEP3 sans audio : skip explicite et journalisé, au lieu du code 0 silencieux actuel.
 - Dépendances STEP4 explicites : CSV de scènes et JSON audio requis pour un output complet.
 - STEP5 : en-tête `fps`/`total_frames` avant `frames_analysis`, pour rendre la réduction idempotente.
-- Suppression de `/api/audio/lemonfox`, `/api/audio/deepinfra`, `/test-sound` et `/test-slideshow-fixes`. Vérifié le 2026-10-22 : ces routes ne sont référencées que par leurs tests, alors que `/sound-design` est appelée par `static/soundManager.js` et reste indispensable.
+- Non-reprise de `/api/audio/lemonfox`, `/api/audio/deepinfra`, `/test-sound` et `/test-slideshow-fixes` dans le workflow Rust. L'application Python legacy reste inchangée et conserve ces routes. Vérifié le 2026-10-22 : elles ne sont référencées que par leurs tests, alors que `/sound-design` est appelée par `static/soundManager.js` et reste indispensable dans les deux workflows.
 - Pas de SSE au lot 1 : le frontend fonctionne au polling, ajouter SSE changerait le contrat.
 
 ## 10. Décisions et questions ouvertes
@@ -393,7 +393,7 @@ Décisions du 2026-10-22 :
 
 - STEP7 conserve `/mnt/cache` comme sortie par défaut ; `_finalized_output` reste un repli.
 - `/sound-design` est conservée : le frontend précharge huit sons de notification.
-- Les routes cloud audio et les pages de test sans référence interne sont retirées au cutover.
+- L'application Python legacy reste strictement inchangée : `/api/audio/*`, `/test-sound` et `/test-slideshow-fixes` y restent disponibles. Le workflow Rust ne les reprend pas.
 
 Reste à trancher :
 

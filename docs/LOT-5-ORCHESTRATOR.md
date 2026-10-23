@@ -168,7 +168,9 @@ basculement du trafic public (reverse proxy, DNS ou port) reste une opération
 externe. En cas d'échec Rust, il suffit de continuer à router vers 5003.
 
 `check` exige que le binaire `workflow-cli` et le gabarit existent, que la base
-et le verrou soient isolés, et que le jeton soit configuré.
+et le verrou soient isolés, et que le jeton soit configuré. Il signale aussi la
+présence de la source STEP1 et des outils externes (`ffmpeg`, `ffprobe`,
+`effectcraft-cli`, `unrar`).
 
 ## Validation
 

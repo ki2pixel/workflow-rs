@@ -63,6 +63,34 @@ case "${1:-}" in
         env WORKFLOW_SERVER_WORKER_TOKEN="$TOKEN" \
             WORKFLOW_SERVER_SECRET_KEY="${WORKFLOW_SERVER_SECRET_KEY:-}" \
             "$BIN" --config "$CONFIG" --check
+
+        cli_path="$(sed -n 's/^workflow_cli = "\(.*\)"/\1/p' "$CONFIG" | head -n 1)"
+        if [[ -n "$cli_path" && -x "$cli_path" ]]; then
+            echo "workflow-cli: $cli_path"
+        else
+            echo "workflow-cli absent ou non exécutable: ${cli_path:-non configuré}" >&2
+        fi
+
+        source_dir="$(sed -n '/^\[steps\.step1\]/,/^\[/ s/^source_dir = "\(.*\)"/\1/p' "$CONFIG" | head -n 1)"
+        if [[ -n "$source_dir" && -d "$source_dir" ]]; then
+            echo "source STEP1: $source_dir"
+        else
+            echo "source STEP1 absente: ${source_dir:-non configurée} (STEP1 échouera)" >&2
+        fi
+
+        for tool in ffmpeg ffprobe effectcraft-cli; do
+            if command -v "$tool" >/dev/null 2>&1; then
+                echo "outil $tool: OK"
+            else
+                echo "outil $tool: absent (étapes concernées en échec)" >&2
+            fi
+        done
+        if command -v unrar >/dev/null 2>&1; then
+            echo "outil unrar: OK (archives RAR)"
+        else
+            echo "outil unrar: absent (archives RAR en échec)" >&2
+        fi
+
         if is_running && ping_rust; then
             echo "Rust répond sur $RUST_URL"
         else

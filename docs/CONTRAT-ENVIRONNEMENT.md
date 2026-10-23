@@ -332,6 +332,12 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > CPU via ONNX Runtime. Le traitement des vidéos est séquentiel et le module
 > n'est pas encore branché à l'orchestrateur. Détail et mesures dans
 > `docs/LOT-4-STEP3.md`.
+>
+> Sur la machine de référence, `config/config.toml` pointe
+> `[steps.step3].edgetpu` et `[steps.step4].edgetpu` vers
+> `vendor/libedgetpu.so.1`, copie locale du paquet Coral ignorée par git. Sur
+> une autre machine, installer `libedgetpu.so.1` dans le chemin système ou
+> passer `--edgetpu` à la commande.
 
 STEP4 reçoit en plus `--videos_json_path <temp.json>` : la liste des vidéos sans `<stem>.json` voisin, produite par l'orchestrateur avant lancement. Si la liste est vide, l'étape se termine immédiatement en succès sans lancer de processus.
 

@@ -91,6 +91,17 @@ case "${1:-}" in
             echo "outil unrar: absent (archives RAR en échec)" >&2
         fi
 
+        for step in step3 step4; do
+            for key in tflite edgetpu; do
+                lib="$(sed -n "/^\\[steps\\.$step\\]/,/^\\[/ s/^$key = \"\\(.*\\)\"/\\1/p" "$CONFIG" | head -n 1)"
+                if [[ -n "$lib" && -r "$lib" ]]; then
+                    echo "bibliothèque $step.$key: OK"
+                else
+                    echo "bibliothèque $step.$key absente: ${lib:-non configurée}" >&2
+                fi
+            done
+        done
+
         if is_running && ping_rust; then
             echo "Rust répond sur $RUST_URL"
         else

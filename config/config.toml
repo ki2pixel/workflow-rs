@@ -78,7 +78,7 @@ yamnet_fallback = "step3/yamnet_split_quantized.tflite"
 mel_matrix = "step3/yamnet_mel_matrix.npy"
 ecapa = "step3/ecapa_tdnn_speaker_float.onnx"
 tflite = "/home/kidpixel/workflow-rs/vendor/libtensorflowlite_c.so"
-edgetpu = "/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"
+edgetpu = "/home/kidpixel/workflow-rs/vendor/libedgetpu.so.1"
 onnxruntime = "/home/kidpixel/workflow_mediapipe/coral_env/lib/python3.11/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
@@ -99,9 +99,9 @@ enabled = true
 device = "tpu"
 cocompiled = true
 tflite = "/home/kidpixel/workflow-rs/vendor/libtensorflowlite_c.so"
-# Paquet Coral installé sur le système. Pour un paquet extrait localement,
-# utiliser --edgetpu (et --tflite si nécessaire) au lancement.
-edgetpu = "/usr/lib/x86_64-linux-gnu/libedgetpu.so.1"
+# Copie locale du paquet Coral (vendor/, ignorée par git). Sur une autre
+# machine, utiliser le chemin système ou --edgetpu au lancement.
+edgetpu = "/home/kidpixel/workflow-rs/vendor/libedgetpu.so.1"
 blazeface = "step4/blazeface_front_quantized_edgetpu.tflite"
 facemesh = "step4/facemesh_quantized_edgetpu.tflite"
 blendshapes = "step4/face_blendshapes.tflite"

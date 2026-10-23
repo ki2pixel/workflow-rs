@@ -178,7 +178,10 @@ et le verrou soient isolés, et que le jeton soit configuré.
 - Test de rendu du vrai `index_new.html` avec la syntaxe Jinja existante.
 - `workflow-server --check` sur la configuration réelle.
 - Smoke HTTP réel : index 200, ping, statut, lancement STEP5 sur racine vide,
-  séquence STEP5→STEP6, refus explicite de STEP1.
+  séquence STEP5→STEP6, refus explicite de STEP1 (levé au lot 6).
+- Tests HTTP de concurrence et d'arrêt : deuxième étape refusée en 409
+  pendant une exécution, arrêt de séquence qui stoppe l'étape courante sans
+  démarrer la suivante.
 - `cargo clippy --workspace --all-targets -- -D warnings` et `cargo fmt`.
 
 ## Limites restantes

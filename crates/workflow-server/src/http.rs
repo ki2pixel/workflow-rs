@@ -584,13 +584,15 @@ mod tests {
     use workflow_core::Config;
 
     fn test_app() -> (tempfile::TempDir, Router) {
-        let dir = tempfile::tempdir().unwrap();
-        let cli = dir.path().join("fake-workflow-cli");
-        fs::write(
-            &cli,
+        test_app_with_script(
             "#!/bin/sh\necho 'TOTAL_JSON_TO_REDUCE: 1'\necho 'Succès: réduction JSON terminée pour demo'\n",
         )
-        .unwrap();
+    }
+
+    fn test_app_with_script(script: &str) -> (tempfile::TempDir, Router) {
+        let dir = tempfile::tempdir().unwrap();
+        let cli = dir.path().join("fake-workflow-cli");
+        fs::write(&cli, script).unwrap();
         let mut permissions = fs::metadata(&cli).unwrap().permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(&cli, permissions).unwrap();
@@ -709,5 +711,170 @@ mod tests {
         let value: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(value["step"], "STEP5");
         assert!(value["log"].is_array());
+    }
+
+    #[tokio::test]
+    async fn a_second_step_is_rejected_while_one_is_running() {
+        let (_dir, app) =
+            test_app_with_script("#!/bin/sh\necho 'TOTAL_JSON_TO_REDUCE: 1'\nexec sleep 5\n");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run/STEP5")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        for _ in 0..100 {
+            let status = step_status_value(&app, "STEP5").await;
+            if status["status"] == "running" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run/STEP6")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert!(value["message"].as_str().unwrap().contains("en cours"));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/stop/STEP5")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn stopping_a_sequence_does_not_start_the_next_step() {
+        let (_dir, app) =
+            test_app_with_script("#!/bin/sh\necho 'TOTAL_JSON_TO_REDUCE: 1'\nexec sleep 5\n");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run_custom_sequence")
+                    .header("x-worker-token", "test-token")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"steps":["STEP5","STEP6"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        let mut current = String::new();
+        for _ in 0..100 {
+            let body = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/sequence/status")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes();
+            let value: Value = serde_json::from_slice(&body).unwrap();
+            current = value["current_step"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            if current == "STEP5" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert_eq!(current, "STEP5");
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/sequence/stop")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/sequence/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["is_running"], false);
+        assert_eq!(value["last_outcome"]["status"], "error");
+        assert!(value["last_outcome"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("manually stopped"));
+
+        assert_eq!(step_status_value(&app, "STEP5").await["status"], "stopped");
+        assert_eq!(step_status_value(&app, "STEP6").await["status"], "idle");
+    }
+
+    async fn step_status_value(app: &Router, step: &str) -> Value {
+        let body = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/status/{step}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        serde_json::from_slice(&body).unwrap()
     }
 }

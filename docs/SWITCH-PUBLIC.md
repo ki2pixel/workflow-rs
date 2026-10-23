@@ -26,6 +26,11 @@ Deux cas concrets :
 Le reste du document décrit le cas 2. Il ne suppose aucune modification du
 code Python : celui-ci continue d'écouter sur 5003.
 
+Pour le cas local, le raccourci Rust `~/Bureau/Lancer_Workflow_Rust.desktop`
+appelle `scripts/start-rust.sh` (vérification, démarrage 5004, navigateur,
+logs). Le raccourci Python `~/Bureau/Lancer_Workflow.desktop` reste valide tel
+quel.
+
 Attention au binding avant d'exposer le proxy : Rust écoute déjà sur
 `127.0.0.1`, mais Flask utilise `FLASK_HOST` avec un défaut `0.0.0.0` (la
 variable `HOST` du `.env` n'est pas lue par `config/settings.py`). Pour que

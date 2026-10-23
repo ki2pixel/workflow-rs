@@ -21,3 +21,6 @@ __pycache__/
 
 # Données d’exécution locales (logs, archives, bases).
 /runtime/
+
+# Secrets locaux du lanceur Rust (générés au premier démarrage).
+/config/launcher.env

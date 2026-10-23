@@ -138,6 +138,30 @@ Linux et le panneau CEP continue d'appeler Python.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
 
+## Lanceurs locaux
+
+Le raccourci Python `~/Bureau/Lancer_Workflow.desktop` reste inchangé : il
+lance `workflow_mediapipe/start_workflow.sh` sur 5003.
+
+Le raccourci Rust `~/Bureau/Lancer_Workflow_Rust.desktop` appelle
+`scripts/start-rust.sh` : vérification, démarrage sur 5004, ouverture de
+Firefox et suivi des logs. Ctrl+C ou fermeture du terminal arrête le serveur.
+Les secrets sont générés au premier lancement dans `config/launcher.env`
+(non versionné, `chmod 600`). Pour utiliser `switch-rust.sh` manuellement :
+
+```sh
+set -a; source config/launcher.env; set +a
+./scripts/switch-rust.sh status
+```
+
+Les deux interfaces peuvent tourner en même temps, mais :
+
+- ne pas lancer STEP2/STEP3/STEP4 matérielles des deux côtés simultanément ;
+- un seul moniteur CSV doit être actif sur le webhook ;
+- les projets et téléchargements Rust restent dans `runtime/`, Python ne les
+  voit pas. Le runtime Rust démarre avec `runtime/projets_extraits` vide : pour
+  tester un projet, le copier dans cette racine, jamais l'inverse.
+
 ## CLI
 
 ```sh

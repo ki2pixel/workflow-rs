@@ -68,6 +68,9 @@ Le dossier `153 Camille` a été préparé le 2026-10-23 et n'est plus une limit
 - shadow STEP5/6 : `15/15` vérifications identiques (5 vidéos × audio, vidéo,
   AE) le 2026-10-23.
 
+Un passage `--limit 11` incluant `153 Camille` donne `81/81` vérifications
+identiques (11 projets, 27 vidéos).
+
 Limite : le STEP4 brut `<stem>.json` n'est pas présent, donc le mode
 `--prefer-raw` n'est pas disponible pour ce projet. Le mode par défaut, qui
 part du `_tracking.json` de production, est validé.

@@ -84,6 +84,11 @@ JSX et la validation STEP8 sur la machine Windows restent à faire.
   succès, puis normalise les vidéos (ffprobe, GPU avec repli CPU, `yadif`) en
   préservant les `.mov` alpha ou listés. Validation réelle sur une archive
   synthétique et via le serveur 5004. Détail dans `docs/LOT-6-STEP1.md`.
+- Lot 7 terminé : séquence STEP2 → STEP8 sur une copie de 244, STEP5/6
+  rejoués sur les artefacts Rust avec `_ae.json`, `_audio.json` et
+  `_tracking.json` identiques sémantiquement à la production, puis bascule
+  contrôlée 5003/5004 avec rollback vérifié. Détail dans
+  `docs/LOT-7-INTEGRATION.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -106,6 +111,7 @@ JSX et la validation STEP8 sur la machine Windows restent à faire.
 - `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
 - `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
 - `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
+- `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -211,7 +217,10 @@ mêmes IDs, bbox et champs de parole ; il mesure 44,2 s sur `real_244` et
 - Rust 1.86 ou plus récent.
 - `python3 scripts/import-models.py` pour copier les modèles de production.
 - `libtensorflowlite_c.so`, produit par `scripts/build-tflite-c.sh`.
-- `libedgetpu.so.1` (paquet Coral) et un `/dev/apex_0` accessible.
+- `libedgetpu.so.1` (paquet Coral) et un `/dev/apex_0` accessible. Sur la
+  machine de référence, la bibliothèque est copiée dans
+  `vendor/libedgetpu.so.1` (ignorée par git) et `config/config.toml` pointe
+  dessus ; sinon, installer le paquet système ou passer `--edgetpu`.
 - Les modèles STEP4 co-compilés et `detect_edgetpu.tflite` pour le chemin TPU ;
   les trois modèles CPU du même manifeste ne servent qu'aux tests
   `--device cpu`.

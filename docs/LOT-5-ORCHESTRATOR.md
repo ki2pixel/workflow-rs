@@ -166,11 +166,14 @@ cargo build --release -p workflow-server -p workflow-cli
 `start` ne touche jamais au port 5003 : Python reste le rollback. Le
 basculement du trafic public (reverse proxy, DNS ou port) reste une opération
 externe. En cas d'échec Rust, il suffit de continuer à router vers 5003.
+La validation réelle de cette coexistence (Rust sur 5004, Python sur 5003,
+rollback après arrêt) est décrite dans `docs/LOT-7-INTEGRATION.md`.
 
 `check` exige que le binaire `workflow-cli` et le gabarit existent, que la base
 et le verrou soient isolés, et que le jeton soit configuré. Il signale aussi la
-présence de la source STEP1 et des outils externes (`ffmpeg`, `ffprobe`,
-`effectcraft-cli`, `unrar`).
+présence de la source STEP1, des outils externes (`ffmpeg`, `ffprobe`,
+`effectcraft-cli`, `unrar`) et des bibliothèques `tflite` / `edgetpu` de STEP3
+et STEP4.
 
 ## Validation
 

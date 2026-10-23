@@ -146,6 +146,14 @@ et les expose via `/status/STEP1`, `/get_specific_log/STEP1/0` et
 - archive synthétique réelle `13_Camille_test.zip` : extraite, `ready.mp4`
   ignorée, `legacy.avi` et `nonalpha.mov` converties en H.264 25 fps,
   `m6+.mov` préservé, archive supprimée, journal et liste écrits ;
+- archive client réelle `153 Camille.zip` (1,9 Go, entrée racine `/`, six
+  fichiers aux noms Unicode) : extraction seule en 2,4 s, six fichiers de
+  tailles identiques, md5 du PNG identique, zéro problème de sécurité ;
+- second passage sur la même archive : aucun retraitement, grâce à
+  `processed_archives.txt` ;
+- réinitialisation mensuelle réelle : marqueur passé de `2026-09` à `2026-10`,
+  sauvegarde `processed_archives_2026-09_backup_*.txt`, liste vidée puis
+  archive réextraite ;
 - parité Python sur une même archive `20_Camille_parity.zip`, avec CPU et un
   worker : les quatre artefacts (`ready.mp4`, `legacy.mp4`, `nonalpha.mp4`,
   `m6+.mov`) sont identiques au bit près (md5). La sortie ne diffère que par le

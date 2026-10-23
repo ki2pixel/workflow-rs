@@ -23,6 +23,7 @@ est mis à jour à chaque mesure de parité.
 | D-015 | moyenne | Frontend/API | Le serveur Rust n'implémente pas encore CSV, cache, statistiques, diagnostics ni `/api/audio/*`. | Ces routes restent dans Python. Le serveur Rust expose des stubs de polling (`/api/csv_*`, `/api/system_monitor`, `/api/performance/frontend`) pour que le frontend ne casse pas ; le panneau de téléchargements reste vide. |
 | D-016 | basse | STEP1 | Le scan Python teste `Path.suffix` contre une liste contenant `.tar.gz`, `.tar.bz2` et `.tar.xz` : ces trois formes ne matchent jamais, car seul le dernier suffixe est comparé. | Le port Rust reproduit le scan effectif (`.zip`, `.zipx`, `.rar`, `.tgz`, `.7z`, `.tar`). Les décodeurs gzip/bzip2/xz restent testés au niveau module, mais le scan ne les sélectionne pas. |
 | D-017 | basse | STEP1 | Python décode les noms de membres TAR avec `surrogateescape` ; Rust utilise un décodage UTF-8 lossy. | Écart limité aux archives dont les noms ne sont pas en UTF-8. Les noms concernés restent visibles dans les journaux, avec un caractère de remplacement. |
+| D-018 | haute | Téléchargement | Le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et le prompt CSV ne sont pas portés. Le serveur Rust crée le schéma et renvoie des stubs `/api/csv_*`. | Garder le moniteur Python pendant la transition, ou porter un lot ingestion avec migration de `download_history` (911 URLs au 2026-10-23) avant activation. Ne jamais démarrer un moniteur Rust avec une base vide : il téléchargerait tous les liens du webhook. |
 
 ## Détails
 
@@ -106,3 +107,27 @@ n'est jamais retenue. Le port Rust reproduit ce filtre pour ne pas changer
 quelles archives sont traitées. Les décodeurs gzip/bzip2/xz restent disponibles
 dans `extract_archive` et sont couverts par les tests unitaires, mais le scan
 quotidien ne sélectionne que les suffixes simples.
+
+### D-018 — Téléchargement automatique non porté
+
+Le serveur Rust contient la configuration `[webhook]` et `[download]`, crée les
+tables `download_history` / `download_failures` dans sa base isolée, et expose
+`/api/csv_monitor_status` / `/api/csv_downloads_status` sous forme de stubs
+vides. Il ne contacte pas le webhook et ne télécharge aucun fichier. STEP1 ne
+voit donc que les archives déjà présentes dans `steps.step1.source_dir` (par
+défaut `~/Téléchargements`), déposées par le moniteur Python ou manuellement.
+
+La logique Python à reproduire est la suivante :
+
+- `WEBHOOK_JSON_URL` est interrogé avec un cache de 60 s et trois tentatives ;
+- les deux schémas (`source_url`/`r2_url` et `url` historique) sont normalisés ;
+- un lien n'est téléchargé que si son URL normalisée n'est pas déjà dans
+  `download_history` ; ce n'est pas une limite « derniers N liens » ;
+- les échecs sont conservés dans `download_failures` avec un cooldown
+  exponentiel, pour ne pas réarmer un lien cassé à chaque cycle ;
+- le téléchargement privilégie R2 puis Dropbox, reprend via `.part` + `Range`,
+  valide le ZIP et n'écrit l'historique qu'après succès.
+
+La base Python contient 911 URLs au 2026-10-23. Une migration vers la base Rust
+est obligatoire avant d'activer un moniteur Rust, sinon une base vide ferait
+re-télécharger tous les liens du webhook.

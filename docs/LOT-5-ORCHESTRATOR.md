@@ -200,6 +200,10 @@ et STEP4.
 - Les routes CSV/downloads/cache/statistiques/audio et `/test-sound` restent
   dans Python. Le serveur Rust expose des stubs vides pour ne pas casser le
   polling du panneau.
+- Le moniteur webhook et le téléchargement R2/Dropbox ne sont pas portés : le
+  serveur Rust crée seulement le schéma SQLite et des stubs. Une bascule 100 %
+  Rust nécessite un lot ingestion et la migration de l'historique Python
+  (D-018).
 - La validation Windows/After Effects et le JSX restent externes et différés.
 - Le verrou Rust est distinct du verrou Python : ne pas lancer de STEP2/3/4
   matérielle des deux côtés simultanément pendant la période de dual-run.

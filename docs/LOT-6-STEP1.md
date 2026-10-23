@@ -161,8 +161,10 @@ et les expose via `/status/STEP1`, `/get_specific_log/STEP1/0` et
 
 - Les archives RAR dépendent de la commande `unrar` (comme `rarfile`) ; aucun
   mot de passe n'est accepté, et un nom de membre contenant un saut de ligne
-  n'est pas représentable dans la sortie `unrar lb`. Le chemin RAR n'a pas pu
-  être exercé faute d'archive de test, même si l'outil est présent.
+  n'est pas représentable dans la sortie `unrar lb`. Le chemin RAR a été
+  exercé manuellement sur une archive RAR5 de test (deux fichiers extraits à
+  l'identique). Les anciens RAR dont `unrar` sort en code 3 restent traités
+  comme des échecs, comme `rarfile`.
 - Les noms TAR non UTF-8 sont décodés en lossy (D-017).
 - Le scan ne sélectionne pas les suffixes composés `.tar.gz`, `.tar.bz2`,
   `.tar.xz` (D-016), par fidélité au comportement Python.

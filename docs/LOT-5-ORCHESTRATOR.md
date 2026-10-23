@@ -75,7 +75,7 @@ Les routes et formes de réponse sont celles de `docs/CONTRAT-ENVIRONNEMENT.md`.
 | Route | Auth | Comportement Rust |
 | --- | --- | --- |
 | `GET /` | non | rend `assets/web/templates/index_new.html` avec la config des étapes |
-| `POST /run/<STEP>` | oui | 202, 404, 409 ; STEP1 → 400 explicite |
+| `POST /run/<STEP>` | oui | 202, 404, 409 ; STEP1 porté au lot 6 |
 | `GET /status/<STEP>` | non | statut + `log`, en-têtes no-cache |
 | `GET /api/step_status/<STEP>` | non | statut sans `log` |
 | `POST /stop/<STEP>` | oui | arrêt SIGTERM, statut `stopped`, code -1 |

@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.1 |
-| Date | 2026-10-22 |
+| Version | 1.2 |
+| Date | 2026-10-23 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -25,7 +25,7 @@ Trois boucles d'arrière-plan tournent dans le processus :
 
 La nouvelle application utilise le port 5004 et une racine de travail distincte. Elle ne partage ni la base SQLite, ni les répertoires, ni le verrou matériel.
 
-Le lot 5 implémente ce contrat pour les STEP2 à STEP8. STEP1 est explicitement indisponible tant qu'il n'est pas porté : `POST /run/STEP1` renvoie 400 et une séquence contenant STEP1 est refusée avant démarrage. Les routes CSV, cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy ; le serveur Rust ne fournit que les stubs de polling du frontend. Voir `LOT-5-ORCHESTRATOR.md` pour le détail et les écarts volontaires.
+Le lot 5 implémente ce contrat pour les STEP2 à STEP8 et le lot 6 pour STEP1 : `POST /run/STEP1` extrait les archives puis normalise les projets, sans appel Python. Les routes CSV, cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy ; le serveur Rust ne fournit que les stubs de polling du frontend. Voir `LOT-5-ORCHESTRATOR.md` et `LOT-6-STEP1.md` pour le détail et les écarts volontaires.
 
 ## 2. API HTTP
 
@@ -299,6 +299,8 @@ Points d'attention :
 | STEP6 | `env/bin/python workflow_scripts/step6/preprocess_ae_json.py --log_dir ... --work_dir ...` | `<BASE>/projets_extraits` | 1800 s |
 | STEP7 | `env/bin/python workflow_scripts/step7/finalize_and_copy.py` | `<BASE>/projets_extraits` | 1800 s |
 | STEP8 | `env/bin/python workflow_scripts/step8/run_mediasolution_ec.py` | `<BASE>` | 14400 s |
+
+Le lot 6 exécute STEP1 par `workflow-cli step1 run --source-dir <source>`, avec un timeout de 14400 s. Les commandes Python ci-dessus restent la référence comportementale ; elles ne sont plus lancées par l'application Rust.
 
 Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYTHONUTF8=1`, `PYTHONUNBUFFERED=1`, `ROOT_SCAN_DIR`, `FOLDER_KEYWORD`, `SUBFOLDER_NAME`, `TRACKING_DISABLE_GPU`, `TRACKING_CPU_WORKERS`, `LD_LIBRARY_PATH` (incluant les répertoires `nvidia/*/lib` du venv), `PYTORCH_CUDA_ALLOC_CONF` (STEP2 et STEP3), `AUDIO_PARTIAL_SUCCESS_OK=1`, `AUDIO_GPU_ISOLATION`.
 

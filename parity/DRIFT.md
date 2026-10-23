@@ -15,12 +15,14 @@ est mis à jour à chaque mesure de parité.
 | D-007 | moyenne | STEP3/5 | STEP3 produit `speaker_stats` par locuteur (`total_time_sec`, `percentage`) ; STEP5 le remplace par `unique_speakers` et `speaker_frame_counts`. | Définir un schéma unique ou documenter la transition. Le harnais applique la projection STEP5 avant comparaison. |
 | D-008 | basse | STEP4 | Le JSON est écrit en streaming directement dans le fichier final ; une interruption laisse un fichier tronqué. | Écriture atomique dans le portage (temporaire + rename), format inchangé. Implémenté au lot 3. |
 | D-009 | info | STEP2-6 | Sur les projets 244 et 245, les sorties STEP2, STEP3 (après projection), STEP4, STEP5 et STEP6 sont identiques à la production ; 249 et 250 sont identiques sur STEP5/6. Au lot 4, le JSON STEP3 brut de 244 et 245 est aussi identique au script Python relancé sur copie isolée. | Aucun écart de comportement à corriger ; ces sorties servent de fixtures. |
-| D-010 | info | STEP1 | Un MOV avec alpha est préservé à l'octet près, sans réencodage (`skipped=1`). | Conserver la détection alpha et la liste `PRESERVED_MOV_NAMES`. |
+| D-010 | info | STEP1 | Un MOV avec alpha est préservé à l'octet près, sans réencodage (`skipped=1`). | Conserver la détection alpha et la liste `PRESERVED_MOV_NAMES`. Implémenté au lot 6, y compris la préservation par précaution quand ffprobe ne conclut pas. |
 | D-011 | basse | Harnais | La VRAM globale n'est pas imputable à une étape ; le harnais distingue désormais `gpu_memory_peak_mb` (processus) et `gpu_total_peak_mb` (carte). | Utiliser la colonne « GPU étape » pour les comparaisons. |
 | D-012 | haute | Isolation | L'application Python n'utilise pas `workflow-hw.lock`. Le harnais le prend, mais l'ancienne application peut démarrer STEP1-4 pendant un test. | Le portage et les scripts de test prennent le verrou. Pendant la transition, vérifier `/sequence/status` et `pgrep` avant toute mesure. |
 | D-013 | moyenne | Orchestrateur | Le contrat Python autorise deux étapes différentes en parallèle ; le frontend ne le fait pas. | Lot 5 : le serveur Rust refuse la deuxième étape avec 409 et sérialise toutes les exécutions. Durcissement volontaire documenté. |
-| D-014 | haute | STEP1 | Le lot 5 n'a pas d'implémentation Rust de l'extraction/normalisation. | Aucun fallback Python implicite. `POST /run/STEP1` renvoie 400 et les séquences contenant STEP1 sont refusées avant démarrage. STEP1 devra être porté ou traité par une frontière explicite dans un lot ultérieur. |
+| D-014 | haute | STEP1 | Le lot 5 n'avait pas d'implémentation Rust de l'extraction/normalisation. | Résolu au lot 6 : extraction ZIP/RAR/TAR, assainissement, réinitialisation mensuelle, suppression des archives et normalisation vidéo. Aucun fallback Python. |
 | D-015 | moyenne | Frontend/API | Le serveur Rust n'implémente pas encore CSV, cache, statistiques, diagnostics ni `/api/audio/*`. | Ces routes restent dans Python. Le serveur Rust expose des stubs de polling (`/api/csv_*`, `/api/system_monitor`, `/api/performance/frontend`) pour que le frontend ne casse pas ; le panneau de téléchargements reste vide. |
+| D-016 | basse | STEP1 | Le scan Python teste `Path.suffix` contre une liste contenant `.tar.gz`, `.tar.bz2` et `.tar.xz` : ces trois formes ne matchent jamais, car seul le dernier suffixe est comparé. | Le port Rust reproduit le scan effectif (`.zip`, `.zipx`, `.rar`, `.tgz`, `.7z`, `.tar`). Les décodeurs gzip/bzip2/xz restent testés au niveau module, mais le scan ne les sélectionne pas. |
+| D-017 | basse | STEP1 | Python décode les noms de membres TAR avec `surrogateescape` ; Rust utilise un décodage UTF-8 lossy. | Écart limité aux archives dont les noms ne sont pas en UTF-8. Les noms concernés restent visibles dans les journaux, avec un caractère de remplacement. |
 
 ## Détails
 
@@ -87,3 +89,20 @@ Le harnais prend `flock` sur `$XDG_RUNTIME_DIR/workflow-hw.lock` pour STEP1 à
 STEP4 et refuse de démarrer si `/sequence/status` indique une séquence active.
 L'application Python ne connaît pas ce verrou. Toute mesure doit donc être
 lancée quand la production est arrêtée, ou après accord explicite.
+
+### D-014 — STEP1 porté
+
+Le lot 6 fournit `workflow-cli step1 run` et `step1 normalize-only`. Le serveur
+5004 construit la commande avec `steps.step1.source_dir` et applique le timeout
+STEP1 (14 400 s par défaut). Le journal horodaté reste écrit dans
+`logs/step1/extract_archives_*.log` et `processed_archives.txt` reste exposé au
+frontend.
+
+### D-016 — Scan des archives composées
+
+La liste Python contient `.tar.gz`, `.tar.bz2` et `.tar.xz`, mais le test porte
+sur `archive.suffix` : pour `projet.tar.gz`, `suffix` vaut `.gz`, donc l'archive
+n'est jamais retenue. Le port Rust reproduit ce filtre pour ne pas changer
+quelles archives sont traitées. Les décodeurs gzip/bzip2/xz restent disponibles
+dans `extract_archive` et sont couverts par les tests unitaires, mais le scan
+quotidien ne sélectionne que les suffixes simples.

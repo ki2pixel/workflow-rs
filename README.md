@@ -18,10 +18,11 @@ sur Coral Edge TPU : VAD YAMNet Split, embeddings ECAPA-TDNN et AHC, avec un
 `_audio.json` identique à la production sur `vox`, `real_244` et `real_245`.
 Le lot 5 ajoute le serveur d'orchestration Rust sur le port 5004, avec état
 thread-safe, contrat de polling, séquence, arrêt, SQLite et verrou isolés, et
-exécution des STEP2 à STEP8 par sous-processus `workflow-cli`. STEP1 reste
-explicitement non porté ; aucune commande Python n'est lancée en repli.
-La compilation Windows du pont, le basculement du JSX et la validation STEP8
-sur la machine Windows restent à faire.
+exécution des étapes par sous-processus `workflow-cli`. Le lot 6 porte STEP1 :
+extraction sécurisée des archives et normalisation MP4 / H.264 / 25 fps. Les
+huit étapes disposent désormais d'une implémentation Rust ; aucune commande
+Python n'est lancée en repli. La compilation Windows du pont, le basculement du
+JSX et la validation STEP8 sur la machine Windows restent à faire.
 
 ## État
 
@@ -77,8 +78,12 @@ sur la machine Windows restent à faire.
   le port 5004, avec base et racine Rust, verrou `/tmp/workflow-rs-hw.lock`,
   séquence sérialisée, arrêt SIGTERM, timeout et logs. STEP5/STEP6 disposent
   d'un mode batch ; 12/12 artefacts identiques aux copies de production 244,
-  245, 249 et 250. STEP1 est refusé explicitement, sans fallback Python.
-  Détail dans `docs/LOT-5-ORCHESTRATOR.md`.
+  245, 249 et 250. Détail dans `docs/LOT-5-ORCHESTRATOR.md`.
+- Lot 6 terminé : STEP1 Rust extrait les archives ZIP/RAR/TAR avec
+  assainissement des chemins, réinitialisation mensuelle et suppression après
+  succès, puis normalise les vidéos (ffprobe, GPU avec repli CPU, `yadif`) en
+  préservant les `.mov` alpha ou listés. Validation réelle sur une archive
+  synthétique et via le serveur 5004. Détail dans `docs/LOT-6-STEP1.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -100,6 +105,7 @@ sur la machine Windows restent à faire.
 - `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
 - `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
+- `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -148,6 +154,9 @@ cargo run -p workflow-cli -- step7 finalize --no-delete \
 cargo run -p workflow-cli -- step8 run --dry-run
 cargo run -p workflow-cli -- step8 run --folder /tmp/projet
 
+cargo run -p workflow-cli -- step1 run --source-dir ~/Téléchargements
+cargo run -p workflow-cli -- step1 normalize-only [--force]
+
 cargo run -p workflow-cli -- retention plan
 cargo run -p workflow-cli -- retention apply
 
@@ -158,6 +167,7 @@ cargo run --release -p workflow-server -- --config config/config.toml
 ./scripts/switch-rust.sh stop
 
 ./scripts/validate-lot5.py       # parité batch STEP5/STEP6 sur copies
+./scripts/validate-step1.py      # parité STEP1 Python/Rust sur archive synthétique
 ```
 
 Sans `--output` audio, le fichier d'entrée est réécrit de façon atomique, comme

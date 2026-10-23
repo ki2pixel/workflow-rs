@@ -23,6 +23,13 @@ thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
 ort.workspace = true
+zip.workspace = true
+tar.workspace = true
+flate2.workspace = true
+bzip2.workspace = true
+xz2.workspace = true
+unicode-normalization.workspace = true
+rayon.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 workflow-tpu = { path = "../workflow-tpu" }

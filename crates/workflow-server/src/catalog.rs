@@ -86,20 +86,18 @@ impl StepKey {
         }
     }
 
-    /// STEP1 n'a pas encore d'implémentation Rust. L'orchestrateur refuse de
-    /// lancer implicitement le script Python legacy.
+    /// Toutes les étapes du catalogue sont portées en Rust.
     pub fn is_available(self) -> bool {
-        !matches!(self, Self::Step1)
+        true
     }
 
     pub fn unavailable_reason(self) -> Option<&'static str> {
-        matches!(self, Self::Step1).then_some(
-            "STEP1 n'est pas encore porté en Rust ; aucune implémentation de repli n'est autorisée.",
-        )
+        None
     }
 
     pub fn timeout_s(self, config: &Config) -> u64 {
         match self {
+            Self::Step1 => config.steps.step1.timeout_s,
             Self::Step8 => config.steps.step8.timeout_s,
             _ => config.steps.default_timeout_s,
         }
@@ -154,7 +152,10 @@ impl StepKey {
         command.push(config_path.as_os_str().to_os_string());
 
         match self {
-            Self::Step1 => unreachable!("STEP1 est refusé avant la construction"),
+            Self::Step1 => {
+                command.extend(["step1", "run", "--source-dir"].map(OsString::from));
+                command.push(config.steps.step1.source_dir.clone().into_os_string());
+            }
             Self::Step2 => {
                 command.extend(["step2", "detect", "--input-dir"].map(OsString::from));
                 command.push(resolved.projects.into_os_string());
@@ -239,7 +240,7 @@ mod tests {
         assert_eq!(StepKey::ALL.len(), 8);
         assert_eq!(StepKey::parse("step3"), Some(StepKey::Step3));
         assert_eq!(StepKey::parse("STEP9"), None);
-        assert!(!StepKey::Step1.is_available());
+        assert!(StepKey::Step1.is_available());
         assert!(StepKey::Step2.is_available());
     }
 
@@ -254,7 +255,11 @@ mod tests {
         assert_eq!(command[0], OsString::from("/opt/workflow-cli"));
         assert_eq!(command[1], OsString::from("--config"));
         assert_eq!(command[3], OsString::from("step5"));
-        assert!(StepKey::Step1.command(&config, config_path, cli).is_err());
+        let step1 = StepKey::Step1
+            .command(&config, config_path, cli)
+            .expect("commande STEP1");
+        assert_eq!(step1[3], OsString::from("step1"));
+        assert_eq!(step1[4], OsString::from("run"));
     }
 
     #[test]

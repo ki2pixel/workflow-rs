@@ -72,6 +72,16 @@ impl Config {
                 "steps.step1.fps doit être strictement positif".into(),
             ));
         }
+        if self.steps.step1.gpu_workers == 0 || self.steps.step1.timeout_s == 0 {
+            return Err(ConfigError::Invalid(
+                "steps.step1.gpu_workers et steps.step1.timeout_s doivent être > 0".into(),
+            ));
+        }
+        if self.steps.step1.crf > 51 {
+            return Err(ConfigError::Invalid(
+                "steps.step1.crf doit être dans [0, 51]".into(),
+            ));
+        }
         if !(0.0..=1.0).contains(&self.steps.step2.threshold) {
             return Err(ConfigError::Invalid(
                 "steps.step2.threshold doit être dans [0, 1]".into(),
@@ -207,6 +217,11 @@ impl Config {
         if self.server.workdir.as_os_str().is_empty() {
             return Err(ConfigError::Invalid(
                 "server.workdir ne peut pas être vide".into(),
+            ));
+        }
+        if self.steps.step1.source_dir.as_os_str().is_empty() {
+            return Err(ConfigError::Invalid(
+                "steps.step1.source_dir ne peut pas être vide".into(),
             ));
         }
         if self.server.max_step_log_bytes < 1024 {
@@ -428,6 +443,8 @@ impl Default for FilterConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Step1Config {
+    /// Répertoire des archives à extraire (aucun parcours récursif).
+    pub source_dir: PathBuf,
     pub skip_preserved_mov: bool,
     pub preserved_mov_names: Vec<String>,
     pub normalize: bool,
@@ -435,18 +452,25 @@ pub struct Step1Config {
     pub use_gpu: bool,
     pub crf: u32,
     pub gpu_workers: u32,
+    /// Supprime l'archive source après extraction réussie.
+    pub delete_archive: bool,
+    /// Délai maximal du sous-processus STEP1 (extraction + normalisation).
+    pub timeout_s: u64,
 }
 
 impl Default for Step1Config {
     fn default() -> Self {
         Self {
+            source_dir: PathBuf::new(),
             skip_preserved_mov: true,
             preserved_mov_names: Vec::new(),
             normalize: true,
             fps: 25,
             use_gpu: true,
-            crf: 18,
-            gpu_workers: 2,
+            crf: 28,
+            gpu_workers: 3,
+            delete_archive: true,
+            timeout_s: 14_400,
         }
     }
 }
@@ -828,6 +852,7 @@ mod tests {
         let mut config = Config::default();
         config.server.secret_key = "secret".into();
         config.server.worker_token = "token".into();
+        config.steps.step1.source_dir = PathBuf::from("/tmp/downloads");
         config.server.port = 5003;
         assert!(config.validate_server().is_err());
         config.server.port = 5004;

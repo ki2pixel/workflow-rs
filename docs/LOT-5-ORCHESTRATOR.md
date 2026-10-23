@@ -1,5 +1,9 @@
 # Lot 5 — Orchestrateur Rust et bascule contrôlée
 
+> Mise à jour lot 6 : STEP1 est désormais porté en Rust. Les mentions
+> d'indisponibilité de STEP1 ci-dessous décrivent l'état livré au lot 5 et sont
+> levées par `docs/LOT-6-STEP1.md`.
+
 ## Objectif
 
 Remplacer le rôle d'orchestration de `app_new.py` sans modifier le serveur
@@ -179,8 +183,9 @@ et le verrou soient isolés, et que le jeton soit configuré.
 
 ## Limites restantes
 
-- STEP1 n'est pas porté. Le frontend « lancer 1-8 » échoue donc à la première
-  étape ; les séquences personnalisées STEP2 à STEP8 fonctionnent.
+- STEP1 n'était pas porté au lot 5 : le frontend « lancer 1-8 » échouait à la
+  première étape. Le lot 6 lève cette limite ; les séquences STEP1 à STEP8
+  fonctionnent désormais.
 - Le mode batch STEP5 ne fait pas l'enrichissement legacy depuis un STEP4 brut
   lorsqu'un `_tracking.json` partiel existe déjà. Le pipeline Rust neuf n'en a
   pas besoin ; les projets Python déjà réduits restent identiques (shadow).

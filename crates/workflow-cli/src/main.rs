@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
+use workflow_steps::step1::{run_normalize_only, run_step1, Step1Options};
 use workflow_steps::step2::{run_step2, Step2Options};
 #[cfg(unix)]
 use workflow_steps::step3::{run_step3, Step3Options};
@@ -36,6 +37,8 @@ struct Cli {
 enum Command {
     /// Vérifie ou affiche la configuration.
     Config(ConfigArgs),
+    /// Extraction des archives et normalisation vidéo STEP1.
+    Step1(Step1Args),
     /// Détection de scènes STEP2 (TransNetV2 ONNX Runtime).
     Step2(Step2Args),
     /// Diarisation audio STEP3 (YAMNet Split Coral, ECAPA-TDNN, AHC).
@@ -68,6 +71,31 @@ enum ConfigCommand {
     Check,
     /// Affiche la configuration en JSON, secrets masqués.
     Show,
+}
+
+#[derive(Debug, Args)]
+struct Step1Args {
+    #[command(subcommand)]
+    command: Step1Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Step1Command {
+    /// Extrait les nouvelles archives puis normalise les projets.
+    Run {
+        /// Remplace `steps.step1.source_dir`.
+        #[arg(long)]
+        source_dir: Option<PathBuf>,
+        /// Désactive la suppression des archives après succès.
+        #[arg(long)]
+        keep_archives: bool,
+    },
+    /// Normalise les projets déjà extraits (rattrapage).
+    NormalizeOnly {
+        /// Ré-encode aussi les vidéos déjà conformes.
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -569,6 +597,35 @@ fn run() -> Result<()> {
                     }
                 }
                 println!("{}", serde_json::to_string_pretty(&value)?);
+            }
+        },
+        Command::Step1(args) => match args.command {
+            Step1Command::Run {
+                source_dir,
+                keep_archives,
+            } => {
+                let mut options = Step1Options::from_config(&config, source_dir)?;
+                if keep_archives {
+                    options.delete_archive = false;
+                }
+                let report = run_step1(&options)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!(
+                        "STEP1: {} archive(s) en échec, {} vidéo(s) non normalisée(s)",
+                        report.failed,
+                        report.normalization.failed
+                    );
+                }
+            }
+            Step1Command::NormalizeOnly { force } => {
+                let mut options = Step1Options::from_config(&config, None)?;
+                options.force_normalize = force;
+                let summary = run_normalize_only(&options)?;
+                println!("{}", serde_json::to_string_pretty(&summary)?);
+                if !summary.is_success() {
+                    anyhow::bail!("STEP1: {} vidéo(s) non normalisée(s)", summary.failed);
+                }
             }
         },
         Command::Step2(args) => match args.command {

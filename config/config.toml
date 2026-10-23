@@ -47,6 +47,18 @@ default_timeout_s = 1800
 keyword = "Camille"
 docs_subfolder = "docs"
 
+[steps.step1]
+source_dir = "/home/kidpixel/Téléchargements"
+normalize = true
+fps = 25
+use_gpu = true
+crf = 28
+gpu_workers = 3
+delete_archive = true
+timeout_s = 14400
+skip_preserved_mov = true
+preserved_mov_names = ["m6+.mov"]
+
 [steps.step5]
 tracking_analytics = true
 expression_summary = false

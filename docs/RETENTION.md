@@ -24,10 +24,10 @@ seuil des orphelins reste `steps.step7.cleanup_threshold_hours`. Une valeur
 le dernier rapport STEP8 sont toujours conservés, même au-delà de 90 jours.
 
 Le nettoyage des téléchargements est désactivé par défaut (`downloads_days =
-0`). Le dossier `~/Téléchargements` de l'utilisateur n'est jamais considéré
-comme géré : `retention` refuse un `--downloads-days` positif hors de
-`paths.base`. Pour activer ce nettoyage, utiliser un répertoire dédié sous
-`runtime/downloads`.
+0`). Le moniteur Rust écrit dans `runtime/downloads`, sous `paths.base` : ce
+dossier peut donc être géré par `retention` si un seuil positif est fourni.
+Le dossier Python `~/Téléchargements` reste hors-scope et n'est jamais
+considéré comme géré.
 
 ### Pourquoi les sorties finalisées sont exclues
 
@@ -92,7 +92,8 @@ supprimer ; un fichier modifié entre le plan et l'application est conservé.
 - Les journaux ne sont reconnus que sous la forme `*.log` ou `*.log.<numéro>`.
   Les rapports ne sont reconnus que sous les préfixes `step7`/`step8` attendus.
 - Le nettoyage des téléchargements n'est accepté que sous `paths.base` ; le
-  dossier personnel `~/Téléchargements` reste hors-scope.
+  dossier Python `~/Téléchargements` reste hors-scope, tandis que
+  `runtime/downloads` (moniteur Rust) est éligible.
 - `apply` doit être lancé hors batch actif. Le seuil de 48 h protège les
   projets en cours, mais ne remplace pas cette règle d'exploitation.
 

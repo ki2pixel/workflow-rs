@@ -21,8 +21,12 @@ thread-safe, contrat de polling, séquence, arrêt, SQLite et verrou isolés, et
 exécution des étapes par sous-processus `workflow-cli`. Le lot 6 porte STEP1 :
 extraction sécurisée des archives et normalisation MP4 / H.264 / 25 fps. Les
 huit étapes disposent désormais d'une implémentation Rust ; aucune commande
-Python n'est lancée en repli. La compilation Windows du pont, le basculement du
-JSX et la validation STEP8 sur la machine Windows restent à faire.
+Python n'est lancée en repli. Le lot 8 porte l'ingestion : moniteur webhook,
+normalisation d'URL, historique SQLite, cooldown des échecs, téléchargement
+R2/Dropbox reprenable et statuts CSV. Le moniteur reste désactivé par défaut
+tant que l'historique Python n'a pas été importé. La compilation Windows du
+pont, le basculement du JSX et la validation STEP8 sur la machine Windows
+restent à faire.
 
 ## État
 
@@ -89,6 +93,11 @@ JSX et la validation STEP8 sur la machine Windows restent à faire.
   `_tracking.json` identiques sémantiquement à la production, puis bascule
   contrôlée 5003/5004 avec rollback vérifié. Détail dans
   `docs/LOT-7-INTEGRATION.md`.
+- Lot 8 terminé : ingestion webhook, normalisation d'URL, historique SQLite,
+  échecs/cooldown, téléchargement `.part` + `Range`, validation ZIP et routes
+  `/api/csv_*`. Import réel de 911 URL identiques à la base Python, audit de
+  normalisation à 0 changement, webhook réel à 462 enregistrements. Détail dans
+  `docs/LOT-8-INGESTION.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -112,6 +121,7 @@ JSX et la validation STEP8 sur la machine Windows restent à faire.
 - `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
 - `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
 - `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
+- `docs/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -163,6 +173,14 @@ cargo run -p workflow-cli -- step8 run --folder /tmp/projet
 cargo run -p workflow-cli -- step1 run --source-dir ~/Téléchargements
 cargo run -p workflow-cli -- step1 normalize-only [--force]
 
+cargo run -p workflow-cli -- history import \
+  --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+cargo run -p workflow-cli -- history audit
+cargo run -p workflow-cli -- history stats
+cargo run -p workflow-cli -- webhook probe --json
+cargo run -p workflow-cli -- webhook probe --plan
+cargo run -p workflow-cli -- download --url 'https://...' --output-dir /tmp/verification
+
 cargo run -p workflow-cli -- retention plan
 cargo run -p workflow-cli -- retention apply
 
@@ -181,6 +199,25 @@ dans la production. Sans `--output` vidéo, la CLI écrit
 `<stem>_tracking.json` (ou réécrit un fichier déjà nommé `_tracking.json`).
 L'en-tête `fps` / `total_frames` est écrit avant `frames_analysis` ; une seconde
 réduction conserve donc les métadonnées.
+
+## Ingestion
+
+Le moniteur est désactivé par défaut. Après import et audit de l'historique,
+passer `webhook.enabled = true` dans `config/config.toml`. Le serveur refuse de
+démarrer le moniteur si `download_history` est vide, ou si
+`steps.step1.source_dir` diffère de `paths.downloads`.
+
+```sh
+./target/release/workflow-cli history import \
+  --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+./target/release/workflow-cli history audit
+./target/release/workflow-cli history stats
+./target/release/workflow-cli webhook probe
+```
+
+`DRY_RUN_DOWNLOADS=true` (ou `webhook.dry_run = true`) marque les nouvelles URL
+dans l'historique sans télécharger. Ne pas lancer les moniteurs Python et Rust
+en même temps sur le même webhook.
 
 ## Pont After Effects
 

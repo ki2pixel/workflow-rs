@@ -19,9 +19,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
 use tower_http::services::ServeDir;
+use workflow_ingest::IngestionService;
 
 pub struct AppState {
     pub runner: Arc<Runner>,
+    pub ingestion: Arc<IngestionService>,
     template: Result<String, String>,
     cache_buster: String,
     static_dir: PathBuf,
@@ -29,15 +31,17 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(runner: Arc<Runner>) -> Arc<Self> {
+    pub fn new(runner: Arc<Runner>) -> anyhow::Result<Arc<Self>> {
         let config = runner.config();
+        let ingestion = Arc::new(IngestionService::new(config, runner.db().repository())?);
         let template_path = config.server.template.clone();
         let static_dir = config.server.frontend_dir.clone();
         let sound_design_dir = config.server.sound_design_dir.clone();
         let template = fs::read_to_string(&template_path)
             .map_err(|error| format!("gabarit {}: {error}", template_path.display()));
-        Arc::new(Self {
+        Ok(Arc::new(Self {
             runner,
+            ingestion,
             template,
             cache_buster: format!(
                 "{}",
@@ -48,7 +52,7 @@ impl AppState {
             ),
             static_dir,
             sound_design_dir,
-        })
+        }))
     }
 }
 
@@ -336,20 +340,12 @@ async fn system_monitor(State(state): State<Arc<AppState>>) -> Response {
     Json(system_metrics()).into_response()
 }
 
-async fn csv_downloads_status() -> Response {
-    Json(json!([])).into_response()
+async fn csv_downloads_status(State(state): State<Arc<AppState>>) -> Response {
+    no_cache(Json(state.ingestion.downloads_status()).into_response())
 }
 
-async fn csv_monitor_status() -> Response {
-    Json(json!({
-        "csv_monitor": {"status": "stopped", "last_check": null, "error": null},
-        "data_source": "webhook",
-        "monitor_interval": 15,
-        "failed_urls": [],
-        "failed_urls_count": 0,
-        "webhook": {"available": false, "last_fetch_ts": null, "error": "legacy Python", "records": 0}
-    }))
-    .into_response()
+async fn csv_monitor_status(State(state): State<Arc<AppState>>) -> Response {
+    no_cache(Json(state.ingestion.monitor_status_json()).into_response())
 }
 
 async fn performance_frontend() -> Response {
@@ -621,7 +617,7 @@ mod tests {
             Arc::new(WorkflowState::new()),
         )
         .unwrap();
-        let app = router(AppState::new(runner));
+        let app = router(AppState::new(runner).unwrap());
         (dir, app)
     }
 
@@ -678,6 +674,43 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn csv_routes_expose_the_ingestion_contract() {
+        let (_dir, app) = test_app();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/csv_downloads_status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let downloads: Value = serde_json::from_slice(&body).unwrap();
+        assert!(downloads.as_array().unwrap().is_empty());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/csv_monitor_status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let monitor: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(monitor["data_source"], "webhook");
+        assert_eq!(monitor["monitor_interval"], 15);
+        assert_eq!(monitor["csv_monitor"]["status"], "stopped");
+        assert!(monitor["failed_urls"].as_array().unwrap().is_empty());
+        assert_eq!(monitor["webhook"]["available"], false);
     }
 
     #[tokio::test]

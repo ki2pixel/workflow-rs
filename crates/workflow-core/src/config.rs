@@ -58,6 +58,97 @@ impl Config {
         if let Some(value) = env_first(&["WORKFLOW_WEBHOOK_URL", "WEBHOOK_JSON_URL"]) {
             self.webhook.url = value;
         }
+        if let Some(value) = env_first(&["WORKFLOW_WEBHOOK_ENABLED", "WEBHOOK_ENABLED"]) {
+            if let Ok(parsed) = parse_bool(&value) {
+                self.webhook.enabled = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["WEBHOOK_TIMEOUT"]) {
+            if let Ok(parsed) = value.parse() {
+                self.webhook.timeout_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["WEBHOOK_CACHE_TTL"]) {
+            if let Ok(parsed) = value.parse() {
+                self.webhook.cache_ttl_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["WEBHOOK_MONITOR_INTERVAL"]) {
+            if let Ok(parsed) = value.parse() {
+                self.webhook.interval_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["WEBHOOK_REQUIRE_HISTORY"]) {
+            if let Ok(parsed) = parse_bool(&value) {
+                self.webhook.require_history = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DRY_RUN_DOWNLOADS"]) {
+            if let Ok(parsed) = parse_bool(&value) {
+                self.webhook.dry_run = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["WORKFLOW_PATHS_DOWNLOADS"]) {
+            self.paths.downloads = Some(PathBuf::from(value));
+        }
+        if let Some(value) = env_first(&["WORKFLOW_STEP1_SOURCE_DIR"]) {
+            self.steps.step1.source_dir = PathBuf::from(value);
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_CHUNK_SIZE_BYTES"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.chunk_bytes = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_CONNECT_TIMEOUT_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.connect_timeout_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_CHUNK_TIMEOUT_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.chunk_timeout_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_PROBE_TIMEOUT_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.probe_timeout_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_MAX_ATTEMPTS"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.max_attempts = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_RETRY_BACKOFF_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.backoff_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_PROGRESS_MIN_INTERVAL_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.progress_min_interval_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_MIN_ZIP_SIZE_BYTES"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.min_zip_bytes = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_VALIDATE_ZIP"]) {
+            if let Ok(parsed) = parse_bool(&value) {
+                self.download.validate_zip = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_COOLDOWN_MAX_S"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.cooldown_max_s = parsed;
+            }
+        }
+        if let Some(value) = env_first(&["DOWNLOAD_MAX_CONCURRENT"]) {
+            if let Ok(parsed) = value.parse() {
+                self.download.max_concurrent = parsed;
+            }
+        }
     }
 
     /// Validation utilisable par la CLI, sans exiger les secrets du serveur.
@@ -198,6 +289,35 @@ impl Config {
                 "steps.step4.decode_width et decode_height doivent être tous deux 0 ou > 0".into(),
             ));
         }
+        if self.webhook.enabled && self.webhook.url.trim().is_empty() {
+            return Err(ConfigError::Invalid(
+                "webhook.url est vide alors que webhook.enabled = true".into(),
+            ));
+        }
+        if self.webhook.timeout_s == 0 || self.webhook.interval_s == 0 {
+            return Err(ConfigError::Invalid(
+                "webhook.timeout_s et webhook.interval_s doivent être > 0".into(),
+            ));
+        }
+        if self.download.chunk_bytes == 0
+            || self.download.connect_timeout_s == 0
+            || self.download.chunk_timeout_s == 0
+            || self.download.probe_timeout_s == 0
+            || self.download.max_attempts == 0
+            || self.download.max_concurrent == 0
+            || self.download.min_zip_bytes == 0
+        {
+            return Err(ConfigError::Invalid(
+                "download: chunk, timeouts, tentatives, concurrence et taille ZIP doivent être > 0"
+                    .into(),
+            ));
+        }
+        if self.download.backoff_s < 0.0 || self.download.progress_min_interval_s < 0.0 {
+            return Err(ConfigError::Invalid(
+                "download.backoff_s et download.progress_min_interval_s doivent être positifs"
+                    .into(),
+            ));
+        }
         Ok(())
     }
 
@@ -253,6 +373,14 @@ fn env_first(names: &[&str]) -> Option<String> {
         }
     }
     None
+}
+
+fn parse_bool(value: &str) -> Result<bool, ()> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => Err(()),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,19 +471,29 @@ impl Default for PathsConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct WebhookConfig {
+    /// Démarre le moniteur d'ingestion. Désactivé par défaut : une base vide
+    /// ferait télécharger tout l'historique du webhook.
+    pub enabled: bool,
+    /// Refuse de démarrer le moniteur si `download_history` est vide.
+    pub require_history: bool,
     pub url: String,
     pub timeout_s: u64,
     pub cache_ttl_s: u64,
     pub interval_s: u64,
+    /// Simule les téléchargements et n'écrit que l'historique (tests/CI).
+    pub dry_run: bool,
 }
 
 impl Default for WebhookConfig {
     fn default() -> Self {
         Self {
+            enabled: false,
+            require_history: true,
             url: String::new(),
             timeout_s: 10,
-            cache_ttl_s: 300,
-            interval_s: 60,
+            cache_ttl_s: 60,
+            interval_s: 15,
+            dry_run: false,
         }
     }
 }
@@ -363,6 +501,9 @@ impl Default for WebhookConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DownloadConfig {
+    /// Taille de lecture historique. Le streaming reqwest gère lui-même ses
+    /// tampons réseau ; la valeur reste acceptée et validée pour compatibilité
+    /// avec les `.env` Python, mais ne change pas le découpage des paquets.
     pub chunk_bytes: u64,
     pub connect_timeout_s: u64,
     pub chunk_timeout_s: u64,
@@ -373,21 +514,25 @@ pub struct DownloadConfig {
     pub min_zip_bytes: u64,
     pub validate_zip: bool,
     pub cooldown_max_s: u64,
+    /// Téléchargements simultanés. Python lançait un thread par lien sans
+    /// limite ; le port borne la pression disque/réseau (D-020).
+    pub max_concurrent: usize,
 }
 
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
-            chunk_bytes: 8 * 1024 * 1024,
-            connect_timeout_s: 10,
+            chunk_bytes: 512 * 1024,
+            connect_timeout_s: 15,
             chunk_timeout_s: 60,
             probe_timeout_s: 10,
             max_attempts: 3,
-            backoff_s: 2.0,
-            progress_min_interval_s: 0.5,
-            min_zip_bytes: 1024,
+            backoff_s: 1.0,
+            progress_min_interval_s: 1.0,
+            min_zip_bytes: 1_000_000,
             validate_zip: true,
             cooldown_max_s: 3_600,
+            max_concurrent: 4,
         }
     }
 }

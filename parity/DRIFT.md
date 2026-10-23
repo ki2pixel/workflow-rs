@@ -20,10 +20,13 @@ est mis à jour à chaque mesure de parité.
 | D-012 | haute | Isolation | L'application Python n'utilise pas `workflow-hw.lock`. Le harnais le prend, mais l'ancienne application peut démarrer STEP1-4 pendant un test. | Le portage et les scripts de test prennent le verrou. Pendant la transition, vérifier `/sequence/status` et `pgrep` avant toute mesure. |
 | D-013 | moyenne | Orchestrateur | Le contrat Python autorise deux étapes différentes en parallèle ; le frontend ne le fait pas. | Lot 5 : le serveur Rust refuse la deuxième étape avec 409 et sérialise toutes les exécutions. Durcissement volontaire documenté. |
 | D-014 | haute | STEP1 | Le lot 5 n'avait pas d'implémentation Rust de l'extraction/normalisation. | Résolu au lot 6 : extraction ZIP/RAR/TAR, assainissement, réinitialisation mensuelle, suppression des archives et normalisation vidéo. Aucun fallback Python. |
-| D-015 | moyenne | Frontend/API | Le serveur Rust n'implémente pas encore CSV, cache, statistiques, diagnostics ni `/api/audio/*`. | Ces routes restent dans Python. Le serveur Rust expose des stubs de polling (`/api/csv_*`, `/api/system_monitor`, `/api/performance/frontend`) pour que le frontend ne casse pas ; le panneau de téléchargements reste vide. |
+| D-015 | moyenne | Frontend/API | Le serveur Rust n'implémente pas encore cache, statistiques, diagnostics ni `/api/audio/*`. | Ces routes restent dans Python. Depuis le lot 8, `/api/csv_monitor_status` et `/api/csv_downloads_status` sont réelles ; `/api/system_monitor` et `/api/performance/frontend` restent des stubs de polling. |
 | D-016 | basse | STEP1 | Le scan Python teste `Path.suffix` contre une liste contenant `.tar.gz`, `.tar.bz2` et `.tar.xz` : ces trois formes ne matchent jamais, car seul le dernier suffixe est comparé. | Le port Rust reproduit le scan effectif (`.zip`, `.zipx`, `.rar`, `.tgz`, `.7z`, `.tar`). Les décodeurs gzip/bzip2/xz restent testés au niveau module, mais le scan ne les sélectionne pas. |
 | D-017 | basse | STEP1 | Python décode les noms de membres TAR avec `surrogateescape` ; Rust utilise un décodage UTF-8 lossy. | Écart limité aux archives dont les noms ne sont pas en UTF-8. Les noms concernés restent visibles dans les journaux, avec un caractère de remplacement. |
-| D-018 | haute | Téléchargement | Le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et le prompt CSV ne sont pas portés. Le serveur Rust crée le schéma et renvoie des stubs `/api/csv_*`. | Garder le moniteur Python pendant la transition, ou porter un lot ingestion avec migration de `download_history` (911 URLs au 2026-10-23) avant activation. Ne jamais démarrer un moniteur Rust avec une base vide : il téléchargerait tous les liens du webhook. |
+| D-018 | haute | Téléchargement | Le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et les statuts CSV n'étaient pas portés avant le lot 8. | Résolu au lot 8 : moniteur, normalisation d'URL, historique, échecs/cooldown, téléchargement reprenable et routes de statut. Le moniteur reste désactivé par défaut et refuse une base vide (`require_history`). |
+| D-019 | moyenne | Téléchargement | Python télécharge dans `~/Téléchargements`, aussi utilisé par STEP1. Le Rust utilise `runtime/downloads` pour rester isolé. | `LOCAL_DOWNLOADS_DIR` n'est volontairement pas repris ; `WORKFLOW_PATHS_DOWNLOADS` et `WORKFLOW_STEP1_SOURCE_DIR` permettent de choisir un dossier commun lors d'une bascule explicite. Quand le moniteur est actif, le serveur exige `steps.step1.source_dir == paths.downloads`. |
+| D-020 | basse | Téléchargement | Python lance un thread par lien, déplace un téléchargement en historique dès qu'une tentative échoue (même si le repli Dropbox réussit ensuite), et conserve l'ancien `error` du moniteur après un succès. | Le port borne la concurrence (`download.max_concurrent`, défaut 4), ne publie le statut final qu'après le repli, remet `error` à null après un passage réussi, et classe une fermeture de corps prématurée en `incomplete`. |
+| D-021 | haute | Migration | Le moniteur Rust ne peut pas deviner l'historique Python. Une base vide ferait télécharger tous les liens du webhook. | Import explicite `workflow-cli history import --from <base>` (lecture seule, 911 URL identiques au 2026-10-23), audit `history audit`, puis `webhook.enabled = true`. Les échecs Python ne sont pas importés : ils sont transitoires et liés à des URL R2 expirées. |
 
 ## Détails
 
@@ -108,26 +111,69 @@ quelles archives sont traitées. Les décodeurs gzip/bzip2/xz restent disponible
 dans `extract_archive` et sont couverts par les tests unitaires, mais le scan
 quotidien ne sélectionne que les suffixes simples.
 
-### D-018 — Téléchargement automatique non porté
+### D-018 — Téléchargement automatique
 
-Le serveur Rust contient la configuration `[webhook]` et `[download]`, crée les
-tables `download_history` / `download_failures` dans sa base isolée, et expose
-`/api/csv_monitor_status` / `/api/csv_downloads_status` sous forme de stubs
-vides. Il ne contacte pas le webhook et ne télécharge aucun fichier. STEP1 ne
-voit donc que les archives déjà présentes dans `steps.step1.source_dir` (par
-défaut `~/Téléchargements`), déposées par le moniteur Python ou manuellement.
+Le lot 8 porte la chaîne complète : `workflow-ingest` interroge le webhook,
+normalise les URL, consulte `download_history`, applique le cooldown de
+`download_failures`, télécharge dans un `.part` reprenable, valide le ZIP, puis
+écrit l'historique. Le serveur expose les vrais statuts sur
+`/api/csv_monitor_status` et `/api/csv_downloads_status`.
 
-La logique Python à reproduire est la suivante :
+La logique reproduite est celle de Python, et non une limite « derniers N
+liens » :
 
-- `WEBHOOK_JSON_URL` est interrogé avec un cache de 60 s et trois tentatives ;
-- les deux schémas (`source_url`/`r2_url` et `url` historique) sont normalisés ;
+- le webhook est interrogé avec un cache de 60 s et trois tentatives ;
+- les deux schémas (`source_url`/`r2_url` et `url` historique) sont acceptés ;
 - un lien n'est téléchargé que si son URL normalisée n'est pas déjà dans
-  `download_history` ; ce n'est pas une limite « derniers N liens » ;
-- les échecs sont conservés dans `download_failures` avec un cooldown
-  exponentiel, pour ne pas réarmer un lien cassé à chaque cycle ;
-- le téléchargement privilégie R2 puis Dropbox, reprend via `.part` + `Range`,
-  valide le ZIP et n'écrit l'historique qu'après succès.
+  `download_history` ;
+- les échecs sont conservés avec un cooldown exponentiel plafonné ;
+- R2 est tenté en premier, puis Dropbox ; le `.part` est partagé pour reprendre
+  sur l'autre URL ;
+- l'historique n'est écrit qu'après un téléchargement validé.
 
-La base Python contient 911 URLs au 2026-10-23. Une migration vers la base Rust
-est obligatoire avant d'activer un moniteur Rust, sinon une base vide ferait
-re-télécharger tous les liens du webhook.
+La base Python contient 911 URL au 2026-10-23. L'import Rust a été vérifié
+comme identique ligne pour ligne, et `history audit` confirme que les 911 URL
+sont déjà normalisées selon l'algorithme Rust.
+
+### D-019 — Dossier de téléchargement isolé
+
+Python écrit dans `LOCAL_DOWNLOADS_DIR` (par défaut `~/Téléchargements`), que
+STEP1 scanne ensuite. Le Rust écrit dans `paths.downloads`
+(`runtime/downloads`) pour ne pas partager de fichiers avec le moniteur Python.
+Lors d'une bascule complète, il suffit d'aligner explicitement
+`WORKFLOW_PATHS_DOWNLOADS` et `WORKFLOW_STEP1_SOURCE_DIR` ; le serveur refuse
+de démarrer le moniteur si les deux diffèrent.
+
+### D-020 — Statut final et concurrence
+
+Trois durcissements sont volontaires :
+
+- `download.max_concurrent` borne les téléchargements simultanés. Python
+  lançait un thread par lien sans limite ; le choix des liens est identique.
+  Les liens en attente de permis sont enregistrés dans le tracker avant
+  l'attente, sinon le passage suivant du moniteur les replanifierait.
+- Le callback de progression ne bascule plus le statut en `failed` à chaque
+  tentative. Un R2 absent suivi d'un Dropbox réussi doit apparaître comme
+  `completed`, avec le message de repli.
+- Le moniteur efface `error` après un passage réussi, au lieu de conserver
+  indéfiniment la dernière erreur.
+
+### D-021 — Migration explicite de l'historique
+
+Le moniteur est désactivé par défaut (`webhook.enabled = false`) et
+`webhook.require_history = true` refuse une base vide. La procédure est :
+
+```bash
+workflow-cli history import --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+workflow-cli history audit
+workflow-cli history stats
+```
+
+L'import ouvre la base source en lecture seule et conserve le plus petit
+timestamp par URL. Les échecs Python ne sont pas importés : les objets R2
+expirés ne doivent pas imposer un cooldown à la nouvelle instance.
+
+Le diagnostic `workflow-cli webhook probe --plan` compare le webhook réel à
+l'historique Rust sans rien écrire. Au 2026-10-23 : 911 URL importées → 0
+téléchargement planifié ; base vide → 429 téléchargements planifiés. Le verrou
+`require_history` n'est donc pas décoratif.

@@ -25,7 +25,7 @@ Trois boucles d'arrière-plan tournent dans le processus :
 
 La nouvelle application utilise le port 5004 et une racine de travail distincte. Elle ne partage ni la base SQLite, ni les répertoires, ni le verrou matériel.
 
-Le lot 5 implémente ce contrat pour les STEP2 à STEP8 et le lot 6 pour STEP1 : `POST /run/STEP1` extrait les archives puis normalise les projets, sans appel Python. Les routes CSV, cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy ; le serveur Rust ne fournit que les stubs de polling du frontend. Voir `LOT-5-ORCHESTRATOR.md` et `LOT-6-STEP1.md` pour le détail et les écarts volontaires.
+Le lot 5 implémente ce contrat pour les STEP2 à STEP8 et le lot 6 pour STEP1 : `POST /run/STEP1` extrait les archives puis normalise les projets, sans appel Python. Le lot 8 porte le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et les statuts CSV. Les routes cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy. Voir `LOT-5-ORCHESTRATOR.md`, `LOT-6-STEP1.md` et `LOT-8-INGESTION.md` pour le détail et les écarts volontaires.
 
 ## 2. API HTTP
 
@@ -140,7 +140,7 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
   "monitor_interval": 15,
   "failed_urls": [],
   "failed_urls_count": 0,
-  "webhook": {"available": true, "last_fetch_ts": 1760000000.0, "error": null, "records": 3}
+  "webhook": {"available": true, "last_fetch_ts": "2026-10-23 15:03:48", "error": null, "records": 3}
 }
 ```
 
@@ -237,6 +237,16 @@ CREATE TABLE download_failures (
 ```
 
 Aucun index explicite. Les fichiers `-wal` et `-shm` sont créés par SQLite. Le groupe partagé est optionnel (`DOWNLOAD_HISTORY_SHARED_GROUP`), avec un mode de fichier `0o664`.
+
+Le serveur Rust utilise le même schéma dans sa base isolée. La migration depuis Python est explicite et en lecture seule :
+
+```bash
+workflow-cli history import --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+workflow-cli history audit
+workflow-cli history stats
+```
+
+`history audit` vérifie que chaque URL stockée est déjà normalisée. Le moniteur reste désactivé (`webhook.enabled = false`) et refuse une base vide (`webhook.require_history = true`) pour éviter de re-télécharger tout le webhook.
 
 Normalisation des URLs avant insertion : trim, décodage des entités HTML, décodage récursif des séquences doublement encodées (`amp%3B`), minuscule du schéma et de l'hôte, suppression des ports par défaut, tri des paramètres de requête, suppression des paramètres vides, un seul `dl=1` pour Dropbox, suppression du slash final hors racine, décodage puis réencodage du chemin.
 

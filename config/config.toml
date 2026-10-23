@@ -7,7 +7,14 @@
 # - WORKFLOW_SERVER_WORKER_TOKEN ;
 # - WORKFLOW_SERVER_PORT (optionnel) ;
 # - WORKFLOW_PATHS_BASE (optionnel) ;
-# - WORKFLOW_WEBHOOK_URL (optionnel).
+# - WORKFLOW_WEBHOOK_URL (optionnel) ;
+# - WORKFLOW_WEBHOOK_ENABLED (optionnel) ;
+# - WORKFLOW_PATHS_DOWNLOADS (optionnel) ;
+# - WORKFLOW_STEP1_SOURCE_DIR (optionnel).
+#
+# Les variables Python WEBHOOK_* et DOWNLOAD_* sont également lues pour la
+# transition, sauf LOCAL_DOWNLOADS_DIR : le dossier Rust reste isolé sous
+# runtime/downloads (voir parity/DRIFT.md, D-019).
 #
 # Les anciens noms FLASK_SECRET_KEY et INTERNAL_WORKER_COMMS_TOKEN restent
 # acceptés pour la période de transition. Les autres clés viennent uniquement
@@ -38,7 +45,30 @@ cache_root = "/mnt/cache"
 finalized = "/mnt/cache"
 
 [webhook]
+# Sécurité : le moniteur ne démarre pas tant que l'historique Python n'a pas
+# été importé. Commandes :
+#   workflow-cli history import --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+#   puis passer enabled = true.
+enabled = false
+require_history = true
 url = "https://webhook.kidpixel.fr/webhook_proxy.php"
+timeout_s = 10
+cache_ttl_s = 60
+interval_s = 15
+dry_run = false
+
+[download]
+chunk_bytes = 524288
+connect_timeout_s = 15
+chunk_timeout_s = 60
+probe_timeout_s = 10
+max_attempts = 3
+backoff_s = 1.0
+progress_min_interval_s = 1.0
+min_zip_bytes = 1000000
+validate_zip = true
+cooldown_max_s = 3600
+max_concurrent = 4
 
 [steps]
 default_timeout_s = 1800
@@ -48,7 +78,9 @@ keyword = "Camille"
 docs_subfolder = "docs"
 
 [steps.step1]
-source_dir = "/home/kidpixel/Téléchargements"
+# Dossier isolé du moniteur Rust. Il doit rester égal à paths.downloads quand
+# webhook.enabled = true, sinon STEP1 ne verrait pas les archives téléchargées.
+source_dir = "/home/kidpixel/workflow-rs/runtime/downloads"
 normalize = true
 fps = 25
 use_gpu = true

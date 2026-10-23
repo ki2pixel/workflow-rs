@@ -97,13 +97,13 @@ Le frontend envoie `X-Worker-Token` depuis la balise `meta`. Sans jeton :
   serveur refuse la deuxième avec 409. Le Python le permettait, mais le
   contrat demande de sérialiser les étapes lourdes. Le frontend attend déjà la
   fin d'une étape avant la suivante.
-- STEP1 n'est pas disponible. Le refus est explicite, avant toute réservation
-  d'état, et aucune commande Python n'est lancée.
-- Les routes CSV, cache, statistiques, diagnostics et audio restent dans le
-  legacy Python. Le serveur Rust fournit seulement les stubs de polling
-  nécessaires au frontend (`/api/csv_*`, `/api/performance/frontend`,
-  `/api/system_monitor`). Le panneau « Téléchargements locaux » reste donc vide
-  tant que la bascule CSV n'est pas faite.
+- Au lot 5, STEP1 n'était pas disponible. Le refus était explicite, avant
+  toute réservation d'état, et aucune commande Python n'était lancée. Le lot 6
+  lève cette limite.
+- Les routes cache, statistiques, diagnostics et audio restent dans le legacy
+  Python. Depuis le lot 8, `/api/csv_monitor_status` et
+  `/api/csv_downloads_status` sont servies par `workflow-ingest` ;
+  `/api/performance/frontend` et `/api/system_monitor` restent des stubs.
 
 ## Commandes d'étape
 
@@ -197,13 +197,11 @@ et STEP4.
 - Le mode batch STEP5 ne fait pas l'enrichissement legacy depuis un STEP4 brut
   lorsqu'un `_tracking.json` partiel existe déjà. Le pipeline Rust neuf n'en a
   pas besoin ; les projets Python déjà réduits restent identiques (shadow).
-- Les routes CSV/downloads/cache/statistiques/audio et `/test-sound` restent
-  dans Python. Le serveur Rust expose des stubs vides pour ne pas casser le
-  polling du panneau.
-- Le moniteur webhook et le téléchargement R2/Dropbox ne sont pas portés : le
-  serveur Rust crée seulement le schéma SQLite et des stubs. Une bascule 100 %
-  Rust nécessite un lot ingestion et la migration de l'historique Python
-  (D-018).
+- Les routes cache/statistiques/audio et `/test-sound` restent dans Python.
+  Les routes CSV sont réelles depuis le lot 8 (voir `LOT-8-INGESTION.md`).
+- Le moniteur webhook et le téléchargement R2/Dropbox sont portés, mais
+  désactivés par défaut. La migration explicite de l'historique Python est
+  obligatoire avant activation (`D-018`, `D-021`).
 - La validation Windows/After Effects et le JSX restent externes et différés.
 - Le verrou Rust est distinct du verrou Python : ne pas lancer de STEP2/3/4
   matérielle des deux côtés simultanément pendant la période de dual-run.

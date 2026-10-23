@@ -49,22 +49,34 @@ async fn run() -> Result<()> {
         .with_context(|| "initialisation de l'orchestrateur")?;
     runner.check_ready()?;
 
+    let history_count = runner.db().repository().count()?;
+    workflow_ingest::validate_monitor_startup(&config, history_count)?;
+
     if cli.check {
         let resolved = config.paths.resolve();
         println!(
-            "configuration server valide\n  port: {}\n  base: {}\n  db: {}\n  projets: {}\n  logs: {}\n  verrou: {}\n  cli: {}",
+            "configuration server valide\n  port: {}\n  base: {}\n  db: {}\n  projets: {}\n  logs: {}\n  téléchargements: {}\n  historique: {} URL(s)\n  webhook: {}\n  dry-run: {}\n  verrou: {}\n  cli: {}",
             config.server.port,
             resolved.base.display(),
             resolved.history_db.display(),
             resolved.projects.display(),
             resolved.logs.display(),
+            resolved.downloads.display(),
+            history_count,
+            if config.webhook.enabled {
+                "activé"
+            } else {
+                "désactivé"
+            },
+            if config.webhook.dry_run { "oui" } else { "non" },
             config.hardware.lock_path.display(),
             runner.cli_path().display()
         );
         return Ok(());
     }
 
-    let state = AppState::new(runner);
+    let state = AppState::new(runner)?;
+    let monitor = state.ingestion.spawn_monitor();
     let app = workflow_server::router(state);
     let address = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&address)
@@ -74,14 +86,37 @@ async fn run() -> Result<()> {
     println!("workflow-server à l'écoute sur http://{address}");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(monitor))
         .await
         .context("serveur HTTP arrêté en erreur")
 }
 
-async fn shutdown_signal() {
+#[cfg(unix)]
+async fn shutdown_signal(monitor: workflow_ingest::MonitorHandle) {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut terminate = match signal(SignalKind::terminate()) {
+        Ok(signal) => signal,
+        Err(error) => {
+            tracing::warn!("SIGTERM indisponible ({error}), attente de Ctrl+C");
+            let _ = tokio::signal::ctrl_c().await;
+            tracing::info!("arrêt demandé");
+            monitor.stop().await;
+            return;
+        }
+    };
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = terminate.recv() => {}
+    }
+    tracing::info!("arrêt demandé");
+    monitor.stop().await;
+}
+
+#[cfg(not(unix))]
+async fn shutdown_signal(monitor: workflow_ingest::MonitorHandle) {
     let _ = tokio::signal::ctrl_c().await;
     tracing::info!("arrêt demandé");
+    monitor.stop().await;
 }
 
 fn validate_isolation(config: &Config) -> Result<()> {

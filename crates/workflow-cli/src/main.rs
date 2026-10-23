@@ -4,6 +4,11 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 use workflow_core::Config;
+use workflow_ingest::download::Downloader;
+use workflow_ingest::history::HistoryRepository;
+use workflow_ingest::monitor::{plan_downloads, PlanContext};
+use workflow_ingest::url::normalize_url;
+use workflow_ingest::webhook::WebhookClient;
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step1::{run_normalize_only, run_step1, Step1Options};
 use workflow_steps::step2::{run_step2, Step2Options};
@@ -37,6 +42,12 @@ struct Cli {
 enum Command {
     /// Vérifie ou affiche la configuration.
     Config(ConfigArgs),
+    /// Historique SQLite des téléchargements (import depuis Python, stats).
+    History(HistoryArgs),
+    /// Diagnostic du webhook, sans écriture d'historique.
+    Webhook(WebhookArgs),
+    /// Télécharge une URL avec le même moteur que le moniteur (sans historique).
+    Download(DownloadArgs),
     /// Extraction des archives et normalisation vidéo STEP1.
     Step1(Step1Args),
     /// Détection de scènes STEP2 (TransNetV2 ONNX Runtime).
@@ -71,6 +82,69 @@ enum ConfigCommand {
     Check,
     /// Affiche la configuration en JSON, secrets masqués.
     Show,
+}
+
+#[derive(Debug, Args)]
+struct HistoryArgs {
+    #[command(subcommand)]
+    command: HistoryCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum HistoryCommand {
+    /// Importe la base Python en lecture seule vers la base Rust isolée.
+    Import {
+        /// Base Python (`download_history.sqlite3`).
+        #[arg(long)]
+        from: PathBuf,
+        /// Remplace l'historique Rust au lieu de fusionner.
+        #[arg(long)]
+        replace: bool,
+        /// Compte les lignes sans écrire.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Affiche le nombre d'URL et d'échecs dans la base Rust.
+    Stats,
+    /// Vérifie que les URL stockées sont déjà normalisées (migration).
+    Audit {
+        /// Nombre d'exemples affichés.
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+}
+
+#[derive(Debug, Args)]
+struct WebhookArgs {
+    #[command(subcommand)]
+    command: WebhookCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum WebhookCommand {
+    /// Interroge le webhook une fois et affiche le nombre d'enregistrements.
+    Probe {
+        /// Sortie JSON complète.
+        #[arg(long)]
+        json: bool,
+        /// Compare le webhook à l'historique Rust et liste ce qui serait téléchargé.
+        #[arg(long)]
+        plan: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct DownloadArgs {
+    #[arg(long)]
+    url: String,
+    /// Timestamp utilisé pour le nom de repli et le journal.
+    #[arg(long)]
+    timestamp: Option<String>,
+    /// Répertoire de destination, explicite pour ne pas polluer STEP1.
+    #[arg(long)]
+    output_dir: PathBuf,
+    #[arg(long)]
+    filename: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -599,6 +673,156 @@ fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&value)?);
             }
         },
+        Command::History(args) => {
+            let resolved = config.paths.resolve();
+            match args.command {
+                HistoryCommand::Import {
+                    from,
+                    replace,
+                    dry_run,
+                } => {
+                    if dry_run {
+                        let source_count = HistoryRepository::preview_import(&from)?;
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json!({
+                                "dry_run": true,
+                                "source": from,
+                                "source_count": source_count,
+                                "destination": resolved.history_db,
+                            }))?
+                        );
+                    } else {
+                        let repository = HistoryRepository::open(&resolved.history_db)?;
+                        let report = repository.import_from(&from, replace)?;
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    }
+                }
+                HistoryCommand::Stats => {
+                    let repository = HistoryRepository::open(&resolved.history_db)?;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "path": repository.path(),
+                            "history": repository.count()?,
+                            "failures": repository.failure_count()?,
+                        }))?
+                    );
+                }
+                HistoryCommand::Audit { limit } => {
+                    let repository = HistoryRepository::open(&resolved.history_db)?;
+                    let entries = repository.get_ts_by_url()?;
+                    let mut changes = Vec::new();
+                    for url in entries.keys() {
+                        let normalized = normalize_url(url);
+                        if &normalized != url {
+                            changes.push(json!({
+                                "stored": url,
+                                "normalized": normalized,
+                            }));
+                        }
+                    }
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "path": repository.path(),
+                            "total": entries.len(),
+                            "changes": changes.len(),
+                            "examples": changes.iter().take(limit).collect::<Vec<_>>(),
+                        }))?
+                    );
+                    if !changes.is_empty() {
+                        anyhow::bail!(
+                            "{} URL(s) ne sont pas normalisées: le moniteur risque de les retélécharger",
+                            changes.len()
+                        );
+                    }
+                }
+            }
+        }
+        Command::Webhook(args) => match args.command {
+            WebhookCommand::Probe {
+                json: as_json,
+                plan,
+            } => {
+                let client = WebhookClient::new(&config.webhook)?;
+                let runtime = tokio::runtime::Runtime::new()?;
+                let records = runtime.block_on(client.fetch());
+                let status = client.status();
+                let Some(records) = records else {
+                    anyhow::bail!(
+                        "webhook indisponible: {}",
+                        status.error.unwrap_or_else(|| "erreur inconnue".into())
+                    );
+                };
+                if plan {
+                    let resolved = config.paths.resolve();
+                    let repository = HistoryRepository::open(&resolved.history_db)?;
+                    let history = repository.get_urls()?;
+                    let failures = repository.get_failure_map()?;
+                    let tracked = std::collections::HashSet::new();
+                    let plans = plan_downloads(
+                        &records,
+                        &PlanContext {
+                            history: &history,
+                            failures: &failures,
+                            tracked: &tracked,
+                            now: chrono::Local::now().naive_local(),
+                            interval_s: config.webhook.interval_s,
+                            cooldown_max_s: config.download.cooldown_max_s,
+                        },
+                    );
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "history": history.len(),
+                            "failures": failures.len(),
+                            "records": records.len(),
+                            "planned": plans.len(),
+                            "plans": plans,
+                        }))?
+                    );
+                    return Ok(());
+                }
+                if as_json {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "status": status,
+                            "count": records.len(),
+                            "records": records.iter().take(10).collect::<Vec<_>>(),
+                        }))?
+                    );
+                } else {
+                    println!(
+                        "webhook: {} enregistrement(s), disponible={}, dernier échange={}",
+                        records.len(),
+                        status.available,
+                        status.last_fetch_ts.unwrap_or_else(|| "n/a".into())
+                    );
+                }
+            }
+        },
+        Command::Download(args) => {
+            let output_dir = args.output_dir;
+            std::fs::create_dir_all(&output_dir)?;
+            let timestamp = args
+                .timestamp
+                .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+            let downloader = Downloader::new(&config.download)?;
+            let runtime = tokio::runtime::Runtime::new()?;
+            let result = runtime.block_on(downloader.download(
+                &args.url,
+                &timestamp,
+                &output_dir,
+                args.filename.as_deref(),
+                None,
+            ));
+            println!("{}", serde_json::to_string_pretty(&result)?);
+            if !result.success {
+                std::process::exit(1);
+            }
+        }
         Command::Step1(args) => match args.command {
             Step1Command::Run {
                 source_dir,

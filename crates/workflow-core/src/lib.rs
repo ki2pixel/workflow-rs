@@ -5,7 +5,7 @@ pub mod error;
 pub mod lock;
 pub mod paths;
 
-pub use config::Config;
+pub use config::{Config, DownloadConfig, WebhookConfig};
 pub use error::ConfigError;
 pub use lock::HardwareLock;
 pub use paths::ResolvedPaths;

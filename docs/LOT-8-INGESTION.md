@@ -186,25 +186,68 @@ Détail dans `../parity/DRIFT.md`.
 | Reprise réelle `Range` | `.part` de 5 000 octets, réponse HTTP 206, `resumed_from=5000`, md5 identique |
 | ZIP réel de production | `155 Camille.zip` (783 691 649 octets) via HTTP local, 1,5 s, md5 identique, validation ZIP réussie |
 | ZIP corrompu | 2 Mo aléatoires nommés `.zip` : `invalid_payload`, `.part` supprimé, aucun fichier final |
+| Dernier lien webhook (R2) | `276 Camille.zip` : 183 450 047 octets, 175 Mo, 29 s, ZIP valide |
+| Dernier lien webhook (Dropbox) | même archive via `source_url`, 33 s, ZIP valide |
+| Moniteur réel bout en bout | base isolée sans les deux URL de `276` : 1 téléchargement planifié, R2 réussi, 183 450 047 octets, ZIP valide, historique réécrit à 911 URL, 0 échec |
+| Repli R2 → Dropbox bout en bout | webhook local avec `r2_url` en 404 et `source_url` réel : repli Dropbox, 175 Mo, message `(R2 absent - repli Dropbox utilisé)`, aucun échec persistant |
+| Chaîne complète STEP1 → STEP8 | `1720 Camille.zip` : 8/8 étapes, 4 `.ecproj`, aucune écriture `/mnt/cache` (voir `VALIDATION-STEP1-8.md`) |
+
+### 7.1 Chaîne complète STEP1 → STEP8
+
+Le test `1720 Camille` couvre l'enchaînement complet, y compris STEP1 :
+1 archive extraite, 4 vidéos déjà conformes, 35/45/61/59 scènes,
+27/27/46/26 segments audio, 5 158/4 673/5 022/5 272 trames de tracking,
+4 `_ae.json`, 1 projet finalisé et 4 `.ecproj`. Détail, isolation et contrôles
+d'intégrité dans `VALIDATION-STEP1-8.md`.
+
+### 7.2 Simuler un nouveau lien sans attendre le webhook
+
+Un lien déjà présent dans l'historique est ignoré, même s'il est toujours
+valide. Pour rejouer le moniteur sur un lien existant, sans toucher à la base
+de production :
+
+1. copier `runtime/download_history.sqlite3` dans un runtime isolé ;
+2. supprimer de la copie les deux URL de l'enregistrement choisi
+   (`source_url` normalisée et `r2_url`) ;
+3. configurer `paths.downloads` et `steps.step1.source_dir` vers un dossier
+   isolé, puis `webhook.enabled = true`, `require_history = true`,
+   `dry_run = false`, `max_concurrent = 1` ;
+4. démarrer le serveur sur un port séparé. Le moniteur planifie exactement
+   l'enregistrement supprimé ;
+5. vérifier `/api/csv_downloads_status`, le fichier téléchargé et le retour de
+   l'historique à son nombre initial d'URL.
+
+Pour exercer le repli, servir un JSON local avec un `r2_url` qui répond 404 et
+le vrai `source_url` Dropbox, puis pointer `webhook.url` vers ce fichier. Le
+test du 2026-10-23 a produit `277_Camille.zip` (183 450 047 octets) avec le
+message `(R2 absent - repli Dropbox utilisé)`. La base et le dossier
+`runtime/downloads` de production n'ont pas été modifiés.
 
 ## 8. Limites
 
-- Le téléchargement réel a été validé sur Dropbox et sur un ZIP de production
-  servi en HTTP local. Aucune grosse archive Dropbox n'a été téléchargée
-  pendant le lot : les objets R2 du webhook avaient expiré et le repli Dropbox
-  a été validé sur un petit fichier.
+- Le téléchargement réel a été validé sur Dropbox (`m6_.png`), sur un ZIP de
+  production local (`155 Camille.zip`, 747 Mo) et sur le dernier lien du
+  webhook (`276 Camille.zip`, 175 Mo) via R2 puis via Dropbox. Les liens R2
+  restent éphémères : un objet expiré doit basculer sur `source_url`.
 - Le moniteur ne télécharge que les liens Dropbox/R2 ressemblant à des archives
   (`/scl/fo/`, `.zip`, `original_filename` en `.zip`), comme Python. Au
   2026-10-23, les 4 seules URL absentes des 911 de l'historique étaient des
   images et une vidéo `.mov` : le moniteur Rust n'a donc rien téléchargé,
   exactement comme Python.
 - Les routes cache, statistiques, diagnostics et audio restent dans Python.
-- La validation Windows/After Effects reste externe et non bloquante.
+- La validation Windows/After Effects et `workflow-bridge.exe` est abandonnée
+  (D-022) : la production cible Linux et le JSX/CEP continue d'appeler Python.
 
 ## 9. Activation
 
 ```bash
-# après import + audit
+# juste avant l'activation : réimporter si Python a ajouté des URL depuis
+# le dernier import. L'import est idempotent et ne modifie pas la base Python.
+./target/release/workflow-cli history import \
+  --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+./target/release/workflow-cli history audit
+./target/release/workflow-cli webhook probe --plan
+
 $EDITOR config/config.toml   # webhook.enabled = true
 cargo build --release -p workflow-server -p workflow-cli
 ./scripts/switch-rust.sh check
@@ -215,7 +258,8 @@ curl -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 
 Le serveur Python reste sur 5003 pour le rollback. Ne pas laisser les deux
 moniteurs actifs sur le même webhook : ils téléchargeraient les mêmes liens
-dans deux dossiers différents.
+dans deux dossiers différents. La procédure de bascule publique par reverse
+proxy est décrite dans `SWITCH-PUBLIC.md`.
 
 Diagnostic ponctuel avec le même moteur, sans écrire l'historique :
 

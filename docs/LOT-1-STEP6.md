@@ -9,7 +9,9 @@
 - Copie de `total_frames`, `tracking_analytics`, `temporal_alignment`, `expression_summary` et `speaker_embeddings` depuis STEP5.
 - Écriture atomique, JSON indenté.
 
-Le mode `analyze_manifest` du panneau AE et le pont Windows restent à porter.
+Le mode `analyze_manifest` du panneau AE et le pont Windows sont abandonnés
+(D-022) : le panneau CEP continue d'appeler Python, et STEP8 est validé en
+headless avec `effectcraft-cli`.
 
 ## Parité
 

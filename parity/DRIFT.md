@@ -27,6 +27,7 @@ est mis à jour à chaque mesure de parité.
 | D-019 | moyenne | Téléchargement | Python télécharge dans `~/Téléchargements`, aussi utilisé par STEP1. Le Rust utilise `runtime/downloads` pour rester isolé. | `LOCAL_DOWNLOADS_DIR` n'est volontairement pas repris ; `WORKFLOW_PATHS_DOWNLOADS` et `WORKFLOW_STEP1_SOURCE_DIR` permettent de choisir un dossier commun lors d'une bascule explicite. Quand le moniteur est actif, le serveur exige `steps.step1.source_dir == paths.downloads`. |
 | D-020 | basse | Téléchargement | Python lance un thread par lien, déplace un téléchargement en historique dès qu'une tentative échoue (même si le repli Dropbox réussit ensuite), et conserve l'ancien `error` du moniteur après un succès. | Le port borne la concurrence (`download.max_concurrent`, défaut 4), ne publie le statut final qu'après le repli, remet `error` à null après un passage réussi, et classe une fermeture de corps prématurée en `incomplete`. |
 | D-021 | haute | Migration | Le moniteur Rust ne peut pas deviner l'historique Python. Une base vide ferait télécharger tous les liens du webhook. | Import explicite `workflow-cli history import --from <base>` (lecture seule, 911 URL identiques au 2026-10-23), audit `history audit`, puis `webhook.enabled = true`. Les échecs Python ne sont pas importés : ils sont transitoires et liés à des URL R2 expirées. |
+| D-022 | info | Validation | La compilation Windows de `workflow-bridge.exe`, le basculement du JSX After Effects et la validation STEP8 sur la machine Windows étaient listés comme restant. | Abandonnés : la production cible Linux, STEP8 est validé en headless avec `effectcraft-cli`, et le JSX/CEP continue d'appeler Python. Aucun chemin Rust ne dépend de cette validation. |
 
 ## Détails
 
@@ -154,7 +155,9 @@ Trois durcissements sont volontaires :
   l'attente, sinon le passage suivant du moniteur les replanifierait.
 - Le callback de progression ne bascule plus le statut en `failed` à chaque
   tentative. Un R2 absent suivi d'un Dropbox réussi doit apparaître comme
-  `completed`, avec le message de repli.
+  `completed`, avec le message de repli. Validé bout en bout le 2026-10-23 :
+  `r2_url` en 404, `source_url` Dropbox en 200, statut `completed`, message
+  `(R2 absent - repli Dropbox utilisé)`, aucun échec persistant.
 - Le moniteur efface `error` après un passage réussi, au lieu de conserver
   indéfiniment la dernière erreur.
 
@@ -177,3 +180,16 @@ Le diagnostic `workflow-cli webhook probe --plan` compare le webhook réel à
 l'historique Rust sans rien écrire. Au 2026-10-23 : 911 URL importées → 0
 téléchargement planifié ; base vide → 429 téléchargements planifiés. Le verrou
 `require_history` n'est donc pas décoratif.
+
+### D-022 — Validation Windows abandonnée
+
+Le lot 1 avait livré `workflow-bridge` côté Rust et le lot 7 avait laissé
+comme reste externe la compilation Windows du binaire, le basculement du JSX
+After Effects et une validation STEP8 sur la machine Windows. Ces points sont
+abandonnés : la cible de production est Linux, STEP8 est validé de bout en
+bout en headless avec `effectcraft-cli`, et le panneau JSX/CEP continue
+d'appeler le pont Python. Aucune étape Rust ne dépend de ce binaire.
+
+Conséquence pratique : ne pas rejouer cette validation lors des lots suivants.
+Le document `docs/LOT-1-BRIDGE.md` et le protocole `docs/STEP2-WINDOWS.md`
+restent comme référence historique ; ils ne sont pas des prérequis de bascule.

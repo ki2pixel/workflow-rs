@@ -171,7 +171,7 @@ de 50 trames a aussi exercé le détecteur d'objets CPU.
 - La cible de production est Linux. `workflow-steps::step4` et la commande CLI
   sont compilés uniquement sous Unix ; la compilation croisée Windows de
   `workflow-cli` reste valide, sans STEP4. La validation Windows/After Effects
-  est différée et non bloquante.
+  est abandonnée (D-022) : la production cible Linux.
 - Le backend CPU est un chemin de test explicite, pas une solution de repli de
   production.
 - Les options Python `--ndjson`, le profiling et l'export verbeux des landmarks

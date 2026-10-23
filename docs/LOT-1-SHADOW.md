@@ -63,6 +63,6 @@ d'abord passer par STEP1 à STEP4. Les trois dossiers complets à la racine sont
 
 ## Limite restante
 
-La validation Windows/After Effects et le branchement de l'orchestrateur Rust
-restent hors de ce shadow. Le script ne prouve pas les chemins d'échec du
-comparateur ; il compare des sorties de production valides.
+La validation Windows/After Effects est abandonnée (D-022) ; le branchement de
+l'orchestrateur Rust reste hors de ce shadow. Le script ne prouve pas les
+chemins d'échec du comparateur ; il compare des sorties de production valides.

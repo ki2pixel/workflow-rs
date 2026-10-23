@@ -24,9 +24,10 @@ huit étapes disposent désormais d'une implémentation Rust ; aucune commande
 Python n'est lancée en repli. Le lot 8 porte l'ingestion : moniteur webhook,
 normalisation d'URL, historique SQLite, cooldown des échecs, téléchargement
 R2/Dropbox reprenable et statuts CSV. Le moniteur reste désactivé par défaut
-tant que l'historique Python n'a pas été importé. La compilation Windows du
-pont, le basculement du JSX et la validation STEP8 sur la machine Windows
-restent à faire.
+tant que l'historique Python n'a pas été importé. La chaîne STEP1 → STEP8 est
+validée sur une archive réelle (`1720 Camille.zip`). La validation Windows du
+pont et du JSX After Effects est abandonnée (D-022) : la production cible
+Linux et le panneau CEP continue d'appeler Python.
 
 ## État
 
@@ -96,8 +97,15 @@ restent à faire.
 - Lot 8 terminé : ingestion webhook, normalisation d'URL, historique SQLite,
   échecs/cooldown, téléchargement `.part` + `Range`, validation ZIP et routes
   `/api/csv_*`. Import réel de 911 URL identiques à la base Python, audit de
-  normalisation à 0 changement, webhook réel à 462 enregistrements. Détail dans
-  `docs/LOT-8-INGESTION.md`.
+  normalisation à 0 changement, webhook réel à 462 enregistrements. Le dernier
+  lien du webhook (`276 Camille.zip`, 175 Mo) a été téléchargé via R2 puis via
+  Dropbox, et le moniteur a été validé bout en bout sur une base isolée, y
+  compris le repli R2 → Dropbox. Détail dans `docs/LOT-8-INGESTION.md`.
+- Chaîne complète validée : STEP1 → STEP8 sur `1720 Camille.zip` (8/8 étapes,
+  4 `.ecproj`, aucune écriture dans `/mnt/cache`). Détail dans
+  `docs/VALIDATION-STEP1-8.md`.
+- Validation Windows/After Effects abandonnée (D-022) : le pont Python et le
+  panneau CEP restent en place, sans dépendance Rust.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -122,6 +130,8 @@ restent à faire.
 - `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
 - `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
 - `docs/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
+- `docs/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
+- `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -230,7 +240,9 @@ cargo build --release -p workflow-bridge
 
 Le binaire traite `mode = "cuts"` (CSV de scènes) et les manifestes de tracking
 (`layers`). Le format de sortie direct ou `{"error": ...}` est conservé ; le JSX
-de production n'est pas modifié dans ce lot.
+de production n'est pas modifié. La compilation Windows du pont et le
+basculement du JSX sont abandonnés (D-022) : le panneau CEP continue d'appeler
+Python.
 
 ## Parité
 

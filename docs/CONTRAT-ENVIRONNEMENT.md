@@ -384,7 +384,7 @@ EffectCraft : STEP8 appelle `effectcraft-cli` en headless, dans une session
 `run prefs.set … file.runScript` (aucun bridge TCP, aucune application lancée),
 avec `scripts/MediaSolution-EC/MediaSolution.jsx`, pour produire les `.ecproj`.
 
-After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` doivent être conservés jusqu'au remplacement par `workflow-bridge.exe`.
+After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée
 

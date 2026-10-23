@@ -202,6 +202,7 @@ et STEP4.
 - Le moniteur webhook et le téléchargement R2/Dropbox sont portés, mais
   désactivés par défaut. La migration explicite de l'historique Python est
   obligatoire avant activation (`D-018`, `D-021`).
-- La validation Windows/After Effects et le JSX restent externes et différés.
+- La validation Windows/After Effects et le JSX sont abandonnés (D-022) : le
+  panneau CEP continue d'appeler Python.
 - Le verrou Rust est distinct du verrou Python : ne pas lancer de STEP2/3/4
   matérielle des deux côtés simultanément pendant la période de dual-run.

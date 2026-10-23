@@ -56,10 +56,24 @@ de mtime avant/après sont identiques.
 STEP1 à STEP6. Le shadow en couvre dix. Les quatre projets restants
 (`260`, `262`, `263`, `265`) peuvent être ajoutés avec `--limit 14`.
 
-Le dossier `153 Camille` n'est pas utilisable pour ce shadow : il n'existe que
-sous forme de ZIP de sources, sans `docs/` ni artefacts STEP2 à STEP6. Il devra
-d'abord passer par STEP1 à STEP4. Les trois dossiers complets à la racine sont
-`148`, `151` et `152` ; ils totalisent 12 vidéos.
+Le dossier `153 Camille` a été préparé le 2026-10-23 et n'est plus une limite :
+
+- extraction STEP1 Rust de `/mnt/cache/old/153 Camille.zip` (1,9 Go) vers
+  `/mnt/cache/153 Camille/docs` : 5 vidéos H.264 1080p déjà conformes, plus le
+  PNG, aucune réécriture ;
+- artefacts STEP2 à STEP5 récupérés de l'archive de production
+  `153 Camille 2026-10-14_16-17-13` (5 hash) : `<stem>.csv`,
+  `<stem>_audio.json`, `<stem>_tracking.json` ;
+- `_ae.json` générés par le STEP6 Python pour servir de référence ;
+- shadow STEP5/6 : `15/15` vérifications identiques (5 vidéos × audio, vidéo,
+  AE) le 2026-10-23.
+
+Limite : le STEP4 brut `<stem>.json` n'est pas présent, donc le mode
+`--prefer-raw` n'est pas disponible pour ce projet. Le mode par défaut, qui
+part du `_tracking.json` de production, est validé.
+
+Les dossiers complets à la racine incluent désormais `148`, `151`, `152` et
+`153`.
 
 ## Limite restante
 

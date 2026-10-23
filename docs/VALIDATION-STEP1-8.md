@@ -157,3 +157,8 @@ Rust, `sync-backends.sh --apply`, démarrage de Python sur 5003 avec
 arrêt de Python, puis relance du lanceur Rust. La synchronisation automatique
 a retrouvé les mêmes comptes côté Rust (911 / 96 / 2 473) et le moniteur a
 repris sur 5004. Aucun téléchargement n'a été créé pendant ce test.
+
+Un test isolé de bout en bout (téléchargement HTTP → STEP1 → STEP7 → sync
+retour) a également été exécuté dans `/tmp/opencode/e2e-900` ; le détail est
+dans `SYNC-BACKENDS.md`, section 10. Le corpus `153 Camille` a été préparé et
+validé 15/15 par le shadow STEP5/6 (voir `LOT-1-SHADOW.md`).

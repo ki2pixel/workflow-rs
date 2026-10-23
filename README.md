@@ -106,6 +106,9 @@ Linux et le panneau CEP continue d'appeler Python.
   la liste STEP1 et les analyses STEP7 avant chaque bascule. Première fusion
   réelle le 2026-10-23 : 911 URL, 96 archives traitées et 640 hash STEP7
   (1,8 Go) de chaque côté. Détail dans `docs/SYNC-BACKENDS.md`.
+- Validation isolée de bout en bout le 2026-10-23 : téléchargement HTTP →
+  STEP1 → STEP7 → sync, puis corpus `153 Camille` validé 15/15 par le shadow
+  STEP5/6.
 - Chaîne complète validée : STEP1 → STEP8 sur `1720 Camille.zip` (8/8 étapes,
   4 `.ecproj`, aucune écriture dans `/mnt/cache`). Détail dans
   `docs/VALIDATION-STEP1-8.md`.

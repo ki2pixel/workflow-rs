@@ -276,3 +276,26 @@ Une entrée de test (`Testalpha_Camille.zip`, hors dossier de téléchargement) 
 été ignorée et retirée de la liste Python. Le rapport complet est dans
 `runtime/backups/sync/20261023_215036/sync-report.json`. Le moniteur Rust est
 actif sur 5004 ; Python 5003 est arrêté.
+
+## 10. Validation de bout en bout isolée (2026-10-23)
+
+Un test complet a été exécuté dans `/tmp/opencode/e2e-900`, avec une
+configuration isolée et un faux backend Python. Il ne touche ni `runtime/`,
+ni `~/Téléchargements`, ni `/mnt/cache` :
+
+- archive synthétique `900_Test_Camille.zip` (vidéo `vox_2spk.mp4`, 30 s)
+  servie en HTTP local, téléchargée par `workflow-cli download` après import
+  de l'URL dans l'historique isolé ;
+- STEP1 Rust : extraction, vidéo déjà conforme, `processed_archives.txt` écrit ;
+- STEP2 → STEP7 : CSV, audio, tracking, `_tracking.json`, `_ae.json`, archive
+  STEP7 et sortie finalisée produits sans échec ;
+- sync `both` : historique 1 → 2, STEP1 1 → 2, 2 archives téléchargées
+  copiées, 2 hash STEP7 copiés. Le fichier Rust reste dans
+  `runtime/downloads` et une copie apparaît côté Python, ce qui confirme le
+  comportement de `copy` ;
+- deuxième sync : 0 copie, 4 téléchargements identiques ignorés, 4 hash
+  dupliqués ignorés, historique et listes stables.
+
+L'état réel est resté à 911 URL, 96 entrées STEP1 et 2 473 fichiers STEP7.
+Le corpus `153 Camille` a par ailleurs été préparé et validé 15/15 par le
+shadow STEP5/6 (voir `LOT-1-SHADOW.md`).

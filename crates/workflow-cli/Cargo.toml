@@ -20,3 +20,4 @@ workflow-core = { path = "../workflow-core" }
 workflow-schema = { path = "../workflow-schema" }
 workflow-steps = { path = "../workflow-steps" }
 workflow-ingest = { path = "../workflow-ingest" }
+workflow-sync = { path = "../workflow-sync" }

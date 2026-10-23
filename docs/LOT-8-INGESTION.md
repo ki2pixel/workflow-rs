@@ -241,10 +241,10 @@ message `(R2 absent - repli Dropbox utilisé)`. La base et le dossier
 ## 9. Activation
 
 ```bash
-# juste avant l'activation : réimporter si Python a ajouté des URL depuis
-# le dernier import. L'import est idempotent et ne modifie pas la base Python.
-./target/release/workflow-cli history import \
-  --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+# juste avant l'activation : fusionner l'historique et la liste STEP1.
+# L'opération est idempotente, sauvegarde les deux bases et ne modifie pas
+# les archives.
+./scripts/sync-backends.sh --apply --downloads skip --step7 skip
 ./target/release/workflow-cli history audit
 ./target/release/workflow-cli webhook probe --plan
 
@@ -258,8 +258,14 @@ curl -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 
 Le serveur Python reste sur 5003 pour le rollback, mais il ne doit pas être
 démarré tant que le moniteur Rust est actif : `start_workflow.sh` lance
-toujours son propre moniteur CSV. Pour un rollback, arrêter Rust, remettre
-`webhook.enabled = false`, redémarrer Rust, puis seulement lancer Python.
+toujours son propre moniteur CSV. La bascule contrôlée passe par
+`scripts/sync-backends.sh --apply` (voir `SYNC-BACKENDS.md`) :
+
+- Python → Rust : arrêter Python, synchroniser, démarrer Rust ;
+- Rust → Python : arrêter Rust, synchroniser, démarrer Python.
+
+Le lanceur Rust synchronise automatiquement avant de démarrer et refuse de
+démarrer si Python répond encore sur 5003.
 
 ### 9.1 État de l'instance au 2026-10-23
 
@@ -268,9 +274,15 @@ Le moniteur Rust est actif sur cette machine depuis le 2026-10-23 21:13 :
 - import de 911 URL, audit à 0 changement, plan à 0 téléchargement sur 462
   enregistrements webhook ;
 - `webhook.enabled = true`, `require_history = true`, `dry_run = false` ;
-- Python 5003 n'est pas lancé ; son moniteur ne tourne pas ;
+- synchronisation réelle à 21:50 : 911 URL, 96 entrées STEP1 et 640 hash
+  STEP7 (1,8 Go) de chaque côté. Sauvegarde et rapport dans
+  `runtime/backups/sync/20261023_215036/` ;
+- Python 5003 n'est pas lancé ; son moniteur ne tourne pas. Il peut être
+  relancé après `scripts/sync-backends.sh --apply` et arrêt de Rust ;
 - les nouvelles archives iront dans `runtime/downloads` et seront traitées par
-  STEP1 Rust. Python ne les verra pas.
+  STEP1 Rust. Une synchronisation `both` avec `--downloads copy` (défaut)
+  copie les archives non traitées dans les deux dossiers ; `move` les déplace
+  dans le dossier du backend cible.
 
 La procédure de bascule publique par reverse proxy est décrite dans
 `SWITCH-PUBLIC.md`.

@@ -133,3 +133,27 @@ curl -H 'X-Worker-Token: test-token-123' \
 curl -H 'X-Worker-Token: test-token-123' \
   http://127.0.0.1:5007/sequence/status
 ```
+
+## 7. Synchronisation Python ↔ Rust
+
+La synchronisation au changement a été validée sur l'état réel le 2026-10-23 :
+
+| Contrôle | Résultat |
+| --- | --- |
+| `download_history` | 911 URL identiques, 0 ajout, 0 mise à jour |
+| `processed_archives.txt` | 96 entrées de chaque côté, chemins remappés |
+| Marqueur STEP1 | `2026-10` des deux côtés |
+| Téléchargements en attente | 0 |
+| Analyses STEP7 | 640 hash / 2 473 fichiers / 1,8 Go copiés, 0 conflit |
+| Deuxième passage | 0 copie, 1 280 doublons ignorés (640 par sens) |
+| Sauvegarde | `runtime/backups/sync/20261023_215036/sync-report.json` |
+
+La copie STEP7 n'a pas modifié les archives Python. Le détail des fusions et
+des options est dans `SYNC-BACKENDS.md`.
+
+Un aller-retour complet a ensuite été validé le 2026-10-23 à 22:18 : arrêt de
+Rust, `sync-backends.sh --apply`, démarrage de Python sur 5003 avec
+`DRY_RUN_DOWNLOADS=true` (911 URL, 96 entrées STEP1, 2 473 fichiers STEP7),
+arrêt de Python, puis relance du lanceur Rust. La synchronisation automatique
+a retrouvé les mêmes comptes côté Rust (911 / 96 / 2 473) et le moniteur a
+repris sur 5004. Aucun téléchargement n'a été créé pendant ce test.

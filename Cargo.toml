@@ -9,6 +9,7 @@ members = [
     "crates/workflow-tpu",
     "crates/workflow-ingest",
     "crates/workflow-server",
+    "crates/workflow-sync",
 ]
 
 [workspace.package]

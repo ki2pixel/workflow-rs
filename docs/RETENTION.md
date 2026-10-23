@@ -16,6 +16,7 @@ legacy, qui reste active et fonctionnelle.
 | Téléchargements | `runtime/downloads` | Manuel (désactivé par défaut) | `--downloads-days` explicite |
 | Sorties finalisées | `/mnt/cache` | Conservation indéfinie | Manuelle uniquement |
 | Base d'historique | `runtime/download_history.sqlite3` | Conservation indéfinie | Manuelle uniquement |
+| Sauvegardes de synchronisation | `runtime/backups/sync` | Manuelle | — |
 | Application Python legacy | Racines Python | Hors-scope | Jamais par `retention` |
 
 Les seuils sont configurables dans `[retention]` de `config/config.toml`. Le
@@ -41,6 +42,12 @@ suppression automatique serait irréversible et dangereuse. Le nettoyage de
 STEP7 archive les analyses pour permettre une reconstruction, puis copie les
 `docs/` dans la sortie finalisée. Après 90 jours, la copie de sécurité n'est
 plus nécessaire au fonctionnement courant ; les livrables restent la référence.
+
+La synchronisation Python → Rust copie les analyses dans `runtime/archives`.
+Cette copie n'est pas une sauvegarde indépendante : `retention` peut la
+supprimer après 90 jours, et le prochain `sync` la recopiera depuis Python si
+elle existe encore. Les sauvegardes de `runtime/backups/sync` ne sont pas
+purgées automatiquement ; les supprimer manuellement après validation.
 
 ## Commande
 

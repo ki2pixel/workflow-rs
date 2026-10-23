@@ -57,6 +57,23 @@ if ! "$ROOT/scripts/switch-rust.sh" check; then
     exit 1
 fi
 
+webhook_enabled="$(sed -n '/^\[webhook\]/,/^\[/ s/^enabled = \(.*\)/\1/p' "$CONFIG" 2>/dev/null | head -n 1 | tr -d '[:space:]')"
+rust_running=0
+if "$ROOT/scripts/switch-rust.sh" running; then
+    rust_running=1
+fi
+if [[ "$rust_running" == "0" && "$webhook_enabled" == "true" && "${WORKFLOW_SYNC_ON_START:-1}" != "0" ]]; then
+    echo
+    echo "Synchronisation de l'état Python legacy vers Rust..."
+    # shellcheck disable=SC2086
+    if ! "$ROOT/scripts/sync-backends.sh" --apply --quiet ${WORKFLOW_SYNC_ARGS:-}; then
+        echo "La synchronisation a échoué ; le serveur n'est pas démarré." >&2
+        echo "Corriger l'erreur, ou relancer avec WORKFLOW_SYNC_ON_START=0." >&2
+        pause_on_error
+        exit 1
+    fi
+fi
+
 echo
 echo "Démarrage du serveur Rust sur $URL ..."
 if ! "$ROOT/scripts/switch-rust.sh" start; then

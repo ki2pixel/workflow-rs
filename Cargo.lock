@@ -2599,6 +2599,7 @@ dependencies = [
  "workflow-ingest",
  "workflow-schema",
  "workflow-steps",
+ "workflow-sync",
 ]
 
 [[package]]
@@ -2699,6 +2700,22 @@ dependencies = [
  "workflow-tpu",
  "xz2",
  "zip",
+]
+
+[[package]]
+name = "workflow-sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "walkdir",
+ "workflow-core",
+ "workflow-ingest",
 ]
 
 [[package]]

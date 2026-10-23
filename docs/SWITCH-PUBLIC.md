@@ -17,8 +17,10 @@ basculer.
 Deux cas concrets :
 
 1. **Usage local seulement** : la bascule consiste à ouvrir
-   `http://127.0.0.1:5004` au lieu de `http://127.0.0.1:5003`. Le rollback est
-   immédiat : rouvrir 5003. Aucun proxy n'est nécessaire.
+   `http://127.0.0.1:5004` au lieu de `http://127.0.0.1:5003`. Avant chaque
+   changement, arrêter le backend actif et lancer
+   `scripts/sync-backends.sh --apply` (voir `SYNC-BACKENDS.md`). Aucun proxy
+   n'est nécessaire.
 2. **Accès par nom de domaine ou depuis l'extérieur** : installer le proxy
    décrit ci-dessous, puis basculer la ligne `workflow_active`. C'est cette
    procédure qui rend la bascule réversible sans changer les URL des clients.
@@ -27,9 +29,9 @@ Le reste du document décrit le cas 2. Il ne suppose aucune modification du
 code Python : celui-ci continue d'écouter sur 5003.
 
 Pour le cas local, le raccourci Rust `~/Bureau/Lancer_Workflow_Rust.desktop`
-appelle `scripts/start-rust.sh` (vérification, démarrage 5004, navigateur,
-logs). Le raccourci Python `~/Bureau/Lancer_Workflow.desktop` reste valide tel
-quel.
+appelle `scripts/start-rust.sh` (vérification, synchronisation Python → Rust,
+démarrage 5004, navigateur, logs). Le raccourci Python
+`~/Bureau/Lancer_Workflow.desktop` reste valide tel quel.
 
 Attention au binding avant d'exposer le proxy : Rust écoute déjà sur
 `127.0.0.1`, mais Flask utilise `FLASK_HOST` avec un défaut `0.0.0.0` (la
@@ -44,11 +46,12 @@ ss -ltnp | grep -E ':5003|:5004'
 
 ## 1. Pourquoi un proxy
 
-Les deux applications ne partagent ni état, ni base, ni racine de travail. Elles
-ne peuvent donc pas répondre alternativement à la même session : le frontend
-polling lirait tantôt l'état Python, tantôt l'état Rust. Le proxy doit choisir
-**un backend actif** pour tout le bloc workflow, et basculer ce bloc d'un seul
-coup.
+Les deux applications ne partagent pas d'état en temps réel : leurs bases,
+listes et racines de travail sont séparées, et une synchronisation explicite
+(`SYNC-BACKENDS.md`) est nécessaire avant chaque bascule. Elles ne peuvent donc
+pas répondre alternativement à la même session : le frontend polling lirait
+tantôt l'état Python, tantôt l'état Rust. Le proxy doit choisir **un backend
+actif** pour tout le bloc workflow, et basculer ce bloc d'un seul coup.
 
 Les routes qui n'existent qu'en Python restent routées vers 5003 en permanence.
 C'est le cas de `/api/audio/*`, `/api/cache/*`, `/api/stats/*`,
@@ -225,17 +228,16 @@ curl -fs -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 curl -fs http://127.0.0.1:5004/sequence/status
 curl -fs http://127.0.0.1:5003/sequence/status
 
-# 3. Historique Rust à jour (réimporter si Python a ajouté des URL).
+# 3. Synchroniser les états avant la bascule.
 cd /home/kidpixel/workflow-rs
-./target/release/workflow-cli history import \
-  --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
+./scripts/sync-backends.sh --apply
 ./target/release/workflow-cli history audit
 ./target/release/workflow-cli webhook probe --plan   # doit rester à 0 ou aux seules nouvelles archives
 
 # 4. Un seul moniteur CSV actif.
 #    État au 2026-10-23 : Rust est le seul moniteur (enabled=true), Python est arrêté.
-#    Pour un rollback : arrêter Rust, remettre enabled=false, redémarrer Rust,
-#    puis seulement lancer Python.
+#    Pour un rollback : arrêter Rust, lancer sync-backends.sh --apply, puis
+#    démarrer Python. Ne pas lancer Python avant la synchronisation.
 ```
 
 Ne jamais basculer au milieu d'une séquence : l'état d'exécution est en
@@ -280,11 +282,16 @@ STEP5/6 sur un projet existant) et vérifier `/status/<step>` et les logs.
 curl -fs -X POST -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
   http://127.0.0.1:5004/sequence/stop
 
-# 2. Désactiver le moniteur Rust si Python reprend /api/csv_*.
-#    config/config.toml : webhook.enabled = false, puis redémarrer Rust.
+# 2. Synchroniser l'état Rust vers Python avant de démarrer Python.
+cd /home/kidpixel/workflow-rs
+./scripts/sync-backends.sh --apply
+
+# 3. Désactiver le moniteur Rust pour qu'un futur démarrage de Rust ne
+#    reprenne pas le webhook. Rust peut rester arrêté.
+#    config/config.toml : webhook.enabled = false.
 #    Ne pas lancer Python avant cette étape : son moniteur démarrerait aussi.
 
-# 3. Remettre Python comme backend actif.
+# 4. Remettre Python comme backend actif.
 sudo tee /etc/nginx/conf.d/00-workflow-active.conf >/dev/null <<'EOF'
 upstream workflow_active {
     server 127.0.0.1:5003;
@@ -295,12 +302,11 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 Python est arrêté pendant la bascule complète. Le rollback n'est donc pas
-instantané : il faut arrêter Rust, désactiver son moniteur, redémarrer Rust,
-puis lancer Python. Les projets et téléchargements créés par Rust restent dans
-`runtime/` ; Python ne les voit pas. Les URL téléchargées par Rust ne sont pas
-non plus dans l'historique Python : après rollback, Python peut les
-retélécharger. Un rollback ne transfère donc pas l'état Rust vers Python. Il
-faut terminer ou abandonner le projet Rust en cours avant de basculer.
+instantané : il faut arrêter Rust, lancer `scripts/sync-backends.sh --apply`,
+désactiver son moniteur, puis lancer Python. La synchronisation transfère
+l'historique, la liste STEP1, les archives non traitées et les analyses STEP7
+(voir `SYNC-BACKENDS.md`). Les projets en cours ne sont pas transférés : il
+faut les terminer ou les abandonner avant de basculer.
 
 ## 7. DNS et TLS
 
@@ -327,9 +333,10 @@ trafic workflow sur 5003.
 
 ## 9. Checklist
 
-- [ ] Python 5003 et Rust 5004 répondent en local.
+- [ ] Backend cible vérifié sur son port local (5004 pour Rust, 5003 pour Python).
+- [ ] `scripts/sync-backends.sh --apply` exécuté et rapport vérifié.
 - [ ] Aucune séquence en cours sur les deux backends.
-- [ ] Historique Rust réimporté et audité.
+- [ ] Historique audité et plan webhook à 0 ou limité aux nouvelles archives.
 - [ ] Un seul moniteur CSV actif.
 - [ ] Canari `rust.example.com` validé (interface + une étape).
 - [ ] `nginx -t` passe.

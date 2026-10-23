@@ -18,6 +18,9 @@ pub struct Config {
     pub steps: StepsConfig,
     pub retention: RetentionConfig,
     pub hardware: HardwareConfig,
+    /// Racines Python legacy, utilisées uniquement par `workflow-cli sync`.
+    /// Le serveur Rust ne les lit jamais.
+    pub legacy: LegacyConfig,
 }
 
 impl Config {
@@ -464,6 +467,44 @@ impl Default for PathsConfig {
             history_group: "wfgroup".into(),
             finalized: PathBuf::from("/mnt/cache"),
             finalized_fallback: None,
+        }
+    }
+}
+
+/// Chemins de l'installation Python legacy.
+///
+/// Ces valeurs ne sont utilisées que par la commande de synchronisation
+/// explicite `workflow-cli sync`, qui refuse de tourner si un serveur écoute.
+/// Le serveur Rust et ses étapes ne les lisent pas.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LegacyConfig {
+    /// Racine du dépôt Python (`workflow_mediapipe`).
+    pub root: PathBuf,
+    /// Dossier de téléchargement Python (`~/Téléchargements`).
+    pub downloads: PathBuf,
+    /// Base d'historique Python. Défaut : `<root>/download_history.sqlite3`.
+    pub history_db: Option<PathBuf>,
+    /// Journaux Python. Défaut : `<root>/logs`.
+    pub logs: Option<PathBuf>,
+    /// Archives d'analyses STEP7 Python. Défaut : `<root>/archives`.
+    pub archives: Option<PathBuf>,
+    /// Projets extraits Python. Défaut : `<root>/projets_extraits`.
+    pub projects: Option<PathBuf>,
+    /// Mot-clé STEP1. Vide : reprend `steps.filter.keyword`.
+    pub keyword: String,
+}
+
+impl Default for LegacyConfig {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::new(),
+            downloads: PathBuf::new(),
+            history_db: None,
+            logs: None,
+            archives: None,
+            projects: None,
+            keyword: String::new(),
         }
     }
 }

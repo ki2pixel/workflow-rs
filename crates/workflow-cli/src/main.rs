@@ -26,6 +26,7 @@ use workflow_steps::step7::{
     finalize_work_dir, find_projects_to_finalize, FinalizeMode, Step7Options,
 };
 use workflow_steps::step8::{run_step8, Step8Options};
+use workflow_sync::{run_sync, DownloadsMode, MergeMode, Step7Mode, SyncDirection, SyncOptions};
 
 #[derive(Debug, Parser)]
 #[command(name = "workflow-cli", version, about = "CLI du pipeline Rust")]
@@ -68,6 +69,8 @@ enum Command {
     Step8(Step8Args),
     /// Planifie ou applique la rétention des données de travail.
     Retention(RetentionArgs),
+    /// Synchronise l'état Python legacy et l'état Rust, hors serveur.
+    Sync(SyncArgs),
 }
 
 #[derive(Debug, Args)]
@@ -483,6 +486,109 @@ struct RetentionOverrides {
     /// Rétention des rapports JSON, en jours (0 désactive).
     #[arg(long)]
     reports_days: Option<u64>,
+}
+
+#[derive(Debug, Args)]
+struct SyncArgs {
+    /// Applique les changements. Sans ce drapeau, la commande simule.
+    #[arg(long)]
+    apply: bool,
+    /// Sens de la synchronisation.
+    #[arg(long, value_enum, default_value_t = SyncDirectionArg::Both)]
+    direction: SyncDirectionArg,
+    /// Fusion de download_history.
+    #[arg(long, value_enum, default_value_t = MergeModeArg::Merge)]
+    history: MergeModeArg,
+    /// Fusion de logs/step1/processed_archives.txt.
+    #[arg(long, value_enum, default_value_t = MergeModeArg::Merge)]
+    processed: MergeModeArg,
+    /// Archives non traitées des dossiers de téléchargement.
+    #[arg(long, value_enum, default_value_t = DownloadsModeArg::Copy)]
+    downloads: DownloadsModeArg,
+    /// Archives d'analyses STEP7.
+    #[arg(long, value_enum, default_value_t = Step7ModeArg::Copy)]
+    step7: Step7ModeArg,
+    /// Réécrit les URL avec la normalisation Rust (migration explicite).
+    #[arg(long)]
+    normalize: bool,
+    /// Répertoire de sauvegarde (défaut : runtime/backups/sync/<horodatage>).
+    #[arg(long)]
+    backup_dir: Option<PathBuf>,
+    /// Autorise un diagnostic en lecture seule si un serveur ou une étape tourne.
+    #[arg(long)]
+    allow_running: bool,
+    /// Affiche un résumé lisible au lieu du rapport JSON.
+    #[arg(long)]
+    quiet: bool,
+    /// Port du serveur Python legacy.
+    #[arg(long, default_value_t = 5003)]
+    legacy_port: u16,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum SyncDirectionArg {
+    Both,
+    PythonToRust,
+    RustToPython,
+}
+
+impl From<SyncDirectionArg> for SyncDirection {
+    fn from(value: SyncDirectionArg) -> Self {
+        match value {
+            SyncDirectionArg::Both => Self::Both,
+            SyncDirectionArg::PythonToRust => Self::PythonToRust,
+            SyncDirectionArg::RustToPython => Self::RustToPython,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum MergeModeArg {
+    Merge,
+    Skip,
+}
+
+impl From<MergeModeArg> for MergeMode {
+    fn from(value: MergeModeArg) -> Self {
+        match value {
+            MergeModeArg::Merge => Self::Merge,
+            MergeModeArg::Skip => Self::Skip,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum DownloadsModeArg {
+    Copy,
+    Move,
+    Skip,
+}
+
+impl From<DownloadsModeArg> for DownloadsMode {
+    fn from(value: DownloadsModeArg) -> Self {
+        match value {
+            DownloadsModeArg::Copy => Self::Copy,
+            DownloadsModeArg::Move => Self::Move,
+            DownloadsModeArg::Skip => Self::Skip,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum Step7ModeArg {
+    Copy,
+    Link,
+    Skip,
+}
+
+impl From<Step7ModeArg> for Step7Mode {
+    fn from(value: Step7ModeArg) -> Self {
+        match value {
+            Step7ModeArg::Copy => Self::Copy,
+            Step7ModeArg::Link => Self::Link,
+            Step7ModeArg::Skip => Self::Skip,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -1247,6 +1353,108 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Command::Sync(args) => {
+            if args.apply && args.allow_running {
+                anyhow::bail!(
+                    "--allow-running est réservé au diagnostic : retirer --apply pour ne rien écrire"
+                );
+            }
+            if config.legacy.root.as_os_str().is_empty() {
+                anyhow::bail!("[legacy].root est vide dans {}", cli.config.display());
+            }
+            if config.legacy.downloads.as_os_str().is_empty() {
+                anyhow::bail!("[legacy].downloads est vide dans {}", cli.config.display());
+            }
+            let resolved = config.paths.resolve();
+            let legacy = config.legacy.resolve(&config.steps.filter.keyword);
+            let backup_dir = args.backup_dir.unwrap_or_else(|| {
+                resolved
+                    .base
+                    .join("backups")
+                    .join("sync")
+                    .join(chrono::Local::now().format("%Y%m%d_%H%M%S").to_string())
+            });
+            let mut server_ports = vec![args.legacy_port, config.server.port];
+            server_ports.sort_unstable();
+            server_ports.dedup();
+            let options = SyncOptions {
+                python: legacy,
+                rust: resolved,
+                direction: args.direction.into(),
+                history: args.history.into(),
+                processed: args.processed.into(),
+                downloads: args.downloads.into(),
+                step7: args.step7.into(),
+                normalize_history: args.normalize,
+                apply: args.apply,
+                backup_dir,
+                lock_path: std::env::temp_dir().join("workflow-sync.lock"),
+                server_ports,
+                allow_running: args.allow_running,
+                now: chrono::Local::now(),
+            };
+            let report = run_sync(&options)?;
+            if args.quiet {
+                print_sync_summary(&report);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
     }
     Ok(())
+}
+
+fn print_sync_summary(report: &workflow_sync::SyncReport) {
+    println!(
+        "Synchronisation {} :",
+        if report.applied {
+            "appliquée"
+        } else {
+            "simulée (aucune écriture)"
+        }
+    );
+    if let Some(history) = &report.history {
+        println!(
+            "  historique : python {} -> {}, rust {} -> {} (ajouts {}, mises à jour {}, supprimés {})",
+            history.python_before,
+            history.python_after,
+            history.rust_before,
+            history.rust_after,
+            history.python_added + history.rust_added,
+            history.python_updated + history.rust_updated,
+            history.python_removed + history.rust_removed
+        );
+    }
+    if let Some(processed) = &report.processed {
+        println!(
+            "  STEP1 : python {} -> {}, rust {} -> {} (ajouts {}, ignorés {})",
+            processed.python_before,
+            processed.python_after,
+            processed.rust_before,
+            processed.rust_after,
+            processed.python_added + processed.rust_added,
+            processed.python_ignored + processed.rust_ignored
+        );
+    }
+    if let Some(downloads) = &report.downloads {
+        println!(
+            "  téléchargements : {} transféré(s), {} conflit(s)",
+            downloads.python_to_rust.len() + downloads.rust_to_python.len(),
+            downloads.conflicts.len()
+        );
+    }
+    if let Some(step7) = &report.step7_archives {
+        println!(
+            "  STEP7 : {} hash copié(s), {} doublon(s), {} conflit(s)",
+            step7.copied_hashes,
+            step7.duplicates_skipped,
+            step7.conflicts.len()
+        );
+    }
+    for warning in &report.warnings {
+        println!("  attention : {warning}");
+    }
+    if let Some(manifest) = &report.applied_manifest {
+        println!("  rapport : {}", manifest.display());
+    }
 }

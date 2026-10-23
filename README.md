@@ -102,6 +102,10 @@ Linux et le panneau CEP continue d'appeler Python.
   lien du webhook (`276 Camille.zip`, 175 Mo) a été téléchargé via R2 puis via
   Dropbox, et le moniteur a été validé bout en bout sur une base isolée, y
   compris le repli R2 → Dropbox. Détail dans `docs/LOT-8-INGESTION.md`.
+- Synchronisation Python ↔ Rust : `workflow-cli sync` fusionne l'historique,
+  la liste STEP1 et les analyses STEP7 avant chaque bascule. Première fusion
+  réelle le 2026-10-23 : 911 URL, 96 archives traitées et 640 hash STEP7
+  (1,8 Go) de chaque côté. Détail dans `docs/SYNC-BACKENDS.md`.
 - Chaîne complète validée : STEP1 → STEP8 sur `1720 Camille.zip` (8/8 étapes,
   4 `.ecproj`, aucune écriture dans `/mnt/cache`). Détail dans
   `docs/VALIDATION-STEP1-8.md`.
@@ -131,6 +135,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
 - `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
 - `docs/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
+- `docs/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
 - `docs/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
 - `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
@@ -155,15 +160,22 @@ set -a; source config/launcher.env; set +a
 ./scripts/switch-rust.sh status
 ```
 
-Les deux interfaces peuvent tourner en même temps, mais :
+En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
 
+- le lanceur Rust exécute `sync-backends.sh --apply --quiet` puis refuse de
+  démarrer si Python répond encore sur 5003 ;
+- le raccourci Python reste inchangé et démarre son propre moniteur ; arrêter
+  Rust avant de le lancer ;
+- avant chaque bascule, `scripts/sync-backends.sh --apply` fusionne
+  l'historique, la liste STEP1 et les analyses STEP7. Le lanceur Rust le fait
+  automatiquement ; pour revenir à Python, lancer la commande à la main ;
 - ne pas lancer STEP2/STEP3/STEP4 matérielles des deux côtés simultanément ;
-- un seul moniteur CSV doit être actif sur le webhook. Actuellement Rust est
-  le seul moniteur ; le raccourci Python ne doit pas être lancé tant que
-  `webhook.enabled = true` côté Rust ;
 - les projets et téléchargements Rust restent dans `runtime/`, Python ne les
   voit pas. Le runtime Rust démarre avec `runtime/projets_extraits` vide : pour
   tester un projet, le copier dans cette racine, jamais l'inverse.
+
+La procédure complète, les options et les sauvegardes sont décrites dans
+`docs/SYNC-BACKENDS.md`.
 
 ## CLI
 
@@ -244,10 +256,12 @@ passer `webhook.enabled = true` dans `config/config.toml`. Le serveur refuse de
 démarrer le moniteur si `download_history` est vide, ou si
 `steps.step1.source_dir` diffère de `paths.downloads`.
 
-Sur l'instance actuelle, il est actif (`enabled = true`). Python 5003 doit
-rester arrêté : son lanceur démarre toujours son propre moniteur. Pour un
-rollback, arrêter Rust, remettre `enabled = false`, redémarrer Rust, puis
-lancer Python.
+Sur l'instance actuelle, il est actif (`enabled = true`). Un seul backend doit
+tourner à la fois. Pour passer à Python : arrêter Rust, lancer
+`./scripts/sync-backends.sh --apply`, puis le raccourci Python. Pour revenir à
+Rust : arrêter Python, lancer le raccourci Rust (il synchronise
+automatiquement) ou `./scripts/sync-backends.sh --apply` puis
+`./scripts/switch-rust.sh start`.
 
 ```sh
 ./target/release/workflow-cli history import \
@@ -255,6 +269,7 @@ lancer Python.
 ./target/release/workflow-cli history audit
 ./target/release/workflow-cli history stats
 ./target/release/workflow-cli webhook probe
+./target/release/workflow-cli sync --apply --quiet
 ```
 
 `DRY_RUN_DOWNLOADS=true` (ou `webhook.dry_run = true`) marque les nouvelles URL

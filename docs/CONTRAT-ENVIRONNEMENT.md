@@ -246,7 +246,11 @@ workflow-cli history audit
 workflow-cli history stats
 ```
 
-`history audit` vérifie que chaque URL stockée est déjà normalisée. Le moniteur reste désactivé (`webhook.enabled = false`) et refuse une base vide (`webhook.require_history = true`) pour éviter de re-télécharger tout le webhook.
+Pour les bascules répétées, `workflow-cli sync` remplace l'import ponctuel :
+il fusionne les deux bases et la liste STEP1, puis copie les archives non
+traitées et les analyses STEP7. Voir `SYNC-BACKENDS.md`.
+
+`history audit` vérifie que chaque URL stockée est déjà normalisée. Le moniteur est désactivé par défaut (`webhook.enabled = false`) et refuse une base vide (`webhook.require_history = true`) pour éviter de re-télécharger tout le webhook.
 
 Normalisation des URLs avant insertion : trim, décodage des entités HTML, décodage récursif des séquences doublement encodées (`amp%3B`), minuscule du schéma et de l'hôte, suppression des ports par défaut, tri des paramètres de requête, suppression des paramètres vides, un seul `dl=1` pour Dropbox, suppression du slash final hors racine, décodage puis réencodage du chemin.
 

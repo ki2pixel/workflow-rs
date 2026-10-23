@@ -17,7 +17,7 @@ TOKEN="${WORKFLOW_SERVER_WORKER_TOKEN:-}"
 
 usage() {
     cat <<EOF
-Usage: $0 {check|start|stop|status}
+Usage: $0 {check|running|start|stop|status}
 
 Environment:
   WORKFLOW_SERVER_WORKER_TOKEN   obligatoire pour check/start/status
@@ -43,7 +43,24 @@ ping_rust() {
 }
 
 ping_legacy() {
-    curl -fs --max-time 2 "$LEGACY_URL/" >/dev/null 2>&1
+    # Toute réponse HTTP prouve que le serveur écoute, même une erreur 500.
+    curl -s -o /dev/null --max-time 2 "$LEGACY_URL/"
+}
+
+webhook_enabled() {
+    sed -n '/^\[webhook\]/,/^\[/ s/^enabled = \(.*\)/\1/p' "$CONFIG" 2>/dev/null \
+        | head -n 1 | tr -d '[:space:]'
+}
+
+require_legacy_stopped() {
+    if [[ "$(webhook_enabled)" != "true" ]]; then
+        return 0
+    fi
+    if ping_legacy; then
+        echo "ERREUR: Python legacy répond sur $LEGACY_URL alors que le moniteur Rust est activé." >&2
+        echo "Arrêter Python, lancer scripts/sync-backends.sh --apply, puis démarrer Rust." >&2
+        exit 1
+    fi
 }
 
 is_running() {
@@ -56,6 +73,7 @@ is_running() {
 case "${1:-}" in
     check)
         require_token
+        require_legacy_stopped
         if [[ ! -x "$BIN" ]]; then
             echo "binaire absent: $BIN (cargo build --release -p workflow-server)" >&2
             exit 1
@@ -113,12 +131,16 @@ case "${1:-}" in
             echo "Python legacy ne répond pas sur $LEGACY_URL (rollback indisponible)" >&2
         fi
         ;;
+    running)
+        is_running
+        ;;
     start)
         require_token
         if is_running; then
             echo "workflow-server déjà démarré (PID $(cat "$PID_FILE"))"
             exit 0
         fi
+        require_legacy_stopped
         env WORKFLOW_SERVER_WORKER_TOKEN="$TOKEN" \
             WORKFLOW_SERVER_SECRET_KEY="${WORKFLOW_SERVER_SECRET_KEY:-}" \
             "$BIN" --config "$CONFIG" --check >/dev/null

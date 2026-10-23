@@ -44,6 +44,15 @@ history_db = "/home/kidpixel/workflow-rs/runtime/download_history.sqlite3"
 cache_root = "/mnt/cache"
 finalized = "/mnt/cache"
 
+[legacy]
+# Racines Python, lues uniquement par `workflow-cli sync`. Le serveur Rust et
+# les étapes ne les utilisent jamais.
+root = "/home/kidpixel/workflow_mediapipe"
+downloads = "/home/kidpixel/Téléchargements"
+keyword = "Camille"
+# history_db, logs, archives et projects sont dérivés de root s'ils sont
+# absents. Les surcharger ici seulement si l'installation Python est déplacée.
+
 [webhook]
 # Sécurité : le moniteur ne démarre pas tant que l'historique Python n'a pas
 # été importé. Commandes :

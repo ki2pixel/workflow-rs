@@ -28,6 +28,7 @@ est mis à jour à chaque mesure de parité.
 | D-020 | basse | Téléchargement | Python lance un thread par lien, déplace un téléchargement en historique dès qu'une tentative échoue (même si le repli Dropbox réussit ensuite), et conserve l'ancien `error` du moniteur après un succès. | Le port borne la concurrence (`download.max_concurrent`, défaut 4), ne publie le statut final qu'après le repli, remet `error` à null après un passage réussi, et classe une fermeture de corps prématurée en `incomplete`. |
 | D-021 | haute | Migration | Le moniteur Rust ne peut pas deviner l'historique Python. Une base vide ferait télécharger tous les liens du webhook. | Import explicite `workflow-cli history import --from <base>` (lecture seule, 911 URL identiques au 2026-10-23), audit `history audit`, puis `webhook.enabled = true`. Les échecs Python ne sont pas importés : ils sont transitoires et liés à des URL R2 expirées. |
 | D-022 | info | Validation | La compilation Windows de `workflow-bridge.exe`, le basculement du JSX After Effects et la validation STEP8 sur la machine Windows étaient listés comme restant. | Abandonnés : la production cible Linux, STEP8 est validé en headless avec `effectcraft-cli`, et le JSX/CEP continue d'appeler Python. Aucun chemin Rust ne dépend de cette validation. |
+| D-023 | haute | Migration | Python et Rust gardent des racines séparées (`download_history`, `processed_archives.txt`, téléchargements, archives STEP7). Une bascule sans fusion fait retélécharger les archives traitées par l'autre backend et perd la liste STEP1. | Synchronisation explicite `workflow-cli sync` avant chaque bascule : union de l'historique (timestamp minimal), fusion de `processed_archives.txt` par nom de fichier avec remappage, copie/déplacement des archives non traitées et copie/hardlink des analyses STEP7 par `(projet, hash)`. Les échecs ne sont pas fusionnés. |
 
 ## Détails
 
@@ -196,3 +197,34 @@ d'appeler le pont Python. Aucune étape Rust ne dépend de ce binaire.
 Conséquence pratique : ne pas rejouer cette validation lors des lots suivants.
 Le document `docs/LOT-1-BRIDGE.md` et le protocole `docs/STEP2-WINDOWS.md`
 restent comme référence historique ; ils ne sont pas des prérequis de bascule.
+
+### D-023 — Synchronisation au changement
+
+Le partage direct des racines Python a été écarté : il aurait fait écrire Rust
+en permanence dans `~/Téléchargements`, `logs/step1` et `archives`, et un
+processus Python oublié aurait pu modifier l'état pendant une exécution Rust.
+La cohabitation retenue est une synchronisation explicite, exécutée serveurs
+arrêtés, avant chaque bascule.
+
+La commande `workflow-cli sync` :
+
+- fusionne `download_history` dans les deux sens et conserve le plus petit
+  timestamp par URL. Elle refuse de réécrire des URL non normalisées sauf avec
+  `--normalize` ;
+- fusionne `processed_archives.txt` par nom de fichier, remappe les chemins
+  vers la racine du backend cible, applique la réinitialisation mensuelle et
+  ignore les entrées hors du dossier de téléchargement ;
+- copie ou déplace les archives non traitées, sans jamais écraser un fichier
+  de même nom mais de contenu différent ;
+- copie ou hardlinke les analyses STEP7 par `(projet, hash vidéo)`, en
+  complétant les hash partiels et en signalant les conflits.
+
+Les échecs de téléchargement ne sont pas fusionnés : ce sont des cooldowns
+transitoires, et une URL peut réussir d'un côté après avoir échoué de l'autre.
+Les projets en cours ne sont pas déplacés ; le rapport avertit s'il en reste.
+
+La synchronisation prend le verrou `/tmp/workflow-sync.lock`, refuse les ports
+5003/5004 actifs et les processus d'étape, et sauvegarde les bases
+(`VACUUM INTO`) et les listes avant écriture. Le lanceur Rust l'exécute
+automatiquement ; le raccourci Python reste inchangé. Détail dans
+`docs/SYNC-BACKENDS.md`.

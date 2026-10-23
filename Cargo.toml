@@ -7,6 +7,7 @@ members = [
     "crates/workflow-cli",
     "crates/workflow-bridge",
     "crates/workflow-tpu",
+    "crates/workflow-server",
 ]
 
 [workspace.package]
@@ -33,5 +34,12 @@ rustfft = "6.2"
 ctrlc = { version = "3", features = ["termination"] }
 libc = "0.2"
 libloading = "0.8"
-tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "sync", "time", "macros", "net", "signal", "fs"] }
 ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "load-dynamic", "tracing", "cuda"] }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+minijinja = "2"
+glob = "0.3"
+http-body-util = "0.1"

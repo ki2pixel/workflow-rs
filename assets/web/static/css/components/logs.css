@@ -1,0 +1,430 @@
+.logs-overlay-container {
+    z-index: 1100;
+    background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
+    padding: clamp(16px, 3vw, 36px);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px) scale(0.96);
+    transition:
+        opacity var(--motion-duration-slow) var(--motion-ease-out-expo),
+        visibility var(--motion-duration-slow) var(--motion-ease-out-expo),
+        transform var(--motion-duration-slow) var(--motion-ease-out-expo);
+    backdrop-filter: blur(8px);
+}
+
+.logs-content-wrapper {
+    width: min(80vw, 1100px);
+    height: min(80vh, 780px);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: var(--bg-card);
+    border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+    border-radius: 28px;
+    padding: 20px 22px 24px;
+    box-shadow:
+        0 28px 60px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
+    overflow: hidden;
+}
+
+.logs-overlay-container[data-visible="true"] {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.logs-overlay-container[data-visible="true"] .logs-content-wrapper {
+    animation: logPanelEntrance 0.6s var(--motion-ease-out-expo) 0.1s both;
+}
+
+@keyframes logPanelEntrance {
+    0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.98);
+        filter: blur(2px);
+    }
+    50% {
+        opacity: 0.8;
+        transform: translateY(-2px) scale(1.01);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+    }
+}
+
+.logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+    animation: logPanelExit 0.4s var(--motion-ease-in-expo) both;
+}
+
+@keyframes logPanelExit {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+        filter: blur(1px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .logs-overlay-container {
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+        transform: none;
+    }
+    
+    .logs-overlay-container[data-visible="true"] .logs-content-wrapper,
+    .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+        animation: none;
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .logs-content-wrapper {
+        width: 95vw;
+        height: 90vh;
+        border-radius: 20px;
+        padding: 18px;
+    }
+}
+
+.log-panel-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    color: var(--accent-primary);
+    font-size: 1.3em;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: color var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.log-panel-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.log-panel-subheader {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+#log-panel-context-step {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.log-panel-specific-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.log-panel-specific-buttons .specific-log-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 10px 18px;
+    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        color var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-fast) var(--motion-ease-standard),
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.log-panel-specific-buttons .specific-log-button:hover {
+    color: var(--text-primary);
+    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+    border-color: rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+.log-panel-specific-buttons .specific-log-button:active {
+    transform: scale(0.98);
+}
+
+#close-log-panel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
+    border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
+    border-radius: 999px;
+    color: var(--text-bright);
+    font-size: 1.45em;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
+    transition:
+        color var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-fast) var(--motion-ease-standard),
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        transform var(--motion-duration-fast) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+#close-log-panel:hover {
+    color: var(--text-primary);
+    background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
+    border-color: rgb(var(--accent-primary-rgb) / 0.7);
+    box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+#close-log-panel:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
+        0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+#close-log-panel:active {
+    transform: scale(0.96);
+}
+
+.log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
+.log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
+
+.log-output,
+.specific-log-output {
+    background-color: var(--log-bg);
+    color: var(--text-bright);
+    padding: 15px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 1em;
+    line-height: 1.45;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-radius: 0 0 8px 8px;
+    flex-grow: 1;
+}
+
+/* Enhanced Log Styling - Different log types */
+.log-line {
+    display: block;
+    margin: 2px 0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    position: relative;
+}
+
+.log-line.log-success {
+    background-color: rgb(var(--status-success-rgb) / 0.12);
+    border-left: 3px solid var(--status-success);
+    color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
+}
+
+.log-line.log-warning {
+    background-color: rgb(var(--status-warning-rgb) / 0.12);
+    border-left: 3px solid var(--status-warning);
+    color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
+}
+
+.log-line.log-error {
+    background-color: rgb(var(--status-error-rgb) / 0.12);
+    border-left: 3px solid var(--status-error);
+    color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
+    font-weight: 500;
+}
+
+.log-line.log-info {
+    background-color: rgb(var(--status-running-rgb) / 0.12);
+    border-left: 3px solid var(--status-running);
+    color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
+}
+
+.log-line.log-debug {
+    background-color: rgba(158, 158, 158, 0.1);
+    border-left: 3px solid #9e9e9e;
+    color: #616161;
+    font-size: 0.85em;
+}
+
+.log-line.log-command {
+    background-color: rgba(156, 39, 176, 0.1);
+    border-left: 3px solid #9c27b0;
+    color: #7b1fa2;
+    font-weight: 500;
+}
+
+.log-line.log-progress {
+    background-color: rgb(var(--accent-primary-rgb) / 0.10);
+    border-left: 3px solid var(--accent-primary);
+    color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+}
+
+/* Log icons for better visual distinction */
+.log-line::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.log-line.log-success::before {
+    background-color: var(--status-success);
+    content: '✓';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-warning::before {
+    background-color: var(--status-warning);
+    content: '⚠';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-error::before {
+    background-color: var(--status-error);
+    content: '✕';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-info::before {
+    background-color: var(--status-running);
+    content: 'ℹ';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-debug::before {
+    background-color: #9e9e9e;
+    content: '•';
+    color: white;
+    font-size: 10px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-command::before {
+    background-color: #9c27b0;
+    content: '$';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-progress::before {
+    background-color: var(--accent-primary);
+    content: '⟳';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+/* Dark mode adjustments for log styling */
+@media (prefers-color-scheme: dark) {
+    .log-line.log-success {
+        background-color: rgb(var(--status-success-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
+    }
+
+    .log-line.log-warning {
+        background-color: rgb(var(--status-warning-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
+    }
+
+    .log-line.log-error {
+        background-color: rgb(var(--status-error-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
+    }
+
+    .log-line.log-info {
+        background-color: rgb(var(--status-running-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
+    }
+
+    .log-line.log-debug {
+        background-color: rgba(158, 158, 158, 0.15);
+        color: #bdbdbd;
+    }
+
+    .log-line.log-command {
+        background-color: rgba(156, 39, 176, 0.15);
+        color: #ba68c8;
+    }
+
+    .log-line.log-progress {
+        background-color: rgb(var(--accent-primary-rgb) / 0.15);
+        color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+    }
+}
+
+/* Hover effects for better interactivity */
+.log-line:hover {
+    background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
+    transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+/* Improved spacing and readability */
+.log-output .log-line:first-child {
+    margin-top: 0;
+}
+
+.log-output .log-line:last-child {
+    margin-bottom: 0;
+}
+.log-output:empty:before {
+    content: "En attente de logs...";
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.specific-log-output:empty:before {
+    content: "Aucun log spécifique chargé.";
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.specific-log-controls-wrapper { margin-top: 15px; }
+.specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
+
+.specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
+
+.log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
+.log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+.log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
+.log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }

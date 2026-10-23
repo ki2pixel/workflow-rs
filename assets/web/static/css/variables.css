@@ -1,0 +1,78 @@
+:root {
+    /* Backgrounds */
+    --bg-dark: #1e1e2f;
+    --bg-card: #2c2c3e;
+    --bg-secondary: #2c2c3e; /* Secondary background for widgets */
+    --bg-tertiary: #3a3a4e; /* Tertiary background for disabled elements */
+    --bg-hover: rgba(121, 134, 203, 0.1);
+    --log-bg: #161625;
+
+    /* Text */
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-muted: #707080; /* Muted text for disabled states */
+    --text-bright: #f0f0f0;
+    --log-text: #c0c0d0;
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+
+    /* UI Elements */
+    --border-color: #39394d;
+    --border-color-translucent: #39394d88;
+    --border-bright: #4a4a5e;
+    --touch-target-min: 44px;
+    --button-compact-padding: 12px;
+    --topbar-height: 68px;
+
+    --motion-duration-fast: 120ms;
+    --motion-duration-medium: 220ms;
+    --motion-duration-slow: 420ms;
+    --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --motion-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-in-expo: cubic-bezier(0.7, 0, 0.84, 0);
+
+    /* Standard Colors */
+    --accent-primary: #7986cb;
+    --accent-secondary: #ff8a65;
+    --green: #66bb6a;
+    --red: #ef5350;
+    --yellow: #ffee58;
+    --blue: #42a5f5;
+    --orange: #ffb74d;
+
+    /* Status Colors (Hex) */
+    --status-running: #4dabf7;
+    --status-success: #4caf50;
+    --status-error: #e53935;
+    --status-warning: #ff9800;
+    --status-idle: #9e9e9e;
+
+    /* RGB Values (for rgba usage) */
+    --accent-primary-rgb: 121 134 203;
+    --accent-secondary-rgb: 255 138 101;
+    --status-running-rgb: 77 171 247;
+    --status-success-rgb: 76 175 80;
+    --status-error-rgb: 229 57 53;
+    --status-warning-rgb: 255 152 0;
+    --status-idle-rgb: 158 158 158;
+
+    /* Pipeline Visualization Variables */
+    --pipeline-node-size: 80px;
+    --pipeline-connector-width: 3px;
+    --pipeline-gap: 2rem;
+    --pipeline-card-radius: 20px;
+    --pipeline-card-padding: 1.5rem;
+    --pipeline-card-max-width: 980px;
+    --pipeline-node-dot-size: 18px;
+    --pipeline-node-border-width: 3px;
+    --pipeline-rail-column-width: 110px;
+    --pipeline-rail-gap: 1.25rem;
+    --pipeline-axis-width: 4px;
+    --pipeline-card-alignment-offset: calc((var(--pipeline-rail-column-width) + var(--pipeline-rail-gap)) / 2);
+
+    /* Pipeline Status Colors mapped to Status Colors */
+    --pipeline-color-idle: var(--status-idle);
+    --pipeline-color-running: var(--status-running);
+    --pipeline-color-success: var(--status-success);
+    --pipeline-color-error: var(--status-error);
+}

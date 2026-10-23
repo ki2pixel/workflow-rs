@@ -11,8 +11,11 @@ use workflow_steps::step3::{run_step3, Step3Options};
 #[cfg(unix)]
 use workflow_steps::step4::{run_step4, Step4Options};
 use workflow_steps::step5::audio::{read_audio_meta, reduce_audio_file};
+use workflow_steps::step5::batch::{run_step5_batch, Step5BatchOptions};
 use workflow_steps::step5::video::{reduce_video_file, VideoOptions};
-use workflow_steps::step6::{build_ae_payload_file, AeOptions, SegmentConfig};
+use workflow_steps::step6::{
+    build_ae_payload_file, run_step6_batch, AeOptions, SegmentConfig, Step6BatchOptions,
+};
 use workflow_steps::step7::{
     finalize_work_dir, find_projects_to_finalize, FinalizeMode, Step7Options,
 };
@@ -219,6 +222,15 @@ struct Step5Args {
 
 #[derive(Debug, Subcommand)]
 enum Step5Command {
+    /// Réduit tous les projets d'un répertoire (mode orchestrateur).
+    Project {
+        /// Dossier contenant les projets (`projets_extraits`).
+        #[arg(long)]
+        work_dir: PathBuf,
+        /// Filtre les dossiers projet par mot-clé (vide = tous).
+        #[arg(long)]
+        keyword: Option<String>,
+    },
     /// Réduit un fichier `_audio.json` (ou un audio brut STEP3).
     Audio {
         #[arg(long)]
@@ -255,6 +267,15 @@ struct Step6Args {
 
 #[derive(Debug, Subcommand)]
 enum Step6Command {
+    /// Construit tous les `_ae.json` d'un répertoire (mode orchestrateur).
+    Project {
+        /// Dossier contenant les projets (`projets_extraits`).
+        #[arg(long)]
+        work_dir: PathBuf,
+        /// Filtre les dossiers projet par mot-clé (vide = tous).
+        #[arg(long)]
+        keyword: Option<String>,
+    },
     /// Construit `<stem>_ae.json` à partir du tracking, de l'audio et du CSV.
     Build {
         #[arg(long)]
@@ -716,6 +737,27 @@ fn run() -> Result<()> {
             }
         },
         Command::Step5(args) => match args.command {
+            Step5Command::Project { work_dir, keyword } => {
+                let report = run_step5_batch(&Step5BatchOptions {
+                    work_dir,
+                    keyword: keyword.unwrap_or_else(|| config.steps.filter.keyword.clone()),
+                    docs_subfolder: config.steps.filter.docs_subfolder.clone(),
+                    tracking_analytics: config.steps.step5.tracking_analytics,
+                    expression_summary: config.steps.step5.expression_summary,
+                    expression_keys: config.steps.step5.expression_keys.clone(),
+                    skip_preserved_mov: config.steps.step1.skip_preserved_mov,
+                    preserved_mov_names: if config.steps.step1.preserved_mov_names.is_empty() {
+                        vec!["m6+.mov".into()]
+                    } else {
+                        config.steps.step1.preserved_mov_names.clone()
+                    },
+                    ffprobe: config.steps.step2.ffprobe.clone(),
+                })?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!("STEP5: {} fichier(s) en échec", report.failures.len());
+                }
+            }
             Step5Command::Audio { input, output } => {
                 let output = output.unwrap_or_else(|| input.clone());
                 let meta = reduce_audio_file(&input, &output)
@@ -751,6 +793,28 @@ fn run() -> Result<()> {
             }
         },
         Command::Step6(args) => match args.command {
+            Step6Command::Project { work_dir, keyword } => {
+                let report = run_step6_batch(&Step6BatchOptions {
+                    work_dir,
+                    keyword: keyword.unwrap_or_else(|| config.steps.filter.keyword.clone()),
+                    docs_subfolder: config.steps.filter.docs_subfolder.clone(),
+                    segment: SegmentConfig {
+                        spread_threshold: f64::from(config.steps.step6.spread_threshold),
+                        confidence_weight: config.steps.step6.confidence_weight,
+                    },
+                    skip_preserved_mov: config.steps.step1.skip_preserved_mov,
+                    preserved_mov_names: if config.steps.step1.preserved_mov_names.is_empty() {
+                        vec!["m6+.mov".into()]
+                    } else {
+                        config.steps.step1.preserved_mov_names.clone()
+                    },
+                    ffprobe: config.steps.step2.ffprobe.clone(),
+                })?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.success() {
+                    anyhow::bail!("STEP6: {} fichier(s) en échec", report.failures.len());
+                }
+            }
             Step6Command::Build {
                 tracking,
                 output,

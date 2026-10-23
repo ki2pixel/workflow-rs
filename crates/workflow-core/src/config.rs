@@ -194,6 +194,26 @@ impl Config {
     /// Validation complète du serveur, secrets compris.
     pub fn validate_server(&self) -> Result<(), ConfigError> {
         self.validate_common()?;
+        if self.server.port == 5003 {
+            return Err(ConfigError::Invalid(
+                "server.port 5003 est réservé au serveur Python legacy".into(),
+            ));
+        }
+        if self.server.workflow_cli.as_os_str().is_empty() {
+            return Err(ConfigError::Invalid(
+                "server.workflow_cli ne peut pas être vide".into(),
+            ));
+        }
+        if self.server.workdir.as_os_str().is_empty() {
+            return Err(ConfigError::Invalid(
+                "server.workdir ne peut pas être vide".into(),
+            ));
+        }
+        if self.server.max_step_log_bytes < 1024 {
+            return Err(ConfigError::Invalid(
+                "server.max_step_log_bytes doit être supérieur ou égal à 1024".into(),
+            ));
+        }
         if self.server.secret_key.trim().is_empty() {
             return Err(ConfigError::Invalid(
                 "server.secret_key est vide (secret obligatoire)".into(),
@@ -233,6 +253,19 @@ pub struct ServerConfig {
     pub snapshot_interval_s: u64,
     pub slow_api_threshold_ms: u64,
     pub gpu_monitoring: bool,
+    /// Binaire `workflow-cli` utilisé pour exécuter les étapes dans un
+    /// processus isolé. Un chemin relatif est résolu depuis `workdir`.
+    pub workflow_cli: PathBuf,
+    /// Répertoire de travail du serveur et des sous-processus.
+    pub workdir: PathBuf,
+    /// Racine des fichiers statiques servis sous `/static`.
+    pub frontend_dir: PathBuf,
+    /// Gabarit HTML de la page principale.
+    pub template: PathBuf,
+    /// Répertoire des sons du panneau.
+    pub sound_design_dir: PathBuf,
+    /// Taille maximale d'un journal d'étape avant rotation.
+    pub max_step_log_bytes: u64,
 }
 
 impl Default for ServerConfig {
@@ -248,6 +281,12 @@ impl Default for ServerConfig {
             snapshot_interval_s: 10,
             slow_api_threshold_ms: 500,
             gpu_monitoring: true,
+            workflow_cli: PathBuf::from("target/release/workflow-cli"),
+            workdir: PathBuf::from("."),
+            frontend_dir: PathBuf::from("assets/web/static"),
+            template: PathBuf::from("assets/web/templates/index_new.html"),
+            sound_design_dir: PathBuf::from("assets/web/sound-design"),
+            max_step_log_bytes: 5 * 1024 * 1024,
         }
     }
 }
@@ -782,6 +821,17 @@ mod tests {
     fn worker_token_default_is_rejected_for_server() {
         let config = Config::default();
         assert!(config.validate_server().is_err());
+    }
+
+    #[test]
+    fn legacy_port_is_rejected_for_the_rust_server() {
+        let mut config = Config::default();
+        config.server.secret_key = "secret".into();
+        config.server.worker_token = "token".into();
+        config.server.port = 5003;
+        assert!(config.validate_server().is_err());
+        config.server.port = 5004;
+        assert!(config.validate_server().is_ok());
     }
 
     #[test]

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
+    <meta name="worker-token" content="{{ worker_token if worker_token else '' }}">
+    <title>Workflow Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/logs.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/workflow-buttons.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/popups.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
+</head>
+
+<body>
+    <a href="#workflow-steps" class="skip-link">Passer au contenu principal (Étapes du Workflow)</a>
+    <div id="notifications-area" aria-live="assertive"></div>
+
+    <div class="topbar-affix" id="topbar-affix">
+        <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
+            <div class="workflow-controls">
+                <div class="sequence-controls">
+                    <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
+                        <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-8)</button>
+                    </div>
+                    <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
+                        <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
+                        <button id="clear-custom-sequence-button" disabled>🗑️ Vider Séquence</button>
+                        <button id="toggle-local-downloads" class="downloads-toggle" aria-pressed="true" title="Afficher/Masquer les Téléchargements Locaux">📥 Téléchargements</button>
+                        <button id="settings-toggle" class="settings-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Afficher les options">⚙️ Settings</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="global-progress-affix" id="global-progress-affix">
+                <div class="global-progress-container" id="global-progress-container">
+                    <div id="global-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <div id="global-progress-text" aria-live="polite"></div>
+            </div>
+            <div id="settings-panel" class="settings-panel" hidden>
+                <section class="settings-section" aria-label="Affichage et préférences">
+                    <p class="settings-title">Affichage & Préférences</p>
+                    <div class="settings-row settings-row--stacked">
+                        <div class="theme-selector-container settings-block">
+                            <label for="theme-selector" class="theme-selector-label">Thème:</label>
+                            <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
+                            </select>
+                        </div>
+
+                        <div id="sound-control-widget" class="sound-control-widget settings-block">
+                            <label class="btn-like-switch" for="sound-toggle" aria-label="Activer/Désactiver les effets sonores">
+                                🔊 Effets Sonores
+                                <input type="checkbox" id="sound-toggle" checked>
+                            </label>
+                        </div>
+
+                        <div class="settings-block">
+                            <label class="btn-like-switch" for="logs-auto-open-toggle" aria-label="Activer/Désactiver l'ouverture auto du panneau de logs">
+                                📟 Auto-ouverture des logs
+                                <input type="checkbox" id="logs-auto-open-toggle" checked>
+                            </label>
+                            <small class="settings-helper">Ouvrir automatiquement la popup de logs lors du lancement d'une étape.</small>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+    </div>
+
+    <div id="topbar-spacer" aria-hidden="true"></div>
+
+    <div class="local-downloads-section card-like-section">
+        <h2>
+            <span class="section-icon">📥</span> Téléchargements Locaux
+        </h2>
+        <div class="local-downloads-list-container">
+            <ul id="local-downloads-list" class="status-list" aria-live="polite">
+                <li class="placeholder">Aucune activité de téléchargement locale récente.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="workflow-wrapper compact-mode" id="workflow-wrapper">
+        <div class="steps-column" id="steps-column">
+            <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
+                <div class="pipeline-timeline" role="list">
+                    <div class="timeline-axis" aria-hidden="true"></div>
+                    {% for step_key, config in steps_config.items() %}
+                    {% if config %}
+                    <div class="timeline-row">
+                        <div class="timeline-rail-column" aria-hidden="true">
+                            <div class="timeline-node" data-step="{{ step_key }}"></div>
+                        </div>
+                        <div class="timeline-cards-column">
+                            <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0">
+                                <div class="timeline-content">
+                            <div class="timeline-head">
+                                <div class="step-title-group">
+                                <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}✂️{% elif step_key == 'STEP3' %}🔊{% elif step_key == 'STEP4' %}👀{% elif step_key == 'STEP5' %}🧩{% elif step_key == 'STEP6' %}🧠{% elif step_key == 'STEP7' %}📦{% elif step_key == 'STEP8' %}🎬{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
+                                <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
+                                </div>
+                                <div class="step-selection-control">
+                                    <span class="step-selection-order-number" id="order-{{step_key}}"></span>
+                                    <input type="checkbox" class="custom-sequence-checkbox" data-step-key="{{ step_key }}" title="Sélectionner pour séquence personnalisée" aria-label="Sélectionner {{ config.display_name }} pour séquence personnalisée">
+                                </div>
+                            </div>
+                            <div class="node-actions step-controls">
+                                <button class="run-button" data-step="{{ step_key }}">Lancer</button>
+                                <button class="cancel-button" data-step="{{ step_key }}" disabled>Annuler</button>
+                            </div>
+                            <div class="timeline-body">
+                                <div class="status-line">
+                                    Statut:
+                                    <span id="status-{{ step_key }}" class="status-badge status-idle" aria-live="polite">Prêt</span>
+                                    <span class="timer" id="timer-{{ step_key }}"></span>
+                                </div>
+                                <div class="step-progress-container" id="progress-container-{{ step_key }}" style="display: none;">
+                                    <div class="progress-bar-wrapper">
+                                        <div class="progress-bar-step" id="progress-bar-{{ step_key }}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                    </div>
+                                    <div class="progress-text-step" id="progress-text-{{ step_key }}" aria-live="polite"></div>
+                                </div>
+                                {% if config.specific_logs %}
+                                <div class="specific-log-controls-wrapper">
+                                    <h4>Logs Spécifiques :</h4>
+                                    <div id="log-panel-specific-buttons-container-{{ step_key }}">
+                                        {% for log_conf in config.specific_logs %}
+                                        <button class="specific-log-button" data-step="{{ step_key }}" data-log-index="{{ loop.index0 }}">{{ log_conf.name }}</button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="timeline-scroll-spacer" aria-hidden="true"></div>
+            </section>
+        </div>
+    </div>
+
+    <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
+        <div class="popup-content">
+            <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
+            <ul id="sequence-summary-list" class="popup-list"></ul>
+            <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
+        </div>
+    </div>
+    <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
+        <div class="popup-content">
+            <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
+            <p>
+                Les étapes suivantes seront lancées dans cet ordre :
+            </p>
+            <ul id="custom-sequence-confirm-list" class="popup-list"></ul>
+            <div class="popup-buttons">
+                <button id="confirm-run-custom-sequence-button" class="popup-confirm-button">Lancer la Séquence</button>
+                <button id="cancel-run-custom-sequence-button" class="popup-cancel-button">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="system-monitor-widget" class="system-monitor-widget">
+        <div class="monitor-header">
+            <span class="monitor-icon">💻</span>
+            <span class="monitor-title">Moniteur Système</span>
+            <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
+        </div>
+        <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
+            C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
+        </div>
+        <div class="monitor-item">
+            <span class="monitor-label">CPU</span>
+            <div class="monitor-bar-container">
+                <div id="cpu-monitor-bar" class="monitor-bar"></div>
+            </div>
+            <span id="cpu-monitor-value" class="monitor-value">... %</span>
+        </div>
+        <div class="monitor-item">
+            <span class="monitor-label">RAM</span>
+            <div class="monitor-bar-container">
+                <div id="ram-monitor-bar" class="monitor-bar"></div>
+            </div>
+            <span id="ram-monitor-value" class="monitor-value">... %</span>
+        </div>
+        <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
+
+        <div id="gpu-monitor-section" style="display: none;">
+            <div class="monitor-item">
+                <span class="monitor-label">GPU</span>
+                <div class="monitor-bar-container">
+                    <div id="gpu-monitor-bar" class="monitor-bar"></div>
+                </div>
+                <span id="gpu-monitor-value" class="monitor-value">... %</span>
+            </div>
+            <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
+        </div>
+        <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
+    </div>
+
+    <div class="logs-overlay-container popup-overlay" id="logs-column-global">
+        <div class="logs-content-wrapper">
+            <div class="log-panel-header">
+                <div class="log-panel-header-main">
+                    <span id="log-panel-title">Logs</span>
+                    <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+                </div>
+                <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
+                    <span id="log-panel-context-step">Aucune étape active</span>
+                    <span id="log-panel-context-status"></span>
+                    <span id="log-panel-context-timer"></span>
+                </div>
+                <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
+            </div>
+            <div class="log-container" id="main-log-container-panel">
+                <div class="log-header">
+                    Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
+                </div>
+                <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="false"></div>
+            </div>
+            <div class="log-container" id="specific-log-container-panel" style="display:none;">
+                <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
+                <div class="specific-log-path" id="specific-log-path-info-panel"></div>
+                <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="false"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
+    <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
+</body>
+
+</html>

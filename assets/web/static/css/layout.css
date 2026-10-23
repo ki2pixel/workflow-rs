@@ -1,0 +1,66 @@
+.workflow-wrapper {
+    display: flex;
+    width: 100%;
+    max-width: 1600px;
+    flex-grow: 1;
+}
+
+/* Local Downloads panel animation (class-based for max browser compatibility) */
+.local-downloads-section {
+    opacity: 0;
+    transform: translateX(30px) scale(0.98);
+    transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.local-downloads-section.downloads-visible {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .local-downloads-section { transition: none !important; transform: none !important; }
+}
+
+/* Keep vertical scrollbar always present to avoid layout jank during height changes */
+html, body { overflow-y: scroll; }
+
+.steps-column {
+    flex: 1 1 100%;
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+    opacity: 1;
+    scroll-margin-top: 0;
+}
+
+/* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
+.workflow-wrapper.compact-mode .steps-column {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
+    gap: 16px 16px; /* row gap, column gap */
+    align-items: start; /* cards height adapt to content by default */
+    align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
+    justify-items: center; /* center cards if column wider than minmax */
+    padding: 10px 20px;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Desktop optimization: uniformize row heights to avoid subtle misalignment */
+@media (min-width: 1200px) {
+  .workflow-wrapper.compact-mode .steps-column {
+    align-items: start;
+  }
+}
+
+
+/* Unified controls section compatibility with slideshow mode */
+.workflow-wrapper.slideshow-mode ~ .unified-controls-section,
+.unified-controls-section + .workflow-wrapper.slideshow-mode {
+    /* Ensure proper spacing and visibility during slideshow */
+    z-index: 1;
+    position: relative;
+ }

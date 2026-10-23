@@ -1,0 +1,144 @@
+/* Styles pour la nouvelle section des téléchargements locaux */
+.local-downloads-section {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 25px;
+    margin: 25px auto;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 900px;
+    /* Animated visibility (GPU-friendly). Visible by default to avoid empty space before JS runs */
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.32s ease;
+    will-change: opacity, transform;
+}
+
+.local-downloads-section[data-visible="false"] {
+    opacity: 0;
+    transform: translateX(24px) scale(0.985);
+}
+
+.local-downloads-section[data-visible="true"] {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .local-downloads-section {
+        transition: none !important;
+        transform: none !important;
+    }
+}
+
+.local-downloads-section h2 {
+    color: var(--accent-secondary);
+    margin-top: 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+}
+.local-downloads-section h2 .section-icon {
+    margin-right: 12px;
+    font-size: 1.6em;
+}
+
+.local-downloads-list-container {
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.status-list { 
+    list-style-type: none;
+    padding-left: 0;
+    margin:0;
+}
+
+.status-list li {
+    padding: 10px 5px;
+    border-bottom: 1px solid var(--border-color-translucent);
+    font-size: 0.95em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+}
+.status-list li:last-child {
+    border-bottom: none;
+}
+.status-list li.placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+    justify-content: center;
+}
+
+.status-list li .timestamp {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+.status-list li .filename {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-right: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
+}
+.status-list li .status-text {
+    font-weight: bold;
+}
+.status-list li .progress-percentage {
+    color: var(--blue);
+    font-weight: bold;
+}
+.status-list li .message {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    font-style: italic;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.download-status-pending .status-text { color: var(--blue); }
+.download-status-starting .status-text { color: var(--blue); }
+.download-status-downloading .status-text { color: var(--yellow); }
+.download-status-completed .status-text { color: var(--green); }
+.download-status-failed .status-text { color: var(--red); }
+
+
+/* --- Unified Controls: Downloads Toggle Button --- */
+.downloads-toggle {
+    margin-left: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-muted);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.downloads-toggle[aria-pressed="true"] {
+    background: var(--accent-primary-light);
+    border-color: var(--accent-primary);
+}
+.downloads-toggle--hidden {
+    opacity: 0.85;
+}
+.downloads-toggle--alert {
+    background: var(--red-translucent, rgba(220, 53, 69, 0.12));
+    border-color: var(--red, #dc3545);
+    color: var(--red, #dc3545);
+}

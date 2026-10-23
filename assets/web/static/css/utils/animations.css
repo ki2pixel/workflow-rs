@@ -1,0 +1,48 @@
+@keyframes pulseStatus {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Shine pass for active progress bar fill */
+@keyframes progressShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Subtle pulse for processing filename text */
+@keyframes textPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Generic spinner */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Micro-interactions for step cards */
+@keyframes subtleOpacityPulse {
+    0%, 100% { opacity: 0.22; }
+    50% { opacity: 0.42; }
+}
+
+@keyframes cardBreath {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.01); }
+}
+
+/* Brief highlight flash for newly opened sections/titles */
+@keyframes highlightFlash {
+    0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent-primary) 55%, transparent); }
+    100% { box-shadow: 0 0 0 10px transparent; }
+}
+
+.section-focus-highlight {
+    animation: highlightFlash 0.35s ease-out;
+    border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .section-focus-highlight { animation: none; }
+}

@@ -19,16 +19,29 @@ port = 5004
 debug = false
 secret_key = ""
 worker_token = ""
+workflow_cli = "/home/kidpixel/workflow-rs/target/release/workflow-cli"
+workdir = "/home/kidpixel/workflow-rs"
+frontend_dir = "/home/kidpixel/workflow-rs/assets/web/static"
+template = "/home/kidpixel/workflow-rs/assets/web/templates/index_new.html"
+sound_design_dir = "/home/kidpixel/workflow-rs/assets/web/sound-design"
+max_step_log_bytes = 5242880
 
 [paths]
 base = "/home/kidpixel/workflow-rs/runtime"
 models = "/home/kidpixel/workflow-rs/assets/models"
+projects = "/home/kidpixel/workflow-rs/runtime/projets_extraits"
+archives = "/home/kidpixel/workflow-rs/runtime/archives"
+logs = "/home/kidpixel/workflow-rs/runtime/logs"
 downloads = "/home/kidpixel/workflow-rs/runtime/downloads"
+history_db = "/home/kidpixel/workflow-rs/runtime/download_history.sqlite3"
 cache_root = "/mnt/cache"
 finalized = "/mnt/cache"
 
 [webhook]
 url = "https://webhook.kidpixel.fr/webhook_proxy.php"
+
+[steps]
+default_timeout_s = 1800
 
 [steps.filter]
 keyword = "Camille"
@@ -134,6 +147,8 @@ downloads_days = 0
 reports_days = 90
 
 [hardware]
+# Verrou distinct du serveur Python legacy (/tmp/workflow-hw.lock).
+lock_path = "/tmp/workflow-rs-hw.lock"
 tpu_device = "/dev/apex_0"
 gpu_mem_limit_mb = 4096
 require_tpu = true

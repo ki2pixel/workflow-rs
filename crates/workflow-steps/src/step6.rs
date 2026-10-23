@@ -1312,6 +1312,164 @@ fn default_csv_path(tracking: &Path) -> Option<PathBuf> {
     Some(tracking.with_file_name(format!("{stem}.csv")))
 }
 
+const BATCH_VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
+
+#[derive(Debug, Clone)]
+pub struct Step6BatchOptions {
+    pub work_dir: PathBuf,
+    pub keyword: String,
+    pub docs_subfolder: String,
+    pub segment: SegmentConfig,
+    pub skip_preserved_mov: bool,
+    pub preserved_mov_names: Vec<String>,
+    pub ffprobe: PathBuf,
+}
+
+#[derive(Debug, Default, Clone, serde::Serialize)]
+pub struct Step6BatchReport {
+    pub projects: usize,
+    pub written: usize,
+    pub failures: Vec<String>,
+}
+
+impl Step6BatchReport {
+    pub fn success(&self) -> bool {
+        self.failures.is_empty()
+    }
+}
+
+/// Construit tous les `_ae.json` des projets filtrés par mot-clé.
+pub fn run_step6_batch(options: &Step6BatchOptions) -> Result<Step6BatchReport, StepError> {
+    let mut report = Step6BatchReport::default();
+    let docs_dirs = find_docs_dirs(&options.work_dir, &options.keyword, &options.docs_subfolder);
+    println!("TOTAL_AE_PREPROCESS: {}", docs_dirs.len());
+
+    for (project_index, docs) in docs_dirs.iter().enumerate() {
+        let project = docs.parent().unwrap_or(docs);
+        println!(
+            "PREPROCESS_AE: {}/{}: {}",
+            project_index + 1,
+            docs_dirs.len(),
+            project
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("?")
+        );
+        let videos = batch_videos(docs, options);
+        for (video_index, video) in videos.iter().enumerate() {
+            let Some(stem) = video.file_stem().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let Some(tracking) = batch_tracking_path(docs, stem) else {
+                eprintln!("Tracking introuvable pour '{}'.", video.display());
+                continue;
+            };
+            let audio = docs.join(format!("{stem}_audio.json"));
+            let csv = docs.join(format!("{stem}.csv"));
+            let output = docs.join(format!("{stem}_ae.json"));
+            println!(
+                "INTERNAL_PROGRESS: {}/{} items ({}%) - {}",
+                video_index + 1,
+                videos.len(),
+                ((video_index + 1) as f64 / videos.len() as f64 * 100.0).round() as u32,
+                video.display()
+            );
+            let payload = build_ae_payload_file(
+                &tracking,
+                &output,
+                &AeOptions {
+                    audio: audio.exists().then_some(audio),
+                    csv: csv.exists().then_some(csv),
+                    config: options.segment.clone(),
+                },
+            );
+            match payload {
+                Ok(Some(_)) => report.written += 1,
+                Ok(None) => {
+                    eprintln!("Aucun payload AE produit pour '{}'.", video.display());
+                }
+                Err(error) => {
+                    let message = format!("AE {}: {error}", tracking.display());
+                    eprintln!("ERREUR: {message}");
+                    report.failures.push(message);
+                }
+            }
+        }
+        report.projects += 1;
+        println!(
+            "Succès: pré-traitement AE terminé pour {}",
+            project
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("?")
+        );
+    }
+
+    Ok(report)
+}
+
+fn find_docs_dirs(work_dir: &Path, keyword: &str, docs_subfolder: &str) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(work_dir) else {
+        return Vec::new();
+    };
+    let mut docs: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|project| project.is_dir())
+        .filter(|project| keyword.is_empty() || project.to_string_lossy().contains(keyword))
+        .map(|project| project.join(docs_subfolder))
+        .filter(|docs| docs.is_dir())
+        .collect();
+    docs.sort();
+    docs
+}
+
+fn batch_videos(docs: &Path, options: &Step6BatchOptions) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(docs) else {
+        return Vec::new();
+    };
+    let mut videos: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .filter(|path| {
+            path.extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    BATCH_VIDEO_EXTENSIONS
+                        .iter()
+                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+                })
+        })
+        .filter(|path| {
+            let preserved = crate::step2::is_preserved_media_with(
+                path,
+                options.skip_preserved_mov,
+                &options.preserved_mov_names,
+                &options.ffprobe,
+            );
+            if preserved {
+                eprintln!(
+                    "Média préservé ignoré (alpha/liste noire): {}",
+                    path.display()
+                );
+            }
+            !preserved
+        })
+        .collect();
+    videos.sort();
+    videos
+}
+
+fn batch_tracking_path(docs: &Path, stem: &str) -> Option<PathBuf> {
+    let reduced = docs.join(format!("{stem}_tracking.json"));
+    if reduced.exists() {
+        return Some(reduced);
+    }
+    let raw = docs.join(format!("{stem}.json"));
+    raw.exists().then_some(raw)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

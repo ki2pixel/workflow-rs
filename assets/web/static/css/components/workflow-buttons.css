@@ -1,0 +1,132 @@
+/* Workflow controls within unified section */
+.workflow-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px solid rgba(121, 134, 203, 0.1);
+}
+
+/* ===== WORKFLOW CONTROL BUTTONS STYLING ===== */
+#run-all-steps-button, #run-custom-sequence-button, #clear-custom-sequence-button {
+    background-color: var(--accent-secondary);
+    color: white;
+    padding: 15px 30px;
+    font-size: 1.1em;
+    font-weight: 500;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+    min-width: 200px;
+    white-space: nowrap;
+}
+
+/* Add subtle shine effect on hover */
+#run-all-steps-button::before, #run-custom-sequence-button::before, #clear-custom-sequence-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+#run-all-steps-button:hover::before, #run-custom-sequence-button:hover::before, #clear-custom-sequence-button:hover::before {
+    left: 100%;
+}
+#run-all-steps-button:hover, #run-custom-sequence-button:hover, #clear-custom-sequence-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    filter: brightness(1.1);
+}
+
+#run-all-steps-button:active, #run-custom-sequence-button:active, #clear-custom-sequence-button:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.1s ease;
+}
+/* Individual button color schemes */
+#run-all-steps-button {
+    background: linear-gradient(135deg, var(--accent-secondary) 0%, rgba(121, 134, 203, 0.9) 100%);
+    border: 1px solid rgba(121, 134, 203, 0.3);
+}
+
+#run-custom-sequence-button {
+    background: linear-gradient(135deg, var(--orange) 0%, rgba(255, 152, 0, 0.9) 100%);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+#clear-custom-sequence-button {
+    background: linear-gradient(135deg, var(--text-secondary) 0%, rgba(108, 117, 125, 0.9) 100%);
+    border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+#run-all-steps-button:disabled, #run-custom-sequence-button:disabled, #clear-custom-sequence-button:disabled {
+    background: linear-gradient(135deg, #555 0%, #444 100%) !important;
+    color: #999 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+    filter: none !important;
+    border: 1px solid #666 !important;
+    opacity: 0.6;
+}
+
+.global-progress-affix {
+    width: min(720px, 100%);
+    padding: 12px 18px 10px 18px;
+    border-radius: 14px;
+    backdrop-filter: saturate(120%) blur(6px);
+    background: color-mix(in oklab, var(--bg-card) 88%, rgba(255,255,255,0.08));
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin: 12px auto 0 auto;
+}
+
+.global-progress-container {
+    width: 100%;
+    background-color: color-mix(in oklab, var(--border-color) 80%, rgba(0,0,0,0.15));
+    border-radius: 999px;
+    padding: 4px;
+    display: none;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.25);
+}
+
+#global-progress-bar {
+    width: 0%;
+    height: 18px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 999px;
+    text-align: center;
+    line-height: 18px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85em;
+    transition: width 0.3s var(--motion-ease-standard), background 0.3s ease, color 0.3s ease;
+}
+
+#global-progress-text {
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .global-progress-affix {
+        width: 100%;
+        padding: 12px 14px 10px 14px;
+        margin: 10px 0 0 0;
+    }
+}

@@ -1,0 +1,117 @@
+.popup-overlay {
+    display: none; 
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    /* Transitions for smooth show/hide when data-visible toggles */
+    opacity: 0;
+    transform: scale(0.98);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, transform;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .popup-overlay {
+        transition: none !important;
+        transform: none !important;
+    }
+    .popup-content {
+        animation: none !important;
+    }
+}
+.popup-content {
+    background: var(--bg-card);
+    padding: 30px;
+    border-radius: 10px;
+    min-width: 300px;
+    max-width: 500px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    color: var(--text-primary);
+    /* Subtle entrance animation */
+    animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.popup-content h3 {
+    color: var(--accent-primary);
+    margin-top: 0;
+    text-align: center;
+}
+.popup-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+}
+.popup-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.popup-list li:last-child {
+    border-bottom: none;
+}
+.popup-list li .order-prefix {
+    font-weight: bold;
+    color: var(--orange);
+    margin-right: 10px;
+}
+.status-icon {
+    margin-right: 8px;
+}
+.summary-popup li .duration {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin-left: 10px;
+}
+.popup-buttons {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+.popup-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.popup-confirm-button { background-color: var(--green); color: white; }
+.popup-cancel-button, #close-summary-popup { background-color: var(--red); color: white; }
+
+#close-summary-popup {
+     display: block;
+     margin: 20px auto 0 auto;
+}
+#close-summary-popup:hover { background-color: #d9534f; }
+.popup-confirm-button:hover { background-color: #5cb85c; }
+
+/* Keyboard accessibility: focus visible ring */
+.popup-buttons button:focus-visible,
+.popup-confirm-button:focus-visible,
+.popup-cancel-button:focus-visible,
+#close-summary-popup:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-primary) 35%, transparent);
+}
+
+/* Visible state driven by data attribute for smoother transitions */
+.popup-overlay[data-visible="true"] {
+    opacity: 1;
+    transform: scale(1);
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

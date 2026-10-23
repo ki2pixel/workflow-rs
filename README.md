@@ -16,6 +16,10 @@ blendshapes, EfficientDet, suivi et détection de parole, avec un JSON identique
 à la production sur `face_pan`, `real_244` et `real_245`. Le lot 4 porte STEP3
 sur Coral Edge TPU : VAD YAMNet Split, embeddings ECAPA-TDNN et AHC, avec un
 `_audio.json` identique à la production sur `vox`, `real_244` et `real_245`.
+Le lot 5 ajoute le serveur d'orchestration Rust sur le port 5004, avec état
+thread-safe, contrat de polling, séquence, arrêt, SQLite et verrou isolés, et
+exécution des STEP2 à STEP8 par sous-processus `workflow-cli`. STEP1 reste
+explicitement non porté ; aucune commande Python n'est lancée en repli.
 La compilation Windows du pont, le basculement du JSX et la validation STEP8
 sur la machine Windows restent à faire.
 
@@ -69,6 +73,12 @@ sur la machine Windows restent à faire.
   STEP5 audio identique sur les deux projets. Le chemin CPU YAMNet reste un
   mode de test explicite. Détail, performance et limites dans
   `docs/LOT-4-STEP3.md`.
+- Lot 5 terminé : `workflow-server` (axum) expose le contrat de polling sur
+  le port 5004, avec base et racine Rust, verrou `/tmp/workflow-rs-hw.lock`,
+  séquence sérialisée, arrêt SIGTERM, timeout et logs. STEP5/STEP6 disposent
+  d'un mode batch ; 12/12 artefacts identiques aux copies de production 244,
+  245, 249 et 250. STEP1 est refusé explicitement, sans fallback Python.
+  Détail dans `docs/LOT-5-ORCHESTRATOR.md`.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
   les binaires restent locaux, seuls le manifeste et le README sont versionnés.
 - `crates/workflow-tpu` : chargement dynamique de `libtensorflowlite_c.so` et de
@@ -89,6 +99,7 @@ sur la machine Windows restent à faire.
 - `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
+- `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
@@ -139,6 +150,14 @@ cargo run -p workflow-cli -- step8 run --folder /tmp/projet
 
 cargo run -p workflow-cli -- retention plan
 cargo run -p workflow-cli -- retention apply
+
+cargo run --release -p workflow-server -- --config config/config.toml --check
+cargo run --release -p workflow-server -- --config config/config.toml
+./scripts/switch-rust.sh check   # avec WORKFLOW_SERVER_WORKER_TOKEN
+./scripts/switch-rust.sh start
+./scripts/switch-rust.sh stop
+
+./scripts/validate-lot5.py       # parité batch STEP5/STEP6 sur copies
 ```
 
 Sans `--output` audio, le fichier d'entrée est réécrit de façon atomique, comme

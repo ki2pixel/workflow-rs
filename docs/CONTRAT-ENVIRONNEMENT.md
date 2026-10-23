@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-10-22 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
@@ -24,6 +24,8 @@ Trois boucles d'arrière-plan tournent dans le processus :
 | Nettoyage orphelins | 12 h, premier passage après 5 min | Supprime les projets orphelins de plus de 48 h et les logs anciens |
 
 La nouvelle application utilise le port 5004 et une racine de travail distincte. Elle ne partage ni la base SQLite, ni les répertoires, ni le verrou matériel.
+
+Le lot 5 implémente ce contrat pour les STEP2 à STEP8. STEP1 est explicitement indisponible tant qu'il n'est pas porté : `POST /run/STEP1` renvoie 400 et une séquence contenant STEP1 est refusée avant démarrage. Les routes CSV, cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy ; le serveur Rust ne fournit que les stubs de polling du frontend. Voir `LOT-5-ORCHESTRATOR.md` pour le détail et les écarts volontaires.
 
 ## 2. API HTTP
 

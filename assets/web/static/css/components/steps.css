@@ -1,0 +1,750 @@
+.step {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color);
+    padding: 25px;
+    margin-bottom: 25px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 700px;
+    transition:
+        transform 0.4s ease-out,
+        opacity 0.4s ease-in-out,
+        border-color 0.3s ease,
+        border-left-color 0.3s ease,
+        margin-bottom 0.4s ease-in-out,
+        padding 0.4s ease-in-out,
+        box-shadow 0.3s ease;
+    scroll-margin-top: 0; /* Désactivé pour permettre un centrage parfait */
+}
+
+.step[data-status="running"],
+.step[data-status="starting"],
+.step[data-status="initiated"] {
+    border-left-color: var(--status-running);
+}
+
+.step[data-status="completed"],
+.step[data-status="success"] {
+    border-left-color: var(--status-success);
+}
+
+.step[data-status="failed"],
+.step[data-status="error"],
+.step[data-status="cancelled"] {
+    border-left-color: var(--status-error);
+}
+
+.step[data-status="warning"],
+.step[data-status="paused"] {
+    border-left-color: var(--status-warning);
+}
+
+/* Compact mode reduces padding/margins and typography to fit viewport */
+.workflow-wrapper.compact-mode:not(.logs-active) .step {
+    max-width: 100%;
+    /* Reduce bottom padding to limit empty space below last controls/log buttons */
+    padding: 14px 14px 10px; /* top right bottom left */
+    margin-bottom: 0; /* handled by grid gap */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12); /* softer shadow to reduce visual noise */
+    align-self: start; /* avoid vertical stretch inside grid on desktop */
+}
+
+/* Smooth reappearance after closing logs panel - now only affects opacity/transform */
+.workflow-wrapper.logs-leaving .steps-column .step {
+    will-change: opacity, transform;
+}
+
+/* Utility class applied via JS for deterministic transitions */
+.step.steps-hidden {
+    opacity: 0 !important;
+    transform: translateY(8px) scale(0.97) !important;
+    pointer-events: none;
+}
+
+/* Staggered delays in compact mode - no longer needed since layout is stable */
+.workflow-wrapper.compact-mode.logs-leaving .steps-column .step {
+    transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
+    transition-duration: 0.4s;
+}
+.step:hover:not(.active-for-log-panel) {
+     transform: translateY(-4px);
+     box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+}
+ .step.active-for-log-panel {
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 8px 25px rgba(121, 134, 203, 0.3), 0 0 0 1px var(--accent-primary);
+    transform: translateY(-2px);
+}
+.step.custom-sequence-selected {
+    border: 2px solid var(--orange);
+    box-shadow: 0 0 15px var(--orange);
+}
+
+.step-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.step-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.step h2 {
+    margin-top: 0;
+    font-size: 1.5em;
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+.step h2 .step-icon { margin-right: 12px; font-size: 1.6em; }
+
+/* Icon accent on hover for better affordance */
+.step:hover h2 .step-icon {
+    color: var(--accent-primary);
+    transform: translateY(-1px);
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.workflow-wrapper.compact-mode:not(.logs-active) .step h2 {
+    font-size: 1.05em; /* slightly smaller titles in compact */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step h2 .step-icon {
+    font-size: 1.1em;
+    margin-right: 6px;
+}
+
+.step-state-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78em;
+    font-weight: 600;
+    text-transform: capitalize;
+    border: 1px solid transparent;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    letter-spacing: 0.02em;
+}
+
+.step-state-chip span {
+    font-size: 0.9em;
+}
+
+.state-running {
+    background: color-mix(in oklab, var(--status-running) 18%, transparent);
+    color: var(--status-running);
+    border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--status-running) 16%, transparent);
+}
+
+.state-success {
+    background: color-mix(in oklab, var(--status-success) 18%, transparent);
+    color: var(--status-success);
+    border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+}
+
+.state-error {
+    background: color-mix(in oklab, var(--status-error) 18%, transparent);
+    color: var(--status-error);
+    border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+}
+
+.state-warning {
+    background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+    color: var(--status-warning);
+    border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+}
+
+.state-idle {
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+    border-color: color-mix(in oklab, var(--status-idle) 35%, transparent);
+}
+
+/* Hover tuning for processing/active steps: keep subtle, avoid large motion */
+.steps-column .step[data-status="running"]:hover,
+.steps-column .step[data-status="starting"]:hover,
+.steps-column .step[data-status="initiated"]:hover,
+.steps-column .step.active-for-log-panel:hover {
+    transform: translateY(-2px) scale(1.005);
+    box-shadow: 0 10px 24px rgba(121, 134, 203, 0.22), 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Respect reduced motion for hover effects */
+@media (prefers-reduced-motion: reduce) {
+    .step:hover:not(.active-for-log-panel),
+    .steps-column .step[data-status="running"]:hover,
+    .steps-column .step[data-status="starting"]:hover,
+    .steps-column .step[data-status="initiated"]:hover,
+    .steps-column .step.active-for-log-panel:hover {
+        transform: none !important;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+    }
+}
+
+.step-selection-control {
+    display: flex;
+    align-items: center;
+}
+.step-selection-control input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+.step-selection-order-number {
+    font-size: 1em;
+    font-weight: bold;
+    color: var(--orange);
+    min-width: 20px;
+    text-align: center;
+}
+
+.step-controls button,
+.specific-log-button {
+    padding: 12px 22px;
+    margin-right: 12px;
+    margin-bottom: 12px;
+    font-size: 0.95em;
+    cursor: pointer;
+    border: none;
+    border-radius: 25px;
+    color: var(--bg-dark);
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    min-height: var(--touch-target-min);
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step-controls button,
+.workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button {
+    padding: var(--button-compact-padding);
+    font-size: 0.86em;
+    margin-right: 6px;
+    /* Reduce vertical gap below the last row of buttons */
+    margin-bottom: 3px;
+    border-radius: 16px;
+}
+
+/* Remove extra bottom gap under the final log button in compact mode */
+.workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button:last-child {
+    margin-bottom: 0;
+}
+.step-controls button:hover, .specific-log-button:hover {
+     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.step-controls button:active, .specific-log-button:active { transform: scale(0.97); }
+
+.run-button { background-color: var(--green); color: white; }
+.run-button:hover { background-color: #5cb85c; }
+.run-button:disabled,
+.cancel-button:disabled,
+.specific-log-button:disabled {
+    background: color-mix(in oklab, var(--bg-tertiary) 80%, black 8%);
+    color: var(--text-muted);
+    border-color: var(--border-color);
+}
+
+.cancel-button { background-color: var(--red); color: white;}
+.cancel-button:hover { background-color: #d9534f; }
+/* Universal focus-visible for action buttons (keyboard accessibility) */
+.run-button:focus-visible,
+.cancel-button:focus-visible,
+.specific-log-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-primary) 35%, transparent);
+    border-color: var(--accent-primary);
+}
+
+.specific-log-button { background-color: var(--yellow); color: #333; }
+.specific-log-button:hover { background-color: #ffeb3b; }
+
+.status-line { margin-top: 15px; margin-bottom:10px; font-weight: bold; font-size: 1.05em; }
+.workflow-wrapper.compact-mode:not(.logs-active) .status-line {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+}
+.status-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85em;
+    letter-spacing: 0.01em;
+    text-transform: capitalize;
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+    border: 1px solid color-mix(in oklab, var(--status-idle) 35%, transparent);
+}
+.status-running,
+.status-starting,
+.status-initiated {
+    background: color-mix(in oklab, var(--status-running) 18%, transparent);
+    color: var(--status-running);
+    border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+    animation: pulseStatus 1.8s infinite ease-in-out;
+}
+.status-success,
+.status-completed {
+    background: color-mix(in oklab, var(--status-success) 18%, transparent);
+    color: var(--status-success);
+    border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+}
+.status-error,
+.status-failed,
+.status-cancelled {
+    background: color-mix(in oklab, var(--status-error) 18%, transparent);
+    color: var(--status-error);
+    border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+}
+.status-warning,
+.status-paused {
+    background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+    color: var(--status-warning);
+    border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+}
+.status-idle {
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+}
+.status-line span.timer {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin-left: 10px;
+}
+
+.step-progress-container {
+    width: 100%;
+    margin-top:10px;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step-progress-container { margin-top: 6px; }
+.progress-bar-wrapper {
+    background-color: var(--border-color);
+    border-radius: 8px;
+    padding: 3px;
+}
+.progress-bar-step {
+    width: 0%;
+    height: 18px;
+    background-color: var(--blue);
+    border-radius: 5px;
+    text-align: center;
+    line-height: 18px;
+    color: white;
+    font-size: 0.85em;
+    font-weight: bold;
+    /* Smoother width transition */
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+    position: relative;
+    overflow: hidden; /* for shine effect */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .progress-bar-step {
+    height: 12px;
+    line-height: 12px;
+    font-size: 0.76em;
+}
+.progress-bar-step[data-active="true"]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+    animation: progressShine 2.0s infinite;
+}
+.progress-text-step {
+    text-align: center;
+    margin-top: 4px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    white-space: pre-line;
+    line-height: 1.2em;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .progress-text-step {
+    font-size: 0.76em;
+}
+
+/* Subtle pulse for current filename while processing */
+.progress-text-step[data-processing="true"] {
+    animation: textPulse 1.5s ease-in-out infinite;
+}
+
+/* Reduce extra spacing around specific log controls to avoid empty space under buttons */
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper {
+    margin-top: 8px; /* was 15px in logs.css; tighter in compact mode */
+    margin-bottom: 0;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper h4 {
+    margin-bottom: 6px; /* override logs.css (10px) to reduce vertical gap */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper > div {
+    /* the immediate container of buttons; ensure no unintended bottom margin */
+    margin-bottom: 0;
+}
+
+/* ========== Micro-interactions for steps ========== */
+/* Non-active steps get a very subtle halo when any step is running */
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"],
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"],
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"] {
+    position: relative;
+}
+
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"]::after,
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"]::after,
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px rgba(121, 134, 203, 0.35);
+    opacity: 0.22;
+    animation: subtleOpacityPulse 2.8s ease-in-out infinite;
+}
+
+/* Active/processing step: breathing effect to indicate ongoing work */
+.steps-column .step.active-for-log-panel,
+.steps-column .step[data-status="running"],
+.steps-column .step[data-status="starting"],
+.steps-column .step[data-status="initiated"] {
+    will-change: transform;
+    animation: cardBreath 3.2s ease-in-out infinite;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status]::after,
+    .steps-column .step.active-for-log-panel,
+    .steps-column .step[data-status="running"],
+    .steps-column .step[data-status="starting"],
+    .steps-column .step[data-status="initiated"] {
+        animation: none !important;
+    }
+}
+
+/* Override transform reset from layout.css to allow hover lift on idle steps */
+.workflow-wrapper:not(.logs-active) .steps-column .step:hover:not(.active-for-log-panel) {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+}
+
+.workflow-wrapper.compact-mode .steps-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--pipeline-gap);
+}
+
+.workflow-pipeline {
+    width: 100%;
+}
+
+.pipeline-timeline {
+    position: relative;
+    width: 100%;
+    max-width: var(--pipeline-card-max-width);
+    margin: 0 auto;
+    transform: translateX(calc(-1 * var(--pipeline-card-alignment-offset)));
+    display: flex;
+    flex-direction: column;
+    gap: var(--pipeline-gap);
+}
+
+@media (max-width: 768px) {
+    .pipeline-timeline {
+        transform: none;
+    }
+}
+
+.timeline-scroll-spacer {
+    width: 100%;
+    height: calc(100vh - var(--topbar-height));
+    min-height: 520px;
+}
+
+.timeline-row {
+    display: grid;
+    grid-template-columns: var(--pipeline-rail-column-width) minmax(0, 1fr);
+    column-gap: var(--pipeline-rail-gap);
+    align-items: stretch;
+}
+
+.timeline-rail-column {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--pipeline-card-padding) 0;
+}
+
+.timeline-cards-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-axis {
+    position: absolute;
+    left: calc((var(--pipeline-rail-column-width) / 2) - (var(--pipeline-axis-width) / 2));
+    top: 0;
+    bottom: 0;
+    width: var(--pipeline-axis-width);
+    background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
+    border-radius: 999px;
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.timeline-step {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: var(--pipeline-card-max-width);
+    margin: 0;
+    border-left: none;
+    padding: 0;
+    border-radius: var(--pipeline-card-radius);
+    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.22);
+    scroll-margin-top: 0;
+    transition:
+        transform var(--motion-duration-slow) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-medium) var(--motion-ease-standard),
+        background var(--motion-duration-medium) var(--motion-ease-standard),
+        border-color var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.timeline-step:hover:not(.active-for-log-panel) {
+    transform: translateY(-6px) scale(1.008);
+    box-shadow:
+        0 20px 40px rgba(0,0,0,0.25),
+        0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
+}
+
+.timeline-step:focus-within:not(.active-for-log-panel) {
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+    transform: translateY(-2px);
+}
+
+.timeline-step[data-status="running"],
+.timeline-step[data-status="starting"],
+.timeline-step[data-status="initiated"] {
+    background: color-mix(in oklab, var(--status-running) 12%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-running) 65%, var(--border-color));
+    box-shadow: 0 10px 30px rgba(var(--status-running-rgb), 0.25);
+}
+
+.timeline-step[data-status="failed"],
+.timeline-step[data-status="error"],
+.timeline-step[data-status="cancelled"] {
+    background: color-mix(in oklab, var(--status-error) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-error) 55%, var(--border-color));
+}
+
+.timeline-step[data-status="completed"],
+.timeline-step[data-status="success"] {
+    background: color-mix(in oklab, var(--status-success) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-success) 55%, var(--border-color));
+}
+
+.timeline-step[data-status="warning"],
+.timeline-step[data-status="paused"],
+.timeline-step[data-status="pending"] {
+    background: color-mix(in oklab, var(--status-warning) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-warning) 55%, var(--border-color));
+}
+
+.timeline-node {
+    position: relative;
+    z-index: 2;
+    width: var(--pipeline-node-dot-size);
+    height: var(--pipeline-node-dot-size);
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--bg-dark) 72%, transparent);
+    border: var(--pipeline-node-border-width) solid var(--pipeline-color-idle);
+    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+    transition:
+        transform var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-medium) var(--motion-ease-standard),
+        border-color var(--motion-duration-medium) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.timeline-step:hover:not(.active-for-log-panel) .timeline-node {
+    transform: scale(1.08);
+}
+
+.timeline-step.is-selected {
+    border-color: color-mix(in oklab, var(--accent-primary) 65%, var(--border-color));
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+}
+
+.timeline-step[data-status="running"] .timeline-node,
+.timeline-step[data-status="starting"] .timeline-node,
+.timeline-step[data-status="initiated"] .timeline-node {
+    border-color: var(--pipeline-color-running);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-running) 45%, transparent);
+}
+
+.timeline-step[data-status="completed"] .timeline-node,
+.timeline-step[data-status="success"] .timeline-node {
+    border-color: var(--pipeline-color-success);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-success) 45%, transparent);
+}
+
+.timeline-step[data-status="failed"] .timeline-node,
+.timeline-step[data-status="error"] .timeline-node,
+.timeline-step[data-status="cancelled"] .timeline-node {
+    border-color: var(--pipeline-color-error);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-error) 45%, transparent);
+}
+
+.timeline-content {
+    display: grid;
+    gap: 0.85rem;
+    padding: var(--pipeline-card-padding);
+}
+
+.timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+}
+
+.node-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.timeline-step .step-controls button,
+.timeline-step .specific-log-button {
+    border-radius: 999px;
+    padding: 10px 18px;
+    margin: 0;
+}
+
+.timeline-step .specific-log-controls-wrapper {
+    margin-top: 4px;
+}
+
+.steps-column .step[data-status="initiated"] {
+    animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-step {
+        transition: none !important;
+    }
+    .timeline-step:hover:not(.active-for-log-panel) {
+        transform: none;
+    }
+    .timeline-axis {
+        transition: none !important;
+    }
+    .timeline-node {
+        transition: none !important;
+    }
+}
+
+@media (max-width: 860px) {
+    .workflow-pipeline {
+        --pipeline-node-size: 68px;
+        --pipeline-card-padding: 1.25rem;
+        --pipeline-gap: 1.6rem;
+        --pipeline-rail-column-width: 84px;
+    }
+
+    .timeline-step:hover:not(.active-for-log-panel) {
+        transform: translateY(-4px) scale(1.006);
+    }
+}
+
+@media (max-width: 720px) {
+    .workflow-pipeline {
+        --pipeline-rail-column-width: 72px;
+        --pipeline-rail-gap: 0.85rem;
+    }
+}
+
+@media (max-width: 620px) {
+    .timeline-axis {
+        display: none;
+    }
+
+    .timeline-step {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-rail {
+        flex-direction: row;
+        justify-content: flex-start;
+        margin-bottom: 10px;
+        gap: 12px;
+    }
+
+    .timeline-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .step-selection-control {
+        align-self: flex-end;
+    }
+
+    .node-actions {
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .timeline-step .step-controls button,
+    .timeline-step .specific-log-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 520px) {
+    .workflow-pipeline {
+        --pipeline-node-size: 60px;
+        --pipeline-card-padding: 1rem;
+        --pipeline-gap: 1.25rem;
+    }
+}
+
+.step-details-open-logs:hover {
+    background-color: color-mix(in oklab, var(--accent-primary) 72%, var(--bg-tertiary));
+}

@@ -18,6 +18,9 @@ est mis à jour à chaque mesure de parité.
 | D-010 | info | STEP1 | Un MOV avec alpha est préservé à l'octet près, sans réencodage (`skipped=1`). | Conserver la détection alpha et la liste `PRESERVED_MOV_NAMES`. |
 | D-011 | basse | Harnais | La VRAM globale n'est pas imputable à une étape ; le harnais distingue désormais `gpu_memory_peak_mb` (processus) et `gpu_total_peak_mb` (carte). | Utiliser la colonne « GPU étape » pour les comparaisons. |
 | D-012 | haute | Isolation | L'application Python n'utilise pas `workflow-hw.lock`. Le harnais le prend, mais l'ancienne application peut démarrer STEP1-4 pendant un test. | Le portage et les scripts de test prennent le verrou. Pendant la transition, vérifier `/sequence/status` et `pgrep` avant toute mesure. |
+| D-013 | moyenne | Orchestrateur | Le contrat Python autorise deux étapes différentes en parallèle ; le frontend ne le fait pas. | Lot 5 : le serveur Rust refuse la deuxième étape avec 409 et sérialise toutes les exécutions. Durcissement volontaire documenté. |
+| D-014 | haute | STEP1 | Le lot 5 n'a pas d'implémentation Rust de l'extraction/normalisation. | Aucun fallback Python implicite. `POST /run/STEP1` renvoie 400 et les séquences contenant STEP1 sont refusées avant démarrage. STEP1 devra être porté ou traité par une frontière explicite dans un lot ultérieur. |
+| D-015 | moyenne | Frontend/API | Le serveur Rust n'implémente pas encore CSV, cache, statistiques, diagnostics ni `/api/audio/*`. | Ces routes restent dans Python. Le serveur Rust expose des stubs de polling (`/api/csv_*`, `/api/system_monitor`, `/api/performance/frontend`) pour que le frontend ne casse pas ; le panneau de téléchargements reste vide. |
 
 ## Détails
 

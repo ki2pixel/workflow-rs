@@ -1,0 +1,376 @@
+/**
+ * CSV Workflow Prompt Styles
+ * Engaging and playful styles for the CSV download completion prompt
+ */
+
+/* Main prompt container */
+.csv-workflow-prompt .popup-content {
+    max-width: 600px;
+    min-width: 500px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    animation: csvPromptSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    /* Ensure solid, opaque background for readability */
+    opacity: 1;
+}
+
+/* Close button */
+.csv-workflow-prompt .popup-close-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #6c757d;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.csv-workflow-prompt .popup-close-button:hover {
+    background: #f8f9fa;
+    color: #495057;
+    transform: scale(1.1);
+}
+
+/* Title */
+.csv-workflow-prompt .popup-title {
+    margin: 0 0 16px 0;
+    padding: 24px 24px 0 24px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #212529;
+    text-align: center;
+}
+
+/* Slide-in animation */
+@keyframes csvPromptSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Prompt content container */
+.csv-workflow-prompt-content {
+    padding: 0;
+}
+
+/* Header section */
+.prompt-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 24px 16px 24px;
+    border-bottom: 1px solid #e0e0e0;
+    background: linear-gradient(90deg, rgba(121, 134, 203, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+    /* Ensure solid background for text readability */
+    backdrop-filter: blur(10px);
+}
+
+.download-icon {
+    font-size: 48px;
+    animation: csvIconBounce 2s ease-in-out infinite;
+}
+
+@keyframes csvIconBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.download-info {
+    flex: 1;
+}
+
+.download-title {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #212529;
+    word-break: break-word;
+}
+
+.download-subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #6c757d;
+    opacity: 1;
+}
+
+/* Message section */
+.prompt-message {
+    padding: 20px 24px;
+}
+
+.main-message {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #495057;
+    text-align: center;
+}
+
+/* Workflow preview */
+.workflow-preview {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #e0e0e0;
+    /* Ensure solid background for content readability */
+    opacity: 1;
+}
+
+.workflow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.step-badge {
+    background: var(--accent-primary);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    animation: csvStepPulse 3s ease-in-out infinite;
+}
+
+.step-badge:nth-child(odd) {
+    animation-delay: 0.5s;
+}
+
+@keyframes csvStepPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+.step-arrow {
+    color: var(--accent-primary);
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* Actions section */
+.prompt-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px 24px 16px 24px;
+    justify-content: center;
+}
+
+.workflow-launch-btn {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    color: white;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb), 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.workflow-launch-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.workflow-launch-btn:active {
+    transform: translateY(0);
+}
+
+.workflow-launch-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.workflow-launch-btn:hover::before {
+    left: 100%;
+}
+
+.workflow-dismiss-btn {
+    background: #ffffff;
+    color: #6c757d;
+    border: 2px solid #e0e0e0;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    /* Ensure solid background for button readability */
+    opacity: 1;
+}
+
+.workflow-dismiss-btn:hover {
+    background: #f8f9fa;
+    border-color: var(--accent-primary);
+    color: #495057;
+}
+
+.btn-icon {
+    font-size: 16px;
+}
+
+.btn-text {
+    white-space: nowrap;
+}
+
+/* Footer section */
+.prompt-footer {
+    padding: 16px 24px 24px 24px;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 0 0 14px 14px;
+    /* Ensure solid background for footer readability */
+    opacity: 1;
+}
+
+.footer-note {
+    margin: 0;
+    font-size: 13px;
+    color: #6c757d;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .csv-workflow-prompt .popup-content {
+        min-width: 90vw;
+        max-width: 95vw;
+        margin: 20px;
+    }
+    
+    .prompt-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+    
+    .workflow-steps {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .step-arrow {
+        transform: rotate(90deg);
+    }
+    
+    .prompt-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .workflow-launch-btn,
+    .workflow-dismiss-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .csv-workflow-prompt .popup-content {
+        background: linear-gradient(135deg, #2c2c3e 0%, #1a1a1a 100%);
+        border-color: var(--accent-primary);
+        color: #e0e0e0;
+    }
+
+    .prompt-header {
+        background: linear-gradient(90deg, rgba(121, 134, 203, 0.15) 0%, rgba(44, 44, 62, 0.95) 100%);
+        border-bottom-color: #404040;
+    }
+
+    .workflow-preview {
+        background: #3a3a4e;
+        border-color: #404040;
+    }
+
+    .prompt-footer {
+        background: #3a3a4e;
+        border-top-color: #404040;
+    }
+
+    .workflow-dismiss-btn {
+        background: #3a3a4e;
+        color: #a0a0b0;
+        border-color: #404040;
+    }
+
+    .workflow-dismiss-btn:hover {
+        background: #4a4a5e;
+        color: #e0e0e0;
+    }
+
+    .download-title {
+        color: #e0e0e0;
+    }
+
+    .download-subtitle {
+        color: #a0a0b0;
+    }
+
+    .main-message {
+        color: #e0e0e0;
+    }
+
+    .footer-note {
+        color: #a0a0b0;
+    }
+}
+
+/* Accessibility improvements */
+.workflow-launch-btn:focus,
+.workflow-dismiss-btn:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .csv-workflow-prompt .popup-content {
+        border-width: 3px;
+    }
+    
+    .step-badge {
+        border: 2px solid currentColor;
+    }
+    
+    .workflow-launch-btn,
+    .workflow-dismiss-btn {
+        border-width: 2px;
+    }
+}

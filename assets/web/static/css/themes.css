@@ -1,0 +1,268 @@
+/* =============================================================================
+   THEME SYSTEM - Workflow MediaPipe v4.0
+   Dynamic theme definitions with smooth transitions
+   ============================================================================= */
+
+/* Base theme transition for smooth switching */
+:root {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Apply transitions to all theme-dependent elements */
+.card-like-section,
+.step,
+.popup-content,
+.unified-controls-section,
+button,
+input,
+select,
+textarea {
+    transition: background-color 0.3s ease, 
+                color 0.3s ease, 
+                border-color 0.3s ease,
+                box-shadow 0.3s ease;
+}
+
+/* =============================================================================
+   THEME 1: DARK PRO (Default - Current)
+   ============================================================================= */
+[data-theme="dark-pro"],
+:root:not([data-theme]) {
+    --bg-dark: #1e1e2f;
+    --bg-card: #2c2c3e;
+    --bg-secondary: #2c2c3e;
+    --bg-tertiary: #3a3a4e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-muted: #707080;
+    --accent-primary: #7986cb;
+    --accent-secondary: #ff8a65;
+    --border-color: #39394d;
+    --green: #66bb6a;
+    --red: #ef5350;
+    --yellow: #ffee58;
+    --blue: #42a5f5;
+    --orange: #ffb74d;
+    --log-bg: #161625;
+    --log-text: #c0c0d0;
+    --border-color-translucent: #39394d88;
+}
+
+/* =============================================================================
+   THEME 2: LIGHT MODE (Professional Light)
+   ============================================================================= */
+[data-theme="light-mode"] {
+    --bg-dark: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e8eef3;
+    --text-primary: #2c3e50;
+    --text-secondary: #546e7a;
+    --text-muted: #90a4ae;
+    --accent-primary: #5c6bc0;
+    --accent-secondary: #ff7043;
+    --border-color: #cfd8dc;
+    --green: #43a047;
+    --red: #e53935;
+    --yellow: #fbc02d;
+    --blue: #1e88e5;
+    --orange: #fb8c00;
+    --log-bg: #f9fafb;
+    --log-text: #37474f;
+    --border-color-translucent: #cfd8dc88;
+}
+
+/* =============================================================================
+   THEME 3: PASTEL ZEN (Soft and Calming)
+   ============================================================================= */
+[data-theme="pastel-zen"] {
+    --bg-dark: #faf3f3;
+    --bg-card: #fff5f5;
+    --bg-secondary: #ffe8f0;
+    --bg-tertiary: #f3e8ff;
+    --text-primary: #4a4a5a;
+    --text-secondary: #7a7a8a;
+    --text-muted: #aaaaba;
+    --accent-primary: #b39ddb;
+    --accent-secondary: #f48fb1;
+    --border-color: #e1d5e7;
+    --green: #81c784;
+    --red: #ef9a9a;
+    --yellow: #fff59d;
+    --blue: #90caf9;
+    --orange: #ffcc80;
+    --log-bg: #fef7ff;
+    --log-text: #5a5a6a;
+    --border-color-translucent: #e1d5e788;
+}
+
+/* =============================================================================
+   THEME 4: NEON CYBERPUNK (Vibrant and Futuristic)
+   ============================================================================= */
+[data-theme="neon-cyberpunk"] {
+    --bg-dark: #0a0e27;
+    --bg-card: #1a1f3a;
+    --bg-secondary: #1a1f3a;
+    --bg-tertiary: #2a2f4a;
+    --text-primary: #e0f7ff;
+    --text-secondary: #a0d7ff;
+    --text-muted: #6097bf;
+    --accent-primary: #00d9ff;
+    --accent-secondary: #ff006e;
+    --border-color: #00ffff;
+    --green: #00ff88;
+    --red: #ff0066;
+    --yellow: #ffff00;
+    --blue: #00d4ff;
+    --orange: #ff9500;
+    --log-bg: #050816;
+    --log-text: #b0e7ff;
+    --border-color-translucent: #00ffff44;
+}
+
+/* Neon glow effects for cyberpunk theme */
+[data-theme="neon-cyberpunk"] button:hover {
+    box-shadow: 0 0 15px var(--accent-primary);
+}
+
+[data-theme="neon-cyberpunk"] .step.running {
+    box-shadow: 0 0 20px var(--blue);
+}
+
+[data-theme="neon-cyberpunk"] .step.completed {
+    box-shadow: 0 0 20px var(--green);
+}
+
+[data-theme="neon-cyberpunk"] .step.error {
+    box-shadow: 0 0 20px var(--red);
+}
+
+/* =============================================================================
+   THEME 5: FOREST NIGHT (Natural and Earthy)
+   ============================================================================= */
+[data-theme="forest-night"] {
+    --bg-dark: #1a2421;
+    --bg-card: #243530;
+    --bg-secondary: #2a3f3a;
+    --bg-tertiary: #344a44;
+    --text-primary: #d4e8d4;
+    --text-secondary: #a4c8a4;
+    --text-muted: #748874;
+    --accent-primary: #66bb6a;
+    --accent-secondary: #ffb74d;
+    --border-color: #3d5a4d;
+    --green: #81c784;
+    --red: #e57373;
+    --yellow: #fff176;
+    --blue: #64b5f6;
+    --orange: #ffb74d;
+    --log-bg: #151f1a;
+    --log-text: #c4d8c4;
+    --border-color-translucent: #3d5a4d88;
+}
+
+/* =============================================================================
+   THEME 6: OCEAN DEPTH (Deep Blue Tones)
+   ============================================================================= */
+[data-theme="ocean-depth"] {
+    --bg-dark: #0d1b2a;
+    --bg-card: #1b263b;
+    --bg-secondary: #1b263b;
+    --bg-tertiary: #2a3f5f;
+    --text-primary: #e0f4ff;
+    --text-secondary: #a8dadc;
+    --text-muted: #6d9bb5;
+    --accent-primary: #457b9d;
+    --accent-secondary: #f1faee;
+    --border-color: #264653;
+    --green: #52b788;
+    --red: #ef476f;
+    --yellow: #ffd166;
+    --blue: #118ab2;
+    --orange: #06d6a0;
+    --log-bg: #081420;
+    --log-text: #d0e4f0;
+    --border-color-translucent: #26465388;
+}
+
+/* =============================================================================
+   THEME SELECTOR STYLING
+   ============================================================================= */
+.theme-selector-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.theme-selector-container:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-selector-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.theme-selector {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    min-width: 140px;
+}
+
+.theme-selector:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-tertiary);
+}
+
+.theme-selector:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(121, 134, 203, 0.3);
+}
+
+.theme-selector option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+/* Icon in theme selector */
+.theme-selector-container::before {
+    content: '🎨';
+    font-size: 18px;
+}
+
+/* =============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================= */
+@media (max-width: 768px) {
+    .theme-selector-container {
+        margin-left: 0;
+        margin-top: 8px;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .theme-selector {
+        flex: 1;
+    }
+}

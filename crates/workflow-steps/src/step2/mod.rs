@@ -654,7 +654,22 @@ fn parse_frame_rate(raw: &str) -> Option<f64> {
 
 /// Détection conservatrice des `.mov` préservés (alpha ou nom configuré).
 pub fn is_preserved_media(path: &Path, options: &Step2Options) -> bool {
-    if !options.skip_preserved_mov {
+    is_preserved_media_with(
+        path,
+        options.skip_preserved_mov,
+        &options.preserved_mov_names,
+        &options.ffprobe,
+    )
+}
+
+/// Variante partagée par les étapes qui filtrent aussi les médias préservés.
+pub fn is_preserved_media_with(
+    path: &Path,
+    skip_preserved_mov: bool,
+    preserved_mov_names: &[String],
+    ffprobe: &Path,
+) -> bool {
+    if !skip_preserved_mov {
         return false;
     }
     if !path
@@ -669,14 +684,13 @@ pub fn is_preserved_media(path: &Path, options: &Step2Options) -> bool {
         .and_then(|value| value.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if options
-        .preserved_mov_names
+    if preserved_mov_names
         .iter()
         .any(|preserved| preserved.eq_ignore_ascii_case(&name))
     {
         return true;
     }
-    probe_mov_alpha(path, &options.ffprobe).unwrap_or(true)
+    probe_mov_alpha(path, ffprobe).unwrap_or(true)
 }
 
 fn probe_mov_alpha(path: &Path, ffprobe: &Path) -> Option<bool> {

@@ -164,7 +164,10 @@ Trois durcissements sont volontaires :
 ### D-021 — Migration explicite de l'historique
 
 Le moniteur est désactivé par défaut (`webhook.enabled = false`) et
-`webhook.require_history = true` refuse une base vide. La procédure est :
+`webhook.require_history = true` refuse une base vide. Sur l'instance de
+production, il est activé depuis le 2026-10-23 21:13 (911 URL importées,
+audit à 0 changement, plan à 0/462). Python 5003 doit rester arrêté tant que
+le moniteur Rust est actif. La procédure est :
 
 ```bash
 workflow-cli history import --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3

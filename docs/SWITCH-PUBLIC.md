@@ -233,8 +233,9 @@ cd /home/kidpixel/workflow-rs
 ./target/release/workflow-cli webhook probe --plan   # doit rester à 0 ou aux seules nouvelles archives
 
 # 4. Un seul moniteur CSV actif.
-#    - soit Python garde /api/csv_* et son moniteur, et Rust reste webhook.enabled=false ;
-#    - soit Rust prend /api/csv_*, on arrête le moniteur Python et on active Rust.
+#    État au 2026-10-23 : Rust est le seul moniteur (enabled=true), Python est arrêté.
+#    Pour un rollback : arrêter Rust, remettre enabled=false, redémarrer Rust,
+#    puis seulement lancer Python.
 ```
 
 Ne jamais basculer au milieu d'une séquence : l'état d'exécution est en
@@ -281,6 +282,7 @@ curl -fs -X POST -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 
 # 2. Désactiver le moniteur Rust si Python reprend /api/csv_*.
 #    config/config.toml : webhook.enabled = false, puis redémarrer Rust.
+#    Ne pas lancer Python avant cette étape : son moniteur démarrerait aussi.
 
 # 3. Remettre Python comme backend actif.
 sudo tee /etc/nginx/conf.d/00-workflow-active.conf >/dev/null <<'EOF'
@@ -292,10 +294,13 @@ EOF
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Python n'a pas été arrêté : le rollback est immédiat. Les projets et
-téléchargements créés par Rust restent dans `runtime/` ; Python ne les voit pas.
-Un rollback ne transfère donc pas l'état Rust vers Python. Il faut terminer ou
-abandonner le projet Rust en cours avant de basculer.
+Python est arrêté pendant la bascule complète. Le rollback n'est donc pas
+instantané : il faut arrêter Rust, désactiver son moniteur, redémarrer Rust,
+puis lancer Python. Les projets et téléchargements créés par Rust restent dans
+`runtime/` ; Python ne les voit pas. Les URL téléchargées par Rust ne sont pas
+non plus dans l'historique Python : après rollback, Python peut les
+retélécharger. Un rollback ne transfère donc pas l'état Rust vers Python. Il
+faut terminer ou abandonner le projet Rust en cours avant de basculer.
 
 ## 7. DNS et TLS
 

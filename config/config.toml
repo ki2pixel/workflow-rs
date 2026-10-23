@@ -49,7 +49,9 @@ finalized = "/mnt/cache"
 # été importé. Commandes :
 #   workflow-cli history import --from /home/kidpixel/workflow_mediapipe/download_history.sqlite3
 #   puis passer enabled = true.
-enabled = false
+# Activé le 2026-10-23 : Rust est le seul moniteur. Python legacy doit rester
+# arrêté ; pour un rollback, remettre false et redémarrer Rust avant Python.
+enabled = true
 require_history = true
 url = "https://webhook.kidpixel.fr/webhook_proxy.php"
 timeout_s = 10

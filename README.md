@@ -23,8 +23,9 @@ extraction sécurisée des archives et normalisation MP4 / H.264 / 25 fps. Les
 huit étapes disposent désormais d'une implémentation Rust ; aucune commande
 Python n'est lancée en repli. Le lot 8 porte l'ingestion : moniteur webhook,
 normalisation d'URL, historique SQLite, cooldown des échecs, téléchargement
-R2/Dropbox reprenable et statuts CSV. Le moniteur reste désactivé par défaut
-tant que l'historique Python n'a pas été importé. La chaîne STEP1 → STEP8 est
+R2/Dropbox reprenable et statuts CSV. Le moniteur est désactivé par défaut ;
+il est actif sur l'instance de production depuis le 2026-10-23, après import
+de l'historique. La chaîne STEP1 → STEP8 est
 validée sur une archive réelle (`1720 Camille.zip`). La validation Windows du
 pont et du JSX After Effects est abandonnée (D-022) : la production cible
 Linux et le panneau CEP continue d'appeler Python.
@@ -157,7 +158,9 @@ set -a; source config/launcher.env; set +a
 Les deux interfaces peuvent tourner en même temps, mais :
 
 - ne pas lancer STEP2/STEP3/STEP4 matérielles des deux côtés simultanément ;
-- un seul moniteur CSV doit être actif sur le webhook ;
+- un seul moniteur CSV doit être actif sur le webhook. Actuellement Rust est
+  le seul moniteur ; le raccourci Python ne doit pas être lancé tant que
+  `webhook.enabled = true` côté Rust ;
 - les projets et téléchargements Rust restent dans `runtime/`, Python ne les
   voit pas. Le runtime Rust démarre avec `runtime/projets_extraits` vide : pour
   tester un projet, le copier dans cette racine, jamais l'inverse.
@@ -240,6 +243,11 @@ Le moniteur est désactivé par défaut. Après import et audit de l'historique,
 passer `webhook.enabled = true` dans `config/config.toml`. Le serveur refuse de
 démarrer le moniteur si `download_history` est vide, ou si
 `steps.step1.source_dir` diffère de `paths.downloads`.
+
+Sur l'instance actuelle, il est actif (`enabled = true`). Python 5003 doit
+rester arrêté : son lanceur démarre toujours son propre moniteur. Pour un
+rollback, arrêter Rust, remettre `enabled = false`, redémarrer Rust, puis
+lancer Python.
 
 ```sh
 ./target/release/workflow-cli history import \

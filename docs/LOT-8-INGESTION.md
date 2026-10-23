@@ -256,10 +256,24 @@ curl -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
   http://127.0.0.1:5004/api/csv_monitor_status
 ```
 
-Le serveur Python reste sur 5003 pour le rollback. Ne pas laisser les deux
-moniteurs actifs sur le même webhook : ils téléchargeraient les mêmes liens
-dans deux dossiers différents. La procédure de bascule publique par reverse
-proxy est décrite dans `SWITCH-PUBLIC.md`.
+Le serveur Python reste sur 5003 pour le rollback, mais il ne doit pas être
+démarré tant que le moniteur Rust est actif : `start_workflow.sh` lance
+toujours son propre moniteur CSV. Pour un rollback, arrêter Rust, remettre
+`webhook.enabled = false`, redémarrer Rust, puis seulement lancer Python.
+
+### 9.1 État de l'instance au 2026-10-23
+
+Le moniteur Rust est actif sur cette machine depuis le 2026-10-23 21:13 :
+
+- import de 911 URL, audit à 0 changement, plan à 0 téléchargement sur 462
+  enregistrements webhook ;
+- `webhook.enabled = true`, `require_history = true`, `dry_run = false` ;
+- Python 5003 n'est pas lancé ; son moniteur ne tourne pas ;
+- les nouvelles archives iront dans `runtime/downloads` et seront traitées par
+  STEP1 Rust. Python ne les verra pas.
+
+La procédure de bascule publique par reverse proxy est décrite dans
+`SWITCH-PUBLIC.md`.
 
 Diagnostic ponctuel avec le même moteur, sans écrire l'historique :
 

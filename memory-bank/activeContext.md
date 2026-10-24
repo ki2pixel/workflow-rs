@@ -5,8 +5,59 @@
 **Aucune.** La migration Rust est terminée pour les huit étapes et
 l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
+**Prochain jalon** : arbitrer « widgets natifs : exigence ou confort ? », puis
+lancer le PoC Tauri A-Strict de 5 jours décrit dans
+`docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md`.
+
 ## Dernière session
 
+- [2026-10-24] **Analyse du rapport Deep Search GUI** :
+  - `docs/audits/Analyse_Architecturale_GUI_Linux.md` (E3) analysé et
+    confronté au code, à E1/E2/C et à des mesures locales ; résultat dans
+    `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md` ;
+  - test de fumée `MiniBrowser` 2.50.4 : page statique et page avec calque de
+    composition, profils par défaut, `DISABLE_DMABUF_RENDERER=1` et
+    `FORCE_SHM`, cinq bascules d'espace de travail ; aucun écran blanc, aucun
+    SIGSEGV sur le chemin par défaut ;
+  - en forçant `WEBKIT_FORCE_DMABUF_RENDERER=1`, page vide et erreurs
+    `AcceleratedSurface` : R1 est réel sur le chemin DMA-BUF, mais le chemin
+    par défaut patché par Ubuntu reste stable ;
+  - VRAM non mesurable par `--query-compute-apps` (WebKit est graphique) ;
+    RSS total 305 Mio contre ~1 030 Mio pour Firefox ;
+  - corrections : `system_monitor` à 5 s, MSRV de repli (`gtk4 0.10.3` 1.83,
+    `relm4 0.10.0` 1.85), identifiant AppIndicator Ubuntu, token A-Strict,
+    gates VRAM/RSS relatifs, 10 000 lignes = lot serveur ;
+  - décision : PoC Tauri A-Strict 5 jours d'abord, GTK4 seulement en cas
+    d'échec ; crate `workflow-desktop-services` dès J1 ; aucun code
+    fonctionnel modifié, aucun accès à `runtime/` ni `/mnt/cache`.
+- [2026-10-24] **Confrontation des deux études GUI** :
+  - `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` compare
+    `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1) et
+    `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` (E2) ;
+  - consensus architectural (modèle 1, serveur headless) ; désaccord limité au
+    toolkit et à l'effort ;
+  - 14 points d'E2 corrigés ou nuancés, dont 5 contredits par le code
+    (`/api/system_monitor`, `/sequence/status`, 200 ms/5 req/s,
+    `clear_disk_cache`, tokens CSS), plus l'accessibilité Iced et l'effort de
+    4 semaines ; 7 corrections appliquées à E1 (révision 1.1), dont
+    `GtkFileLauncher` → `gio::AppInfo`, `GSK_RENDERER=cairo`, NVML, SSE,
+    `LogEntry` ;
+  - règle de décision : Tauri T1 si le délai prime, GTK4/Relm4 si « widgets
+    natifs » et 0 Mio VRAM sont exigés ; PoC à deux pistes recommandé ;
+  - décision consignée dans `decisionLog.md` ; aucun code fonctionnel modifié,
+    aucun accès à `runtime/` ni `/mnt/cache`.
+- [2026-10-24] **Étude d'interface desktop Linux** :
+  - livrable `docs/ETUDE-GUI-NATIVE-LINUX.md` : inventaire réel du frontend,
+    mesures (logs 5,4 l/s max, 300 lignes bornées, VRAM bureau ~933 Mio),
+    matrice pondérée Tauri/Slint/Iced/GTK4/egui, modèles d'intégration ;
+  - recommandation : coque Tauri v2 en mode URL distante (client de `:5004`),
+    fonctions de bureau côté Rust, serveur supervisé indépendamment ;
+  - option native de repli : GTK4/Relm4 ; Iced et egui écartés ;
+  - trois corrections au cadrage : débit de logs réel, séquence pilotée par le
+    client (pas `/run_custom_sequence`), gestionnaire de cache absent du
+    frontend Rust (D-015) ;
+  - décision d'orientation consignée dans `decisionLog.md` ; aucun code
+    fonctionnel modifié, aucun accès à `runtime/` ni `/mnt/cache`.
 - [2026-10-24] **Synchronisation documentaire** :
   - chiffre de tests aligné sur la mesure
     (`cargo test --workspace -- --list`) : 280 ;
@@ -102,6 +153,14 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
 ## Prochaines actions
 
+- Arbitrer « widgets natifs : exigence ou confort ? ». Si confort, lancer le
+  PoC Tauri A-Strict de 5 jours (J1–J5) ; si exigence contractuelle, passer
+  directement à GTK4/Relm4 avec le crate `workflow-desktop-services`.
+- Le PoC Tauri doit mesurer la VRAM avec `nvidia-smi pmon` et
+  `fuser /dev/nvidia0`, comparer à la baseline Firefox, et couvrir 20 cycles,
+  5 bascules d'espace de travail et 2 h de polling.
+- Ratifier le passage des séquences côté serveur (`/run_custom_sequence`,
+  `/sequence/status`) et ajouter le test associé.
 - Diagnostiquer D-024 sans modifier les données de production.
 - Lire `docs/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.

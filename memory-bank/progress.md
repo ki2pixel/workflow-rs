@@ -27,7 +27,26 @@
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
   les 22 `SKILL.md` alignés (tests 280, `max_workers` retiré, verrou STEP1,
   gate EffectCraft, legacy en lecture seule).
-- **Aucune tâche active.**
+- Étude d'interface desktop Linux livrée (`docs/ETUDE-GUI-NATIVE-LINUX.md`) :
+  inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui,
+  recommandation d'une coque Tauri v2 cliente de `:5004` et option native
+  GTK4/Relm4. Aucun code fonctionnel modifié.
+- Confrontation des deux études GUI
+  (`docs/audits/2026-10-24-confrontation-etudes-gui-linux.md`) : consensus
+  architectural, 14 points d'E2 corrigés ou nuancés, 7 corrections appliquées à E1
+  (révision 1.1). Le choix du toolkit reste conditionnel à l'arbitrage
+  « widgets natifs » ; règle de décision et PoC à deux pistes documentés.
+- Analyse du rapport Deep Search GUI
+  (`docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md`) :
+  vérifications locales `MiniBrowser` 2.50.4 (profils par défaut,
+  `DISABLE=1`, `FORCE_SHM`, calque de composition, cinq bascules d'espace de
+  travail), R1 non reproduit sur le chemin par défaut mais reproduit en
+  forçant `FORCE_DMABUF=1` (page vide, `AcceleratedSurface`), VRAM non
+  mesurable par `--query-compute-apps`, corrections MSRV/AppIndicator/token,
+  gates VRAM/RSS relatifs. Décision : PoC Tauri A-Strict 5 jours d'abord,
+  GTK4 en repli, crate `workflow-desktop-services` dès J1.
+- **Aucune tâche active.** Prochain jalon : arbitrage « widgets natifs :
+  exigence ou confort ? » puis PoC Tauri A-Strict de 5 jours.
 
 ## Chronologie de migration
 

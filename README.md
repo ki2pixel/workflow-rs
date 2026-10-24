@@ -142,6 +142,10 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
+- `docs/ETUDE-GUI-NATIVE-LINUX.md` : faisabilité d'une interface desktop native (inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui, modèles d'intégration, feuille de route).
+- `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` : confrontation de l'étude interne avec l'étude indépendante, faits vérifiés, corrections et règle de décision Tauri/GTK4.
+- `docs/audits/Analyse_Architecturale_GUI_Linux.md` : rapport de recherche externe (Deep Search) sur Tauri/GTK4, veille WebKitGTK/NVIDIA, sécurité IPC, tray, PoC et registre de risques.
+- `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md` : analyse critique du rapport externe, vérifications locales `MiniBrowser`, corrections de seuils/MSRV et PoC Tauri révisé.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.

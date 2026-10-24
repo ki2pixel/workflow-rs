@@ -8,6 +8,180 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-10-24 — Rapport Deep Search GUI : R1 non reproduit, PoC Tauri corrigé
+
+- **Contexte** : le rapport de recherche externe
+  `docs/audits/Analyse_Architecturale_GUI_Linux.md` (E3) a été analysé et
+  confronté au code, aux études E1/E2/C et à des mesures locales. L'analyse
+  critique et les vérifications sont consignées dans
+  `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md`.
+- **Décision** :
+  1. L'**architecture reste inchangée** : modèle 1, serveur headless
+     autoritaire, GUI client, Tauri A-Strict en phase 1, GTK4/Relm4 en repli,
+     C2 rejeté, socle C3 (`workflow-desktop-services`) mutualisé.
+  2. Le **PoC Tauri passe en premier, 5 jours**, au lieu d'un PoC à deux
+     pistes de 15–20 jours. GTK4 n'est financé que si Tauri échoue sur une
+     porte mesurable.
+  3. **R1 (écran blanc/SIGSEGV DMA-BUF) est reclassé** : le bug amont
+     `block/buzz#3654` est réel, mais il n'a pas été reproduit sur le chemin
+     par défaut de WebKitGTK 2.50.4/Ubuntu 22.04/NVIDIA 535, y compris avec
+     `WEBKIT_DISABLE_DMABUF_RENDERER=1`, un calque de composition et cinq
+     bascules d'espace de travail. En forçant le chemin DMA-BUF
+     (`WEBKIT_FORCE_DMABUF_RENDERER=1`), le contenu devient vide avec des
+     erreurs `AcceleratedSurface` : le risque est réel sur ce chemin, mais le
+     chemin par défaut patché est stable. Le patch Ubuntu rend `FORCE_SHM`
+     inopérant (`isNVIDIA()` retourne avant sa lecture). Le PoC garde le
+     profil forcé comme canari et le profil par défaut comme mode livré, et
+     confirme sur 20 cycles et 2 h.
+  4. Les **seuils VRAM/RSS deviennent relatifs** : aucun OOM CUDA sur 5 runs
+     de STEP2 et VRAM totale < 3 900 Mio, plutôt qu'un seuil absolu de
+     50 Mio. La baseline est Firefox + bureau (~1 030 Mio RSS, ~1 000 Mio
+     VRAM), pas une application native idéale.
+  5. Les **10 000 lignes de logs** sont un lot **serveur** (SSE/fichier), pas
+     un critère de choix toolkit. AT-SPI n'est une exigence que si
+     l'opérateur utilise Orca quotidiennement.
+  6. La **MSRV est portée par le crate GUI** : `workflow-gui` peut exiger
+     1.90 (Tauri 2.12) ou 1.93 (Relm4 0.11) sans changer la MSRV 1.86 des
+     neuf crates existantes. Si une exception est interdite, le repli correct
+     est `gtk4 0.10.3` (1.83) + `relm4 0.10.0` (1.85), et non
+     `gtk4 0.11.5`/`relm4 0.10.1` (1.92) comme l'écrit E3.
+  7. Le **token A-Strict** doit être spécifié : lecture de `/` et parsing de
+     la balise `worker-token`, ou route de session dédiée ; pas de lecture de
+     `config/config.toml` depuis le GUI.
+- **Alternatives rejetées** :
+  - Financer GTK4 en parallèle sans preuve d'échec Tauri : coût 70–95 j-h
+    contre 12–18 j-h, alors que le test local ne montre pas de blocage.
+  - Conserver les gates absolus de E3 (50 Mio VRAM, 300 Mio RSS) : ils
+    rejettent une solution déjà meilleure que la baseline Firefox.
+  - Traiter les 10 000 lignes comme un argument GTK4 : le serveur borne à
+    300 lignes, le changement est serveur dans les deux cas.
+  - Reprendre les MSRV de repli de E3 : versions fausses, vérifiées sur
+    crates.io.
+- **Conséquences** :
+  - Nouveau document d'analyse :
+    `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md`.
+  - Le PoC Tauri doit mesurer la VRAM avec `nvidia-smi pmon`, la VRAM totale
+    et `fuser /dev/nvidia0`, pas avec `--query-compute-apps` (contextes
+    compute uniquement).
+  - Le crate `workflow-desktop-services` est créé dès J1, pour éviter une
+    réécriture si GTK4 est choisi plus tard.
+  - Aucun code fonctionnel, aucun contrat HTTP, aucun accès à `runtime/` ou
+    `/mnt/cache` n'a été modifié.
+- **Validation** : `MiniBrowser` 2.50.4, trois profils, page statique et page
+  avec calque de composition, cinq bascules d'espace de travail ; versions
+  vérifiées par `dpkg-query`, `apt-cache policy`, `crates.io` et le changelog
+  Debian. Le test local est un test de fumée, pas une preuve de parité ou de stabilité
+  longue durée.
+
+## 2026-10-24 — Confrontation des études GUI : faits corrigés, choix conditionnel
+
+- **Contexte** : une étude indépendante
+  (`docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md`, E2) recommande
+  GTK4/Relm4 et conteste l'orientation Tauri de
+  `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1). Les deux documents ont été confrontés
+  ligne à ligne et vérifiés contre le code à HEAD ; le résultat est consigné
+  dans `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md`.
+- **Décision** :
+  1. L'**architecture est acquise** : modèle 1 (client GUI découplé), serveur
+     headless autoritaire, GUI jamais parent du serveur, aucun accès
+     CUDA/TPU/verrou depuis le processus graphique. Les deux études convergent.
+  2. Le **choix du toolkit reste conditionnel** à une exigence à arbitrer :
+     « natif » signifie-t-il *application de bureau* (Tauri T1 suffit) ou
+     *widgets natifs + AT-SPI + VRAM nulle* (GTK4/Relm4) ?
+  3. La **règle de décision** est fixée : délai court et parité visuelle →
+     Tauri T1 (12–18 j) ; widgets natifs, isolation VRAM et logs virtualisés →
+     GTK4/Relm4 (70–95 j). Un PoC à deux pistes (15–20 j) est recommandé si le
+     budget le permet.
+  4. Les **corrections factuelles** sont appliquées à E1 (révision 1.1) :
+     `GtkFileLauncher` remplacé par `gio::AppInfo` (GTK 4.6), RSS GTK4 révisé,
+     `GSK_RENDERER=cairo`, NVML en phase 2, badges `/mnt/cache` et
+     `/dev/apex_0`, modèle `LogEntry` avec coalescence 16 ms, SSE en phase 3.
+  5. Les **affirmations erronées d'E2** ne sont pas reprises :
+     `/api/system_monitor` existe bien en Rust (`http.rs:82`, `614-669`) ;
+     le frontend n'appelle jamais `/sequence/status` ; le polling réel est de
+     2 req/s par étape active (le chemin 200 ms n'est jamais activé) ;
+     `clear_disk_cache` est du code mort dans `downloadsListManager.js` ;
+     les tokens CSS web ne sont pas réutilisables tels quels avant GTK 4.16 ;
+     Iced n'a pas d'AT-SPI (issue #552) ; une parité GTK4 ne tient pas en
+     4 semaines.
+- **Alternatives rejetées** :
+  - Suivre E2 telle quelle : les prémisses fausses (D-015, 5 req/s,
+    `/sequence/status`) justifient à tort une réécriture complète.
+  - Suivre E1 sans révision : `GtkFileLauncher` est indisponible sur Ubuntu
+    22.04 et les optimisations Cairo/NVML/SSE manquaient.
+  - Trancher la techno sans arbitrer l'exigence : aucun des deux documents ne
+    peut désigner un gagnant unique, le classement dépend de la pondération.
+- **Conséquences** :
+  - E1 passe en version 1.1 ; la recommandation par défaut reste Tauri T1,
+    mais elle est explicitement conditionnelle.
+  - Le prochain jalon est l'arbitrage « widgets natifs : exigence ou
+    confort ? », puis le PoC correspondant (5–8 j Tauri ou 8–10 j GTK4).
+  - Aucun code fonctionnel, aucun contrat HTTP, aucun accès à `runtime/` ou
+    `/mnt/cache` n'a été modifié par la confrontation.
+- **Validation** : vérifications à HEAD (greps, versions de paquets, docs GTK,
+  issues amont) listées en annexe A du document de confrontation. Aucune
+  mesure de prototype supplémentaire.
+
+## 2026-10-24 — Interface desktop Linux : coque native, client du serveur
+
+- **Contexte** : étude de faisabilité demandée pour remplacer l'interface web
+  `assets/web` (rendue par Minijinja, servie sur `:5004`) par une application
+  desktop Linux X11/Wayland. Contraintes : ne pas casser l'architecture
+  serveur, ne pas modifier le legacy Python, préserver les contrats
+  JSON/CSV/HTTP, ne pas écrire dans `/mnt/cache`. Le constat de départ contient
+  trois hypothèses fausses : débit de logs de « milliers de lignes/s », usage
+  de `POST /run_custom_sequence` par le frontend, et existence d'un
+  gestionnaire de cache Rust.
+- **Décision** (orientation, subordonnée aux critères de sortie du PoC) :
+  1. La cible est une application desktop **cliente** de `workflow-server`
+     (modèle 1). L'orchestrateur n'est pas fusionné dans le binaire GUI :
+     une fenêtre n'est pas un démon, et un crash graphique ne doit pas emporter
+     le webhook, l'ingestion ni les séquences.
+  2. Le premier lot utilise **Tauri v2 en mode URL distante** (fenêtre sur
+     `:5004`), avec les fonctions de bureau côté Rust (tray, instance unique,
+     notifications, `xdg-open`). Aucun changement de contrat HTTP, aucun
+     changement de `assets/web`, aucune dépendance npm.
+  3. L'option native de repli est **GTK4 + gtk4-rs/Relm4**, évaluée seulement
+     si le PoC échoue (artefacts WebKitGTK/NVIDIA, RSS > 500 Mo, latence
+     d'entrée > 100 ms, crash pendant STEP2).
+  4. Iced et egui sont écartés pour cette UI (accessibilité Linux insuffisante,
+     widgets timeline/logs à écrire). Slint reste documenté mais non retenu
+     (réécriture complète, MSRV 1.92, licence à trancher).
+  5. Les séquences doivent passer côté serveur (`POST /run_custom_sequence`,
+     `GET /sequence/status`, `POST /sequence/stop`) pour survivre à la
+     fermeture de la fenêtre ; c'est un changement de comportement volontaire
+     à couvrir par un test.
+  6. Le serveur reste supervisé indépendamment du GUI (`switch-rust.sh start`
+     pour le PoC, systemd user pour le MVP) ; le GUI n'est jamais son parent.
+- **Alternatives rejetées** :
+  - Modèle monolithique (GUI + `Runner` dans le même processus) : duplication
+    du cycle de vie, double moniteur webhook possible, perte de l'isolation
+    des crashs, réimplémentation du verrou et des groupes de processus.
+  - Tauri T2 (assets embarqués) : le template dépend de Minijinja
+    (`steps_config`, `worker_token`), il faudrait dupliquer le rendu, ajouter
+    CORS et élargir la CSP.
+  - Tauri T3 (commandes IPC à la place de `fetch`) : pousse mécaniquement vers
+    le modèle monolithique.
+  - Iced/egui pour la parité visuelle : accessibilité et composants
+    personnalisés insuffisants.
+  - Navigateur en mode `--app` : moins d'une heure de travail, mais pas de
+    tray, pas d'instance unique, pas de notifications fiables, dépendance au
+    profil Firefox.
+- **Conséquences** :
+  - Nouvelle crate `workflow-desktop` prévue ; les neuf crates existantes et
+    `assets/web` restent inchangés en phase 1.
+  - Le MSRV du workspace devra passer de 1.86 à 1.90 (Tauri 2.12) si le PoC
+    est retenu ; la décision du 2026-10-24 sur le rapport Deep Search précise
+    qu'elle peut être portée par le seul crate GUI.
+  - Les paquets de développement (`libwebkit2gtk-4.1-dev`, `libxdo-dev`,
+    `libayatana-appindicator3-dev`) sont absents de la machine mais
+    installables ; les bibliothèques runtime sont déjà présentes.
+  - La documentation de référence est `docs/ETUDE-GUI-NATIVE-LINUX.md`.
+- **Validation** : aucune exécution de prototype à ce stade. Les mesures
+  (logs 5,4 l/s max, 300 lignes bornées, `nvidia-smi` 10–20 ms, VRAM bureau
+  ~933 Mio) et les versions de frameworks sont consignées dans l'étude. Le
+  PoC devra démontrer les seuils du §8.3 avant toute décision définitive.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

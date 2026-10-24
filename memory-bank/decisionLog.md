@@ -30,8 +30,19 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   - Supprimer les skills sans équivalent Rust : perte de la frontière
     CEP/JSX/AE.
   - Renommer tous les skills : aurait cassé la correspondance avec le legacy.
-- **Validation** : arborescence de 51 fichiers, vérification des commandes et
-  chemins, `cargo fmt`, `clippy`, `test`, commit unique.
+- **Validation** : arborescence de 51 fichiers à l'époque, vérification des
+  commandes et chemins, `cargo fmt`, `clippy`, `test`, commit unique.
+
+## 2026-10-24 — Skill `rust-patterns`
+
+- **Contexte** : ajout d'une skill générique sur les idiomes Rust.
+- **Décision** : normaliser son format et l'intégrer à la matrice de routage en
+  priorité 3, derrière les skills d'exploitation et de domaine.
+- **Contenu adapté** : tests inline (pas de dossier `tests/`), commandes
+  `cargo test --workspace` et `cargo clippy --workspace --all-targets`,
+  références vers `codingstandards.md` et `rust-concurrency-orchestrator`.
+- **Conséquence** : 22 skills, 52 fichiers dans `.agents/` + `memory-bank/`.
+  `codingstandards.md` reste prioritaire en cas de conflit.
 
 ## Décisions de migration
 

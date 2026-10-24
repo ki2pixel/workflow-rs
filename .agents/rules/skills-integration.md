@@ -27,6 +27,7 @@ globs:
 | `ae`, `after effects`, `jsx`, `_ae.json`, `_tracking.json`, `cuts`, `bridge` | `after-effects-json-contract` | 2 |
 | `workflow-bridge`, `manifest_path`, `analyze_manifest`, `cep` | `after-effects-bridge` | 2 |
 | `diagnostic`, `préflight`, `santé`, `environnement`, `modèle`, `vérification` | `pipeline-diagnostics` | 3 |
+| `idiome`, `ownership`, `borrow`, `lifetime`, `trait`, `générique`, `newtype`, `builder`, `itérateur`, `refactor`, `revue de code`, `api publique` | `rust-patterns` | 3 |
 | `timeline`, `frontend`, `ui`, `logs`, `overlay`, `minijinja` | `frontend-timeline-designer` | 3 |
 | `overlay`, `focus`, `auto-ouverture`, `logs` | `logs-overlay-conductor` | 3 |
 | `json`, `jsonpath`, `masse`, `clé`, `valeur`, `jq` | `json-mcp-expert` | 3 |
@@ -65,7 +66,16 @@ hors périmètre Rust sans le signaler.
 2. Skills d'étape ou de domaine (STEP3, STEP4, Coral, ONNX, ingestion...).
 3. `codingstandards.md` et les règles du dépôt.
 4. `docs/LOT-*.md`, `docs/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md`.
-5. Skills génériques (documentation, debugging, JSON, planification).
+5. Skills génériques (documentation, debugging, JSON, planification,
+   `rust-patterns`).
+
+## Complémentarité
+
+- `rust-patterns` : idiomes généraux (ownership, erreurs, traits, enums, API).
+- `rust-concurrency-orchestrator` : choix de concurrence, canaux, verrous et
+  sérialisation du pipeline.
+- `.agents/rules/codingstandards.md` : règles obligatoires du dépôt ; en cas de
+  conflit avec une skill, elles priment.
 
 ## Règle de frontière
 

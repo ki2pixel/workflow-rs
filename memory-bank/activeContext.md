@@ -18,6 +18,11 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   - initialisation de `memory-bank/` avec 5 fichiers à partir de l'historique
     git (31 commits) et des docs de lot ;
   - ajout d'un pointeur dans `AGENTS.md`.
+- [2026-10-24] **Intégration de `rust-patterns`** :
+  - normalisation du frontmatter et du Markdown (table, commandes, structure) ;
+  - ajout du routage priorité 3 dans `skills-integration.md` ;
+  - mise à jour du décompte : 22 skills, 52 fichiers dans `.agents/` +
+    `memory-bank/`.
 
 ## État du système
 

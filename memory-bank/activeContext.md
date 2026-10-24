@@ -23,6 +23,14 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   - ajout du routage priorité 3 dans `skills-integration.md` ;
   - mise à jour du décompte : 22 skills, 52 fichiers dans `.agents/` +
     `memory-bank/`.
+- [2026-10-24] **Audit documentaire** :
+  - correction des commandes de parité : le venv legacy est
+    `../workflow_mediapipe/coral_env/bin/python`, pas `coral_env/` ;
+  - alignement de l'état de production dans `README.md`, `SWITCH-PUBLIC.md` et
+    `CONTRAT-ENVIRONNEMENT.md` : Rust `:5004`, Python `:5003` en rollback ;
+  - `.agents/workflows/repomix-bundle.md` est supprimé dans l'arbre de travail
+    (non commité) ; le décompte courant est 51 fichiers dans `.agents/` +
+    `memory-bank/`.
 
 ## État du système
 

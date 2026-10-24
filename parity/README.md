@@ -1,7 +1,7 @@
 # Corpus et harnais de parité
 
-Le harnais mesure l'application Python actuelle, fige ses sorties et compare la
-future application Rust. Il n'est pas livré en production.
+Le harnais mesure l'application Python legacy, fige ses sorties et compare
+l'implémentation Rust. Il n'est pas livré en production.
 
 ## Disposition
 
@@ -27,28 +27,29 @@ exacte qui a permis de les produire.
 cd /home/kidpixel/workflow-rs
 
 # 1. Construire les médias synthétiques (idempotent)
-coral_env/bin/python tools/parity/parity.py build-corpus
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py build-corpus
 
 # 2. Vérifier le manifeste et les entrées
-coral_env/bin/python tools/parity/parity.py verify --probe
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py verify --probe
 
 # 3. Mesurer une étape
-coral_env/bin/python tools/parity/parity.py run --case real_244_step6
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py run --case real_244_step6
 
 # 4. Figer la première mesure d'un cas synthétique
-coral_env/bin/python tools/parity/parity.py run --case cuts_step2 --snapshot
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py run --case cuts_step2 --snapshot
 
 # 5. Comparer deux dossiers sans le harnais
-coral_env/bin/python tools/parity/parity.py diff \
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py diff \
   --expected parity/fixtures/real_244_step6/expected \
   --actual parity/fixtures/real_244_step6/actual
 
 # 6. Agréger
-coral_env/bin/python tools/parity/parity.py report
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py report
 ```
 
-`coral_env/bin/python` est utilisé pour `tomllib` (Python 3.11) et `psutil`.
-Les étapes elles-mêmes tournent dans leurs venvs d'origine.
+`../workflow_mediapipe/coral_env/bin/python` est utilisé pour `tomllib`
+(Python 3.11) et `psutil`. Il n'existe pas de `coral_env/` dans ce dépôt. Les
+étapes elles-mêmes tournent dans leurs venvs d'origine.
 
 ## Sécurité
 
@@ -135,7 +136,7 @@ Deux cas appliquent une transformation explicite :
 Le comparateur est vérifié par mutation volontaire :
 
 ```bash
-coral_env/bin/python tools/parity/selftest.py
+../workflow_mediapipe/coral_env/bin/python tools/parity/selftest.py
 ```
 
 Le script contrôle un dossier intact, puis injecte une différence JSON, CSV,

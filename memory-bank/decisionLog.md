@@ -8,6 +8,21 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-10-24 — Commandes de parité et état de production
+
+- **Contexte** : les commandes du harnais citaient `coral_env/bin/python` depuis
+  la racine du dépôt Rust, où ce venv n'existe pas. Le README présentait aussi
+  Python comme le workflow legacy actif, alors que Rust `:5004` est le backend
+  de production depuis le 2026-10-23.
+- **Décision** :
+  1. Les commandes de parité du dépôt Rust utilisent
+     `../workflow_mediapipe/coral_env/bin/python`.
+  2. Les documents d'état (`README.md`, `CONTRAT-ENVIRONNEMENT.md`,
+     `SWITCH-PUBLIC.md`) présentent Rust comme backend de production et Python
+     comme référence de parité et rollback.
+- **Conséquence** : ne pas recréer `coral_env/` dans ce dépôt ; toute nouvelle
+  commande de parité doit pointer vers le venv legacy.
+
 ## 2026-10-24 — Bootstrap des agents et de la memory-bank
 
 - **Contexte** : le dépôt Rust n'avait ni `.agents/` ni `memory-bank/`, alors

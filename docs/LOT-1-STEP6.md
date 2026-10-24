@@ -57,7 +57,7 @@ d'optimisation.
   --csv "/mnt/cache/244 Cvmille/docs/<stem>.csv" \
   --output /tmp/real_244_ae.json
 
-coral_env/bin/python tools/parity/parity.py diff \
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py diff \
   --expected parity/fixtures/real_244_step6/expected \
   --actual /tmp
 ```

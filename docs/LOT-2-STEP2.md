@@ -1,5 +1,9 @@
 # Lot 2 : STEP2 TransNetV2
 
+> Mise à jour lot 5 : STEP2 est branché à l'orchestrateur Rust
+> (`workflow-server`, route `/run/STEP2`). Les mentions « pas encore branché »
+> ci-dessous décrivent l'état livré au lot 2.
+
 STEP2 est porté dans `workflow-steps::step2`. La production Python reste
 l'oracle ; le binaire Rust écrit le même CSV, à côté de chaque vidéo, sans
 modifier le reste du pipeline.

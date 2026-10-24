@@ -1,5 +1,9 @@
 # Lot 3 : STEP4 tracking Coral
 
+> Mise à jour lot 5 : STEP4 est branché à l'orchestrateur Rust
+> (`workflow-server`, route `/run/STEP4`). Les mentions « pas encore branché »
+> ci-dessous décrivent l'état livré au lot 3.
+
 STEP4 est porté dans `workflow-steps::step4`. Le chemin nominal utilise le
 Coral Edge TPU ; le backend CPU TFLite/XNNPACK emprunte exactement le même code
 de préparation, de post-traitement et de suivi et sert uniquement aux tests.

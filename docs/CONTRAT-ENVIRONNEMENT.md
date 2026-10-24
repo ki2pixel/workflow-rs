@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.2 |
-| Date | 2026-10-23 |
+| Version | 1.3 |
+| Date | 2026-10-24 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -323,9 +323,8 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > `<stem>.csv`, avec les mêmes lignes `PROCESSING_VIDEO`,
 > `INTERNAL_PROGRESS: <n>/<total> frames (<p>%) - <nom>` et `Succès:`. Il prend
 > le verrou matériel et charge ONNX Runtime CUDA depuis
-> `steps.step2.onnxruntime`. Ce chemin n'est pas encore branché à
-> l'orchestrateur ; l'application Python reste le workflow legacy actif et le
-> contrat observable de référence.
+> `steps.step2.onnxruntime`. Il est branché à l'orchestrateur depuis le lot 5 ;
+> l'application Python reste la référence de parité et le rollback.
 >
 > Lot 3 : le port Rust de STEP4 est lancé par
 > `workflow-cli step4 track --input-dir <docs>`. Il écrit le même
@@ -335,7 +334,7 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > fallback. `<stem>.csv` et `<stem>_audio.json` sont requis par défaut ;
 > `--allow-partial-speaking` est réservé aux fixtures sans ces entrées. Le
 > module est compilé sous Unix uniquement, la cible de production restant
-> Linux. Il n'est pas encore branché à l'orchestrateur.
+> Linux. Il est branché à l'orchestrateur depuis le lot 5.
 >
 > Lot 4 : le port Rust de STEP3 est lancé par
 > `workflow-cli step3 diarize --input-dir <docs>`. Il écrit le même
@@ -343,8 +342,8 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > temporaire puis renommage. Le chemin nominal exige YAMNet Split compilé et le
 > Coral (`device = "tpu"`, `require_edgetpu = true`) ; `--device cpu` utilise
 > le modèle quantifié et reste un mode de test explicite. ECAPA-TDNN tourne sur
-> CPU via ONNX Runtime. Le traitement des vidéos est séquentiel et le module
-> n'est pas encore branché à l'orchestrateur. Détail et mesures dans
+> CPU via ONNX Runtime. Le traitement des vidéos est séquentiel ; le module est
+> branché à l'orchestrateur depuis le lot 5. Détail et mesures dans
 > `docs/LOT-4-STEP3.md`.
 >
 > Sur la machine de référence, `config/config.toml` pointe

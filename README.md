@@ -1,12 +1,10 @@
 # workflow-rs
 
-Réécriture Rust du pipeline `workflow_mediapipe`.
-
-Le dépôt Python reste la référence de production et le workflow legacy actif ;
-la bascule du workflow principal vers Rust ne l'arrête pas et ne le modifie pas.
-Le lot 0 a
-validé le pont matériel Coral, le contrat d'environnement et le harnais de
-parité. Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
+Réécriture Rust du pipeline `workflow_mediapipe`. Rust est le backend de
+production depuis le 2026-10-23 ; le dépôt Python reste la référence de parité
+et le rollback, sans être arrêté ni modifié par la bascule. Le lot 0 a validé le
+pont matériel Coral, le contrat d'environnement et le harnais de parité.
+Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
 `effectcraft-cli`) sont opérationnels. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
@@ -297,11 +295,14 @@ Python.
 ## Parité
 
 ```sh
-coral_env/bin/python tools/parity/parity.py verify --probe
-coral_env/bin/python tools/parity/parity.py run --case real_244_step6
-coral_env/bin/python tools/parity/parity.py run-all --tag synthetic
-coral_env/bin/python tools/parity/parity.py report
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py verify --probe
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py run --case real_244_step6
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py run-all --tag synthetic
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py report
 ```
+
+Le venv `../workflow_mediapipe/coral_env/bin/python` fournit Python 3.11
+(`tomllib`) et `psutil` ; il n'existe pas de `coral_env/` dans ce dépôt.
 
 Les étapes réelles STEP2 à STEP6 des projets `244` et `245` sont identiques à la
 production, ainsi que STEP5 et STEP6 de `249` et `250`. Le port Rust STEP2

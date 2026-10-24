@@ -9,18 +9,17 @@
 
 ## 0. Situation actuelle
 
-Aujourd'hui l'interface est utilisée en local sur `http://127.0.0.1:5003` et
-aucun reverse proxy n'est installé sur la machine (`nginx`, `caddy` et
-`cloudflared` sont absents). Il n'y a donc pas encore de « trafic public » à
-basculer.
+Le backend de production est Rust sur `http://127.0.0.1:5004` ; Python
+`http://127.0.0.1:5003` reste le rollback. Aucun reverse proxy n'est installé
+sur la machine (`nginx`, `caddy` et `cloudflared` sont absents). Il n'y a donc
+pas encore de « trafic public » à basculer.
 
 Deux cas concrets :
 
-1. **Usage local seulement** : la bascule consiste à ouvrir
-   `http://127.0.0.1:5004` au lieu de `http://127.0.0.1:5003`. Avant chaque
-   changement, arrêter le backend actif et lancer
-   `scripts/sync-backends.sh --apply` (voir `SYNC-BACKENDS.md`). Aucun proxy
-   n'est nécessaire.
+1. **Usage local seulement** : la bascule locale est faite. Pour revenir à
+   Python, arrêter Rust, lancer `scripts/sync-backends.sh --apply` (voir
+   `SYNC-BACKENDS.md`), puis le raccourci Python ; pour repasser à Rust, suivre
+   la procédure inverse. Aucun proxy n'est nécessaire.
 2. **Accès par nom de domaine ou depuis l'extérieur** : installer le proxy
    décrit ci-dessous, puis basculer la ligne `workflow_active`. C'est cette
    procédure qui rend la bascule réversible sans changer les URL des clients.

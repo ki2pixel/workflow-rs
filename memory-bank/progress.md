@@ -11,6 +11,8 @@
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
 - Shadow STEP5/6 `162/162` sur 20 projets.
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
+- Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de
+  production aligné sur Rust `:5004`.
 - **Aucune tâche active.**
 
 ## Chronologie de migration

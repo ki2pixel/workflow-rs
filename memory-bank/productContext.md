@@ -7,7 +7,7 @@ automatise l'ingestion, l'extraction, l'analyse vidéo/audio, la réduction JSON
 le pré-traitement After Effects, la finalisation et la génération de projets
 EffectCraft.
 
-Le dépôt Python reste la référence de production et le chemin de rollback. La
+Le dépôt Python reste la référence de parité et le chemin de rollback. La
 migration n'a pas pour objectif de modifier le legacy : elle doit produire des
 artefacts compatibles et permettre une bascule contrôlée.
 

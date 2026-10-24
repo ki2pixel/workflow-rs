@@ -45,7 +45,7 @@ silencieusement les recommandations de segments.
 Reproduction :
 
 ```bash
-coral_env/bin/python tools/parity/parity.py run --case silent_step3
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py run --case silent_step3
 ```
 
 Le code de sortie est 0, `outputs` est vide, et la console contient

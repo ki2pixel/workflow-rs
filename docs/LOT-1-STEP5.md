@@ -63,7 +63,7 @@ cargo build --release -p workflow-cli
   --output /tmp/real_244_tracking.json \
   --audio parity/fixtures/real_244_step3/expected/real_244_audio.json
 
-coral_env/bin/python tools/parity/parity.py diff \
+../workflow_mediapipe/coral_env/bin/python tools/parity/parity.py diff \
   --expected parity/fixtures/real_244_step5/expected \
   --actual /tmp
 ```

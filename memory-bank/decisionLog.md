@@ -8,6 +8,55 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
+
+- **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes
+  du journal, dont d'anciennes erreurs webhook du 2026-10-23 ; l'opérateur les
+  a prises pour des erreurs du batch courant. Le journal serveur était aussi
+  plus pauvre que `logs/app.log` du legacy et contenait des séquences ANSI.
+- **Décision** :
+  1. Désactiver ANSI quand stderr n'est pas un terminal (cas du lanceur), tout
+     en conservant la couleur en exécution manuelle ; même règle pour le CLI.
+  2. Enrichir `workflow-server.log` : résumé de configuration, requêtes
+     mutantes/4xx-5xx avec durée, démarrage/arrêt et heartbeat du moniteur
+     webhook, téléchargements planifiés, étapes avec PID et séquences avec
+     durée/résultat.
+  3. Faire démarrer `tail` après la dernière ligne existante dans
+     `start-rust.sh`, pour n'afficher que la session courante.
+- **Alternatives rejetées** :
+  - Tout passer en `debug` par défaut : trop de bruit toutes les 15 s.
+  - Supprimer les anciennes lignes du journal : perte de traçabilité.
+- **Conséquences** : `RUST_LOG=debug` reste le levier pour les requêtes GET et
+  le détail des passages webhook ; les anciennes lignes ANSI déjà écrites ne
+  sont pas réécrites.
+- **Validation** : serveur lancé avec stderr redirigé, zéro octet ESC dans le
+  nouveau journal, résumé de configuration et téléchargement dry-run visibles.
+
+## 2026-10-24 — Widget système Rust et auto-ouverture des logs
+
+- **Contexte** : un batch STEP1 → STEP8 lancé depuis le frontend Rust a montré
+  deux écarts d'interface : le widget Moniteur Système n'affichait pas la GPU,
+  et l'overlay de logs s'ouvrait automatiquement à chaque lancement, alors que
+  l'opérateur legacy travaillait avec l'auto-ouverture désactivée.
+- **Décision** :
+  1. `/api/system_monitor` lit la première carte NVIDIA avec `nvidia-smi` et
+     expose le contrat GPU existant (`name`, `utilization_percent`, `memory`,
+     `temperature_c`), avec `null` si l'outil est absent et
+     `{"error": "GPU data not available"}` en cas d'échec.
+  2. La copie frontend Rust passe `ui.autoOpenLogOverlay` à `false` par
+     défaut ; le toggle « Auto-ouverture des logs » reste disponible et la
+     valeur persistée dans `localStorage` reste prioritaire.
+- **Alternatives rejetées** :
+  - Continuer à router `/api/system_monitor` vers Python : le serveur Rust
+    direct `:5004` affichait CPU/RAM sans GPU et dépendait d'un second
+    processus pour une métrique machine.
+  - Supprimer le toggle : l'opérateur doit pouvoir réactiver l'auto-ouverture.
+- **Conséquences** : `/api/system_monitor` peut être routé vers le backend
+  actif (voir `docs/SWITCH-PUBLIC.md`) ; la divergence de valeur par défaut
+  est consignée dans `systemPatterns.md`.
+- **Validation** : endpoint réel sur GTX 1650 (30 %, 0,41/4,0 Go, 44 °C),
+  tests serveur GPU, page rendue avec la case décochée.
+
 ## 2026-10-24 — Audit croisé du rapport Gemini Web
 
 - **Contexte** : trois rapports d'audit Gemini Web (retirés du dépôt après

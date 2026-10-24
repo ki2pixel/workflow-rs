@@ -4,6 +4,7 @@ use crate::catalog::StepKey;
 use crate::runner::Runner;
 use crate::state::now_iso;
 use std::sync::Arc;
+use std::time::Instant;
 
 pub async fn run_sequence(
     runner: Arc<Runner>,
@@ -12,6 +13,14 @@ pub async fn run_sequence(
     sequence_id: crate::state::SequenceId,
 ) {
     let started_at = now_iso();
+    let started = Instant::now();
+    let step_keys = steps.iter().map(|step| step.as_str()).collect::<Vec<_>>();
+    tracing::info!(
+        sequence_type = %sequence_type,
+        sequence_id = sequence_id.get(),
+        steps = ?step_keys,
+        "séquence démarrée"
+    );
     let mut summary: Vec<(String, String, String)> = Vec::new();
     let mut success = true;
 
@@ -91,6 +100,13 @@ pub async fn run_sequence(
     ) {
         tracing::warn!("enregistrement de la séquence impossible: {error:#}");
     }
+    tracing::info!(
+        sequence_type = %sequence_type,
+        sequence_id = sequence_id.get(),
+        success = final_success,
+        duration_ms = started.elapsed().as_millis() as u64,
+        "séquence terminée"
+    );
 }
 
 /// Utilisé par les tests et le mode CLI pour un enchaînement déjà validé.

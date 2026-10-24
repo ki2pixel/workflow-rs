@@ -114,7 +114,18 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.
 
-## 12. Documentation et mémoire
+## 12. Journalisation
+
+- `tracing_subscriber` écrit sur stderr ; ANSI uniquement si stderr est un
+  terminal. Le lanceur redirige vers `runtime/logs/workflow-server.log`, donc
+  le fichier reste du texte brut.
+- Niveau par défaut `info` : configuration, requêtes mutantes, erreurs HTTP,
+  webhook significatif, étapes et séquences. `RUST_LOG=debug` active les GET,
+  les passages webhook complets et les tentatives de téléchargement.
+- Les journaux d'étapes restent dans `runtime/logs/step_STEPx.log`, avec la
+  sortie brute du CLI et rotation de taille.
+
+## 13. Documentation et mémoire
 
 - Docs en français, code/commandes en anglais.
 - `README.md` : état et commandes.
@@ -124,15 +135,19 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - `memory-bank/` : état courant, décisions, progrès.
 - `AGENTS.md` : résumé opérationnel pour les agents.
 
-## 13. Frontend
+## 14. Frontend
 
-- `assets/web` est une copie du legacy ; ne pas diverger.
+- `assets/web` est une copie du legacy ; ne pas diverger sans décision
+  explicite.
 - `index_new.html` est prétraité par Minijinja (`url_for`, `tojson`).
 - `AppState`, `DOMBatcher`, `DOMDiff`, `PollingManager` sont les patrons.
 - L'overlay de logs utilise un focus trap et une auto-ouverture configurable.
+  Contrairement au legacy, la copie Rust désactive l'auto-ouverture par
+  défaut (`ui.autoOpenLogOverlay = false`) ; le toggle Settings reste
+  fonctionnel et une valeur persistée par l'opérateur reste prioritaire.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
 
-## 14. After Effects
+## 15. After Effects
 
 - `workflow-bridge` gère `cuts` et les manifestes `layers`.
 - Le format de sortie et le préfixe `[PY] Error:` sont contractuels.

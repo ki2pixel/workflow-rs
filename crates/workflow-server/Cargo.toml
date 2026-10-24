@@ -29,6 +29,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 workflow-core = { path = "../workflow-core" }
 workflow-ingest = { path = "../workflow-ingest" }
+workflow-schema = { path = "../workflow-schema" }
 
 [dev-dependencies]
 http-body-util.workspace = true

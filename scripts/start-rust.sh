@@ -76,6 +76,13 @@ fi
 
 echo
 echo "Démarrage du serveur Rust sur $URL ..."
+# Ne pas rejouer les anciennes lignes du journal dans le terminal : elles
+# peuvent contenir des erreurs webhook déjà résolues et donner l'impression
+# qu'elles viennent du lancement courant.
+LOG_START_LINE=1
+if [[ -f "$LOG_FILE" ]]; then
+    LOG_START_LINE=$(( $(wc -l < "$LOG_FILE" 2>/dev/null || echo 0) + 1 ))
+fi
 if ! "$ROOT/scripts/switch-rust.sh" start; then
     echo "Le serveur n'a pas démarré ; voir $LOG_FILE" >&2
     pause_on_error
@@ -108,8 +115,9 @@ if [[ -z "$SERVER_PID" ]]; then
 fi
 
 # `--pid` fait sortir tail dès que le serveur s'arrête, même si tail ignore
-# SIGINT en tant que tâche de fond.
-tail -n 40 -f --pid="$SERVER_PID" "$LOG_FILE" &
+# SIGINT en tant que tâche de fond. On repart de la ligne comptée avant le
+# démarrage pour n'afficher que la session courante.
+tail -n +"$LOG_START_LINE" -f --pid="$SERVER_PID" "$LOG_FILE" &
 TAIL_PID=$!
 
 STOPPED=0

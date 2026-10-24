@@ -54,7 +54,7 @@ actif** pour tout le bloc workflow, et basculer ce bloc d'un seul coup.
 
 Les routes qui n'existent qu'en Python restent routées vers 5003 en permanence.
 C'est le cas de `/api/audio/*`, `/api/cache/*`, `/api/stats/*`,
-`/api/system/diagnostics`, `/api/system_monitor`, `/api/performance/metrics`,
+`/api/system/diagnostics`, `/api/performance/metrics`,
 `/api/performance/reset`, `/test-sound` et `/test-slideshow-fixes`.
 
 ## 2. Table de routage
@@ -65,24 +65,24 @@ C'est le cas de `/api/audio/*`, `/api/cache/*`, `/api/stats/*`,
 | `/sound-design/*` | actif (Rust) |
 | `/run/*`, `/status/*`, `/stop/*`, `/cancel/*`, `/sequence/*`, `/get_specific_log/*`, `/run_custom_sequence` | actif |
 | `/api/ping`, `/api/step_status/*`, `/api/csv_*`, `/api/performance/frontend` | actif |
+| `/api/system_monitor` | actif (CPU, RAM, GPU, disque) |
 | `/api/audio/*` | Python |
 | `/api/cache/*` | Python |
 | `/api/stats/*` | Python |
 | `/api/system/diagnostics` | Python |
-| `/api/system_monitor` | Python (données réelles) |
 | `/api/performance/metrics`, `/api/performance/reset` | Python |
 | `/test-sound`, `/test-slideshow-fixes`, `/get_specific_log_test/*` | Python |
 
-`/api/system_monitor` est volontairement laissé à Python : le serveur Rust
-expose un stub de polling, mais les métriques réelles viennent du service
-Python. `/api/performance/frontend` reste sur Rust : le frontend ignore la
-réponse et le stub Rust évite un 404.
+`/api/system_monitor` est servi par le backend actif : Rust lit `/proc` pour
+CPU/RAM, `statvfs` pour le disque et `nvidia-smi` pour la GPU ; le rollback
+Python conserve NVML. `/api/performance/frontend` reste sur Rust : le frontend
+ignore la réponse et le stub Rust évite un 404.
 
 Les routes Python-only lisent les racines Python (`projets_extraits`,
 `cache`, base d'historique). Pendant que Rust est actif, elles ne décrivent
 donc **pas** l'état des projets Rust : ce sont des outils d'exploitation
 legacy, pas des routes de statut du workflow. Le frontend ne les appelle pas ;
-seul `/api/system_monitor` est pollé et reste machine-wide.
+seul `/api/system_monitor` est pollé, désormais par le backend actif.
 
 ## 3. Configuration Nginx
 
@@ -130,7 +130,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/workflow.example.com/privkey.pem;
 
     # Routes Python-only, y compris pendant la bascule.
-    location ~ ^/api/(audio/|cache/|stats/|system/diagnostics|system_monitor|performance/metrics|performance/reset) {
+    location ~ ^/api/(audio/|cache/|stats/|system/diagnostics|performance/metrics|performance/reset) {
         proxy_pass http://workflow_python;
         proxy_http_version 1.1;
         proxy_set_header Connection "";

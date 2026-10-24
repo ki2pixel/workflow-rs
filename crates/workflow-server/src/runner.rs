@@ -207,12 +207,6 @@ impl Runner {
         .await;
         write_log(&log_writer, format!("Commande: {command_line}")).await;
         write_log(&log_writer, format!("Dans: {}", self.workdir.display())).await;
-        tracing::info!(
-            step = step.as_str(),
-            run_id = run_id.get(),
-            command = %command_line,
-            "étape lancée"
-        );
 
         let mut process = Command::new(&command[0]);
         process
@@ -247,6 +241,20 @@ impl Runner {
         };
         if let Some(pid) = child.id() {
             control.set_pid(pid);
+            tracing::info!(
+                step = step.as_str(),
+                run_id = run_id.get(),
+                pid,
+                command = %command_line,
+                "étape lancée"
+            );
+        } else {
+            tracing::info!(
+                step = step.as_str(),
+                run_id = run_id.get(),
+                command = %command_line,
+                "étape lancée"
+            );
         }
         self.state.mark_running(step, run_id);
 

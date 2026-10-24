@@ -7,8 +7,14 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 278 tests unitaires, sans matériel.
-- Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
+- 280 tests unitaires, sans matériel.
+- Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
+  via le frontend Rust (8/8 étapes `completed`).
+- Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
+  des logs désactivée par défaut (toggle conservé).
+- Journal serveur enrichi (configuration, requêtes, webhook, étapes,
+  séquences), ANSI désactivé à l'écriture fichier et terminal limité à la
+  session courante au démarrage.
 - Shadow STEP5/6 `162/162` sur 20 projets.
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
 - Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de

@@ -103,7 +103,8 @@ Le frontend envoie `X-Worker-Token` depuis la balise `meta`. Sans jeton :
 - Les routes cache, statistiques, diagnostics et audio restent dans le legacy
   Python. Depuis le lot 8, `/api/csv_monitor_status` et
   `/api/csv_downloads_status` sont servies par `workflow-ingest` ;
-  `/api/performance/frontend` et `/api/system_monitor` restent des stubs.
+  `/api/performance/frontend` reste un stub. `/api/system_monitor` expose les
+  métriques réelles CPU/RAM/disque et la GPU via `nvidia-smi`.
 
 ## Commandes d'étape
 
@@ -141,6 +142,13 @@ dans `/mnt/cache`. Le contrôle est reproductible avec :
 
 - Sortie stdout/stderr fusionnée ligne par ligne, échappée HTML dans l'état.
 - Journal `runtime/logs/step_STEPx.log`, rotation à 5 Mio (`.1` à `.6`).
+- Journal serveur `runtime/logs/workflow-server.log` : résumé de configuration
+  au démarrage, requêtes mutantes et erreurs HTTP, cycle webhook, étapes
+  (PID, code retour, durée, journal) et séquences. Les couleurs ANSI sont
+  désactivées quand stderr est redirigé vers un fichier ; `RUST_LOG=debug`
+  ajoute les requêtes GET et le détail de chaque passage webhook.
+- `scripts/start-rust.sh` n'affiche dans le terminal que les lignes écrites
+  après le démarrage courant, pour ne pas rejouer les anciennes erreurs.
 - Progression dérivée des lignes `TOTAL_*`, `PROCESSING_VIDEO`,
   `REDUCING_JSON`, `PREPROCESS_AE`, `INTERNAL_PROGRESS`, `Succès`, `MS_BATCH_*`.
 - Timeout par étape : `steps.default_timeout_s`, sauf STEP8

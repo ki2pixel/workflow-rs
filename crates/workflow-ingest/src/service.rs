@@ -145,23 +145,44 @@ impl IngestionService {
             return;
         }
         tracing::info!(
-            "moniteur webhook démarré (intervalle {}s, cache {}s)",
-            self.webhook_config.interval_s,
-            self.webhook_config.cache_ttl_s
+            url = %self.webhook_config.url,
+            interval_s = self.webhook_config.interval_s,
+            cache_ttl_s = self.webhook_config.cache_ttl_s,
+            dry_run = self.webhook_config.dry_run,
+            "moniteur webhook démarré"
         );
+        let mut cycles: u64 = 0;
+        let mut last_error: Option<String> = None;
         loop {
             if *shutdown.borrow() {
                 break;
             }
             self.set_monitor("running", None);
+            cycles += 1;
             match self.check_once().await {
                 Ok(count) => {
+                    if last_error.take().is_some() {
+                        tracing::info!("moniteur webhook: connexion rétablie");
+                    }
                     self.set_monitor("running", None);
-                    tracing::debug!("moniteur webhook: {count} téléchargement(s) planifié(s)");
+                    if count > 0 {
+                        tracing::info!(
+                            downloads = count,
+                            "moniteur webhook: téléchargements planifiés"
+                        );
+                    } else if cycles % 20 == 0 {
+                        tracing::info!(
+                            cycles,
+                            "moniteur webhook: passage OK, aucun nouveau téléchargement"
+                        );
+                    } else {
+                        tracing::debug!(downloads = 0, "moniteur webhook: passage terminé");
+                    }
                 }
                 Err(error) => {
+                    last_error = Some(error.to_string());
                     self.set_monitor("running", Some(error.to_string()));
-                    tracing::error!("moniteur webhook: {error:#}");
+                    tracing::error!(error = %format!("{error:#}"), "moniteur webhook: échec du passage");
                 }
             }
             tokio::select! {
@@ -191,6 +212,10 @@ impl IngestionService {
             .fetch()
             .await
             .ok_or_else(|| anyhow::anyhow!("webhook indisponible"))?;
+        tracing::debug!(
+            records = records.len(),
+            "webhook: enregistrements récupérés"
+        );
         let repository = self.history.clone();
         let (history, failures) = tokio::task::spawn_blocking(move || {
             let history = repository.get_urls()?;
@@ -212,6 +237,7 @@ impl IngestionService {
             },
         );
         let count = plans.len();
+        tracing::debug!(downloads = count, "webhook: planification terminée");
         for plan in plans {
             if self.webhook_config.dry_run {
                 let timestamp = effective_timestamp(&plan.timestamp);

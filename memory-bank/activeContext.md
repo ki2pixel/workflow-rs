@@ -7,6 +7,25 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
 ## Dernière session
 
+- [2026-10-24] **Journal serveur enrichi** :
+  - `workflow-server.log` inclut désormais la configuration au démarrage, les
+    requêtes mutantes et erreurs HTTP avec durée, le cycle webhook, les étapes
+    avec PID et les séquences.
+  - ANSI désactivé automatiquement quand stderr est redirigé vers un fichier ;
+    `RUST_LOG=debug` pour les GET et le détail webhook.
+  - `start-rust.sh` n'affiche plus les 40 anciennes lignes au démarrage, ce qui
+    évite de confondre les erreurs webhook du 2026-10-23 avec un incident
+    courant.
+- [2026-10-24] **Widget système et auto-ouverture des logs** :
+  - `/api/system_monitor` expose la GPU via `nvidia-smi` (première carte,
+    contrat `null`/`error` conservé) ; le batch STEP1 → STEP8 du jour a servi
+    de validation d'exploitation.
+  - L'auto-ouverture de l'overlay de logs est désactivée par défaut côté
+    frontend Rust ; le toggle Settings et la préférence persistée restent
+    effectifs.
+  - Logs du batch `1531 Camille` vérifiés : 8/8 étapes `completed`, aucun
+    échec d'étape ; seules les erreurs webhook du 2026-10-23 restent dans le
+    journal serveur.
 - [2026-10-24] **Remédiation de l'audit backend (36 constats)** : six lots
   appliqués sur les neuf crates. Orchestrateur : `RunId`, `StepPhase::Stopping`,
   fin générationnelle, canal de logs borné, rotation en cours d'exécution,
@@ -49,7 +68,7 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 278 tests unitaires ; pas de CI.
+- 280 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

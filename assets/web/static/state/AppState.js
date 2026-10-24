@@ -44,7 +44,7 @@ class AppState {
             focusedElementBeforePopup: null,
             ui: {
                 compactMode: false,
-                autoOpenLogOverlay: true,
+                autoOpenLogOverlay: false,
                 localDownloadsVisible: true,
                 systemMonitorMinimized: false,
                 settingsOpen: false,
@@ -183,7 +183,7 @@ class AppState {
             focusedElementBeforePopup: null,
             ui: {
                 compactMode: false,
-                autoOpenLogOverlay: true,
+                autoOpenLogOverlay: false,
                 localDownloadsVisible: true,
                 systemMonitorMinimized: false,
                 settingsOpen: false

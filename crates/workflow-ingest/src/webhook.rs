@@ -95,9 +95,15 @@ impl WebhookClient {
             match self.fetch_once().await {
                 Ok(records) => {
                     self.record_success(&records);
+                    tracing::debug!(records = records.len(), "webhook: récupération réussie");
                     return Some(records);
                 }
                 Err(error) => {
+                    tracing::debug!(
+                        attempt,
+                        error = %error,
+                        "webhook: tentative échouée"
+                    );
                     last_error = Some(error.to_string());
                     self.record_failure(last_error.clone());
                     if attempt < 3 {

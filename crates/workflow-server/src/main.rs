@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,11 +33,14 @@ async fn main() {
 }
 
 async fn run() -> Result<()> {
+    // Le lanceur redirige stderr vers un fichier : désactiver les séquences
+    // ANSI dans ce cas, tout en gardant la couleur en exécution manuelle.
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_writer(std::io::stderr)
+        .with_ansi(std::io::stderr().is_terminal())
         .init();
 
     let cli = Cli::parse();
@@ -44,6 +48,23 @@ async fn run() -> Result<()> {
         .with_context(|| format!("chargement de {}", cli.config.display()))?;
     config.validate_server()?;
     validate_isolation(&config)?;
+    let resolved = config.paths.resolve();
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        config = %cli.config.display(),
+        host = %config.server.host,
+        port = config.server.port,
+        base = %resolved.base.display(),
+        projets = %resolved.projects.display(),
+        logs = %resolved.logs.display(),
+        telechargements = %resolved.downloads.display(),
+        history_db = %resolved.history_db.display(),
+        webhook_enabled = config.webhook.enabled,
+        webhook_interval_s = config.webhook.interval_s,
+        webhook_dry_run = config.webhook.dry_run,
+        hardware_lock = %config.hardware.lock_path.display(),
+        "configuration serveur chargée"
+    );
     if config.server.allow_remote {
         tracing::warn!(
             host = config.server.host.as_str(),
@@ -83,6 +104,11 @@ async fn run() -> Result<()> {
         return Ok(());
     }
 
+    tracing::info!(
+        history_count,
+        workflow_cli = %runner.cli_path().display(),
+        "orchestrateur prêt"
+    );
     let state = AppState::new(runner)?;
     let monitor = state.ingestion.spawn_monitor();
     let app = workflow_server::router(state);
@@ -91,7 +117,6 @@ async fn run() -> Result<()> {
         .await
         .with_context(|| format!("écoute impossible sur {address}"))?;
     tracing::info!("workflow-server à l'écoute sur http://{address}");
-    println!("workflow-server à l'écoute sur http://{address}");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(monitor, workflow_state))

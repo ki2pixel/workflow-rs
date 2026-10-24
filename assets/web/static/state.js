@@ -69,7 +69,7 @@ export function setAutoOpenLogOverlay(enabled) {
 
 export function getAutoOpenLogOverlay() {
     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
-    return typeof uiValue === 'boolean' ? uiValue : true;
+    return typeof uiValue === 'boolean' ? uiValue : false;
 }
 
 export function setAutoModeLogPanelOpened(opened) {

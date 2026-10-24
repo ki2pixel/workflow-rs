@@ -131,6 +131,11 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
 
 `gpu` vaut `null` si NVML est indisponible, ou `{"error": "GPU data not available"}` si le device existe sans données.
 
+Le serveur Rust lit la première carte via `nvidia-smi` et applique les mêmes
+arrondis (`round(x, 1)` pour le pourcentage mémoire, `round(x, 2)` pour les
+Go). Une absence de `nvidia-smi` produit `gpu: null` ; une commande en erreur
+produit l'objet `error`.
+
 `GET /api/csv_monitor_status` :
 
 ```json
@@ -268,6 +273,7 @@ Délai avant nouvel essai : `min(intervalle_monitorage × 2^(tentatives-1), DOWN
 | `<BASE>/logs/startup.log`, `stdout.log` | Logs du lanceur |
 | `<BASE>/logs/step{1..8}/` | Logs spécifiques affichés dans l'interface |
 | `<BASE>/logs/step_{STEP}.log` | Log du sous-processus, rotation 5 Mo × 5 |
+| `<BASE>/logs/workflow-server.log` | Log du serveur Rust : configuration, requêtes mutantes, webhook, étapes et séquences ; texte brut, sans ANSI |
 | `<BASE>/download_history.sqlite3` | Historique et échecs |
 | `~/Téléchargements` | Archives déposées et téléchargées (`LOCAL_DOWNLOADS_DIR`) |
 | `/mnt/cache` | Sortie STEP7 par défaut (`OUTPUT_DIR`), et racine du cache |

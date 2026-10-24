@@ -7,7 +7,7 @@ use crate::runner::Runner;
 use crate::sequence::run_sequence;
 use axum::body::Bytes;
 use axum::extract::{Path, Request, State};
-use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
@@ -19,12 +19,14 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
 use subtle::ConstantTimeEq;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use workflow_ingest::IngestionService;
+use workflow_schema::round::round_to;
 
 pub struct AppState {
     pub runner: Arc<Runner>,
@@ -91,13 +93,33 @@ pub fn router(state: Arc<AppState>) -> Router {
 async fn security_headers(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
+    let started = std::time::Instant::now();
     let mut response = next.run(request).await;
-    if response.status().is_client_error() || response.status().is_server_error() {
+    let status = response.status();
+    let duration_ms = started.elapsed().as_millis() as u64;
+    if status.is_client_error() || status.is_server_error() {
         tracing::warn!(
             %method,
             path = %path,
-            status = %response.status(),
+            status = %status,
+            duration_ms = duration_ms,
             "requête HTTP en erreur"
+        );
+    } else if method == Method::GET || method == Method::HEAD {
+        tracing::debug!(
+            %method,
+            path = %path,
+            status = %status,
+            duration_ms = duration_ms,
+            "requête HTTP"
+        );
+    } else {
+        tracing::info!(
+            %method,
+            path = %path,
+            status = %status,
+            duration_ms = duration_ms,
+            "requête HTTP"
         );
     }
     let headers = response.headers_mut();
@@ -388,7 +410,13 @@ async fn specific_log(
 
 async fn system_monitor(State(state): State<Arc<AppState>>) -> Response {
     let _ = state;
-    Json(system_metrics()).into_response()
+    match tokio::task::spawn_blocking(system_metrics).await {
+        Ok(metrics) => Json(metrics).into_response(),
+        Err(error) => raw_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Métriques système indisponibles: {error}"),
+        ),
+    }
 }
 
 async fn csv_downloads_status(State(state): State<Arc<AppState>>) -> Response {
@@ -628,7 +656,7 @@ fn system_metrics() -> Value {
             "total_gb": total_gb,
             "available_gb": available_gb
         },
-        "gpu": Value::Null,
+        "gpu": gpu_metrics(),
         "disk": {
             "percent": disk_percent,
             "used_gb": disk_used_gb,
@@ -637,6 +665,61 @@ fn system_metrics() -> Value {
         },
         "timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
         "snapshot_age_s": 0.0
+    })
+}
+
+/// Interroge la première carte NVIDIA via `nvidia-smi`.
+///
+/// `null` reproduit le cas « NVML indisponible » du contrat Python ; une
+/// commande présente mais en erreur renvoie l'objet `error` attendu par le
+/// frontend, qui l'affiche dans le widget.
+fn gpu_metrics() -> Value {
+    let output = match Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
+            "--format=csv,noheader,nounits",
+            "--id=0",
+        ])
+        .output()
+    {
+        Ok(output) => output,
+        Err(_) => return Value::Null,
+    };
+    if !output.status.success() {
+        return json!({"error": "GPU data not available"});
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    match stdout.lines().find(|line| !line.trim().is_empty()) {
+        Some(line) => parse_gpu_line(line),
+        None => json!({"error": "GPU data not available"}),
+    }
+}
+
+fn parse_gpu_line(line: &str) -> Value {
+    let fields: Vec<&str> = line.split(',').map(str::trim).collect();
+    if fields.len() != 5 {
+        return json!({"error": "GPU data not available"});
+    }
+    let (Some(utilization), Some(used_mib), Some(total_mib), Some(temperature)) = (
+        fields[1].parse::<f64>().ok(),
+        fields[2].parse::<f64>().ok(),
+        fields[3].parse::<f64>().ok(),
+        fields[4].parse::<f64>().ok(),
+    ) else {
+        return json!({"error": "GPU data not available"});
+    };
+    if total_mib <= 0.0 {
+        return json!({"error": "GPU data not available"});
+    }
+    json!({
+        "name": fields[0],
+        "utilization_percent": utilization as u64,
+        "memory": {
+            "percent": round_to(used_mib / total_mib * 100.0, 1),
+            "used_gb": round_to(used_mib / 1024.0, 2),
+            "total_gb": round_to(total_mib / 1024.0, 2)
+        },
+        "temperature_c": temperature as i64
     })
 }
 
@@ -1174,6 +1257,23 @@ mod tests {
         }
         assert_eq!(status["status"], "stopped");
         assert_eq!(step_status_value(&app, "STEP6").await["status"], "idle");
+    }
+
+    #[test]
+    fn given_nvidia_smi_line_when_parsed_then_gpu_contract_is_respected() {
+        let value = parse_gpu_line("NVIDIA GeForce GTX 1650, 27, 329, 4096, 44");
+        assert_eq!(value["name"], "NVIDIA GeForce GTX 1650");
+        assert_eq!(value["utilization_percent"], 27);
+        assert_eq!(value["memory"]["used_gb"], 0.32);
+        assert_eq!(value["memory"]["total_gb"], 4.0);
+        assert_eq!(value["memory"]["percent"], 8.0);
+        assert_eq!(value["temperature_c"], 44);
+    }
+
+    #[test]
+    fn given_invalid_nvidia_smi_line_when_parsed_then_error_object_is_returned() {
+        let value = parse_gpu_line("NVIDIA GeForce GTX 1650, N/A, 0, 0, N/A");
+        assert_eq!(value["error"], "GPU data not available");
     }
 
     async fn step_status_value(app: &Router, step: &str) -> Value {

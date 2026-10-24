@@ -2715,6 +2715,7 @@ dependencies = [
  "tracing-subscriber",
  "workflow-core",
  "workflow-ingest",
+ "workflow-schema",
 ]
 
 [[package]]

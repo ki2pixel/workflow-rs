@@ -3,8 +3,7 @@ mod cuts;
 use anyhow::{Context, Result};
 use clap::Parser;
 use serde_json::{json, Value};
-use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Parser)]
@@ -62,18 +61,8 @@ fn write_json_atomically(path: &Path, payload: &Value) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let temp_path = path.with_extension("tmp");
-    let result = (|| -> Result<()> {
-        let file = File::create(&temp_path)?;
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(&mut writer, payload)?;
-        writer.write_all(b"\n")?;
-        writer.flush()?;
-        fs::rename(&temp_path, path)?;
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temp_path);
-    }
-    result
+    let mut bytes = serde_json::to_vec_pretty(payload)?;
+    bytes.push(b'\n');
+    workflow_core::fsutil::write_atomic(path, &bytes)?;
+    Ok(())
 }

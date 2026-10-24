@@ -24,6 +24,7 @@ import { workerManager } from './utils/WorkerManager.js';
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
     starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
+    stopping: { label: 'Arrêt en cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏹️' },
     initiated: { label: 'Initialisation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
     completed: { label: 'Terminé', badgeClass: 'status-completed', chipClass: 'state-success', icon: '✅' },
     success: { label: 'Terminé', badgeClass: 'status-success', chipClass: 'state-success', icon: '✅' },
@@ -231,7 +232,7 @@ export function updateGlobalUIForSequenceState(isRunning) {
         if (runButton) runButton.disabled = isRunning;
 
         if (cancelButton) {
-            if (stepInfo && ['running', 'starting', 'initiated'].includes(stepInfo.status)) {
+            if (stepInfo && ['running', 'starting', 'stopping', 'initiated'].includes(stepInfo.status)) {
                 cancelButton.disabled = false;
             } else {
                 cancelButton.disabled = true;
@@ -438,13 +439,13 @@ export function updateStepCardUI(stepKey, data) {
             updateStepStateChip(stepKey, normalizedStatus);
 
             if (runButton && cancelButton) {
-                const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                const isCurrentlyRunningOrStarting = ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus);
                 runButton.disabled = isCurrentlyRunningOrStarting || getIsAnySequenceRunning();
                 cancelButton.disabled = !isCurrentlyRunningOrStarting;
             }
 
             const logsOpen = isLogsPanelOpen();
-            if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+            if (logsOpen && ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus)) {
                 if (getActiveStepKeyForLogs() !== stepKey) {
                     setActiveStepForLogPanelUI(stepKey);
                     hideNonActiveSteps(stepKey, true);
@@ -459,7 +460,7 @@ export function updateStepCardUI(stepKey, data) {
                 stopStepTimer(stepKey);
             } else if (normalizedStatus === 'idle' && !getStepTimer(stepKey)) {
                 resetStepTimerDisplay(stepKey);
-            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
+            } else if (['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
                 // TODO: Implement proper timer resumption after page reload
                 // Date: 2026-01-19
                 // Owner: kidpixel
@@ -479,7 +480,7 @@ export function updateStepCardUI(stepKey, data) {
                     currentProgress = data.progress_current_fractional || data.progress_current;
 
                     if (data.progress_current_fractional === null && data.progress_text) {
-                        const isSpecialRunning = (['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
+                        const isSpecialRunning = (['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running','starting','stopping','initiated'].includes(normalizedStatus);
                         if (!isSpecialRunning) {
                             const percentMatch = data.progress_text.match(/(\d+)%/);
                             if (percentMatch) {
@@ -493,7 +494,7 @@ export function updateStepCardUI(stepKey, data) {
                     percentage = Math.round((currentProgress / data.progress_total) * 100);
                     percentage = Math.min(percentage, 100);
 
-                    if ((['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                    if ((['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus)) {
                         if (percentage >= 100) {
                             percentage = 99;
                         }
@@ -560,7 +561,7 @@ export function updateStepCardUI(stepKey, data) {
                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
                     }
                     delete lastProgressTextByStep[stepKey];
-                } else if (data.progress_total > 0 && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                } else if (data.progress_total > 0 && ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus)) {
                     console.log(`[PROGRESS CALC] ${stepKey}:`, {
                         progress_current: data.progress_current,
                         progress_current_fractional: data.progress_current_fractional,
@@ -592,7 +593,7 @@ export function updateStepCardUI(stepKey, data) {
                     const subText = formatProgressText(candidateText, displayCurrent, data.progress_total);
                     progressTextEl.textContent = subText;
 
-                    const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                    const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus);
                     if (shouldAutoCenter) {
                         const logsOpenNow = isLogsPanelOpen();
                         if (!logsOpenNow) {
@@ -607,7 +608,7 @@ export function updateStepCardUI(stepKey, data) {
                         }
                     }
 
-                    if (candidateText && ['running','starting','initiated'].includes(data.status)) {
+                    if (candidateText && ['running','starting','stopping','initiated'].includes(data.status)) {
                         progressTextEl.setAttribute('data-processing', 'true');
                     } else {
                         progressTextEl.removeAttribute('data-processing');
@@ -617,7 +618,7 @@ export function updateStepCardUI(stepKey, data) {
                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
                     }
-                } else if (['running', 'starting', 'initiated'].includes(data.status)) {
+                } else if (['running', 'starting', 'stopping', 'initiated'].includes(data.status)) {
                     progressContainer.style.display = 'block';
                     progressBar.style.backgroundColor = 'var(--blue)';
                     progressBar.setAttribute('data-active', 'true');
@@ -647,13 +648,13 @@ export function updateStepCardUI(stepKey, data) {
                 }
             }
 
-            const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
+            const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="stopping"], .step[data-status="initiated"]');
             if (workflowWrapper) {
                 if (anyRunning) {
                     workflowWrapper.classList.add('any-step-running');
-                    if (['running','starting','initiated'].includes(data.status)) {
+                    if (['running','starting','stopping','initiated'].includes(data.status)) {
                         workflowWrapper.setAttribute('data-active-step', stepKey);
-                    } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
+                    } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="stopping"], .step[data-status="initiated"]`)) {
                         workflowWrapper.removeAttribute('data-active-step');
                     }
                 } else {

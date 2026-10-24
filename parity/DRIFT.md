@@ -242,3 +242,34 @@ donc de la configuration ou du modèle STEP4 utilisé le 2026-10-14, non
 conservé dans l'archive. Le shadow par défaut, qui part du `_tracking.json`
 de production, reste à 15/15. Les corpus 154-159 et 1720 ne sont pas
 affectés : leurs références et leurs bruts (1720) sont cohérents.
+
+### D-025 — `/sound-design` hors racine : 404 au lieu de 403
+
+`ServeDir` renvoie `404` pour une traversée ou un fichier absent sous
+`/sound-design`, alors que `docs/CONTRAT-ENVIRONNEMENT.md` mentionne
+`403 {"error":"Access denied"}`. Aucun contenu hors racine n'est servi : la
+différence est un code HTTP, pas une faille. Le frontend courant ne distingue
+pas ces deux codes. Un middleware dédié n'a pas été ajouté pour éviter de
+transformer une réponse statique standard en contrat spécifique ; le 403
+documenté reste un attendu théorique du contrat Python.
+
+### D-026 — `anyhow` interne, `thiserror` aux frontières
+
+`workflow-ingest` expose `IngestError` et `workflow-sync` expose `SyncError`
+sur leurs points d'entrée publics (`IngestResult`/`SyncResult`) ; les détails
+internes conservent `anyhow` pour le contexte fichier/SQLite. Les étapes
+STEP2, STEP3, STEP4, STEP7 et STEP8 gardent des `anyhow::Result` internes :
+leurs erreurs traversent le serveur comme un code de sortie de sous-processus,
+sans consommateur typé. Cette dérogation est assumée et limitée à ces modules ;
+toute nouvelle API publique d'étape doit préférer `StepError`.
+
+### D-027 — Arrêt manuel d'une étape et descendants
+
+Le serveur lance chaque CLI dans son propre groupe de processus et envoie
+`SIGTERM` puis `SIGKILL` au groupe, ce qui couvre `ffmpeg` et les autres
+descendants. Un `workflow-cli stepN run` lancé à la main, hors serveur, ne
+installe pas de gestionnaire de signal : un `SIGTERM` direct au CLI peut
+laisser un `ffmpeg` orphelin terminer son écriture. Le verrou matériel et le
+nettoyage des temporaires limitent l'impact ; ce cas reste un usage manuel
+hors orchestration, documenté ici plutôt que masqué par un gestionnaire de
+signaux partiel.

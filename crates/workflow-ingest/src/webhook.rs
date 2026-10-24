@@ -3,6 +3,7 @@
 //! Reproduit `services/webhook_service.py` : deux schémas JSON acceptés,
 //! normalisation des timestamps, cache TTL et trois tentatives.
 
+use crate::error::{IngestError, IngestResult};
 use crate::url::classify_url_type;
 use chrono::{DateTime, Local, NaiveDateTime};
 use reqwest::Client;
@@ -52,7 +53,7 @@ pub struct WebhookClient {
 }
 
 impl WebhookClient {
-    pub fn new(config: &WebhookConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &WebhookConfig) -> IngestResult<Self> {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(config.timeout_s.max(1)))
             .timeout(Duration::from_secs(config.timeout_s.max(1)))
@@ -132,9 +133,9 @@ impl WebhookClient {
         state.status.error = error;
     }
 
-    async fn fetch_once(&self) -> anyhow::Result<Vec<WebhookRecord>> {
+    async fn fetch_once(&self) -> IngestResult<Vec<WebhookRecord>> {
         if self.url.trim().is_empty() {
-            anyhow::bail!("webhook.url est vide");
+            return Err(IngestError::Webhook("webhook.url est vide".into()));
         }
         let response = self
             .client

@@ -16,7 +16,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use workflow_core::Config;
+use workflow_core::{Config, HardwareLock};
 
 /// Journal STEP1 : sortie standard pour le serveur et copie horodatée dans
 /// `logs/step1/extract_archives_*.log` comme l'implémentation Python.
@@ -84,6 +84,12 @@ pub struct Step1Options {
     pub preserved_mov_names: Vec<String>,
     /// `None` désactive le fichier de journal (tests).
     pub log_file: Option<PathBuf>,
+    /// Verrou matériel partagé avec STEP2/3/4. `None` le désactive (tests).
+    pub lock_path: Option<PathBuf>,
+    /// Budget de décompression par archive (anti zip bomb).
+    pub max_extracted_bytes: u64,
+    /// Ratio maximal taille décompressée / taille compressée.
+    pub max_compression_ratio: u64,
 }
 
 impl Step1Options {
@@ -127,6 +133,9 @@ impl Step1Options {
             skip_preserved_mov: config.steps.step1.skip_preserved_mov,
             preserved_mov_names,
             log_file,
+            lock_path: Some(config.hardware.lock_path.clone()),
+            max_extracted_bytes: config.steps.step1.max_extracted_bytes,
+            max_compression_ratio: config.steps.step1.max_compression_ratio,
         })
     }
 
@@ -153,6 +162,7 @@ impl Step1Report {
 
 /// Extrait les nouvelles archives puis normalise chaque projet.
 pub fn run_step1(options: &Step1Options) -> Result<Step1Report, StepError> {
+    let _lock = acquire_hardware_lock(options, options.normalize)?;
     let logger = options.logger();
     fs::create_dir_all(&options.projects_dir)?;
 
@@ -217,6 +227,10 @@ pub fn run_step1(options: &Step1Options) -> Result<Step1Report, StepError> {
             &options.docs_subfolder,
             &options.unrar,
             &logger,
+            archive::ExtractionLimits {
+                max_bytes: options.max_extracted_bytes,
+                max_compression_ratio: options.max_compression_ratio,
+            },
         ) {
             Ok(outcome) => {
                 report.extracted += 1;
@@ -279,6 +293,7 @@ pub fn run_step1(options: &Step1Options) -> Result<Step1Report, StepError> {
 
 /// Normalise les projets déjà extraits, sans toucher aux archives.
 pub fn run_normalize_only(options: &Step1Options) -> Result<NormalizationSummary, StepError> {
+    let _lock = acquire_hardware_lock(options, true)?;
     let logger = options.logger();
     logger.line("--- Démarrage de la normalisation seule (rattrapage) ---");
     logger.line(format!(
@@ -294,6 +309,25 @@ fn display_name(path: &Path) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.display().to_string())
+}
+
+fn acquire_hardware_lock(
+    options: &Step1Options,
+    uses_gpu: bool,
+) -> Result<Option<HardwareLock>, StepError> {
+    if !uses_gpu || !options.use_gpu {
+        return Ok(None);
+    }
+    let Some(path) = &options.lock_path else {
+        return Ok(None);
+    };
+    let lock = HardwareLock::acquire(path, false).map_err(|error| {
+        StepError::Lock(format!(
+            "verrou matériel STEP1 indisponible: {} (une autre étape GPU/Coral tourne peut-être): {error}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(lock))
 }
 
 #[cfg(test)]
@@ -323,7 +357,22 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
             log_file: None,
+            lock_path: None,
+            max_extracted_bytes: archive::ExtractionLimits::default().max_bytes,
+            max_compression_ratio: archive::ExtractionLimits::default().max_compression_ratio,
         }
+    }
+
+    #[test]
+    fn given_held_hardware_lock_when_gpu_normalization_then_rejected() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut options = base_options(&temp);
+        options.use_gpu = true;
+        options.lock_path = Some(temp.path().join("hardware.lock"));
+        fs::create_dir_all(&options.projects_dir).unwrap();
+        let _held = HardwareLock::acquire(options.lock_path.as_ref().unwrap(), false).unwrap();
+        let error = run_normalize_only(&options).unwrap_err();
+        assert!(error.to_string().contains("verrou"));
     }
 
     #[test]

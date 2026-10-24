@@ -5,6 +5,7 @@
 //! l'interface. Le serveur ne fait que l'exposer.
 
 pub mod download;
+pub mod error;
 pub mod history;
 pub mod monitor;
 pub mod service;
@@ -13,6 +14,7 @@ pub mod url;
 pub mod webhook;
 
 pub use download::{DownloadResult, Downloader, ErrorKind};
+pub use error::{IngestError, IngestResult};
 pub use history::{cooldown_remaining_s, FailureRecord, HistoryRepository, ImportReport};
 pub use monitor::{plan_downloads, DownloadPlan, PlanContext};
 pub use service::{validate_monitor_startup, IngestionService, MonitorHandle, MonitorStatus};

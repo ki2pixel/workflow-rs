@@ -34,124 +34,104 @@ impl Config {
 
     pub fn from_toml(text: &str) -> Result<Self, ConfigError> {
         let mut config: Self = toml::from_str(text)?;
-        config.apply_env_overrides();
+        config.apply_env_overrides()?;
         Ok(config)
     }
 
     /// Surcharges d'environnement. Les secrets utilisent `WORKFLOW_*` en
     /// priorité, puis les anciens noms pour la période de transition.
-    pub fn apply_env_overrides(&mut self) {
-        if let Some(value) = env_first(&["WORKFLOW_SERVER_SECRET_KEY", "FLASK_SECRET_KEY"]) {
+    ///
+    /// Une valeur non parsable est une erreur : une faute de frappe dans
+    /// `launcher.env` ne doit pas être silencieusement ignorée.
+    pub fn apply_env_overrides(&mut self) -> Result<(), ConfigError> {
+        self.apply_env_lookup(|name| env::var(name).ok())
+    }
+
+    pub(crate) fn apply_env_lookup(
+        &mut self,
+        lookup: impl Fn(&str) -> Option<String>,
+    ) -> Result<(), ConfigError> {
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_SERVER_SECRET_KEY", "FLASK_SECRET_KEY"])
+        {
             self.server.secret_key = value;
         }
-        if let Some(value) = env_first(&[
-            "WORKFLOW_SERVER_WORKER_TOKEN",
-            "INTERNAL_WORKER_COMMS_TOKEN",
-        ]) {
+        if let Some(value) = env_first(
+            &lookup,
+            &[
+                "WORKFLOW_SERVER_WORKER_TOKEN",
+                "INTERNAL_WORKER_COMMS_TOKEN",
+            ],
+        ) {
             self.server.worker_token = value;
         }
-        if let Some(value) = env_first(&["WORKFLOW_SERVER_PORT"]) {
-            if let Ok(port) = value.parse::<u16>() {
-                self.server.port = port;
-            }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_SERVER_PORT"]) {
+            self.server.port = parse_env(&value, "WORKFLOW_SERVER_PORT")?;
         }
-        if let Some(value) = env_first(&["WORKFLOW_PATHS_BASE"]) {
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_SERVER_ALLOW_REMOTE"]) {
+            self.server.allow_remote = parse_bool_env(&value, "WORKFLOW_SERVER_ALLOW_REMOTE")?;
+        }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_PATHS_BASE"]) {
             self.paths.base = PathBuf::from(value);
         }
-        if let Some(value) = env_first(&["WORKFLOW_WEBHOOK_URL", "WEBHOOK_JSON_URL"]) {
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_WEBHOOK_URL", "WEBHOOK_JSON_URL"]) {
             self.webhook.url = value;
         }
-        if let Some(value) = env_first(&["WORKFLOW_WEBHOOK_ENABLED", "WEBHOOK_ENABLED"]) {
-            if let Ok(parsed) = parse_bool(&value) {
-                self.webhook.enabled = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_WEBHOOK_ENABLED", "WEBHOOK_ENABLED"]) {
+            self.webhook.enabled = parse_bool_env(&value, "WORKFLOW_WEBHOOK_ENABLED")?;
         }
-        if let Some(value) = env_first(&["WEBHOOK_TIMEOUT"]) {
-            if let Ok(parsed) = value.parse() {
-                self.webhook.timeout_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["WEBHOOK_TIMEOUT"]) {
+            self.webhook.timeout_s = parse_env(&value, "WEBHOOK_TIMEOUT")?;
         }
-        if let Some(value) = env_first(&["WEBHOOK_CACHE_TTL"]) {
-            if let Ok(parsed) = value.parse() {
-                self.webhook.cache_ttl_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["WEBHOOK_CACHE_TTL"]) {
+            self.webhook.cache_ttl_s = parse_env(&value, "WEBHOOK_CACHE_TTL")?;
         }
-        if let Some(value) = env_first(&["WEBHOOK_MONITOR_INTERVAL"]) {
-            if let Ok(parsed) = value.parse() {
-                self.webhook.interval_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["WEBHOOK_MONITOR_INTERVAL"]) {
+            self.webhook.interval_s = parse_env(&value, "WEBHOOK_MONITOR_INTERVAL")?;
         }
-        if let Some(value) = env_first(&["WEBHOOK_REQUIRE_HISTORY"]) {
-            if let Ok(parsed) = parse_bool(&value) {
-                self.webhook.require_history = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["WEBHOOK_REQUIRE_HISTORY"]) {
+            self.webhook.require_history = parse_bool_env(&value, "WEBHOOK_REQUIRE_HISTORY")?;
         }
-        if let Some(value) = env_first(&["DRY_RUN_DOWNLOADS"]) {
-            if let Ok(parsed) = parse_bool(&value) {
-                self.webhook.dry_run = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DRY_RUN_DOWNLOADS"]) {
+            self.webhook.dry_run = parse_bool_env(&value, "DRY_RUN_DOWNLOADS")?;
         }
-        if let Some(value) = env_first(&["WORKFLOW_PATHS_DOWNLOADS"]) {
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_PATHS_DOWNLOADS"]) {
             self.paths.downloads = Some(PathBuf::from(value));
         }
-        if let Some(value) = env_first(&["WORKFLOW_STEP1_SOURCE_DIR"]) {
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_STEP1_SOURCE_DIR"]) {
             self.steps.step1.source_dir = PathBuf::from(value);
         }
-        if let Some(value) = env_first(&["DOWNLOAD_CHUNK_SIZE_BYTES"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.chunk_bytes = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_CONNECT_TIMEOUT_S"]) {
+            self.download.connect_timeout_s = parse_env(&value, "DOWNLOAD_CONNECT_TIMEOUT_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_CONNECT_TIMEOUT_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.connect_timeout_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_CHUNK_TIMEOUT_S"]) {
+            self.download.chunk_timeout_s = parse_env(&value, "DOWNLOAD_CHUNK_TIMEOUT_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_CHUNK_TIMEOUT_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.chunk_timeout_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_PROBE_TIMEOUT_S"]) {
+            self.download.probe_timeout_s = parse_env(&value, "DOWNLOAD_PROBE_TIMEOUT_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_PROBE_TIMEOUT_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.probe_timeout_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_MAX_ATTEMPTS"]) {
+            self.download.max_attempts = parse_env(&value, "DOWNLOAD_MAX_ATTEMPTS")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_MAX_ATTEMPTS"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.max_attempts = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_RETRY_BACKOFF_S"]) {
+            self.download.backoff_s = parse_env(&value, "DOWNLOAD_RETRY_BACKOFF_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_RETRY_BACKOFF_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.backoff_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_PROGRESS_MIN_INTERVAL_S"]) {
+            self.download.progress_min_interval_s =
+                parse_env(&value, "DOWNLOAD_PROGRESS_MIN_INTERVAL_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_PROGRESS_MIN_INTERVAL_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.progress_min_interval_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_MIN_ZIP_SIZE_BYTES"]) {
+            self.download.min_zip_bytes = parse_env(&value, "DOWNLOAD_MIN_ZIP_SIZE_BYTES")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_MIN_ZIP_SIZE_BYTES"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.min_zip_bytes = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_VALIDATE_ZIP"]) {
+            self.download.validate_zip = parse_bool_env(&value, "DOWNLOAD_VALIDATE_ZIP")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_VALIDATE_ZIP"]) {
-            if let Ok(parsed) = parse_bool(&value) {
-                self.download.validate_zip = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_COOLDOWN_MAX_S"]) {
+            self.download.cooldown_max_s = parse_env(&value, "DOWNLOAD_COOLDOWN_MAX_S")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_COOLDOWN_MAX_S"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.cooldown_max_s = parsed;
-            }
+        if let Some(value) = env_first(&lookup, &["DOWNLOAD_MAX_CONCURRENT"]) {
+            self.download.max_concurrent = parse_env(&value, "DOWNLOAD_MAX_CONCURRENT")?;
         }
-        if let Some(value) = env_first(&["DOWNLOAD_MAX_CONCURRENT"]) {
-            if let Ok(parsed) = value.parse() {
-                self.download.max_concurrent = parsed;
-            }
-        }
+        Ok(())
     }
 
     /// Validation utilisable par la CLI, sans exiger les secrets du serveur.
@@ -214,7 +194,6 @@ impl Config {
         if self.steps.step3.median_filter_size == 0
             || self.steps.step3.embedding_stride == 0
             || self.steps.step3.adaptive_threshold == 0
-            || self.steps.step3.max_workers == 0
             || self.steps.step3.max_speakers == 0
             || self.steps.step3.min_cluster_embeddings == 0
             || self.steps.step3.ecapa_batch_size == 0
@@ -235,9 +214,15 @@ impl Config {
                     .into(),
             ));
         }
-        if self.hardware.gpu_mem_limit_mb == 0 {
+        if self.steps.step1.max_extracted_bytes == 0 || self.steps.step1.max_compression_ratio == 0
+        {
             return Err(ConfigError::Invalid(
-                "hardware.gpu_mem_limit_mb doit être strictement positif".into(),
+                "steps.step1: max_extracted_bytes et max_compression_ratio doivent être > 0".into(),
+            ));
+        }
+        if self.steps.step7.timeout_s == 0 {
+            return Err(ConfigError::Invalid(
+                "steps.step7.timeout_s doit être strictement positif".into(),
             ));
         }
         if !matches!(
@@ -302,8 +287,7 @@ impl Config {
                 "webhook.timeout_s et webhook.interval_s doivent être > 0".into(),
             ));
         }
-        if self.download.chunk_bytes == 0
-            || self.download.connect_timeout_s == 0
+        if self.download.connect_timeout_s == 0
             || self.download.chunk_timeout_s == 0
             || self.download.probe_timeout_s == 0
             || self.download.max_attempts == 0
@@ -311,13 +295,24 @@ impl Config {
             || self.download.min_zip_bytes == 0
         {
             return Err(ConfigError::Invalid(
-                "download: chunk, timeouts, tentatives, concurrence et taille ZIP doivent être > 0"
-                    .into(),
+                "download: timeouts, tentatives, concurrence et taille ZIP doivent être > 0".into(),
             ));
         }
         if self.download.backoff_s < 0.0 || self.download.progress_min_interval_s < 0.0 {
             return Err(ConfigError::Invalid(
                 "download.backoff_s et download.progress_min_interval_s doivent être positifs"
+                    .into(),
+            ));
+        }
+        if self
+            .hardware
+            .lock_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == "workflow-hw.lock")
+        {
+            return Err(ConfigError::Invalid(
+                "hardware.lock_path ne peut pas utiliser workflow-hw.lock (verrou Python legacy)"
                     .into(),
             ));
         }
@@ -352,10 +347,11 @@ impl Config {
                 "server.max_step_log_bytes doit être supérieur ou égal à 1024".into(),
             ));
         }
-        if self.server.secret_key.trim().is_empty() {
-            return Err(ConfigError::Invalid(
-                "server.secret_key est vide (secret obligatoire)".into(),
-            ));
+        if !is_loopback_host(&self.server.host) && !self.server.allow_remote {
+            return Err(ConfigError::Invalid(format!(
+                "server.host ({}) n'est pas une adresse loopback; définir server.allow_remote = true pour exposer le serveur",
+                self.server.host
+            )));
         }
         let token = self.server.worker_token.trim();
         if token.is_empty() || token == "dev-internal-worker-token" || token.starts_with("dev-") {
@@ -367,9 +363,19 @@ impl Config {
     }
 }
 
-fn env_first(names: &[&str]) -> Option<String> {
+fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim();
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    host.parse::<std::net::IpAddr>()
+        .map(|address| address.is_loopback())
+        .unwrap_or(false)
+}
+
+fn env_first(lookup: &impl Fn(&str) -> Option<String>, names: &[&str]) -> Option<String> {
     for name in names {
-        if let Ok(value) = env::var(name) {
+        if let Some(value) = lookup(name) {
             if !value.is_empty() {
                 return Some(value);
             }
@@ -378,11 +384,22 @@ fn env_first(names: &[&str]) -> Option<String> {
     None
 }
 
-fn parse_bool(value: &str) -> Result<bool, ()> {
+fn parse_env<T>(value: &str, name: &str) -> Result<T, ConfigError>
+where
+    T: std::str::FromStr,
+{
+    value
+        .parse()
+        .map_err(|_| ConfigError::Invalid(format!("{name}={value:?} n'est pas une valeur valide")))
+}
+
+fn parse_bool_env(value: &str, name: &str) -> Result<bool, ConfigError> {
     match value.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
         "0" | "false" | "no" | "off" => Ok(false),
-        _ => Err(()),
+        _ => Err(ConfigError::Invalid(format!(
+            "{name}={value:?} n'est pas un booléen valide"
+        ))),
     }
 }
 
@@ -391,14 +408,15 @@ fn parse_bool(value: &str) -> Result<bool, ()> {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub debug: bool,
+    /// Autorise explicitement une écoute non-loopback. Sans ce flag, le
+    /// serveur refuse de démarrer hors loopback.
+    pub allow_remote: bool,
+    /// Conservé pour compatibilité avec `launcher.env` ; aucune session
+    /// signée ne l'utilise encore côté Rust.
     pub secret_key: String,
     pub worker_token: String,
-    pub polling_interval_ms: u64,
-    pub system_monitor_interval_ms: u64,
-    pub snapshot_interval_s: u64,
-    pub slow_api_threshold_ms: u64,
-    pub gpu_monitoring: bool,
+    /// Âge minimal des fichiers orphelins purgés au démarrage. 0 désactive.
+    pub orphan_max_age_hours: u64,
     /// Binaire `workflow-cli` utilisé pour exécuter les étapes dans un
     /// processus isolé. Un chemin relatif est résolu depuis `workdir`.
     pub workflow_cli: PathBuf,
@@ -419,14 +437,10 @@ impl Default for ServerConfig {
         Self {
             host: "127.0.0.1".into(),
             port: 5004,
-            debug: false,
+            allow_remote: false,
             secret_key: String::new(),
             worker_token: String::new(),
-            polling_interval_ms: 1_000,
-            system_monitor_interval_ms: 5_000,
-            snapshot_interval_s: 10,
-            slow_api_threshold_ms: 500,
-            gpu_monitoring: true,
+            orphan_max_age_hours: 24,
             workflow_cli: PathBuf::from("target/release/workflow-cli"),
             workdir: PathBuf::from("."),
             frontend_dir: PathBuf::from("assets/web/static"),
@@ -542,10 +556,9 @@ impl Default for WebhookConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DownloadConfig {
-    /// Taille de lecture historique. Le streaming reqwest gère lui-même ses
-    /// tampons réseau ; la valeur reste acceptée et validée pour compatibilité
-    /// avec les `.env` Python, mais ne change pas le découpage des paquets.
-    pub chunk_bytes: u64,
+    /// Autorise les adresses privées/loopback. Réservé aux tests locaux et
+    /// aux déploiements internes explicites ; false en production.
+    pub allow_private_hosts: bool,
     pub connect_timeout_s: u64,
     pub chunk_timeout_s: u64,
     pub probe_timeout_s: u64,
@@ -563,7 +576,7 @@ pub struct DownloadConfig {
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
-            chunk_bytes: 512 * 1024,
+            allow_private_hosts: false,
             connect_timeout_s: 15,
             chunk_timeout_s: 60,
             probe_timeout_s: 10,
@@ -642,6 +655,10 @@ pub struct Step1Config {
     pub delete_archive: bool,
     /// Délai maximal du sous-processus STEP1 (extraction + normalisation).
     pub timeout_s: u64,
+    /// Budget cumulé de décompression par archive (anti zip bomb).
+    pub max_extracted_bytes: u64,
+    /// Ratio maximal taille décompressée / taille compressée par membre.
+    pub max_compression_ratio: u64,
 }
 
 impl Default for Step1Config {
@@ -657,6 +674,8 @@ impl Default for Step1Config {
             gpu_workers: 3,
             delete_archive: true,
             timeout_s: 14_400,
+            max_extracted_bytes: 100 * 1024 * 1024 * 1024,
+            max_compression_ratio: 200,
         }
     }
 }
@@ -721,7 +740,6 @@ pub struct Step3Config {
     pub adaptive_stride: bool,
     /// Nombre de fenêtres de parole à partir duquel le stride adaptatif vaut 2.
     pub adaptive_threshold: u32,
-    pub max_workers: u32,
     /// Modèle YAMNet Split compilé pour l'Edge TPU.
     pub yamnet: PathBuf,
     /// Modèle YAMNet Split quantifié, utilisé uniquement par `device = "cpu"`.
@@ -759,7 +777,6 @@ impl Default for Step3Config {
             embedding_stride: 1,
             adaptive_stride: false,
             adaptive_threshold: 500,
-            max_workers: 4,
             yamnet: PathBuf::from("step3/yamnet_split_edgetpu_compiled.tflite"),
             yamnet_fallback: PathBuf::from("step3/yamnet_split_quantized.tflite"),
             mel_matrix: PathBuf::from("step3/yamnet_mel_matrix.npy"),
@@ -913,6 +930,7 @@ pub struct Step7Config {
     pub mode: String,
     pub restore_archives: bool,
     pub delete_source: bool,
+    pub timeout_s: u64,
 }
 
 impl Default for Step7Config {
@@ -922,6 +940,7 @@ impl Default for Step7Config {
             mode: "lenient".into(),
             restore_archives: false,
             delete_source: true,
+            timeout_s: 14_400,
         }
     }
 }
@@ -982,22 +1001,13 @@ impl Default for RetentionConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct HardwareConfig {
     pub lock_path: PathBuf,
-    pub tpu_device: PathBuf,
-    pub gpu_mem_limit_mb: u32,
-    pub require_tpu: bool,
 }
 
 impl Default for HardwareConfig {
     fn default() -> Self {
-        let lock_path = env::var("XDG_RUNTIME_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/tmp"))
-            .join("workflow-hw.lock");
         Self {
-            lock_path,
-            tpu_device: PathBuf::from("/dev/apex_0"),
-            gpu_mem_limit_mb: 4_096,
-            require_tpu: true,
+            // Toujours distinct du verrou Python legacy `/tmp/workflow-hw.lock` (D-012).
+            lock_path: PathBuf::from("/tmp/workflow-rs-hw.lock"),
         }
     }
 }
@@ -1057,7 +1067,68 @@ mod tests {
 
     #[test]
     fn env_override_applies_secret() {
-        // Le test ne peut pas manipuler l'environnement global sans risque de
-        // collision avec les autres tests. La méthode est couverte par la CLI.
+        let mut config = Config::default();
+        config
+            .apply_env_lookup(|name| match name {
+                "WORKFLOW_SERVER_SECRET_KEY" => Some("secret".into()),
+                "WORKFLOW_SERVER_WORKER_TOKEN" => Some("token".into()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(config.server.secret_key, "secret");
+        assert_eq!(config.server.worker_token, "token");
+    }
+
+    #[test]
+    fn invalid_env_override_is_rejected() {
+        let mut config = Config::default();
+        let error = config
+            .apply_env_lookup(|name| (name == "WORKFLOW_SERVER_PORT").then(|| "abc".into()))
+            .unwrap_err();
+        assert!(error.to_string().contains("WORKFLOW_SERVER_PORT"));
+    }
+
+    #[test]
+    fn invalid_bool_env_override_is_rejected() {
+        let mut config = Config::default();
+        let error = config
+            .apply_env_lookup(|name| (name == "WORKFLOW_WEBHOOK_ENABLED").then(|| "oui".into()))
+            .unwrap_err();
+        assert!(error.to_string().contains("WORKFLOW_WEBHOOK_ENABLED"));
+    }
+
+    #[test]
+    fn default_hardware_lock_is_the_rust_one() {
+        let config = Config::from_toml("").unwrap();
+        assert_eq!(
+            config.hardware.lock_path,
+            PathBuf::from("/tmp/workflow-rs-hw.lock")
+        );
+    }
+
+    #[test]
+    fn python_hardware_lock_is_rejected_everywhere() {
+        let mut config = Config::default();
+        config.hardware.lock_path = PathBuf::from("/run/user/1000/workflow-hw.lock");
+        assert!(config.validate_common().is_err());
+    }
+
+    #[test]
+    fn non_loopback_host_requires_allow_remote() {
+        let mut config = Config::default();
+        config.server.worker_token = "token".into();
+        config.steps.step1.source_dir = PathBuf::from("/tmp/downloads");
+        config.server.host = "0.0.0.0".into();
+        assert!(config.validate_server().is_err());
+        config.server.allow_remote = true;
+        assert!(config.validate_server().is_ok());
+    }
+
+    #[test]
+    fn empty_secret_key_is_accepted() {
+        let mut config = Config::default();
+        config.server.worker_token = "token".into();
+        config.steps.step1.source_dir = PathBuf::from("/tmp/downloads");
+        assert!(config.validate_server().is_ok());
     }
 }

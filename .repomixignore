@@ -1,0 +1,9 @@
+# Secrets et données locales — ne jamais exporter dans un bundle d'audit.
+config/launcher.env
+runtime/
+parity/
+assets/models/
+vendor/
+target/
+*.part
+*.tmp

@@ -23,7 +23,7 @@
 [server]
 host = "127.0.0.1"
 port = 5004
-debug = false
+allow_remote = false
 secret_key = ""
 worker_token = ""
 workflow_cli = "/home/kidpixel/workflow-rs/target/release/workflow-cli"
@@ -32,6 +32,7 @@ frontend_dir = "/home/kidpixel/workflow-rs/assets/web/static"
 template = "/home/kidpixel/workflow-rs/assets/web/templates/index_new.html"
 sound_design_dir = "/home/kidpixel/workflow-rs/assets/web/sound-design"
 max_step_log_bytes = 5242880
+orphan_max_age_hours = 24
 
 [paths]
 base = "/home/kidpixel/workflow-rs/runtime"
@@ -69,7 +70,7 @@ interval_s = 15
 dry_run = false
 
 [download]
-chunk_bytes = 524288
+allow_private_hosts = false
 connect_timeout_s = 15
 chunk_timeout_s = 60
 probe_timeout_s = 10
@@ -99,6 +100,8 @@ crf = 28
 gpu_workers = 3
 delete_archive = true
 timeout_s = 14400
+max_extracted_bytes = 107374182400
+max_compression_ratio = 200
 skip_preserved_mov = true
 preserved_mov_names = ["m6+.mov"]
 
@@ -115,7 +118,6 @@ device = "tpu"
 embedding_stride = 1
 adaptive_stride = false
 adaptive_threshold = 500
-max_workers = 1
 yamnet = "step3/yamnet_split_edgetpu_compiled.tflite"
 yamnet_fallback = "step3/yamnet_split_quantized.tflite"
 mel_matrix = "step3/yamnet_mel_matrix.npy"
@@ -182,6 +184,7 @@ cleanup_threshold_hours = 48
 mode = "lenient"
 restore_archives = false
 delete_source = true
+timeout_s = 14400
 
 [steps.step8]
 timeout_s = 14400
@@ -204,9 +207,6 @@ reports_days = 90
 [hardware]
 # Verrou distinct du serveur Python legacy (/tmp/workflow-hw.lock).
 lock_path = "/tmp/workflow-rs-hw.lock"
-tpu_device = "/dev/apex_0"
-gpu_mem_limit_mb = 4096
-require_tpu = true
 
 [steps.step2]
 cudnn_algo_search = true

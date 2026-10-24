@@ -6,6 +6,7 @@
 
 pub mod catalog;
 pub mod db;
+pub mod error;
 pub mod http;
 pub mod progress;
 pub mod runner;

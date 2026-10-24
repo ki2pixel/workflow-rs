@@ -244,57 +244,57 @@ pub struct BlendFilter {
 impl BlendFilter {
     pub fn filter(&self, values: &[f64; 52]) -> Option<Vec<(String, f64)>> {
         let profile = self.profile.trim().to_ascii_lowercase();
-        let all: Vec<(String, f64)> = ARKIT_52_BLENDSHAPE_NAMES
-            .iter()
-            .enumerate()
-            .map(|(index, name)| ((*name).to_string(), values[index]))
-            .collect();
-        if profile.is_empty() || matches!(profile.as_str(), "full" | "all") {
-            return Some(all);
-        }
         if matches!(profile.as_str(), "none" | "off" | "0" | "false" | "no") {
             return None;
         }
+        if profile.is_empty() || matches!(profile.as_str(), "full" | "all") {
+            return Some(Self::collect(|_| true, values));
+        }
         if profile == "mouth" {
-            let mut filtered: Vec<(String, f64)> = all
-                .into_iter()
-                .filter(|(name, _)| name.starts_with("mouth") || name.starts_with("jaw"))
-                .collect();
+            let mut filtered = Self::collect(
+                |name| name.starts_with("mouth") || name.starts_with("jaw"),
+                values,
+            );
             if self.include_tongue {
-                if let Some(value) = values
-                    .iter()
-                    .enumerate()
-                    .find(|(index, _)| ARKIT_52_BLENDSHAPE_NAMES[*index] == "tongueOut")
-                    .map(|(_, value)| *value)
-                {
-                    filtered.push(("tongueOut".to_string(), value));
+                if let Some(index) = blend_index("tongueOut") {
+                    filtered.push(("tongueOut".to_string(), values[index]));
                 }
             }
             return (!filtered.is_empty()).then_some(filtered);
         }
         if profile == "mediapipe" {
-            let mut filtered: Vec<(String, f64)> = all
-                .into_iter()
-                .filter(|(name, _)| name != "tongueOut")
-                .collect();
+            let mut filtered = Self::collect(|name| name != "tongueOut", values);
             filtered.push(("_neutral".to_string(), 0.0));
-            return (!filtered.is_empty()).then_some(filtered);
+            return Some(filtered);
         }
         if profile == "custom" {
-            let mut filtered = Vec::new();
+            let mut filtered = Vec::with_capacity(self.export_keys.len());
             for key in &self.export_keys {
-                if let Some(value) = all
-                    .iter()
-                    .find(|(name, _)| name == key)
-                    .map(|(_, value)| *value)
-                {
-                    filtered.push((key.clone(), value));
+                if let Some(index) = blend_index(key) {
+                    filtered.push((key.clone(), values[index]));
                 }
             }
             return (!filtered.is_empty()).then_some(filtered);
         }
-        Some(all)
+        Some(Self::collect(|_| true, values))
     }
+
+    /// Ne matérialise que les entrées retenues : un profil `none` ou `custom`
+    /// ne paie plus les 52 allocations de noms par frame.
+    fn collect(predicate: impl Fn(&str) -> bool, values: &[f64; 52]) -> Vec<(String, f64)> {
+        ARKIT_52_BLENDSHAPE_NAMES
+            .iter()
+            .enumerate()
+            .filter(|(_, name)| predicate(name))
+            .map(|(index, name)| ((*name).to_string(), values[index]))
+            .collect()
+    }
+}
+
+fn blend_index(name: &str) -> Option<usize> {
+    ARKIT_52_BLENDSHAPE_NAMES
+        .iter()
+        .position(|candidate| *candidate == name)
 }
 
 #[cfg(test)]

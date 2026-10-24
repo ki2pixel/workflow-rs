@@ -2,12 +2,13 @@
 //! historique → statut UI.
 
 use crate::download::{DownloadResult, Downloader, ErrorKind, ProgressCallback};
+use crate::error::{IngestError, IngestResult as Result};
 use crate::history::HistoryRepository;
 use crate::monitor::{plan_downloads, DownloadPlan, PlanContext};
 use crate::tracker::{new_download_id, DownloadRecord, DownloadTracker};
 use crate::url::normalize_url;
 use crate::webhook::WebhookClient;
-use anyhow::{Context, Result};
+use anyhow::Context;
 use chrono::{DateTime, Local, NaiveDateTime};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -45,17 +46,17 @@ pub fn validate_monitor_startup(config: &Config, history_count: u64) -> Result<(
         return Ok(());
     }
     if config.webhook.require_history && history_count == 0 {
-        anyhow::bail!(
-            "webhook activé mais download_history est vide: importez d'abord la base Python avec `workflow-cli history import --from <base>` (ou désactivez webhook.require_history)"
-        );
+        return Err(IngestError::Message(
+            "webhook activé mais download_history est vide: importez d'abord la base Python avec `workflow-cli history import --from <base>` (ou désactivez webhook.require_history)".into(),
+        ));
     }
     let resolved = config.paths.resolve();
     if config.steps.step1.source_dir != resolved.downloads {
-        anyhow::bail!(
+        return Err(IngestError::Message(format!(
             "webhook activé mais steps.step1.source_dir ({}) diffère de paths.downloads ({}): STEP1 ne verrait pas les archives téléchargées",
             config.steps.step1.source_dir.display(),
             resolved.downloads.display()
-        );
+        )));
     }
     Ok(())
 }
@@ -152,14 +153,14 @@ impl IngestionService {
             if *shutdown.borrow() {
                 break;
             }
-            self.set_monitor("checking", None);
+            self.set_monitor("running", None);
             match self.check_once().await {
                 Ok(count) => {
-                    self.set_monitor("active", None);
+                    self.set_monitor("running", None);
                     tracing::debug!("moniteur webhook: {count} téléchargement(s) planifié(s)");
                 }
                 Err(error) => {
-                    self.set_monitor("error", Some(error.to_string()));
+                    self.set_monitor("running", Some(error.to_string()));
                     tracing::error!("moniteur webhook: {error:#}");
                 }
             }
@@ -190,8 +191,14 @@ impl IngestionService {
             .fetch()
             .await
             .ok_or_else(|| anyhow::anyhow!("webhook indisponible"))?;
-        let history = self.history.get_urls()?;
-        let failures = self.history.get_failure_map()?;
+        let repository = self.history.clone();
+        let (history, failures) = tokio::task::spawn_blocking(move || {
+            let history = repository.get_urls()?;
+            let failures = repository.get_failure_map()?;
+            Ok::<_, anyhow::Error>((history, failures))
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("lecture SQLite interrompue: {error}"))??;
         let tracked = self.tracker.tracked_urls();
         let plans = plan_downloads(
             &records,

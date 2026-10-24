@@ -98,6 +98,7 @@ impl StepKey {
     pub fn timeout_s(self, config: &Config) -> u64 {
         match self {
             Self::Step1 => config.steps.step1.timeout_s,
+            Self::Step7 => config.steps.step7.timeout_s,
             Self::Step8 => config.steps.step8.timeout_s,
             _ => config.steps.default_timeout_s,
         }
@@ -260,6 +261,13 @@ mod tests {
             .expect("commande STEP1");
         assert_eq!(step1[3], OsString::from("step1"));
         assert_eq!(step1[4], OsString::from("run"));
+    }
+
+    #[test]
+    fn step7_timeout_is_configurable() {
+        let mut config = Config::default();
+        config.steps.step7.timeout_s = 42;
+        assert_eq!(StepKey::Step7.timeout_s(&config), 42);
     }
 
     #[test]

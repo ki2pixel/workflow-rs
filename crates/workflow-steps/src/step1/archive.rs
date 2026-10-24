@@ -12,12 +12,68 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 const PROCESSED_ARCHIVES_FILE: &str = "processed_archives.txt";
 const PROCESSED_ARCHIVES_RESET_MARKER: &str = "processed_archives.last_reset";
 const ARCHIVE_EXTENSIONS: [&str; 6] = [".zip", ".zipx", ".rar", ".tgz", ".7z", ".tar"];
+
+/// Budgets appliqués à chaque archive. Ils bornent les bombes de
+/// décompression sans pénaliser les vidéos (ratio faible, taille réelle).
+#[derive(Debug, Clone, Copy)]
+pub struct ExtractionLimits {
+    pub max_bytes: u64,
+    pub max_compression_ratio: u64,
+}
+
+impl Default for ExtractionLimits {
+    fn default() -> Self {
+        Self {
+            max_bytes: 100 * 1024 * 1024 * 1024,
+            max_compression_ratio: 200,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MemberWrite {
+    Written,
+    Skipped,
+    QuotaExceeded,
+}
+
+struct ExtractionBudget {
+    remaining: u64,
+    max_ratio: u64,
+}
+
+impl ExtractionBudget {
+    fn new(limits: ExtractionLimits) -> Self {
+        Self {
+            remaining: limits.max_bytes,
+            max_ratio: limits.max_compression_ratio,
+        }
+    }
+
+    fn check_declared(&self, declared: u64, compressed: u64) -> bool {
+        if declared > self.remaining {
+            return false;
+        }
+        if compressed > 0 && declared / compressed.max(1) > self.max_ratio {
+            return false;
+        }
+        true
+    }
+
+    fn consume(&mut self, bytes: u64) -> bool {
+        if bytes > self.remaining {
+            return false;
+        }
+        self.remaining -= bytes;
+        true
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveError {
@@ -276,6 +332,7 @@ pub fn extract_archive(
     docs_subfolder: &str,
     unrar: &Path,
     logger: &RunLogger,
+    limits: ExtractionLimits,
 ) -> Result<ExtractionOutcome, ArchiveError> {
     let project_folder_name = derive_project_folder_name(
         archive
@@ -300,18 +357,38 @@ pub fn extract_archive(
     ));
 
     let mut sanitizer = FilenameSanitizer::new();
+    let mut budget = ExtractionBudget::new(limits);
     let (security_issues, extraction_ok) = match archive_extension(archive).as_str() {
         ".zip" | ".zipx" => {
             logger.line(format!("Extraction ZIP sécurisée de {archive_name}"));
-            extract_zip(archive, &temp_extract_dir, &mut sanitizer, logger)?
+            extract_zip(
+                archive,
+                &temp_extract_dir,
+                &mut sanitizer,
+                logger,
+                &mut budget,
+            )?
         }
         ".rar" => {
             logger.line(format!("Extraction RAR sécurisée de {archive_name}"));
-            extract_rar(archive, &temp_extract_dir, unrar, &mut sanitizer, logger)?
+            extract_rar(
+                archive,
+                &temp_extract_dir,
+                unrar,
+                &mut sanitizer,
+                logger,
+                &mut budget,
+            )?
         }
         ".tar" | ".gz" | ".bz2" | ".xz" | ".tgz" => {
             logger.line(format!("Extraction TAR sécurisée de {archive_name}"));
-            extract_tar(archive, &temp_extract_dir, &mut sanitizer, logger)?
+            extract_tar(
+                archive,
+                &temp_extract_dir,
+                &mut sanitizer,
+                logger,
+                &mut budget,
+            )?
         }
         other => {
             logger.line(format!("Format non supporté: {}", archive.display()));
@@ -458,6 +535,7 @@ fn extract_zip(
     destination: &Path,
     sanitizer: &mut FilenameSanitizer,
     logger: &RunLogger,
+    budget: &mut ExtractionBudget,
 ) -> Result<(usize, bool), ArchiveError> {
     let file = File::open(archive)?;
     let mut zip = zip::ZipArchive::new(file)
@@ -478,6 +556,13 @@ fn extract_zip(
         if name.ends_with('/') || entry.is_dir() {
             continue;
         }
+        if !budget.check_declared(entry.size(), entry.compressed_size()) {
+            return Err(ArchiveError::Invalid(format!(
+                "budget de décompression dépassé pour '{}' dans {}",
+                name,
+                archive.display()
+            )));
+        }
         let result = sanitizer.sanitize_archive_member_path(&name);
         security_issues += result.security_issues.len();
         if result.was_modified {
@@ -486,14 +571,22 @@ fn extract_zip(
                 result.sanitized_name
             ));
         }
-        if !write_member(
+        match write_member(
             destination,
             &result.sanitized_name,
             &mut entry,
             logger,
             &name,
+            budget,
         ) {
-            security_issues += 1;
+            MemberWrite::Written => {}
+            MemberWrite::Skipped => security_issues += 1,
+            MemberWrite::QuotaExceeded => {
+                return Err(ArchiveError::Invalid(format!(
+                    "budget de décompression dépassé dans {}",
+                    archive.display()
+                )))
+            }
         }
     }
     Ok((security_issues, true))
@@ -504,6 +597,7 @@ fn extract_tar(
     destination: &Path,
     sanitizer: &mut FilenameSanitizer,
     logger: &RunLogger,
+    budget: &mut ExtractionBudget,
 ) -> Result<(usize, bool), ArchiveError> {
     let reader = open_tar_reader(archive)?;
     let mut tar = tar::Archive::new(reader);
@@ -535,6 +629,14 @@ fn extract_tar(
             .path()
             .map(|path| path.to_string_lossy().to_string())
             .unwrap_or_default();
+        let declared = entry.header().size().unwrap_or(0);
+        if !budget.check_declared(declared, 0) {
+            return Err(ArchiveError::Invalid(format!(
+                "budget de décompression dépassé pour '{}' dans {}",
+                name,
+                archive.display()
+            )));
+        }
         let result = sanitizer.sanitize_archive_member_path(&name);
         security_issues += result.security_issues.len();
         if result.was_modified {
@@ -543,14 +645,22 @@ fn extract_tar(
                 result.sanitized_name
             ));
         }
-        if !write_member(
+        match write_member(
             destination,
             &result.sanitized_name,
             &mut entry,
             logger,
             &name,
+            budget,
         ) {
-            security_issues += 1;
+            MemberWrite::Written => {}
+            MemberWrite::Skipped => security_issues += 1,
+            MemberWrite::QuotaExceeded => {
+                return Err(ArchiveError::Invalid(format!(
+                    "budget de décompression dépassé dans {}",
+                    archive.display()
+                )))
+            }
         }
     }
     Ok((security_issues, true))
@@ -562,6 +672,7 @@ fn extract_rar(
     unrar: &Path,
     sanitizer: &mut FilenameSanitizer,
     logger: &RunLogger,
+    budget: &mut ExtractionBudget,
 ) -> Result<(usize, bool), ArchiveError> {
     let listing = Command::new(unrar)
         .args(["lb", "-p-", "--"])
@@ -590,13 +701,44 @@ fn extract_rar(
                 result.sanitized_name
             ));
         }
-        let output = Command::new(unrar)
+        let mut child = Command::new(unrar)
             .args(["p", "-inul", "-p-", "--"])
             .arg(archive)
             .arg(member)
-            .output()
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|error| ArchiveError::Tool(format!("unrar: {error}")))?;
+        let mut stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| ArchiveError::Tool("unrar: stdout indisponible".into()))?;
+        let target = destination.join(&result.sanitized_name);
+        let member_write = write_member(
+            destination,
+            &result.sanitized_name,
+            &mut stdout,
+            logger,
+            member,
+            budget,
+        );
+        // Fermer le tube permet à unrar de terminer même si l'écriture a été
+        // interrompue (chemin non sûr, disque plein, quota).
+        drop(stdout);
+        let output = child
+            .wait_with_output()
+            .map_err(|error| ArchiveError::Tool(format!("unrar: {error}")))?;
+        if member_write == MemberWrite::QuotaExceeded {
+            return Err(ArchiveError::Invalid(format!(
+                "budget de décompression dépassé dans {}",
+                archive.display()
+            )));
+        }
         if !output.status.success() {
+            if member_write == MemberWrite::Written {
+                let _ = fs::remove_file(&target);
+            }
             logger.line(format!(
                 "Échec de lecture du membre RAR '{member}' de {}: {}",
                 archive.display(),
@@ -604,14 +746,7 @@ fn extract_rar(
             ));
             continue;
         }
-        let mut reader = io::Cursor::new(output.stdout);
-        if !write_member(
-            destination,
-            &result.sanitized_name,
-            &mut reader,
-            logger,
-            member,
-        ) {
+        if member_write == MemberWrite::Skipped {
             security_issues += 1;
         }
     }
@@ -624,38 +759,61 @@ fn write_member(
     reader: &mut impl Read,
     logger: &RunLogger,
     original_name: &str,
-) -> bool {
+    budget: &mut ExtractionBudget,
+) -> MemberWrite {
     if !validate_extraction_path(sanitized_name, destination) {
         logger.line(format!(
             "Unsafe extraction path detected, skipping: {original_name}"
         ));
-        return false;
+        return MemberWrite::Skipped;
     }
     let target = destination.join(sanitized_name);
     if let Some(parent) = target.parent() {
         if let Err(error) = fs::create_dir_all(parent) {
             logger.line(format!("Impossible de créer {}: {error}", parent.display()));
-            return false;
+            return MemberWrite::Skipped;
         }
     }
-    match File::create(&target) {
-        Ok(mut file) => {
-            if let Err(error) = io::copy(reader, &mut file) {
-                logger.line(format!(
-                    "Échec d'extraction du membre '{original_name}': {error}"
-                ));
-                let _ = fs::remove_file(&target);
-                return false;
-            }
-            true
-        }
+    let mut file = match File::create(&target) {
+        Ok(file) => file,
         Err(error) => {
             logger.line(format!(
                 "Échec d'extraction du membre '{original_name}': {error}"
             ));
-            false
+            return MemberWrite::Skipped;
+        }
+    };
+    let mut buffer = vec![0_u8; 64 * 1024];
+    loop {
+        let read = match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(error) => {
+                logger.line(format!(
+                    "Échec d'extraction du membre '{original_name}': {error}"
+                ));
+                let _ = fs::remove_file(&target);
+                return MemberWrite::Skipped;
+            }
+        };
+        if !budget.consume(read as u64) {
+            logger.line(format!(
+                "Budget de décompression dépassé pour le membre '{original_name}'"
+            ));
+            drop(file);
+            let _ = fs::remove_file(&target);
+            return MemberWrite::QuotaExceeded;
+        }
+        if let Err(error) = file.write_all(&buffer[..read]) {
+            logger.line(format!(
+                "Échec d'extraction du membre '{original_name}': {error}"
+            ));
+            drop(file);
+            let _ = fs::remove_file(&target);
+            return MemberWrite::Skipped;
         }
     }
+    MemberWrite::Written
 }
 
 fn open_tar_reader(archive: &Path) -> Result<Box<dyn Read>, ArchiveError> {
@@ -834,13 +992,116 @@ mod tests {
         let projects = temp.path().join("projects");
         fs::create_dir_all(&projects).unwrap();
         let logger = RunLogger::new(None);
-        let outcome =
-            extract_archive(&archive, &projects, "docs", Path::new("unrar"), &logger).unwrap();
+        let outcome = extract_archive(
+            &archive,
+            &projects,
+            "docs",
+            Path::new("unrar"),
+            &logger,
+            ExtractionLimits::default(),
+        )
+        .unwrap();
         let docs = outcome.docs_dir;
         assert!(docs.join("ok.txt").exists());
         assert!(docs.join("escape.txt").exists());
         assert!(!temp.path().join("escape.txt").exists());
         assert!(!projects.join("_temp_13 Camille").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rar_member_is_streamed_and_partial_file_removed_on_failure() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("17_Camille.rar");
+        fs::write(&archive, b"fake rar").unwrap();
+        let projects = temp.path().join("projects");
+        fs::create_dir_all(&projects).unwrap();
+        let unrar = temp.path().join("unrar");
+        fs::write(
+            &unrar,
+            "#!/bin/sh\nif [ \"$1\" = \"lb\" ]; then echo 'root/clip.bin'; exit 0; fi\nif [ \"$1\" = \"p\" ]; then head -c 8388608 /dev/zero; exit 0; fi\nexit 2\n",
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&unrar).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&unrar, permissions).unwrap();
+
+        let logger = RunLogger::new(None);
+        let outcome = extract_archive(
+            &archive,
+            &projects,
+            "docs",
+            &unrar,
+            &logger,
+            ExtractionLimits::default(),
+        )
+        .unwrap();
+        let extracted = outcome.docs_dir.join("clip.bin");
+        assert_eq!(fs::metadata(&extracted).unwrap().len(), 8_388_608);
+
+        let second = temp.path().join("18_Camille.rar");
+        fs::write(&second, b"fake rar").unwrap();
+        let failing = temp.path().join("unrar-fail");
+        fs::write(
+            &failing,
+            "#!/bin/sh\nif [ \"$1\" = \"lb\" ]; then echo 'root/broken.bin'; exit 0; fi\nif [ \"$1\" = \"p\" ]; then head -c 4096 /dev/zero; echo boom >&2; exit 1; fi\nexit 2\n",
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&failing).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&failing, permissions).unwrap();
+        assert!(extract_archive(
+            &second,
+            &projects,
+            "docs",
+            &failing,
+            &logger,
+            ExtractionLimits::default()
+        )
+        .is_err());
+        assert!(!projects
+            .join("18 Camille")
+            .join("docs")
+            .join("broken.bin")
+            .exists());
+    }
+
+    #[test]
+    fn given_zip_bomb_when_budget_exceeded_then_rejected() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("19_Camille.zip");
+        {
+            let file = File::create(&archive).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            writer
+                .start_file("root/bomb.bin", zip::write::SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(&vec![0_u8; 2 * 1024 * 1024]).unwrap();
+            writer.finish().unwrap();
+        }
+        let projects = temp.path().join("projects");
+        fs::create_dir_all(&projects).unwrap();
+        let logger = RunLogger::new(None);
+        let error = extract_archive(
+            &archive,
+            &projects,
+            "docs",
+            Path::new("unrar"),
+            &logger,
+            ExtractionLimits {
+                max_bytes: 1024 * 1024,
+                max_compression_ratio: 200,
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("budget"));
+        assert!(!projects
+            .join("19 Camille")
+            .join("docs")
+            .join("bomb.bin")
+            .exists());
     }
 
     #[test]
@@ -864,8 +1125,15 @@ mod tests {
         let projects = temp.path().join("projects");
         fs::create_dir_all(&projects).unwrap();
         let logger = RunLogger::new(None);
-        let outcome =
-            extract_archive(&archive, &projects, "docs", Path::new("unrar"), &logger).unwrap();
+        let outcome = extract_archive(
+            &archive,
+            &projects,
+            "docs",
+            Path::new("unrar"),
+            &logger,
+            ExtractionLimits::default(),
+        )
+        .unwrap();
         assert!(outcome.docs_dir.join("clip.txt").exists());
     }
 
@@ -900,8 +1168,15 @@ mod tests {
             fs::write(&archive, bytes).unwrap();
             let projects = temp.path().join(format!("projects-{name}"));
             fs::create_dir_all(&projects).unwrap();
-            let outcome =
-                extract_archive(&archive, &projects, "docs", Path::new("unrar"), &logger).unwrap();
+            let outcome = extract_archive(
+                &archive,
+                &projects,
+                "docs",
+                Path::new("unrar"),
+                &logger,
+                ExtractionLimits::default(),
+            )
+            .unwrap();
             assert!(outcome.docs_dir.join("clip.txt").exists());
         }
     }

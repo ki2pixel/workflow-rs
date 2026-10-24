@@ -851,105 +851,12 @@ fn kill_child(child: &mut Child) {
 }
 
 fn is_preserved_media(path: &Path, options: &Step4Options) -> bool {
-    if !options.skip_preserved_mov {
-        return false;
-    }
-    let extension = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .map(|value| value.to_ascii_lowercase());
-    if extension.as_deref() != Some("mov") {
-        return false;
-    }
-    let name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default();
-    if options
-        .preserved_mov_names
-        .iter()
-        .any(|preserved| preserved.eq_ignore_ascii_case(name))
-    {
-        return true;
-    }
-    probe_mov_alpha(path, &options.ffprobe).unwrap_or(true)
-}
-
-const ALPHA_PIX_FMT_PREFIXES: &[&str] = &[
-    "yuva", "gbrap", "ya8", "ya16", "ayuv", "rgba", "bgra", "argb", "abgr",
-];
-const ALPHA_CODEC_TAGS: &[&str] = &["ap4h", "ap4x", "rle", "png"];
-
-fn pix_fmt_has_alpha(pix_fmt: &str) -> bool {
-    let normalized = pix_fmt.trim().to_ascii_lowercase();
-    !normalized.is_empty()
-        && ALPHA_PIX_FMT_PREFIXES
-            .iter()
-            .any(|prefix| normalized.starts_with(prefix))
-}
-
-fn probe_mov_alpha(path: &Path, ffprobe: &Path) -> Option<bool> {
-    // Même premier étage que `utils/media_filters.py` : tous les flux vidéo,
-    // `pix_fmt` puis `codec_tag_string`. MediaInfo n'est pas appelé ; un cas
-    // indéterminé renvoie None et le média est conservé par précaution.
-    let output = Command::new(ffprobe)
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            "v",
-            "-show_entries",
-            "stream=codec_tag_string,pix_fmt",
-            "-of",
-            "json",
-        ])
-        .arg(path)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let payload: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-    let streams = payload.get("streams")?.as_array()?;
-    if streams.is_empty() {
-        return None;
-    }
-
-    let mut missing_pix_fmt = false;
-    for stream in streams {
-        let pix_fmt = stream
-            .get("pix_fmt")
-            .and_then(|value| value.as_str())
-            .unwrap_or_default()
-            .trim();
-        if pix_fmt.is_empty() {
-            missing_pix_fmt = true;
-        } else if pix_fmt_has_alpha(pix_fmt) {
-            return Some(true);
-        }
-    }
-    if !missing_pix_fmt {
-        return Some(false);
-    }
-    for stream in streams {
-        if stream
-            .get("pix_fmt")
-            .and_then(|value| value.as_str())
-            .is_some_and(|value| !value.trim().is_empty())
-        {
-            continue;
-        }
-        let tag = stream
-            .get("codec_tag_string")
-            .and_then(|value| value.as_str())
-            .unwrap_or_default()
-            .trim()
-            .to_ascii_lowercase();
-        if ALPHA_CODEC_TAGS.contains(&tag.as_str()) {
-            return Some(true);
-        }
-    }
-    None
+    crate::media::is_preserved_media_with(
+        path,
+        options.skip_preserved_mov,
+        &options.preserved_mov_names,
+        &options.ffprobe,
+    )
 }
 
 #[cfg(test)]
@@ -965,6 +872,7 @@ mod tests {
 
     #[test]
     fn alpha_pixel_formats_are_strict() {
+        use crate::media::pix_fmt_has_alpha;
         assert!(pix_fmt_has_alpha("yuva420p"));
         assert!(pix_fmt_has_alpha("rgba64le"));
         assert!(pix_fmt_has_alpha("ya8"));

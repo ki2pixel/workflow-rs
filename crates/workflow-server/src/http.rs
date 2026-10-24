@@ -1,12 +1,14 @@
 //! Contrat HTTP de polling consommé par le frontend existant.
 
 use crate::catalog::{frontend_config, LogKind, SpecificLog, StepKey};
+use crate::error::WorkflowServerError;
 use crate::progress::html_escape;
 use crate::runner::Runner;
 use crate::sequence::run_sequence;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::extract::{Path, Request, State};
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -15,10 +17,13 @@ use minijinja::{context, Environment};
 use regex::Regex;
 use serde_json::{json, Value};
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
+use subtle::ConstantTimeEq;
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
 use workflow_ingest::IngestionService;
 
 pub struct AppState {
@@ -78,7 +83,34 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/performance/frontend", post(performance_frontend))
         .nest_service("/static", ServeDir::new(static_dir))
         .nest_service("/sound-design", ServeDir::new(sound_dir))
+        .layer(middleware::from_fn(security_headers))
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+async fn security_headers(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        ),
+    );
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert(
+        HeaderName::from_static("permissions-policy"),
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    response
 }
 
 async fn index(State(state): State<Arc<AppState>>) -> Response {
@@ -150,14 +182,7 @@ async fn run_step(
     }
     let control = match state.runner.state().reserve_step(step) {
         Ok(control) => control,
-        Err(message) => {
-            let code = if message.contains("en cours") {
-                StatusCode::CONFLICT
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            return status_error(code, &message);
-        }
+        Err(error) => return error.into_response(),
     };
     let display_name = step.display_name();
     let runner = state.runner.clone();
@@ -202,18 +227,21 @@ async fn run_custom_sequence(
         }
         steps.push(step);
     }
-    if let Err(message) = state.runner.state().start_sequence("Custom") {
-        let code = if message.contains("en cours") {
-            StatusCode::CONFLICT
-        } else {
-            StatusCode::BAD_REQUEST
-        };
-        return status_error(code, &message);
-    }
+    let sequence_id = match state.runner.state().start_sequence(steps.clone(), "Custom") {
+        Ok(sequence_id) => sequence_id,
+        Err(error) => {
+            let status = if error.is_conflict() {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            return status_error(status, &error.to_string());
+        }
+    };
     let runner = state.runner.clone();
     let count = steps.len();
     tokio::spawn(async move {
-        run_sequence(runner, steps, "Custom".into()).await;
+        run_sequence(runner, steps, "Custom".into(), sequence_id).await;
     });
     (
         StatusCode::ACCEPTED,
@@ -262,7 +290,12 @@ async fn stop_step(
             "message": format!("Step '{}' stopped successfully", step.as_str())
         }))
         .into_response(),
-        Err(message) => Json(json!({"status": "error", "message": message})).into_response(),
+        Err(error) => match error {
+            WorkflowServerError::StepNotRunning { step } => {
+                status_error(StatusCode::OK, &format!("Step '{step}' is not running"))
+            }
+            other => other.into_response(),
+        },
     }
 }
 
@@ -283,11 +316,7 @@ async fn cancel_step(
             "message": format!("Step '{}' stopped successfully", step.as_str())
         }))
         .into_response(),
-        Err(message) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"status": "error", "message": message})),
-        )
-            .into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -305,8 +334,7 @@ async fn stop_sequence(State(state): State<Arc<AppState>>, headers: HeaderMap) -
             "message": "Sequence stopped. Stopped steps: current"
         }))
         .into_response(),
-        Err(message) if message.contains("Aucune") => status_error(StatusCode::CONFLICT, &message),
-        Err(message) => status_error(StatusCode::INTERNAL_SERVER_ERROR, &message),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -321,7 +349,20 @@ async fn specific_log(
     let Some(log) = logs.get(index) else {
         return raw_error(StatusCode::NOT_FOUND, "Log index out of range");
     };
-    let (content, error, path) = read_log(log, step);
+    let logs_root = state.runner.config().paths.resolve().logs;
+    let log_for_read = log.clone();
+    let (content, error, path) = match tokio::task::spawn_blocking(move || {
+        read_log(&log_for_read, step, &logs_root)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => (
+            format!("Lecture du journal interrompue: {error}"),
+            Some("Erreur interne".into()),
+            String::new(),
+        ),
+    };
     Json(json!({
         "content": content,
         "error": error,
@@ -369,7 +410,7 @@ fn authorize(state: &AppState, headers: &HeaderMap) -> Option<Response> {
             "Missing authentication token",
         ));
     };
-    if received != expected {
+    if received.as_bytes().ct_eq(expected.as_bytes()).unwrap_u8() != 1 {
         return Some(raw_error(
             StatusCode::UNAUTHORIZED,
             "Invalid authentication token",
@@ -400,7 +441,12 @@ fn no_cache(mut response: Response) -> Response {
     response
 }
 
-fn read_log(log: &SpecificLog, step: StepKey) -> (String, Option<String>, String) {
+fn read_log(
+    log: &SpecificLog,
+    step: StepKey,
+    logs_root: &std::path::Path,
+) -> (String, Option<String>, String) {
+    let root = fs::canonicalize(logs_root).unwrap_or_else(|_| logs_root.to_path_buf());
     let path = match log.kind {
         LogKind::File => log.path.clone(),
         LogKind::DirectoryLatest => {
@@ -410,6 +456,7 @@ fn read_log(log: &SpecificLog, step: StepKey) -> (String, Option<String>, String
                     paths
                         .filter_map(Result::ok)
                         .filter(|path| path.is_file())
+                        .filter(|path| log_path_is_confined(path, &root))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -427,7 +474,9 @@ fn read_log(log: &SpecificLog, step: StepKey) -> (String, Option<String>, String
                         .path
                         .parent()
                         .map(|root| root.join(format!("step_{}.log", step.as_str())));
-                    if let Some(fallback) = fallback.filter(|path| path.is_file()) {
+                    if let Some(fallback) =
+                        fallback.filter(|path| path.is_file() && log_path_is_confined(path, &root))
+                    {
                         fallback
                     } else {
                         return (
@@ -452,22 +501,56 @@ fn read_log(log: &SpecificLog, step: StepKey) -> (String, Option<String>, String
             processed,
         );
     }
-    match fs::read_to_string(&path) {
-        Ok(content) => {
-            let lines: Vec<&str> = content.lines().collect();
-            let start = lines.len().saturating_sub(log.lines);
-            let tail = if start == lines.len() {
-                "Fichier vide.".to_string()
-            } else {
-                lines[start..].join("\n")
-            };
-            (tail, None, processed)
-        }
+    if !log_path_is_confined(&path, &root) {
+        return (
+            format!("Accès refusé hors de paths.logs: {processed}"),
+            Some("Accès refusé".into()),
+            processed,
+        );
+    }
+    match read_tail(&path, log.lines) {
+        Ok(content) => (content, None, processed),
         Err(error) => (
             format!("Impossible de lire le fichier: {error}"),
             Some(format!("Erreur de lecture: {error}")),
             processed,
         ),
+    }
+}
+
+fn log_path_is_confined(path: &std::path::Path, root: &std::path::Path) -> bool {
+    fs::canonicalize(path)
+        .map(|canonical| canonical.starts_with(root))
+        .unwrap_or(false)
+}
+
+/// Lit uniquement la queue du fichier, sans charger un journal de plusieurs
+/// centaines de Mio en mémoire.
+fn read_tail(path: &std::path::Path, max_lines: usize) -> std::io::Result<String> {
+    const MAX_TAIL_BYTES: u64 = 512 * 1024;
+    let mut file = fs::File::open(path)?;
+    let length = file.metadata()?.len();
+    let mut position = length;
+    let mut data = Vec::new();
+    while position > 0 && data.len() < MAX_TAIL_BYTES as usize {
+        let chunk = (position.min(64 * 1024)) as usize;
+        position -= chunk as u64;
+        file.seek(SeekFrom::Start(position))?;
+        let mut buffer = vec![0_u8; chunk];
+        file.read_exact(&mut buffer)?;
+        buffer.extend_from_slice(&data);
+        data = buffer;
+        if data.iter().filter(|byte| **byte == b'\n').count() > max_lines + 1 {
+            break;
+        }
+    }
+    let text = String::from_utf8_lossy(&data);
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.len().saturating_sub(max_lines);
+    if start == lines.len() {
+        Ok("Fichier vide.".to_string())
+    } else {
+        Ok(lines[start..].join("\n"))
     }
 }
 
@@ -661,6 +744,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn given_large_log_when_requested_then_only_tail_is_returned() {
+        let (dir, app) = test_app();
+        let logs = dir.path().join("runtime").join("logs").join("step5");
+        fs::create_dir_all(&logs).unwrap();
+        let mut content = String::new();
+        for index in 0..10_000 {
+            content.push_str(&format!("ligne-{index}\n"));
+        }
+        fs::write(logs.join("run.log"), content).unwrap();
+        let body = app
+            .oneshot(
+                Request::builder()
+                    .uri("/get_specific_log/STEP5/0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        let content = value["content"].as_str().unwrap();
+        assert!(content.contains("ligne-9999"));
+        assert!(!content.contains("ligne-0\n"));
+        assert!(content.len() < 64 * 1024);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn given_symlink_outside_logs_when_requested_then_content_not_leaked() {
+        use std::os::unix::fs::symlink;
+        let (dir, app) = test_app();
+        let logs = dir.path().join("runtime").join("logs").join("step5");
+        fs::create_dir_all(&logs).unwrap();
+        let secret = dir.path().join("secret.txt");
+        fs::write(&secret, "contenu-secret-hors-logs").unwrap();
+        symlink(&secret, logs.join("evil.log")).unwrap();
+        let body = app
+            .oneshot(
+                Request::builder()
+                    .uri("/get_specific_log/STEP5/0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert!(!value.to_string().contains("contenu-secret-hors-logs"));
+        assert!(value["error"].is_string());
+    }
+
+    #[tokio::test]
+    async fn given_index_when_served_then_security_headers_present() {
+        let (_dir, app) = test_app();
+        let response = app
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().contains_key("content-security-policy"));
+        assert_eq!(
+            response.headers().get("x-content-type-options").unwrap(),
+            "nosniff"
+        );
+        assert_eq!(response.headers().get("x-frame-options").unwrap(), "DENY");
+    }
+
+    #[tokio::test]
+    async fn given_not_running_when_stop_then_contract_message_and_200() {
+        let (_dir, app) = test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/stop/STEP3")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["status"], "error");
+        assert_eq!(value["message"], "Step 'STEP3' is not running");
+    }
+
+    #[tokio::test]
     async fn mutating_routes_require_the_worker_token() {
         let (_dir, app) = test_app();
         let response = app
@@ -804,6 +984,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn given_stopping_step_when_immediate_run_then_conflict() {
+        let (_dir, app) = test_app_with_script("#!/bin/sh\ntrap '' TERM\nsleep 30\n");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run/STEP5")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        for _ in 0..100 {
+            if step_status_value(&app, "STEP5").await["status"] == "running" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/stop/STEP5")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let status = step_status_value(&app, "STEP5").await;
+        assert_eq!(status["status"], "stopping");
+        assert_eq!(status["is_stopping"], true);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run/STEP6")
+                    .header("x-worker-token", "test-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run_custom_sequence")
+                    .header("x-worker-token", "test-token")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"steps":["STEP6"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
     async fn stopping_a_sequence_does_not_start_the_next_step() {
         let (_dir, app) =
             test_app_with_script("#!/bin/sh\necho 'TOTAL_JSON_TO_REDUCE: 1'\nexec sleep 5\n");
@@ -888,7 +1139,30 @@ mod tests {
             .unwrap()
             .contains("manually stopped"));
 
-        assert_eq!(step_status_value(&app, "STEP5").await["status"], "stopped");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/run_custom_sequence")
+                    .header("x-worker-token", "test-token")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"steps":["STEP6"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let mut status = step_status_value(&app, "STEP5").await;
+        for _ in 0..100 {
+            if status["status"] == "stopped" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            status = step_status_value(&app, "STEP5").await;
+        }
+        assert_eq!(status["status"], "stopped");
         assert_eq!(step_status_value(&app, "STEP6").await["status"], "idle");
     }
 

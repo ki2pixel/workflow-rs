@@ -70,6 +70,15 @@ is_running() {
     [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
+collect_descendants() {
+    local parent="$1"
+    local child
+    for child in $(pgrep -P "$parent" 2>/dev/null || true); do
+        echo "$child"
+        collect_descendants "$child"
+    done
+}
+
 case "${1:-}" in
     check)
         require_token
@@ -147,7 +156,7 @@ case "${1:-}" in
         mkdir -p "$(dirname "$PID_FILE")" "$(dirname "$LOG_FILE")"
         env WORKFLOW_SERVER_WORKER_TOKEN="$TOKEN" \
             WORKFLOW_SERVER_SECRET_KEY="${WORKFLOW_SERVER_SECRET_KEY:-}" \
-            nohup "$BIN" --config "$CONFIG" >>"$LOG_FILE" 2>&1 &
+            setsid "$BIN" --config "$CONFIG" >>"$LOG_FILE" 2>&1 &
         echo $! >"$PID_FILE"
         for _ in $(seq 1 30); do
             if ping_rust; then
@@ -181,7 +190,15 @@ case "${1:-}" in
             sleep 0.5
         done
         echo "arrêt forcé de $pid" >&2
-        kill -9 "$pid" 2>/dev/null || true
+        descendants="$(collect_descendants "$pid")"
+        kill -9 -- "-$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+        for child in $descendants; do
+            pgid="$(ps -o pgid= -p "$child" 2>/dev/null | tr -d ' ')"
+            if [[ -n "$pgid" ]]; then
+                kill -9 -- "-$pgid" 2>/dev/null || true
+            fi
+            kill -9 "$child" 2>/dev/null || true
+        done
         rm -f "$PID_FILE"
         ;;
     status)

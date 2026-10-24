@@ -5,13 +5,19 @@ use crate::runner::Runner;
 use crate::state::now_iso;
 use std::sync::Arc;
 
-pub async fn run_sequence(runner: Arc<Runner>, steps: Vec<StepKey>, sequence_type: String) {
+pub async fn run_sequence(
+    runner: Arc<Runner>,
+    steps: Vec<StepKey>,
+    sequence_type: String,
+    sequence_id: crate::state::SequenceId,
+) {
     let started_at = now_iso();
     let mut summary: Vec<(String, String, String)> = Vec::new();
     let mut success = true;
 
     if steps.is_empty() {
         runner.state().complete_sequence(
+            sequence_id,
             true,
             format!("Séquence {sequence_type} Terminée avec succès. Détails: "),
             &sequence_type,
@@ -66,7 +72,7 @@ pub async fn run_sequence(runner: Arc<Runner>, steps: Vec<StepKey>, sequence_typ
         let message = format!("Séquence {sequence_type} {overall}. Détails: {details}");
         runner
             .state()
-            .complete_sequence(success, message, &sequence_type);
+            .complete_sequence(sequence_id, success, message, &sequence_type);
     }
 
     let manual_stop = runner.state().sequence_stop_requested();
@@ -93,8 +99,11 @@ pub async fn execute_steps(
     steps: Vec<StepKey>,
     sequence_type: &str,
 ) -> Result<(), String> {
-    runner.state().start_sequence(sequence_type)?;
-    run_sequence(runner, steps, sequence_type.into()).await;
+    let sequence_id = runner
+        .state()
+        .start_sequence(steps.clone(), sequence_type)
+        .map_err(|error| error.to_string())?;
+    run_sequence(runner, steps, sequence_type.into(), sequence_id).await;
     Ok(())
 }
 

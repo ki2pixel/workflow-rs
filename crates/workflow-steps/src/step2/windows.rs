@@ -125,9 +125,9 @@ pub fn reference_windows(
     stride: usize,
     padding: usize,
 ) -> Vec<Vec<u8>> {
-    if frames.is_empty() {
+    let Some(last) = frames.last() else {
         return Vec::new();
-    }
+    };
     let remainder = frames.len() % stride;
     let end_padding = padding + stride - if remainder == 0 { stride } else { remainder };
     let mut padded = Vec::with_capacity(padding + frames.len() + end_padding);
@@ -136,7 +136,7 @@ pub fn reference_windows(
     }
     padded.extend(frames.iter().cloned());
     for _ in 0..end_padding {
-        padded.push(frames.last().unwrap().clone());
+        padded.push(last.clone());
     }
 
     let mut windows = Vec::new();

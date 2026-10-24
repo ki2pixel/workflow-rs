@@ -141,6 +141,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
+- `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.

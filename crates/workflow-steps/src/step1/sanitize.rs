@@ -75,7 +75,11 @@ impl FilenameSanitizer {
             }
         }
 
-        let normalized: String = member_path.nfkc().collect();
+        if member_path.contains('\\') {
+            security_issues.push("Backslash separator normalized to '/'".into());
+        }
+        let normalized_path = member_path.replace('\\', "/");
+        let normalized: String = normalized_path.nfkc().collect();
         let mut path_parts: Vec<String> = Vec::new();
         for part in normalized.split('/') {
             if part.is_empty() || part == "." || part == ".." {
@@ -250,6 +254,18 @@ mod tests {
             &result.sanitized_name,
             Path::new("/tmp")
         ));
+    }
+
+    #[test]
+    fn backslash_separators_are_normalized_without_traversal() {
+        let mut sanitizer = FilenameSanitizer::new();
+        let result = sanitizer.sanitize_archive_member_path("dossier\\..\\..\\evil.mp4");
+        assert_eq!(result.sanitized_name, "dossier/evil.mp4");
+        assert!(!result.sanitized_name.contains('\\'));
+        assert!(result
+            .security_issues
+            .iter()
+            .any(|issue| issue.contains("Backslash")));
     }
 
     #[test]

@@ -903,10 +903,8 @@ fn write_report(log_dir: &Path, report: &Step8Report) -> Result<PathBuf> {
         "step8_run_{}.json",
         Local::now().format("%Y%m%d_%H%M%S")
     ));
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, serde_json::to_vec_pretty(report)?)
-        .with_context(|| format!("écriture de {}", temp_path.display()))?;
-    fs::rename(&temp_path, &path).with_context(|| format!("publication de {}", path.display()))?;
+    workflow_core::fsutil::write_atomic(&path, &serde_json::to_vec_pretty(report)?)
+        .with_context(|| format!("publication de {}", path.display()))?;
     Ok(path)
 }
 

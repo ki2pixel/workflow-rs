@@ -7,12 +7,16 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 233 tests unitaires, sans matériel.
+- 275 tests unitaires, sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
 - Shadow STEP5/6 `162/162` sur 20 projets.
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
 - Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de
   production aligné sur Rust `:5004`.
+- Remédiation de l'audit backend du 2026-10-24 : 31 constats corrigés,
+  2 partiels (A9 arrêt manuel CLI, R8 buffers STEP4), 3 documentés
+  (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`, clippy strict,
+  275 tests et `config check` verts.
 - **Aucune tâche active.**
 
 ## Chronologie de migration
@@ -32,6 +36,17 @@
 | Lanceur | 2026-10-23 | `f827d53` | `start-rust.sh`, secrets, Firefox | Lancement réel |
 | Sync | 2026-10-23 | `28287af`, `6b6e5e1` | Fusion Python ↔ Rust | 911/96/640, 1,8 Go |
 | Shadow | 2026-10-23/24 | `01fbbf2`, `b7b594b` | Corpus 153–159 et 1720 | 162/162 sur 20 projets |
+
+## Remédiation audit backend (2026-10-24)
+
+| Lot | Contenu | Preuve |
+| --- | --- | --- |
+| 1 | P0 concurrence : `RunId`, `Stopping`, fin générationnelle, erreurs typées, `parking_lot` | 40 tests serveur, 409 après `/stop`, fin périmée ignorée |
+| 2 | Cycle de vie : arrêt des groupes, verrou STEP1, isolation partagée, `allow_remote`, purges | test SIGTERM/SIGKILL de groupe, `bash -n switch-rust.sh` |
+| 3 | Parité : `round_to` STEP3, RAR streamé | 0,1 % sur 1,8 s/3 600 s, faux `unrar` multi-Mio |
+| 4 | Sécurité/contrats : CSP, constant-time, SSRF, quotas, symlinks, logs, fsync, timeout STEP7 | tests headers, IP privées, zip bomb, symlink hors logs |
+| 5 | Robustesse : canal borné, rotation, progression, purge orphelins, `media.rs`, regex | ligne 64 Kio, rotation en cours, progression 3 étapes |
+| 6 | Clôture : `unwrap` STEP2, TraceLayer, tests CLI/TPU, docs | 275 tests, clippy/fmt, D-025 à D-027 |
 
 ## Détails des validations
 

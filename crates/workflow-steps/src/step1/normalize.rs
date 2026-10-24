@@ -750,6 +750,9 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
             log_file: None,
+            lock_path: None,
+            max_extracted_bytes: 100 * 1024 * 1024 * 1024,
+            max_compression_ratio: 200,
         }
     }
 

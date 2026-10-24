@@ -15,6 +15,7 @@
 use serde::Serialize;
 
 pub mod archives;
+pub mod error;
 pub mod history;
 pub mod lock;
 pub mod processed;
@@ -24,10 +25,11 @@ pub use archives::{
     sync_downloads, sync_step7_archives, DownloadsMode, DownloadsSyncReport, Step7Mode,
     Step7SyncReport,
 };
+pub use error::{SyncError, SyncResult};
 pub use history::{merge_history, HistoryMergeOptions, HistoryMergeReport};
 pub use lock::{ensure_no_conflicting_processes, ensure_servers_stopped, SyncLock};
 pub use processed::{merge_processed_archives, ProcessedMergeOptions, ProcessedMergeReport};
-pub use report::{run_sync, SyncOptions, SyncReport};
+pub use report::{SyncOptions, SyncReport};
 
 /// Sens de la synchronisation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -71,4 +73,9 @@ impl MergeMode {
             Self::Skip => "skip",
         }
     }
+}
+
+/// Point d'entrée public : convertit l'erreur interne `anyhow` en type stable.
+pub fn run_sync(options: &SyncOptions) -> SyncResult<SyncReport> {
+    report::run_sync(options).map_err(SyncError::from)
 }

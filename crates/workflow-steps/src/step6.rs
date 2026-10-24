@@ -1262,7 +1262,7 @@ fn read_json(path: &Path) -> Result<Value, StepError> {
 }
 
 fn write_json_atomically(path: &Path, payload: &Value) -> Result<(), StepError> {
-    let temp_path = path.with_extension("tmp");
+    let temp_path = workflow_core::fsutil::hidden_temp_path(path);
     let result = (|| -> Result<(), StepError> {
         let file = File::create(&temp_path).map_err(|source| StepError::Write {
             path: temp_path.clone(),
@@ -1272,7 +1272,14 @@ fn write_json_atomically(path: &Path, payload: &Value) -> Result<(), StepError> 
         serde_json::to_writer_pretty(&mut writer, payload)?;
         writer.write_all(b"\n")?;
         writer.flush()?;
-        fs::rename(&temp_path, path).map_err(|source| StepError::Write {
+        writer
+            .get_ref()
+            .sync_all()
+            .map_err(|source| StepError::Write {
+                path: temp_path.clone(),
+                source,
+            })?;
+        workflow_core::fsutil::publish(&temp_path, path).map_err(|source| StepError::Write {
             path: path.to_path_buf(),
             source,
         })?;

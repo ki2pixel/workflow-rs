@@ -8,6 +8,57 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-10-24 — Audit croisé du rapport Gemini Web
+
+- **Contexte** : trois rapports d'audit Gemini Web (retirés du dépôt après
+  synthèse), produits à partir d'un export Repomix partiellement tronqué.
+- **Décision** :
+  1. Ne retenir un constat Gemini qu'après reproduction à HEAD ; ne pas
+     importer ses sévérités telles quelles.
+  2. Retenir cinq nouveaux constats : C9 (arrondi STEP3, P1), R7 (RAR en RAM,
+     P1), S9 (secrets d'export, P2), R8 (allocations/regex, P2) et R9
+     (duplication, P2).
+  3. Enrichir S2 (verrou par défaut et CLI sans `validate_isolation`), A4,
+     R1, R6, S7 et C4.
+  4. Requalifier SEC-01 et STP1-01 en P2 ; rejeter AUD-06 (déjà corrigé) ;
+     classer AUD-01 et AUD-07 hors périmètre.
+- **Alternatives rejetées** :
+  - Reprendre le P0 SEC-01 : le fichier est ignoré, en mode 600 et le serveur
+    est loopback ; la rotation reste une action d'hygiène.
+  - Corriger STP1-01 comme une traversée : sous Linux, les antislashs restent
+    un nom de fichier littéral.
+- **Conséquences** : le rapport passe à 36 constats (1 P0, 6 P1, 29 P2) ; la
+  matrice de priorisation est corrigée (l'ancien total de 23 P2 était
+  arithmétiquement faux). Aucun code n'est modifié.
+- **Validation** : revérification par grep/lecture à HEAD `ae2098d`, simulation
+  numérique Python vs formule Rust pour C9, contrôle des fixtures
+  `vox_step3`, du frontend et de `parity/README.md`.
+
+## 2026-10-24 — Audit backend Rust
+
+- **Contexte** : audit statique et opérationnel demandé sur les neuf crates,
+  sans exécution matérielle ni modification des données de production.
+- **Décision** :
+  1. Consigner le rapport dans
+     `docs/audits/2026-10-24-audit-backend-rust.md` ; les audits futurs suivent
+     la même convention `docs/audits/AAAA-MM-JJ-<sujet>.md`.
+  2. Classer les constats en P0 (bloquant), P1 (majeur) et P2 (qualité), avec
+     preuve `fichier:ligne` et test de non-régression attendu.
+  3. Traiter en priorité la course `stop` → `reserve` / `finish` (A1), qui
+     autorise deux étapes simultanées et peut écraser l'état de la nouvelle
+     exécution.
+- **Alternatives rejetées** :
+  - Corriger directement pendant l'audit : mélange diagnostic et remédiation,
+    et empêche de mesurer l'état initial.
+  - Documenter uniquement dans la conversation : perte de traçabilité.
+- **Conséquences** : les correctifs P0/P1 (sérialisation générationnelle,
+  arrêt propre des sous-processus, portée du verrou, isolation/secret) devront
+  être consignés dans ce journal au moment de leur implémentation. Le rapport
+  ne modifie ni `runtime/`, ni `/mnt/cache`, ni le dépôt Python legacy.
+- **Validation** : `cargo check`, `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings`,
+  `cargo test --workspace` (233/233), `cargo tree -d`.
+
 ## 2026-10-24 — Commandes de parité et état de production
 
 - **Contexte** : les commandes du harnais citaient `coral_env/bin/python` depuis
@@ -181,3 +232,40 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - `docs/SWITCH-PUBLIC.md`
 - `docs/RETENTION.md`
 - `docs/VALIDATION-STEP1-8.md`
+
+## Remédiation de l'audit backend du 2026-10-24
+
+- [2026-10-24 15:00:00] - **Statut `stopping` exposé sans libérer le créneau**
+  - `WorkflowState` attribue un `RunId` à chaque exécution ; `StepPhase::Stopping`
+    reste actif jusqu'à la fin réelle du sous-processus.
+  - `finish_step(step, run_id, …)` ignore une finalisation périmée : un arrêt
+    tardif ne peut plus écraser l'état d'une exécution suivante.
+  - Le frontend mappe `stopping` sur « Arrêt en cours » et le traite comme un
+    état actif.
+- [2026-10-24 15:03:00] - **Suppression des clés TOML mortes**
+  - Retirées : `server.debug`, `server.polling_interval_ms`,
+    `server.system_monitor_interval_ms`, `server.snapshot_interval_s`,
+    `server.slow_api_threshold_ms`, `server.gpu_monitoring`,
+    `download.chunk_bytes`, `steps.step3.max_workers`, `hardware.tpu_device`,
+    `hardware.gpu_mem_limit_mb`, `hardware.require_tpu`.
+  - Rupture assumée : `deny_unknown_fields` rejette désormais une ancienne
+    configuration ; `config/config.toml` et `config/env.map.toml` sont alignés.
+- [2026-10-24 15:06:00] - **`thiserror` aux frontières d'ingestion et de sync**
+  - `IngestError` et `SyncError` exposent des résultats typés ; les détails
+    internes restent en `anyhow`.
+  - Les steps STEP2/3/4/7/8 conservent `anyhow` en interne : dérogation
+    documentée D-026, car leurs erreurs traversent le serveur comme code de
+    sortie.
+- [2026-10-24 15:09:00] - **Verrou matériel unique et écoute explicite**
+  - Défaut `/tmp/workflow-rs-hw.lock`, distinct du verrou Python ; tout
+    basename `workflow-hw.lock` est refusé, où que soit le chemin.
+  - `server.host` non-loopback exige `server.allow_remote = true` ; le
+    lancement journalise un avertissement dans ce cas.
+- [2026-10-24 15:12:00] - **Isolation partagée et arrêt des groupes**
+  - `workflow_core::validate_isolation` est appelé par la CLI et le serveur.
+  - Chaque CLI d'étape tourne dans son groupe ; l'arrêt serveur envoie
+    `SIGTERM` puis `SIGKILL` au groupe, et `switch-rust.sh stop` tue aussi les
+    descendants orphelins.
+- [2026-10-24 15:13:18] - **Traversée `/sound-design` documentée**
+  - `ServeDir` renvoie 404 au lieu du 403 du contrat Python ; aucune fuite.
+    Décision D-025 : conserver le comportement standard et documenter l'écart.

@@ -18,6 +18,8 @@ pub enum StepError {
     Json(#[from] serde_json::Error),
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
+    #[error("verrou matériel: {0}")]
+    Lock(String),
     #[error("schéma inattendu: {0}")]
     Schema(String),
 }

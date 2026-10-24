@@ -102,6 +102,11 @@ export function updateClearCacheGlobalButtonState(status, message = '') {
             if (textSpan) textSpan.textContent = "Nettoyage...";
             clearBtn.classList.add('running');
             break;
+        case 'stopping':
+            clearBtn.disabled = true;
+            if (textSpan) textSpan.textContent = "Arrêt en cours...";
+            clearBtn.classList.add('running');
+            break;
         case 'completed':
             clearBtn.disabled = isOtherSequenceRunning;
             if (textSpan) textSpan.textContent = "Cache Vidé";

@@ -754,6 +754,7 @@ fn run() -> Result<()> {
     let config = Config::load(&cli.config)
         .with_context(|| format!("chargement de {}", cli.config.display()))?;
     config.validate_common()?;
+    workflow_core::validate_isolation(&config)?;
 
     match cli.command {
         Command::Config(args) => match args.command {
@@ -1456,5 +1457,46 @@ fn print_sync_summary(report: &workflow_sync::SyncReport) {
     }
     if let Some(manifest) = &report.applied_manifest {
         println!("  rapport : {}", manifest.display());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn given_config_check_when_parsed_then_global_config_applies() {
+        let cli = Cli::try_parse_from([
+            "workflow-cli",
+            "--config",
+            "/tmp/isolated.toml",
+            "config",
+            "check",
+        ])
+        .unwrap();
+        assert_eq!(cli.config, PathBuf::from("/tmp/isolated.toml"));
+        assert!(matches!(
+            cli.command,
+            Command::Config(ConfigArgs {
+                command: ConfigCommand::Check
+            })
+        ));
+    }
+
+    #[test]
+    fn given_no_subcommand_when_parsed_then_rejected() {
+        assert!(Cli::try_parse_from(["workflow-cli"]).is_err());
+    }
+
+    #[test]
+    fn given_unknown_step_when_parsed_then_rejected() {
+        assert!(Cli::try_parse_from(["workflow-cli", "step9"]).is_err());
+    }
+
+    #[test]
+    fn given_default_invocation_when_parsed_then_relative_config_is_used() {
+        let cli = Cli::try_parse_from(["workflow-cli", "config", "show"]).unwrap();
+        assert_eq!(cli.config, PathBuf::from("config/config.toml"));
     }
 }

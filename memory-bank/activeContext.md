@@ -7,6 +7,17 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
 ## Dernière session
 
+- [2026-10-24] **Remédiation de l'audit backend (36 constats)** : six lots
+  appliqués sur les neuf crates. Orchestrateur : `RunId`, `StepPhase::Stopping`,
+  fin générationnelle, canal de logs borné, rotation en cours d'exécution,
+  erreurs HTTP typées, arrêt des groupes de processus. Configuration :
+  `allow_remote`, verrou `/tmp/workflow-rs-hw.lock`, clés TOML mortes
+  supprimées, `steps.step7.timeout_s`. Sécurité : SSRF public-only, token
+  constant-time, en-têtes CSP, quotas ZIP/RAR, symlinks STEP7 refusés, logs
+  confinés. Parité : `round_to` partagé STEP3, RAR streamé. Persistance :
+  `fsync` avant publication, temporaires cachés, purge des orphelins.
+  Documentation : D-025 (404 `/sound-design`), D-026 (frontières typées),
+  D-027 (arrêt manuel CLI). Suite : 275 tests, fmt/clippy verts.
 - [2026-10-24] **Bootstrap `.agents/` et `memory-bank/`** :
   - création de `.agents/rules/` (10 règles), `.agents/skills/` (21 skills +
     9 ressources) et `.agents/workflows/` (6 workflows) ;
@@ -38,7 +49,9 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 233 tests unitaires ; pas de CI.
+- 275 tests unitaires ; pas de CI.
+- Audit backend du 2026-10-24 remédié : 31 corrigés, 2 partiels (A9, R8),
+  3 documentés (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock`.
 - Runtime : `runtime/` ; sortie finalisée : `/mnt/cache`.
@@ -52,6 +65,11 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 3. **Surveillance production** : vérifier le moniteur webhook et les
    téléchargements après quelques jours.
 4. **Parité STEP4** : la configuration d'origine de `153` reste à retrouver.
+5. **A9 partiel** : un `workflow-cli stepN run` manuel interrompu par `SIGTERM`
+   peut laisser un `ffmpeg` orphelin ; le chemin serveur est couvert. Voir
+   D-027.
+6. **R8 partiel** : les tampons d'image STEP4 restent réalloués par frame ;
+   seuls les blendshapes et les regex d'ingestion ont été optimisés.
 
 ## Prochaines actions
 

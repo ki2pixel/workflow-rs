@@ -41,6 +41,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 use walkdir::WalkDir;
 use workflow_core::{Config, HardwareLock};
+use workflow_schema::round::round_to;
 
 const FPS: f64 = 25.0;
 const VIDEO_EXTENSIONS: [&str; 5] = ["mp4", "avi", "mov", "mkv", "webm"];
@@ -91,7 +92,6 @@ pub struct Step3Options {
     pub min_speaker_speech_duration: f64,
     pub min_cluster_embeddings: usize,
     pub ecapa_batch_size: usize,
-    pub max_workers: usize,
     pub lock_path: Option<PathBuf>,
     pub logs_dir: Option<PathBuf>,
     pub skip_preserved_mov: bool,
@@ -146,7 +146,6 @@ impl Step3Options {
             min_speaker_speech_duration: step.min_speaker_speech_duration,
             min_cluster_embeddings: step.min_cluster_embeddings as usize,
             ecapa_batch_size: step.ecapa_batch_size as usize,
-            max_workers: step.max_workers as usize,
             lock_path: Some(config.hardware.lock_path.clone()),
             logs_dir: Some(config.paths.resolve().logs.join("step3")),
             skip_preserved_mov: config.steps.step1.skip_preserved_mov,
@@ -454,90 +453,12 @@ fn audio_output_path(video: &Path) -> PathBuf {
 }
 
 fn is_preserved_media(video: &Path, options: &Step3Options) -> bool {
-    if !options.skip_preserved_mov {
-        return false;
-    }
-    if !video
-        .extension()
-        .and_then(|value| value.to_str())
-        .is_some_and(|value| value.eq_ignore_ascii_case("mov"))
-    {
-        return false;
-    }
-    let name = video
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    if options
-        .preserved_mov_names
-        .iter()
-        .any(|preserved| preserved.eq_ignore_ascii_case(&name))
-    {
-        return true;
-    }
-    probe_mov_alpha(video, &options.ffprobe).unwrap_or(true)
-}
-
-fn probe_mov_alpha(path: &Path, ffprobe: &Path) -> Option<bool> {
-    let output = Command::new(ffprobe)
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            "v",
-            "-show_entries",
-            "stream=codec_name,codec_tag_string,pix_fmt",
-            "-of",
-            "json",
-        ])
-        .arg(path)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let payload: Value = serde_json::from_slice(&output.stdout).ok()?;
-    let streams = payload.get("streams")?.as_array()?;
-    if streams.is_empty() {
-        return None;
-    }
-    const ALPHA_PREFIXES: [&str; 9] = [
-        "yuva", "gbrap", "ya8", "ya16", "ayuv", "rgba", "bgra", "argb", "abgr",
-    ];
-    const ALPHA_TAGS: [&str; 4] = ["ap4h", "ap4x", "rle", "png"];
-    let mut missing_pix_fmt = false;
-    for stream in streams {
-        if let Some(pix_fmt) = stream.get("pix_fmt").and_then(Value::as_str) {
-            let normalized = pix_fmt.to_ascii_lowercase();
-            if ALPHA_PREFIXES
-                .iter()
-                .any(|prefix| normalized.starts_with(prefix))
-            {
-                return Some(true);
-            }
-        } else {
-            missing_pix_fmt = true;
-        }
-    }
-    if !missing_pix_fmt {
-        return Some(false);
-    }
-    for stream in streams {
-        if stream.get("pix_fmt").is_some() {
-            continue;
-        }
-        let tag = stream
-            .get("codec_tag_string")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_ascii_lowercase();
-        if ALPHA_TAGS.contains(&tag.as_str()) {
-            return Some(true);
-        }
-    }
-    None
+    crate::media::is_preserved_media_with(
+        video,
+        options.skip_preserved_mov,
+        &options.preserved_mov_names,
+        &options.ffprobe,
+    )
 }
 
 fn process_video(
@@ -923,13 +844,7 @@ fn write_audio_json(
         }
     }
     let speaker_stats = speaker_stats(diarization);
-    let temp = output.with_file_name(format!(
-        "{}.tmp",
-        output
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("audio")
-    ));
+    let temp = workflow_core::fsutil::hidden_temp_path(output);
     let result = (|| -> Result<()> {
         let file = File::create(&temp)
             .with_context(|| format!("création du JSON audio {}", temp.display()))?;
@@ -971,7 +886,11 @@ fn write_audio_json(
         }
         write!(writer, "\n  ]\n}}\n")?;
         writer.flush().context("flush du JSON audio")?;
-        fs::rename(&temp, output)
+        writer
+            .get_ref()
+            .sync_all()
+            .with_context(|| format!("synchronisation de {}", temp.display()))?;
+        workflow_core::fsutil::publish(&temp, output)
             .with_context(|| format!("renommage atomique de {}", output.display()))?;
         Ok(())
     })();
@@ -1003,11 +922,6 @@ fn speaker_stats(diarization: &[DiarizationSegment]) -> Map<String, Value> {
         );
     }
     stats
-}
-
-fn round_to(value: f64, decimals: u32) -> f64 {
-    let factor = 10_f64.powi(decimals as i32);
-    (value * factor).round_ties_even() / factor
 }
 
 #[cfg(test)]
@@ -1049,6 +963,39 @@ mod tests {
         assert_eq!(round_to(0.125, 2), 0.12);
         assert_eq!(round_to(0.135, 2), 0.14);
         assert_eq!(round_to(196.84 * 25.0, 0), 4921.0);
+    }
+
+    #[test]
+    fn speaker_percentage_matches_python_half_values() {
+        let diarization = vec![
+            DiarizationSegment {
+                speaker: "SPEAKER_00".into(),
+                start: 0.0,
+                end: 1.8,
+            },
+            DiarizationSegment {
+                speaker: "SPEAKER_01".into(),
+                start: 1.8,
+                end: 3600.0,
+            },
+        ];
+        let stats = speaker_stats(&diarization);
+        assert_eq!(stats["SPEAKER_00"]["percentage"], json!(0.1));
+
+        let diarization = vec![
+            DiarizationSegment {
+                speaker: "SPEAKER_00".into(),
+                start: 0.0,
+                end: 5.4,
+            },
+            DiarizationSegment {
+                speaker: "SPEAKER_01".into(),
+                start: 5.4,
+                end: 3600.0,
+            },
+        ];
+        let stats = speaker_stats(&diarization);
+        assert_eq!(stats["SPEAKER_00"]["percentage"], json!(0.1));
     }
 
     #[test]

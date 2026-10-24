@@ -3,18 +3,21 @@
 //! Reproduit `services/download_service.py` : sonde HEAD, fichier `.part`,
 //! reprise HTTP `Range`, validation ZIP et erreurs typées.
 
+use crate::error::IngestResult as Result;
 use crate::url::{normalize_url, rewrite_dropbox_to_dl_host};
-use anyhow::Result;
 use futures_util::StreamExt;
 use regex::Regex;
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use reqwest::header::{
     ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, RANGE,
 };
 use reqwest::{Client, StatusCode};
 use serde::Serialize;
+use std::io;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::AsyncWriteExt;
@@ -103,13 +106,73 @@ pub struct Downloader {
     config: DownloadConfig,
 }
 
+/// Résolveur qui refuse les cibles loopback, privées, link-local et
+/// multicast. Il protège le téléchargeur contre une URL webhook compromise
+/// (SSRF), y compris après redirection.
+#[derive(Debug)]
+struct PublicOnlyResolver;
+
+impl Resolve for PublicOnlyResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        Box::pin(async move {
+            let host = name.as_str().to_string();
+            let resolved = tokio::net::lookup_host((host.as_str(), 0)).await?;
+            let addresses: Vec<SocketAddr> = resolved
+                .filter(|address| is_public_ip(address.ip()))
+                .collect();
+            if addresses.is_empty() {
+                let error: Box<dyn std::error::Error + Send + Sync> = Box::new(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!("adresse non publique refusée pour {host}"),
+                ));
+                return Err(error);
+            }
+            Ok(Box::new(addresses.into_iter()) as Addrs)
+        })
+    }
+}
+
+fn is_public_ip(address: IpAddr) -> bool {
+    match address {
+        IpAddr::V4(address) => is_public_ipv4(address),
+        IpAddr::V6(address) => {
+            if let Some(mapped) = address.to_ipv4_mapped() {
+                return is_public_ipv4(mapped);
+            }
+            !(address.is_loopback()
+                || address.is_unspecified()
+                || address.is_multicast()
+                || address.is_unique_local()
+                || address.is_unicast_link_local())
+        }
+    }
+}
+
+fn is_public_ipv4(address: Ipv4Addr) -> bool {
+    let octets = address.octets();
+    let cgnat = octets[0] == 100 && (octets[1] & 0xc0) == 64;
+    !(address.is_private()
+        || address.is_loopback()
+        || address.is_link_local()
+        || address.is_broadcast()
+        || address.is_documentation()
+        || address.is_unspecified()
+        || address.is_multicast()
+        || octets[0] == 0
+        || cgnat)
+}
+
 impl Downloader {
     pub fn new(config: &DownloadConfig) -> Result<Self> {
-        let client = Client::builder()
+        let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(config.connect_timeout_s.max(1)))
             .read_timeout(Duration::from_secs(config.chunk_timeout_s.max(1)))
-            .user_agent(USER_AGENT)
-            .build()?;
+            .redirect(reqwest::redirect::Policy::limited(3))
+            .user_agent(USER_AGENT);
+        if !config.allow_private_hosts {
+            builder = builder.dns_resolver(Arc::new(PublicOnlyResolver));
+        }
+        let client = builder.build()?;
         Ok(Self {
             client,
             config: config.clone(),
@@ -681,8 +744,7 @@ fn expected_total_size(
     effective_offset: u64,
 ) -> Option<u64> {
     let content_range = header_string(response, CONTENT_RANGE);
-    if let Some(captured) = Regex::new(r"/(\d+)\s*$")
-        .expect("regex content-range")
+    if let Some(captured) = content_range_total_regex()
         .captures(&content_range)
         .and_then(|captures| captures.get(1))
         .and_then(|value| value.as_str().parse::<u64>().ok())
@@ -766,8 +828,8 @@ pub fn resolve_target_filename(
 
 fn extract_filename(content_disposition: &str, timestamp: &str, url: &str) -> String {
     let default = format!("download_{}", clean_timestamp(timestamp));
-    let utf8 = Regex::new(r#"(?i)filename\*=UTF-8''([^;\n\r]+)"#).expect("regex utf8 filename");
-    let simple = Regex::new(r#"(?i)filename="([^"]+)""#).expect("regex filename");
+    let utf8 = utf8_filename_regex();
+    let simple = quoted_filename_regex();
     let mut filename = if content_disposition.is_empty() {
         default
     } else if let Some(captures) = utf8.captures(content_disposition) {
@@ -923,6 +985,23 @@ fn new_download_id() -> String {
     format!("csv_{:08x}", (mixed & 0xffff_ffff) as u32)
 }
 
+fn content_range_total_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"/(\d+)\s*$").expect("motif Content-Range"))
+}
+
+fn utf8_filename_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r#"(?i)filename\*=UTF-8''([^;\n\r]+)"#).expect("motif filename UTF-8")
+    })
+}
+
+fn quoted_filename_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r#"(?i)filename="([^"]+)""#).expect("motif filename"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1033,10 +1112,39 @@ mod tests {
 
     fn downloader() -> Downloader {
         let config = DownloadConfig {
+            allow_private_hosts: true,
             backoff_s: 0.0,
             ..DownloadConfig::default()
         };
         Downloader::new(&config).unwrap()
+    }
+
+    #[test]
+    fn given_private_addresses_when_classified_then_rejected() {
+        for address in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "192.168.1.1",
+            "169.254.1.1",
+            "100.64.0.1",
+            "0.0.0.0",
+            "::1",
+            "fe80::1",
+            "fc00::1",
+        ] {
+            assert!(!is_public_ip(address.parse().unwrap()), "{address}");
+        }
+        assert!(is_public_ip("93.184.216.34".parse().unwrap()));
+        assert!(is_public_ip(
+            "2606:2800:220:1:248:1893:25c8:1946".parse().unwrap()
+        ));
+    }
+
+    #[tokio::test]
+    async fn given_localhost_when_public_resolver_then_rejected() {
+        use reqwest::dns::Resolve;
+        let name = "localhost".parse().unwrap();
+        assert!(PublicOnlyResolver.resolve(name).await.is_err());
     }
 
     #[test]

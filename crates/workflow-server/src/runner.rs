@@ -8,7 +8,9 @@
 use crate::catalog::StepKey;
 use crate::db::HistoryDb;
 use crate::progress::ProgressParser;
-use crate::state::{calculate_duration, now_epoch, terminate_pid, RunControl, WorkflowState};
+use crate::state::{
+    calculate_duration, now_epoch, terminate_pid, RunControl, RunId, StepPhase, WorkflowState,
+};
 use anyhow::{Context, Result};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
@@ -16,10 +18,16 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use workflow_core::Config;
+
+/// Capacité du canal de logs : un producteur bavard ne peut pas faire croître
+/// la mémoire sans limite.
+const LOG_CHANNEL_CAPACITY: usize = 1024;
+/// Taille maximale d'une ligne conservée (au-delà, elle est tronquée).
+const MAX_LINE_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct StepOutcome {
@@ -56,6 +64,13 @@ impl Runner {
         ] {
             fs::create_dir_all(directory)
                 .with_context(|| format!("création du répertoire {}", directory.display()))?;
+        }
+        let purged = workflow_core::fsutil::purge_orphans(
+            &resolved.base,
+            config.server.orphan_max_age_hours,
+        );
+        if purged > 0 {
+            tracing::info!(purged, "résidus d'exécutions interrompues purgés");
         }
         let workdir = absolute_from_cwd(&config.server.workdir)?;
         let cli = if config.server.workflow_cli.is_absolute() {
@@ -145,24 +160,26 @@ impl Runner {
         control: Arc<RunControl>,
     ) -> StepOutcome {
         let started_epoch = now_epoch();
+        let run_id = control.run_id();
+        let mut guard = FinishGuard::new(&self.state, step, run_id, started_epoch);
         self.state.append_log(
             step,
             format!("--- Lancement de: {} ---\n", step.display_name()),
         );
 
         if control.is_stop_requested() {
-            return self.finish(step, "stopped", Some(-1), started_epoch, None);
+            return guard.finish("stopped", Some(-1));
         }
         if let Some(reason) = step.unavailable_reason() {
             self.state.append_log(step, format!("{reason}\n"));
-            return self.finish(step, "failed", Some(-1), started_epoch, Some(reason.into()));
+            return guard.finish("failed", Some(-1));
         }
 
         let command = match step.command(&self.config, &self.config_path, &self.cli) {
             Ok(command) => command,
             Err(error) => {
                 self.state.append_log(step, format!("{error}\n"));
-                return self.finish(step, "failed", Some(-1), started_epoch, Some(error));
+                return guard.finish("failed", Some(-1));
             }
         };
         let command_line = command
@@ -181,10 +198,10 @@ impl Runner {
             &self.config.paths.resolve().logs,
             self.max_log_bytes,
         );
-        if let Some(file) = &mut log_file {
-            let _ = writeln!(file, "--- Lancement de: {} ---", step.display_name());
-            let _ = writeln!(file, "Commande: {command_line}");
-            let _ = writeln!(file, "Dans: {}", self.workdir.display());
+        if let Some(sink) = &mut log_file {
+            sink.write_line(&format!("--- Lancement de: {} ---", step.display_name()));
+            sink.write_line(&format!("Commande: {command_line}"));
+            sink.write_line(&format!("Dans: {}", self.workdir.display()));
         }
 
         let mut process = Command::new(&command[0]);
@@ -195,23 +212,28 @@ impl Runner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            process.as_std_mut().process_group(0);
+        }
         let mut child = match process.spawn() {
             Ok(child) => child,
             Err(error) => {
                 let message = format!("Échec du lancement de {}: {error}", command_line);
                 self.state.append_log(step, format!("{message}\n"));
-                if let Some(file) = &mut log_file {
-                    let _ = writeln!(file, "{message}");
+                if let Some(sink) = &mut log_file {
+                    sink.write_line(&message);
                 }
-                return self.finish(step, "failed", Some(-1), started_epoch, Some(message));
+                return guard.finish("failed", Some(-1));
             }
         };
         if let Some(pid) = child.id() {
             control.set_pid(pid);
         }
-        self.state.mark_running(step);
+        self.state.mark_running(step, run_id);
 
-        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        let (tx, mut rx) = mpsc::channel::<String>(LOG_CHANNEL_CAPACITY);
         if let Some(stdout) = child.stdout.take() {
             tokio::spawn(pump(stdout, tx.clone()));
         }
@@ -236,7 +258,7 @@ impl Runner {
                     let message = format!("Erreur d'attente du sous-processus: {error}");
                     self.state.append_log(step, format!("{message}\n"));
                     let _ = child.start_kill();
-                    return self.finish(step, "failed", Some(-1), started_epoch, Some(message));
+                    return guard.finish("failed", Some(-1));
                 }
             }
 
@@ -314,22 +336,43 @@ impl Runner {
             step,
             format!("\n--- {} {} ---\n", step.display_name(), suffix),
         );
-        self.finish(step, status, code, started_epoch, None)
+        guard.finish(status, code)
+    }
+}
+
+/// Garde RAII : si la tâche disparaît sans finaliser (panique, annulation),
+/// l'état publie un échec au lieu de rester bloqué en `running`.
+struct FinishGuard<'a> {
+    state: &'a WorkflowState,
+    step: StepKey,
+    run_id: RunId,
+    started_epoch: f64,
+    finished: bool,
+}
+
+impl<'a> FinishGuard<'a> {
+    fn new(state: &'a WorkflowState, step: StepKey, run_id: RunId, started_epoch: f64) -> Self {
+        Self {
+            state,
+            step,
+            run_id,
+            started_epoch,
+            finished: false,
+        }
     }
 
-    fn finish(
-        &self,
-        step: StepKey,
-        status: &str,
-        return_code: Option<i32>,
-        started_epoch: f64,
-        _message: Option<String>,
-    ) -> StepOutcome {
-        let duration = calculate_duration(Some(started_epoch));
+    fn finish(&mut self, status: &str, return_code: Option<i32>) -> StepOutcome {
+        let duration = calculate_duration(Some(self.started_epoch));
+        let phase = match status {
+            "completed" => StepPhase::Completed,
+            "stopped" => StepPhase::Stopped,
+            _ => StepPhase::Failed,
+        };
+        self.finished = true;
         self.state
-            .finish_step(step, status, return_code, duration.clone());
+            .finish_step(self.step, self.run_id, phase, return_code, duration.clone());
         StepOutcome {
-            step,
+            step: self.step,
             status: status.into(),
             return_code,
             duration,
@@ -338,33 +381,125 @@ impl Runner {
     }
 }
 
-async fn pump<R>(reader: R, tx: mpsc::UnboundedSender<String>)
+impl Drop for FinishGuard<'_> {
+    fn drop(&mut self) {
+        if self.finished {
+            return;
+        }
+        let duration = calculate_duration(Some(self.started_epoch));
+        self.state.finish_step(
+            self.step,
+            self.run_id,
+            StepPhase::Failed,
+            Some(-1),
+            duration,
+        );
+    }
+}
+
+async fn pump<R>(reader: R, tx: mpsc::Sender<String>)
 where
     R: AsyncRead + Unpin,
 {
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::new();
     loop {
-        buffer.clear();
-        match reader.read_until(b'\n', &mut buffer).await {
-            Ok(0) => break,
-            Ok(_) => {
-                let line = String::from_utf8_lossy(&buffer)
-                    .trim_end_matches(['\n', '\r'])
-                    .to_string();
-                if tx.send(line).is_err() {
+        match read_capped_line(&mut reader, &mut buffer).await {
+            Ok(Some(line)) => {
+                if tx.send(line).await.is_err() {
                     break;
                 }
             }
+            Ok(None) => break,
             Err(_) => break,
         }
     }
 }
 
-fn write_line(file: &mut Option<BufWriter<File>>, line: &str) {
-    if let Some(file) = file {
-        let _ = writeln!(file, "{line}");
-        let _ = file.flush();
+/// Lit une ligne en plafonnant sa taille : le surplus est consommé puis jeté
+/// au lieu d'être accumulé en mémoire.
+async fn read_capped_line<R>(
+    reader: &mut R,
+    buffer: &mut Vec<u8>,
+) -> std::io::Result<Option<String>>
+where
+    R: AsyncBufRead + Unpin,
+{
+    buffer.clear();
+    let mut truncated = false;
+    loop {
+        let chunk = reader.fill_buf().await?;
+        if chunk.is_empty() {
+            if buffer.is_empty() && !truncated {
+                return Ok(None);
+            }
+            break;
+        }
+        let newline = chunk.iter().position(|byte| *byte == b'\n');
+        let take = newline.map(|index| index + 1).unwrap_or(chunk.len());
+        let room = MAX_LINE_BYTES.saturating_sub(buffer.len());
+        let copied = take.min(room);
+        buffer.extend_from_slice(&chunk[..copied]);
+        if copied < take {
+            truncated = true;
+        }
+        reader.consume(take);
+        if newline.is_some() {
+            break;
+        }
+    }
+    let mut line = String::from_utf8_lossy(buffer)
+        .trim_end_matches(['\n', '\r'])
+        .to_string();
+    if truncated {
+        line.push_str(" …[ligne tronquée]");
+    }
+    Ok(Some(line))
+}
+
+struct LogSink {
+    file: BufWriter<File>,
+    path: PathBuf,
+    max_bytes: u64,
+    written: u64,
+}
+
+impl LogSink {
+    fn new(path: PathBuf, max_bytes: u64, file: File) -> Self {
+        let written = file.metadata().map(|metadata| metadata.len()).unwrap_or(0);
+        Self {
+            file: BufWriter::new(file),
+            path,
+            max_bytes,
+            written,
+        }
+    }
+
+    fn write_line(&mut self, line: &str) {
+        let _ = writeln!(self.file, "{line}");
+        self.written = self.written.saturating_add(line.len() as u64 + 1);
+        if self.max_bytes > 0 && self.written >= self.max_bytes {
+            self.rotate();
+        }
+    }
+
+    fn rotate(&mut self) {
+        let _ = self.file.flush();
+        rotate_log(&self.path, 0);
+        if let Ok(file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+        {
+            self.file = BufWriter::new(file);
+            self.written = 0;
+        }
+    }
+}
+
+fn write_line(sink: &mut Option<LogSink>, line: &str) {
+    if let Some(sink) = sink {
+        sink.write_line(line);
     }
 }
 
@@ -373,7 +508,7 @@ fn open_log(
     step: StepKey,
     logs_dir: &Path,
     max_bytes: u64,
-) -> Option<BufWriter<File>> {
+) -> Option<LogSink> {
     let path = logs_dir.join(format!("step_{}.log", step.as_str()));
     if let Err(error) = fs::create_dir_all(logs_dir) {
         state.append_log(
@@ -384,7 +519,7 @@ fn open_log(
     }
     rotate_log(&path, max_bytes);
     match OpenOptions::new().create(true).append(true).open(&path) {
-        Ok(file) => Some(BufWriter::new(file)),
+        Ok(file) => Some(LogSink::new(path, max_bytes, file)),
         Err(error) => {
             state.append_log(
                 step,
@@ -453,6 +588,43 @@ mod tests {
         let state = Arc::new(WorkflowState::new());
         let runner = Runner::new(config, dir.path().join("config.toml"), state).unwrap();
         (dir, runner)
+    }
+
+    #[tokio::test]
+    async fn given_giant_line_when_captured_then_truncated() {
+        let (_dir, runner) =
+            test_runner("#!/bin/sh\nhead -c 200000 /dev/zero | tr '\\0' 'a'\necho\n");
+        let control = runner.state().reserve_step(StepKey::Step5).unwrap();
+        let outcome = runner.execute_reserved(StepKey::Step5, control).await;
+        assert_eq!(outcome.status, "completed");
+        let status = runner.state().step_status(StepKey::Step5, true).unwrap();
+        let log = status.log.unwrap();
+        assert!(log.iter().any(|line| line.contains("tronqué")));
+        assert!(log.iter().all(|line| line.len() < 70 * 1024));
+    }
+
+    #[tokio::test]
+    async fn given_log_exceeding_limit_when_running_then_rotated() {
+        let dir = tempfile::tempdir().unwrap();
+        let cli = fake_cli(
+            dir.path(),
+            "#!/bin/sh\ni=0\nwhile [ $i -lt 200 ]; do echo '0123456789012345678901234567890123456789'; i=$((i+1)); done\n",
+        );
+        let mut config = Config::default();
+        config.paths.base = dir.path().join("runtime");
+        config.paths.logs = Some(config.paths.base.join("logs"));
+        config.paths.projects = Some(config.paths.base.join("projets_extraits"));
+        config.paths.history_db = Some(config.paths.base.join("history.sqlite3"));
+        config.server.workflow_cli = cli;
+        config.server.workdir = dir.path().to_path_buf();
+        config.server.max_step_log_bytes = 1024;
+        config.hardware.lock_path = dir.path().join("hardware.lock");
+        let state = Arc::new(WorkflowState::new());
+        let runner = Runner::new(config, dir.path().join("config.toml"), state).unwrap();
+        let control = runner.state().reserve_step(StepKey::Step5).unwrap();
+        runner.execute_reserved(StepKey::Step5, control).await;
+        let logs = dir.path().join("runtime").join("logs");
+        assert!(logs.join("step_STEP5.log.1").exists());
     }
 
     #[tokio::test]

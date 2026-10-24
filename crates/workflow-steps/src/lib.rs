@@ -1,6 +1,7 @@
 //! Implémentations des étapes du pipeline.
 
 pub mod error;
+pub mod media;
 pub mod retention;
 pub mod step1;
 pub mod step2;

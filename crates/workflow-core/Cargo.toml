@@ -11,3 +11,6 @@ toml.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 fs2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

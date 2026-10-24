@@ -185,7 +185,7 @@ fn number_value(value: f64) -> Value {
 }
 
 fn write_json_atomically(output: &Path, payload: &Value) -> Result<(), StepError> {
-    let temp_path = output.with_extension("tmp");
+    let temp_path = workflow_core::fsutil::hidden_temp_path(output);
     let write_result = (|| -> Result<(), StepError> {
         let file = File::create(&temp_path).map_err(|source| StepError::Write {
             path: temp_path.clone(),
@@ -201,7 +201,14 @@ fn write_json_atomically(output: &Path, payload: &Value) -> Result<(), StepError
             path: temp_path.clone(),
             source,
         })?;
-        fs::rename(&temp_path, output).map_err(|source| StepError::Write {
+        writer
+            .get_ref()
+            .sync_all()
+            .map_err(|source| StepError::Write {
+                path: temp_path.clone(),
+                source,
+            })?;
+        workflow_core::fsutil::publish(&temp_path, output).map_err(|source| StepError::Write {
             path: output.to_path_buf(),
             source,
         })?;

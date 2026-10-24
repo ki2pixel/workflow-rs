@@ -334,7 +334,12 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<()> {
             Err(_) => continue,
         };
         let target = destination.join(relative);
-        if entry.file_type().is_dir() {
+        if entry.file_type().is_symlink() {
+            anyhow::bail!(
+                "symlink interdit pendant la finalisation STEP7: {}",
+                entry.path().display()
+            );
+        } else if entry.file_type().is_dir() {
             fs::create_dir_all(&target)?;
         } else if entry.file_type().is_file() {
             if let Some(parent) = target.parent() {
@@ -637,9 +642,7 @@ fn write_finalized_manifest(
         "mode": mode.as_str(),
         "projects": projects,
     });
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, serde_json::to_vec_pretty(&payload)?)?;
-    fs::rename(&temp_path, &path)?;
+    workflow_core::fsutil::write_atomic(&path, &serde_json::to_vec_pretty(&payload)?)?;
     Ok(path)
 }
 
@@ -757,6 +760,19 @@ mod tests {
         assert!(project.join("docs/clip_audio.json").exists());
         assert!(project.join("docs/clip.json").exists());
         assert!(project.join("notes.json").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn given_symlink_when_copying_tree_then_rejected() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let destination = dir.path().join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("clip.mp4"), b"ok").unwrap();
+        symlink(source.join("clip.mp4"), source.join("lien.mp4")).unwrap();
+        assert!(copy_tree(&source, &destination).is_err());
     }
 
     #[test]

@@ -52,31 +52,44 @@ de mtime avant/après sont identiques.
 
 ## Couverture disponible
 
-`/mnt/cache` contient 14 projets complets, soit 23 vidéos avec les six artefacts
-STEP1 à STEP6. Le shadow en couvre dix. Les quatre projets restants
-(`260`, `262`, `263`, `265`) peuvent être ajoutés avec `--limit 14`.
+`/mnt/cache` contient les projets de production complets (dossiers `docs/`
+avec vidéos et artefacts STEP1 à STEP6). Le shadow en couvrait dix le
+2026-10-22 ; les corpus préparés depuis portent la couverture à vingt projets.
 
-Le dossier `153 Camille` a été préparé le 2026-10-23 et n'est plus une limite :
+### Corpus 153 à 159 et 1720
 
-- extraction STEP1 Rust de `/mnt/cache/old/153 Camille.zip` (1,9 Go) vers
-  `/mnt/cache/153 Camille/docs` : 5 vidéos H.264 1080p déjà conformes, plus le
-  PNG, aucune réécriture ;
-- artefacts STEP2 à STEP5 récupérés de l'archive de production
-  `153 Camille 2026-10-14_16-17-13` (5 hash) : `<stem>.csv`,
-  `<stem>_audio.json`, `<stem>_tracking.json` ;
-- `_ae.json` générés par le STEP6 Python pour servir de référence ;
-- shadow STEP5/6 : `15/15` vérifications identiques (5 vidéos × audio, vidéo,
-  AE) le 2026-10-23.
+Le 2026-10-23 et le 2026-10-24, sept corpus ont été ajoutés :
 
-Un passage `--limit 11` incluant `153 Camille` donne `81/81` vérifications
-identiques (11 projets, 27 vidéos).
+| Projet | Source | Vidéos | Préparation | Shadow |
+| --- | --- | ---: | --- | --- |
+| 153 Camille | ZIP + archive 2026-10-14 | 5 | STEP1 Rust, artefacts archive, STEP6 Python | 15/15 |
+| 154 Camille | ZIP + archive 2026-10-14 | 4 | idem | 12/12 |
+| 155 Camille | ZIP + archive 2026-10-14 | 2 | idem | 6/6 |
+| 156 Camille | ZIP + archive 2026-10-14 | 5 | idem | 15/15 |
+| 158 Camille | ZIP + archive 2026-10-14 | 5 | idem | 15/15 |
+| 159 Camille | ZIP + archive 2026-10-14 | 4 | idem | 12/12 |
+| 1720 Camille | ZIP seul | 4 | STEP1 Rust, STEP2-6 Python | 12/12 (+12/12 raw) |
 
-Limite : le STEP4 brut `<stem>.json` n'est pas présent, donc le mode
-`--prefer-raw` n'est pas disponible pour ce projet. Le mode par défaut, qui
-part du `_tracking.json` de production, est validé.
+La préparation réutilise STEP1 Rust pour l'extraction (vidéos déjà conformes),
+puis copie les artefacts de l'archive STEP7 correspondante et lance le STEP6
+Python pour les `_ae.json`. Pour 1720, faute d'archive, le STEP2-6 Python a
+été exécuté sur les vidéos extraites.
 
-Les dossiers complets à la racine incluent désormais `148`, `151`, `152` et
-`153`.
+Les archives STEP7 de 154, 155, 156, 158 et 159 proviennent du lot
+`2026-10-14` ; les plus anciennes (`2026-09-17` pour 154/155) ne
+correspondaient pas aux vidéos des ZIP actuels. Les vidéos étaient déjà
+conformes : STEP1 n'a réencodé aucun fichier.
+
+Le passage global `--limit 20` donne `162/162` vérifications identiques.
+
+### 153 et `--prefer-raw`
+
+Le STEP4 Python a été relancé sur `153 Camille` le 2026-10-24 avec la
+détection d'objets active. Les `<stem>.json` bruts existent désormais, mais
+`--prefer-raw` ne reproduit pas le `_tracking.json` d'archive : `5/15`
+seulement. La production du 2026-10-14 avait une configuration STEP4 plus
+détectrice (11 853 objets contre 4 977 sur la vidéo Manon). Le mode par défaut
+reste `15/15`. La dérive est suivie dans `parity/DRIFT.md` (D-024).
 
 ## Limite restante
 

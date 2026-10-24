@@ -29,6 +29,7 @@ est mis à jour à chaque mesure de parité.
 | D-021 | haute | Migration | Le moniteur Rust ne peut pas deviner l'historique Python. Une base vide ferait télécharger tous les liens du webhook. | Import explicite `workflow-cli history import --from <base>` (lecture seule, 911 URL identiques au 2026-10-23), audit `history audit`, puis `webhook.enabled = true`. Les échecs Python ne sont pas importés : ils sont transitoires et liés à des URL R2 expirées. |
 | D-022 | info | Validation | La compilation Windows de `workflow-bridge.exe`, le basculement du JSX After Effects et la validation STEP8 sur la machine Windows étaient listés comme restant. | Abandonnés : la production cible Linux, STEP8 est validé en headless avec `effectcraft-cli`, et le JSX/CEP continue d'appeler Python. Aucun chemin Rust ne dépend de cette validation. |
 | D-023 | haute | Migration | Python et Rust gardent des racines séparées (`download_history`, `processed_archives.txt`, téléchargements, archives STEP7). Une bascule sans fusion fait retélécharger les archives traitées par l'autre backend et perd la liste STEP1. | Synchronisation explicite `workflow-cli sync` avant chaque bascule : union de l'historique (timestamp minimal), fusion de `processed_archives.txt` par nom de fichier avec remappage, copie/déplacement des archives non traitées et copie/hardlink des analyses STEP7 par `(projet, hash)`. Les échecs ne sont pas fusionnés. |
+| D-024 | moyenne | Validation | Le STEP4 Python relancé sur `153 Camille` le 2026-10-24 ne reproduit pas le `_tracking.json` archivé : 4 977 objets contre 11 853 sur une vidéo, et le shadow `--prefer-raw` tombe à 5/15. | Le corpus par défaut utilise le `_tracking.json` de production et reste à 15/15. Les fichiers bruts régénérés sont conservés pour diagnostic. Ne pas utiliser `--prefer-raw` sur 153 tant que la configuration STEP4 d'origine n'est pas retrouvée. |
 
 ## Détails
 
@@ -228,3 +229,16 @@ La synchronisation prend le verrou `/tmp/workflow-sync.lock`, refuse les ports
 (`VACUUM INTO`) et les listes avant écriture. Le lanceur Rust l'exécute
 automatiquement ; le raccourci Python reste inchangé. Détail dans
 `docs/SYNC-BACKENDS.md`.
+
+### D-024 — STEP4 régénéré vs archive 153
+
+Le 2026-10-24, le STEP4 Python a été relancé sur les 5 vidéos de
+`153 Camille` avec `STEP4_ENABLE_OBJECT_DETECTION=1`, comme la production.
+Les fichiers `<stem>.json` bruts sont produits (5/5), mais leur réduction
+STEP5 ne retrouve pas le `_tracking.json` archivé : 4 977 objets contre
+11 853 sur la vidéo Manon, et 5/15 vérifications `--prefer-raw` identiques.
+La vidéo est pourtant identique (SHA-256 `5d1951...`). La différence vient
+donc de la configuration ou du modèle STEP4 utilisé le 2026-10-14, non
+conservé dans l'archive. Le shadow par défaut, qui part du `_tracking.json`
+de production, reste à 15/15. Les corpus 154-159 et 1720 ne sont pas
+affectés : leurs références et leurs bruts (1720) sont cohérents.

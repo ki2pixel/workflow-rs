@@ -160,5 +160,6 @@ repris sur 5004. Aucun téléchargement n'a été créé pendant ce test.
 
 Un test isolé de bout en bout (téléchargement HTTP → STEP1 → STEP7 → sync
 retour) a également été exécuté dans `/tmp/opencode/e2e-900` ; le détail est
-dans `SYNC-BACKENDS.md`, section 10. Le corpus `153 Camille` a été préparé et
-validé 15/15 par le shadow STEP5/6 (voir `LOT-1-SHADOW.md`).
+dans `SYNC-BACKENDS.md`, section 10. Les corpus 153, 154, 155, 156, 158, 159
+et 1720 ont été préparés ; le shadow STEP5/6 donne 162/162 sur 20 projets
+(voir `LOT-1-SHADOW.md`).

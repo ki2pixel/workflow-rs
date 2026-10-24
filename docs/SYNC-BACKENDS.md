@@ -297,5 +297,5 @@ ni `~/Téléchargements`, ni `/mnt/cache` :
   dupliqués ignorés, historique et listes stables.
 
 L'état réel est resté à 911 URL, 96 entrées STEP1 et 2 473 fichiers STEP7.
-Le corpus `153 Camille` a par ailleurs été préparé et validé 15/15 par le
-shadow STEP5/6 (voir `LOT-1-SHADOW.md`).
+Les corpus 153, 154, 155, 156, 158, 159 et 1720 ont été préparés ; le shadow
+STEP5/6 donne 162/162 sur 20 projets (voir `LOT-1-SHADOW.md`).

@@ -710,6 +710,7 @@ fn extract_rar(
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|error| ArchiveError::Tool(format!("unrar: {error}")))?;
+        let _guard = crate::process::ChildGuard::register(child.id());
         let mut stdout = child
             .stdout
             .take()

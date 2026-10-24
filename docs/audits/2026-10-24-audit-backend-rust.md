@@ -13,9 +13,8 @@
   aucune mesure de parité réelle (les tests ne chargent ni modèle, ni GPU, ni
   Coral).
 - **Statut** : audit en lecture seule lors de sa rédaction. Remédiation
-  appliquée le 2026-10-24 : 31 constats corrigés, 2 partiels (A9, R8),
-  3 documentés (C3 → D-025, C4 → D-015, C8 → D-024). Voir la section 0
-  ci-dessous.
+  appliquée le 2026-10-24 : 33 constats corrigés et 3 documentés
+  (C3 → D-025, C4 → D-015, C8 → D-024). Voir la section 0 ci-dessous.
 
 ## 0. Statut de remédiation (2026-10-24)
 
@@ -30,12 +29,12 @@ tests, `cargo fmt --check` et
 | A1 | corrigé | `RunId`/`StepPhase::Stopping`, `finish_step` générationnel, tests 409 après `/stop` |
 | A2 | corrigé | arrêt gracieux du serveur, groupes de processus, `switch-rust.sh stop` |
 | A3 | corrigé | STEP1 prend `HardwareLock` si normalisation GPU |
-| A4 | corrigé | canal borné 1 024, lignes plafonnées à 64 Kio (4 Kio dans l'état) |
+| A4 | corrigé | canal borné, writer bloquant dédié, lignes plafonnées, logs de cycle de vie et 4xx/5xx |
 | A5 | corrigé | `parking_lot::RwLock`, `FinishGuard` RAII, `WorkflowServerError` |
 | A6 | corrigé | rotation pendant l'écriture, lecture en queue de fichier |
 | A7 | corrigé | progression calculée sur les étapes réelles de la séquence |
 | A8 | corrigé | purge au démarrage des `_temp_*`, `*.part`, `*.tmp*` anciens |
-| A9 | partiel | groupes de processus côté serveur ; CLI manuel documenté D-027 |
+| A9 | corrigé | groupes de processus côté serveur et gestionnaire SIGTERM/SIGINT pour STEP1–4 |
 | S1 | corrigé | hôte non-loopback refusé sans `server.allow_remote` |
 | S2 | corrigé | défaut `/tmp/workflow-rs-hw.lock`, rejet global de `workflow-hw.lock` |
 | S3 | corrigé | `secret_key` optionnel, documenté comme inutilisé |
@@ -52,7 +51,7 @@ tests, `cargo fmt --check` et
 | R5 | corrigé | plus de décision HTTP sur `message.contains` |
 | R6 | corrigé | tests CLI/TPU, Given/When/Then, zéro `unwrap` hors tests |
 | R7 | corrigé | `unrar p` streamé, stderr drainé, partiel supprimé |
-| R8 | partiel | blendshapes filtrés avant allocation, regex `OnceLock` ; buffers STEP4 inchangés |
+| R8 | corrigé | blendshapes filtrés avant allocation, regex `OnceLock`, cache thread-local de resize STEP4 |
 | R9 | corrigé | `workflow-steps/src/media.rs` partagé |
 | C1 | corrigé | message `Step 'STEPX' is not running` |
 | C2 | corrigé | moniteur CSV publie `running`/`stopped` |

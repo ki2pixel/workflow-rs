@@ -269,3 +269,23 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - [2026-10-24 15:13:18] - **Traversée `/sound-design` documentée**
   - `ServeDir` renvoie 404 au lieu du 403 du contrat Python ; aucune fuite.
     Décision D-025 : conserver le comportement standard et documenter l'écart.
+
+## Compléments A4, A9 et R8 (2026-10-24)
+
+- [2026-10-24 15:25:00] - **Journaux hors du runtime Tokio**
+  - Les lignes de journal sont transmises à un writer dédié exécuté via
+    `spawn_blocking` ; un disque lent ne bloque plus un worker HTTP.
+  - Le canal du writer est borné (512) et le canal amont reste à 1 024.
+  - `Runner` journalise début, fin, code de retour, durée et chemin de
+    journal ; le middleware HTTP signale les réponses 4xx/5xx.
+- [2026-10-24 15:28:00] - **Gestionnaire de signaux pour STEP1–4**
+  - `workflow_steps::process` suit jusqu'à 64 enfants longs dans une table
+    atomique ; `ffmpeg` et `unrar p` y sont enregistrés.
+  - La CLI installe `SIGTERM`/`SIGINT` uniquement pour STEP1–4 : les enfants
+    reçoivent `SIGTERM`, puis le CLI sort en `128 + signal`.
+  - STEP8 garde son gestionnaire `ctrlc` à double signal ; aucun remplacement.
+- [2026-10-24 15:31:00] - **Cache de resize STEP4**
+  - Les coefficients `xofs`/`xalpha` et les lignes `row0`/`row1` sont calculés
+    une fois par thread et par couple de dimensions, puis réutilisés.
+  - L'allocation de l'image de sortie reste inhérente au retour d'un
+    `RgbImage` possédé ; elle est la seule allocation par frame conservée.

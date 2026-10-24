@@ -360,6 +360,7 @@ async fn process_video(
     let mut child = ffmpeg_command(video, options)
         .spawn()
         .with_context(|| format!("lancement de ffmpeg pour {}", video.display()))?;
+    let _child_guard = crate::process::ChildGuard::register(child.id().unwrap_or(0));
     let mut stdout = child.stdout.take().context("stdout ffmpeg indisponible")?;
     let mut stderr = child.stderr.take().context("stderr ffmpeg indisponible")?;
     let stderr_task = tokio::spawn(async move {

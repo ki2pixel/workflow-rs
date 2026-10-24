@@ -25,7 +25,7 @@ use workflow_core::Config;
 
 /// Capacité du canal de logs : un producteur bavard ne peut pas faire croître
 /// la mémoire sans limite.
-const LOG_CHANNEL_CAPACITY: usize = 1024;
+const LOG_CHANNEL_CAPACITY: usize = 256;
 /// Taille maximale d'une ligne conservée (au-delà, elle est tronquée).
 const MAX_LINE_BYTES: usize = 64 * 1024;
 
@@ -192,17 +192,27 @@ impl Runner {
         self.state
             .append_log(step, format!("Dans: {}\n\n", self.workdir.display()));
 
-        let mut log_file = open_log(
+        let log_sink = open_log(
             &self.state,
             step,
             &self.config.paths.resolve().logs,
             self.max_log_bytes,
         );
-        if let Some(sink) = &mut log_file {
-            sink.write_line(&format!("--- Lancement de: {} ---", step.display_name()));
-            sink.write_line(&format!("Commande: {command_line}"));
-            sink.write_line(&format!("Dans: {}", self.workdir.display()));
-        }
+        let log_path = log_sink.as_ref().map(|sink| sink.path().to_path_buf());
+        let log_writer = log_sink.map(LogWriter::spawn);
+        write_log(
+            &log_writer,
+            format!("--- Lancement de: {} ---", step.display_name()),
+        )
+        .await;
+        write_log(&log_writer, format!("Commande: {command_line}")).await;
+        write_log(&log_writer, format!("Dans: {}", self.workdir.display())).await;
+        tracing::info!(
+            step = step.as_str(),
+            run_id = run_id.get(),
+            command = %command_line,
+            "étape lancée"
+        );
 
         let mut process = Command::new(&command[0]);
         process
@@ -222,8 +232,15 @@ impl Runner {
             Err(error) => {
                 let message = format!("Échec du lancement de {}: {error}", command_line);
                 self.state.append_log(step, format!("{message}\n"));
-                if let Some(sink) = &mut log_file {
-                    sink.write_line(&message);
+                write_log(&log_writer, message.clone()).await;
+                tracing::error!(
+                    step = step.as_str(),
+                    run_id = run_id.get(),
+                    error = %error,
+                    "échec du lancement de l'étape"
+                );
+                if let Some(writer) = log_writer {
+                    writer.finish().await;
                 }
                 return guard.finish("failed", Some(-1));
             }
@@ -248,8 +265,8 @@ impl Runner {
 
         let exit_status = loop {
             while let Ok(line) = rx.try_recv() {
-                write_line(&mut log_file, &line);
                 parser.process(&line, &self.state);
+                write_log(&log_writer, line).await;
             }
             match child.try_wait() {
                 Ok(Some(status)) => break status,
@@ -291,8 +308,8 @@ impl Runner {
                 line = rx.recv() => {
                     match line {
                         Some(line) => {
-                            write_line(&mut log_file, &line);
                             parser.process(&line, &self.state);
+                            write_log(&log_writer, line).await;
                         }
                         None => {
                             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -308,8 +325,8 @@ impl Runner {
         while Instant::now() < drain_deadline {
             match tokio::time::timeout(Duration::from_millis(100), rx.recv()).await {
                 Ok(Some(line)) => {
-                    write_line(&mut log_file, &line);
                     parser.process(&line, &self.state);
+                    write_log(&log_writer, line).await;
                 }
                 Ok(None) => break,
                 Err(_) => break,
@@ -336,7 +353,25 @@ impl Runner {
             step,
             format!("\n--- {} {} ---\n", step.display_name(), suffix),
         );
-        guard.finish(status, code)
+        write_log(
+            &log_writer,
+            format!("\n--- {} {} ---\n", step.display_name(), suffix),
+        )
+        .await;
+        let outcome = guard.finish(status, code);
+        if let Some(writer) = log_writer {
+            writer.finish().await;
+        }
+        tracing::info!(
+            step = step.as_str(),
+            run_id = run_id.get(),
+            status = outcome.status.as_str(),
+            return_code = ?outcome.return_code,
+            duration = %outcome.duration,
+            log = ?log_path,
+            "étape terminée"
+        );
+        outcome
     }
 }
 
@@ -475,6 +510,14 @@ impl LogSink {
         }
     }
 
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn flush(&mut self) {
+        let _ = self.file.flush();
+    }
+
     fn write_line(&mut self, line: &str) {
         let _ = writeln!(self.file, "{line}");
         self.written = self.written.saturating_add(line.len() as u64 + 1);
@@ -497,9 +540,46 @@ impl LogSink {
     }
 }
 
-fn write_line(sink: &mut Option<LogSink>, line: &str) {
-    if let Some(sink) = sink {
-        sink.write_line(line);
+enum LogCommand {
+    Line(String),
+}
+
+/// Écrit les journaux sur un thread bloquant dédié : un disque lent ne bloque
+/// plus un worker du runtime Tokio.
+struct LogWriter {
+    tx: mpsc::Sender<LogCommand>,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+impl LogWriter {
+    fn spawn(mut sink: LogSink) -> Self {
+        let (tx, mut rx) = mpsc::channel(128);
+        let handle = tokio::task::spawn_blocking(move || {
+            while let Some(LogCommand::Line(line)) = rx.blocking_recv() {
+                sink.write_line(&line);
+            }
+            sink.flush();
+        });
+        Self { tx, handle }
+    }
+
+    async fn line(&self, line: String) {
+        if self.tx.send(LogCommand::Line(line)).await.is_err() {
+            tracing::warn!("écriture du journal interrompue");
+        }
+    }
+
+    async fn finish(self) {
+        drop(self.tx);
+        if let Err(error) = self.handle.await {
+            tracing::warn!(%error, "thread d'écriture du journal en échec");
+        }
+    }
+}
+
+async fn write_log(writer: &Option<LogWriter>, line: impl Into<String>) {
+    if let Some(writer) = writer {
+        writer.line(line.into()).await;
     }
 }
 
@@ -629,7 +709,7 @@ mod tests {
 
     #[tokio::test]
     async fn successful_command_updates_state_and_log() {
-        let (_dir, runner) = test_runner(
+        let (dir, runner) = test_runner(
             "#!/bin/sh\necho 'TOTAL_JSON_TO_REDUCE: 1'\necho 'REDUCING_JSON: 1/1: demo'\necho 'Succès: réduction JSON terminée pour demo'\n",
         );
         let control = runner.state().reserve_step(StepKey::Step5).unwrap();
@@ -640,6 +720,14 @@ mod tests {
         assert_eq!(status.progress_current, 1);
         assert_eq!(status.return_code, Some(0));
         assert!(status.log.unwrap().join("").contains("réduction JSON"));
+        let log = fs::read_to_string(
+            dir.path()
+                .join("runtime")
+                .join("logs")
+                .join("step_STEP5.log"),
+        )
+        .unwrap();
+        assert!(log.contains("Succès: réduction JSON terminée"));
     }
 
     #[tokio::test]

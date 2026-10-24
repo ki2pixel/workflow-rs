@@ -7,16 +7,15 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 275 tests unitaires, sans matériel.
+- 278 tests unitaires, sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
 - Shadow STEP5/6 `162/162` sur 20 projets.
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
 - Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de
   production aligné sur Rust `:5004`.
-- Remédiation de l'audit backend du 2026-10-24 : 31 constats corrigés,
-  2 partiels (A9 arrêt manuel CLI, R8 buffers STEP4), 3 documentés
-  (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`, clippy strict,
-  275 tests et `config check` verts.
+- Remédiation de l'audit backend du 2026-10-24 : 33 constats corrigés,
+  3 documentés (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`,
+  clippy strict, 278 tests et `config check` verts.
 - **Aucune tâche active.**
 
 ## Chronologie de migration
@@ -45,8 +44,8 @@
 | 2 | Cycle de vie : arrêt des groupes, verrou STEP1, isolation partagée, `allow_remote`, purges | test SIGTERM/SIGKILL de groupe, `bash -n switch-rust.sh` |
 | 3 | Parité : `round_to` STEP3, RAR streamé | 0,1 % sur 1,8 s/3 600 s, faux `unrar` multi-Mio |
 | 4 | Sécurité/contrats : CSP, constant-time, SSRF, quotas, symlinks, logs, fsync, timeout STEP7 | tests headers, IP privées, zip bomb, symlink hors logs |
-| 5 | Robustesse : canal borné, rotation, progression, purge orphelins, `media.rs`, regex | ligne 64 Kio, rotation en cours, progression 3 étapes |
-| 6 | Clôture : `unwrap` STEP2, TraceLayer, tests CLI/TPU, docs | 275 tests, clippy/fmt, D-025 à D-027 |
+| 5 | Robustesse : canal borné, writer bloquant, rotation, progression, purge orphelins, `media.rs`, regex, cache resize | ligne 64 Kio, rotation en cours, progression 3 étapes |
+| 6 | Clôture : `unwrap` STEP2, TraceLayer, tests CLI/TPU, docs | 278 tests, clippy/fmt, D-025 à D-027 |
 
 ## Détails des validations
 

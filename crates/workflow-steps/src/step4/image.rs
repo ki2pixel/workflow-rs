@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::OnceLock;
 
 /// Image RGB 8 bits, canaux entrelacés.
@@ -69,37 +70,96 @@ pub fn resize_linear(src: &RgbImage, dst_width: usize, dst_height: usize) -> Rgb
     if src.width == dst_width * 2 && src.height == dst_height * 2 {
         return resize_area_2x(src, dst_width, dst_height);
     }
-
-    // OpenCV calcule scale = 1 / (dst/src), pas src/dst : l'arrondi
-    // flottant diffère aux coordonnées entières exactes.
-    let scale_x = 1.0 / (dst_width as f64 / src.width as f64);
-    let scale_y = 1.0 / (dst_height as f64 / src.height as f64);
-    let scale_x_f = scale_x as f32;
-    let scale_y_f = scale_y as f32;
-
-    let mut xofs = vec![0usize; dst_width];
-    let mut xalpha = vec![[0i16; 2]; dst_width];
-    for dx in 0..dst_width {
-        let fx = (dx as f32 + 0.5) * scale_x_f - 0.5;
-        let mut sx = fx.floor() as i32;
-        let mut frac = fx - sx as f32;
-        if sx < 0 {
-            sx = 0;
-            frac = 0.0;
+    RESIZE_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        let cache = cache
+            .get_or_insert_with(|| ResizeCache::new(src.width, src.height, dst_width, dst_height));
+        if !cache.matches(src.width, src.height, dst_width, dst_height) {
+            *cache = ResizeCache::new(src.width, src.height, dst_width, dst_height);
         }
-        if sx >= src.width as i32 - 1 {
-            sx = src.width as i32 - 1;
-            frac = 0.0;
+        resize_with_cache(src, dst_width, dst_height, cache)
+    })
+}
+
+thread_local! {
+    /// Les dimensions source/cible sont constantes pendant une vidéo : les
+    /// coefficients et les lignes intermédiaires sont calculés une seule fois
+    /// par thread au lieu d'être réalloués à chaque frame.
+    static RESIZE_CACHE: RefCell<Option<ResizeCache>> = const { RefCell::new(None) };
+}
+
+struct ResizeCache {
+    src_width: usize,
+    src_height: usize,
+    dst_width: usize,
+    dst_height: usize,
+    xofs: Vec<usize>,
+    xalpha: Vec<[i16; 2]>,
+    row0: Vec<i32>,
+    row1: Vec<i32>,
+}
+
+impl ResizeCache {
+    fn new(src_width: usize, src_height: usize, dst_width: usize, dst_height: usize) -> Self {
+        // OpenCV calcule scale = 1 / (dst/src), pas src/dst : l'arrondi
+        // flottant diffère aux coordonnées entières exactes.
+        let scale_x = 1.0 / (dst_width as f64 / src_width as f64);
+        let scale_x_f = scale_x as f32;
+        let mut xofs = vec![0usize; dst_width];
+        let mut xalpha = vec![[0i16; 2]; dst_width];
+        for dx in 0..dst_width {
+            let fx = (dx as f32 + 0.5) * scale_x_f - 0.5;
+            let mut sx = fx.floor() as i32;
+            let mut frac = fx - sx as f32;
+            if sx < 0 {
+                sx = 0;
+                frac = 0.0;
+            }
+            if sx >= src_width as i32 - 1 {
+                sx = src_width as i32 - 1;
+                frac = 0.0;
+            }
+            xofs[dx] = sx.max(0) as usize;
+            xalpha[dx] = [
+                saturate_short((1.0 - frac) * 2048.0),
+                saturate_short(frac * 2048.0),
+            ];
         }
-        xofs[dx] = sx as usize;
-        let a0 = saturate_short((1.0 - frac) * 2048.0);
-        let a1 = saturate_short(frac * 2048.0);
-        xalpha[dx] = [a0, a1];
+        Self {
+            src_width,
+            src_height,
+            dst_width,
+            dst_height,
+            xofs,
+            xalpha,
+            row0: vec![0i32; dst_width * 3],
+            row1: vec![0i32; dst_width * 3],
+        }
     }
 
+    fn matches(
+        &self,
+        src_width: usize,
+        src_height: usize,
+        dst_width: usize,
+        dst_height: usize,
+    ) -> bool {
+        self.src_width == src_width
+            && self.src_height == src_height
+            && self.dst_width == dst_width
+            && self.dst_height == dst_height
+    }
+}
+
+fn resize_with_cache(
+    src: &RgbImage,
+    dst_width: usize,
+    dst_height: usize,
+    cache: &mut ResizeCache,
+) -> RgbImage {
+    let scale_y = 1.0 / (dst_height as f64 / src.height as f64);
+    let scale_y_f = scale_y as f32;
     let mut out = vec![0u8; dst_width * dst_height * 3];
-    let mut row0 = vec![0i32; dst_width * 3];
-    let mut row1 = vec![0i32; dst_width * 3];
 
     for dy in 0..dst_height {
         let fy = (dy as f32 + 0.5) * scale_y_f - 0.5;
@@ -116,18 +176,24 @@ pub fn resize_linear(src: &RgbImage, dst_width: usize, dst_height: usize) -> Rgb
         let b0 = saturate_short((1.0 - frac) * 2048.0);
         let b1 = saturate_short(frac * 2048.0);
 
-        hresize_row(src, sy as usize, &xofs, &xalpha, &mut row0);
+        hresize_row(
+            src,
+            sy as usize,
+            &cache.xofs,
+            &cache.xalpha,
+            &mut cache.row0,
+        );
         let second = if sy >= src.height as i32 - 1 {
             sy as usize
         } else {
             (sy + 1) as usize
         };
-        hresize_row(src, second, &xofs, &xalpha, &mut row1);
+        hresize_row(src, second, &cache.xofs, &cache.xalpha, &mut cache.row1);
 
         let out_row = dy * dst_width * 3;
         for index in 0..dst_width * 3 {
-            let s0 = row0[index] >> 4;
-            let s1 = row1[index] >> 4;
+            let s0 = cache.row0[index] >> 4;
+            let s1 = cache.row1[index] >> 4;
             let value = ((i32::from(b0) * s0) >> 16) + ((i32::from(b1) * s1) >> 16) + 2;
             out[out_row + index] = (value >> 2).clamp(0, 255) as u8;
         }
@@ -369,6 +435,19 @@ pub fn image_to_uint8_input(image: &RgbImage, output: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn given_cached_resize_when_dimensions_change_then_results_stay_stable() {
+        let data = (0..75).map(|value| value as u8).collect();
+        let image = RgbImage::new(5, 5, data);
+        let first = resize_linear(&image, 2, 2);
+        let second = resize_linear(&image, 3, 3);
+        let first_again = resize_linear(&image, 2, 2);
+        assert_eq!(first.data, first_again.data);
+        assert_eq!(second.width, 3);
+        assert_eq!(second.height, 3);
+        assert_eq!(second.data.len(), 27);
+    }
 
     #[test]
     fn nearest_uses_floor_mapping() {

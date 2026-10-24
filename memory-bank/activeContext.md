@@ -17,7 +17,7 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   confinés. Parité : `round_to` partagé STEP3, RAR streamé. Persistance :
   `fsync` avant publication, temporaires cachés, purge des orphelins.
   Documentation : D-025 (404 `/sound-design`), D-026 (frontières typées),
-  D-027 (arrêt manuel CLI). Suite : 275 tests, fmt/clippy verts.
+  D-027 (arrêt manuel CLI). Suite : 278 tests, fmt/clippy verts.
 - [2026-10-24] **Bootstrap `.agents/` et `memory-bank/`** :
   - création de `.agents/rules/` (10 règles), `.agents/skills/` (21 skills +
     9 ressources) et `.agents/workflows/` (6 workflows) ;
@@ -49,9 +49,9 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 275 tests unitaires ; pas de CI.
-- Audit backend du 2026-10-24 remédié : 31 corrigés, 2 partiels (A9, R8),
-  3 documentés (C3 → D-025, C4 → D-015, C8 → D-024).
+- 278 tests unitaires ; pas de CI.
+- Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
+  (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock`.
 - Runtime : `runtime/` ; sortie finalisée : `/mnt/cache`.
@@ -65,11 +65,9 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 3. **Surveillance production** : vérifier le moniteur webhook et les
    téléchargements après quelques jours.
 4. **Parité STEP4** : la configuration d'origine de `153` reste à retrouver.
-5. **A9 partiel** : un `workflow-cli stepN run` manuel interrompu par `SIGTERM`
-   peut laisser un `ffmpeg` orphelin ; le chemin serveur est couvert. Voir
+5. **Signaux** : les étapes 1 à 4 installent un gestionnaire `SIGTERM`/`SIGINT`
+   qui termine leurs enfants ; STEP8 conserve son propre gestionnaire. Voir
    D-027.
-6. **R8 partiel** : les tampons d'image STEP4 restent réalloués par frame ;
-   seuls les blendshapes et les regex d'ingestion ont été optimisés.
 
 ## Prochaines actions
 

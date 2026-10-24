@@ -89,7 +89,17 @@ pub fn router(state: Arc<AppState>) -> Router {
 }
 
 async fn security_headers(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
     let mut response = next.run(request).await;
+    if response.status().is_client_error() || response.status().is_server_error() {
+        tracing::warn!(
+            %method,
+            path = %path,
+            status = %response.status(),
+            "requête HTTP en erreur"
+        );
+    }
     let headers = response.headers_mut();
     headers.insert(
         header::CONTENT_SECURITY_POLICY,

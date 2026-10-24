@@ -266,10 +266,13 @@ toute nouvelle API publique d'étape doit préférer `StepError`.
 ### D-027 — Arrêt manuel d'une étape et descendants
 
 Le serveur lance chaque CLI dans son propre groupe de processus et envoie
-`SIGTERM` puis `SIGKILL` au groupe, ce qui couvre `ffmpeg` et les autres
-descendants. Un `workflow-cli stepN run` lancé à la main, hors serveur, ne
-installe pas de gestionnaire de signal : un `SIGTERM` direct au CLI peut
-laisser un `ffmpeg` orphelin terminer son écriture. Le verrou matériel et le
-nettoyage des temporaires limitent l'impact ; ce cas reste un usage manuel
-hors orchestration, documenté ici plutôt que masqué par un gestionnaire de
-signaux partiel.
+`SIGTERM` puis `SIGKILL` au groupe. Pour les lancements manuels, la CLI
+installe en plus un gestionnaire `SIGTERM`/`SIGINT` pour STEP1 à STEP4 : les
+enfants longs (`ffmpeg`, `unrar p`) sont enregistrés dans une table atomique
+et reçoivent `SIGTERM` avant que le CLI ne quitte. STEP8 conserve son propre
+gestionnaire à double signal, qui n'est pas remplacé.
+
+Limite résiduelle : un `SIGKILL` ne peut pas être intercepté ; les fichiers
+`.part`/`.tmp` laissés par une mort brutale sont purgés au démarrage suivant
+(A8). Un enfant qui ignorerait `SIGTERM` peut survivre quelques secondes ;
+c'est le même compromis que la fenêtre de grâce de 5 s du serveur.

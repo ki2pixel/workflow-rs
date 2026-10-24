@@ -751,6 +751,15 @@ fn run() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
+    #[cfg(unix)]
+    if matches!(
+        &cli.command,
+        Command::Step1(_) | Command::Step2(_) | Command::Step3(_) | Command::Step4(_)
+    ) {
+        // STEP8 installe son propre gestionnaire (double SIGTERM) : ne pas le
+        // remplacer ici.
+        workflow_steps::process::install_shutdown_handler();
+    }
     let config = Config::load(&cli.config)
         .with_context(|| format!("chargement de {}", cli.config.display()))?;
     config.validate_common()?;

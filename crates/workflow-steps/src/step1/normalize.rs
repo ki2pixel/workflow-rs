@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const FPS_TOLERANCE: f64 = 0.1;
@@ -406,7 +406,11 @@ pub fn normalize_video(
     }
     command.arg(&temp_output_path);
 
-    let result = command.output();
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let result = command.spawn().and_then(|child| {
+        let _guard = crate::process::ChildGuard::register(child.id());
+        child.wait_with_output()
+    });
     match result {
         Ok(output) if output.status.success() => {}
         Ok(output) => {

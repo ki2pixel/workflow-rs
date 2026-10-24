@@ -36,7 +36,7 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Instant;
 use walkdir::WalkDir;
@@ -700,7 +700,10 @@ fn extract_audio(video: &Path, options: &Step3Options) -> Result<Option<AudioDat
         return Ok(None);
     }
     let mut command = Command::new(&options.ffmpeg);
-    command.args(["-nostdin", "-v", "error"]);
+    command
+        .args(["-nostdin", "-v", "error"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     if options.ffmpeg_threads > 0 {
         command
             .arg("-threads")
@@ -721,7 +724,11 @@ fn extract_audio(video: &Path, options: &Step3Options) -> Result<Option<AudioDat
             "s16le",
             "pipe:1",
         ])
-        .output()
+        .spawn()
+        .and_then(|child| {
+            let _guard = crate::process::ChildGuard::register(child.id());
+            child.wait_with_output()
+        })
         .with_context(|| format!("lancement de FFmpeg pour {}", video.display()))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

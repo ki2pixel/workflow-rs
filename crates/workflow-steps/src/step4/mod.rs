@@ -505,6 +505,7 @@ fn process_video(
     let video_display = video.display().to_string();
     let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel::<DecodedFrame>(3);
     let decoder = std::thread::spawn(move || {
+        let _guard = crate::process::ChildGuard::register(child.id());
         let mut stdout = stdout;
         let mut child = child;
         loop {

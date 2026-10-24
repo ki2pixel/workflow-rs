@@ -7,6 +7,18 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
 ## Dernière session
 
+- [2026-10-24] **Synchronisation documentaire** :
+  - chiffre de tests aligné sur la mesure
+    (`cargo test --workspace -- --list`) : 280 ;
+  - statut `stopping`/`is_stopping`, en-têtes de sécurité, `server.allow_remote`,
+    `download.allow_private_hosts`, quotas STEP1 et `steps.step7.timeout_s`
+    documentés dans le contrat et les docs de lot ;
+  - index D-025 à D-027 complété dans `decisionLog.md` ;
+  - purge des résidus au démarrage ajoutée à `RETENTION.md` ;
+  - audit de `.agents/rules/codingstandards.md` et des 22 `SKILL.md` :
+    compte de tests 280, clé `steps.step3.max_workers` retirée, verrou STEP1,
+    arrêt `stopping`, gate `effectcraft-cli`, écriture legacy interdite dans les
+    skills frontend.
 - [2026-10-24] **Journal serveur enrichi** :
   - `workflow-server.log` inclut désormais la configuration au démarrage, les
     requêtes mutantes et erreurs HTTP avec durée, le cycle webhook, les étapes
@@ -36,7 +48,7 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
   confinés. Parité : `round_to` partagé STEP3, RAR streamé. Persistance :
   `fsync` avant publication, temporaires cachés, purge des orphelins.
   Documentation : D-025 (404 `/sound-design`), D-026 (frontières typées),
-  D-027 (arrêt manuel CLI). Suite : 278 tests, fmt/clippy verts.
+  D-027 (arrêt manuel CLI). Suite : 280 tests, fmt/clippy verts.
 - [2026-10-24] **Bootstrap `.agents/` et `memory-bank/`** :
   - création de `.agents/rules/` (10 règles), `.agents/skills/` (21 skills +
     9 ressources) et `.agents/workflows/` (6 workflows) ;

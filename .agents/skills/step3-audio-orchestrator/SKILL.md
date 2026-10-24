@@ -59,7 +59,8 @@ Options utiles :
 - [ ] `steps.step3.require_edgetpu = true` en production.
 - [ ] `steps.step3.embedding_stride = 1` par défaut (zéro régression).
 - [ ] `steps.step3.adaptive_stride = false` par défaut.
-- [ ] `steps.step3.max_workers = 1`.
+- [ ] Traitement séquentiel : aucune parallélisation des vidéos ni des
+      sessions YAMNet (pas de clé `max_workers` dans le TOML).
 - [ ] `/dev/apex_0` accessible.
 - [ ] Le modèle contient `edgetpu-custom-op`.
 - [ ] Le JSON est écrit atomiquement.
@@ -76,7 +77,7 @@ Options utiles :
 | `ModuleNotFoundError` | Impossible : le chemin Rust n'appelle pas Python ; vérifier la config |
 | `SKIP_NO_AUDIO` | Comportement attendu (D-002), pas une erreur |
 | `JSON différent` | Comparer avec la fixture et vérifier le modèle/mel matrix |
-| `OOM` | Réduire `max_workers`, `ecapa_batch_size` ; vérifier le RSS |
+| `OOM` | Réduire `ecapa_batch_size`, `cpu_threads` ; vérifier le RSS |
 | `verrou refusé` | Une autre étape matérielle tourne ; attendre ou arrêter |
 | `date de frames incohérente` | Vérifier la normalisation STEP1 (25 fps) |
 

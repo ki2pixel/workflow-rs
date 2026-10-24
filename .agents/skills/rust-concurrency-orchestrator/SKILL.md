@@ -42,10 +42,10 @@ Choisir et vérifier le bon modèle de concurrence :
 
 ### STEP3
 
-- Une session YAMNet réutilisée séquentiellement (`max_workers = 1`).
+- Une session YAMNet réutilisée séquentiellement.
 - Ne pas la partager entre threads sans un verrou couvrant l'écriture du
   tenseur, `invoke()` et la lecture.
-- Traitement séquentiel des vidéos (`max_workers = 1`).
+- Traitement séquentiel des vidéos.
 - ECAPA sur CPU, batch 32.
 
 ### STEP4
@@ -73,7 +73,9 @@ Choisir et vérifier le bon modèle de concurrence :
 - Une seule étape à la fois.
 - Un deuxième lancement renvoie 409.
 - Une séquence s'arrête au premier échec.
-- `stop`/`cancel` envoient SIGTERM et attendent.
+- `stop`/`cancel` passent par `stopping`, envoient SIGTERM puis SIGKILL et
+  conservent le créneau jusqu'à la mort du sous-processus ; un `finish_step`
+  périmé est ignoré (`RunId`).
 
 ## Checklist
 

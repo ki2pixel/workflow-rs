@@ -34,8 +34,9 @@ workflow-cli step1 run --source-dir <source>
 ```
 
 Le serveur construit la commande à partir de `steps.step1.source_dir` et
-applique `steps.step1.timeout_s` (14 400 s par défaut, au lieu de 1 800 s pour
-les autres étapes).
+applique `steps.step1.timeout_s` (14 400 s par défaut, au lieu de 1 800 s par
+défaut pour les autres étapes ; STEP7 et STEP8 disposent aussi de leur propre
+timeout à 14 400 s).
 
 ## Configuration
 
@@ -49,14 +50,17 @@ crf = 28
 gpu_workers = 3
 delete_archive = true
 timeout_s = 14400
+max_extracted_bytes = 107374182400
+max_compression_ratio = 200
 skip_preserved_mov = true
 preserved_mov_names = ["m6+.mov"]
 ```
 
 Les valeurs de normalisation (`fps`, `crf`, `gpu_workers`) sont validées au
-chargement : `fps > 0`, `crf <= 51`, `gpu_workers > 0`, `timeout_s > 0`.
-`source_dir` doit être non vide pour le serveur ; la CLI accepte
-`--source-dir` en surcharge.
+chargement : `fps > 0`, `crf <= 51`, `gpu_workers > 0`, `timeout_s > 0`. Les
+quotas `max_extracted_bytes` et `max_compression_ratio` doivent aussi être
+strictement positifs. `source_dir` doit être non vide pour le serveur ; la CLI
+accepte `--source-dir` en surcharge.
 
 ## Extraction
 
@@ -95,6 +99,13 @@ comportant un composant parent. Les entrées non régulières d'un TAR
 (symlinks, hardlinks, périphériques) sont ignorées et comptées comme problèmes
 de sécurité, comme Python. Les liens ZIP sont écrits comme des fichiers
 ordinaires, faute de support de lien dans `zipfile`.
+
+Chaque archive est bornée par un budget de décompression :
+`max_extracted_bytes` (100 Gio par défaut) pour le total extrait et
+`max_compression_ratio` (200 par défaut) pour le rapport entre taille déclarée
+et taille compressée. Un dépassement interrompt l'extraction ; le dossier
+temporaire `_temp_*` est supprimé, l'archive reste en place et l'erreur est
+remontée.
 
 ### Déplacement
 

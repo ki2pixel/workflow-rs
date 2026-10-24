@@ -11,14 +11,14 @@ Maintenir l'intégration matérielle du Coral M.2 PCIe et son orchestration Rust
 
 - **Macro** : le serveur sérialise les étapes ; une seule étape matérielle à la
   fois.
-- **Verrou** : `HardwareLock` sur `/tmp/workflow-rs-hw.lock` pour STEP2/3/4.
-  La sync utilise son propre verrou `/tmp/workflow-sync.lock` et refuse de
-  démarrer si un serveur écoute.
+- **Verrou** : `HardwareLock` sur `/tmp/workflow-rs-hw.lock` pour STEP1
+  (normalisation vidéo) et STEP2/3/4. La sync utilise son propre verrou
+  `/tmp/workflow-sync.lock` et refuse de démarrer si un serveur écoute.
 - **Micro** : `workflow-tpu::Session` charge `libtensorflowlite_c.so` et
   `libedgetpu.so.1`, vérifie la signature `edgetpu-custom-op` et sérialise
   l'accès aux tenseurs.
 - **STEP3** : une session YAMNet réutilisée pour toutes les fenêtres ; le
-  pipeline est séquentiel (`max_workers = 1`), donc aucun accès concurrent.
+  pipeline est séquentiel, donc aucun accès concurrent.
 - **STEP4** : un délégué Edge TPU par modèle TPU ; les blendshapes restent sur
   CPU.
 
@@ -66,7 +66,7 @@ cargo run -p workflow-cli -- --config config/config.toml config show | \
 | `dlopen` échoue | Chemin de `libedgetpu.so.1` ou `libtensorflowlite_c.so` |
 | `edgetpu-custom-op` absent | Modèle non compilé pour l'Edge TPU |
 | OOM TPU | Modèle trop gros ou sessions concurrentes ; vérifier la SRAM |
-| Verrou refusé | STEP2/3/4 ou sync déjà en cours |
+| Verrou refusé | STEP1 (normalisation), STEP2/3/4 ou sync déjà en cours |
 | Deux étapes en parallèle | Le serveur doit renvoyer 409 ; vérifier l'état |
 | Résultats non déterministes | Accès aux tenseurs hors verrou |
 | `pcie_aspm` actif | Ajouter `pcie_aspm=off` au kernel et redémarrer |

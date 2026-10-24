@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.3 |
+| Version | 1.4 |
 | Date | 2026-10-24 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
@@ -91,7 +91,8 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
 {
   "step": "STEP3",
   "display_name": "3. Analyse audio",
-  "status": "idle|starting|running|completed|failed|stopped|cancelled|initiated",
+  "status": "idle|starting|running|stopping|completed|failed|stopped|cancelled|initiated",
+  "is_stopping": false,
   "return_code": null,
   "progress_current": 0,
   "progress_total": 0,
@@ -103,7 +104,7 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
 }
 ```
 
-`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`.
+`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`. Le serveur Rust ajoute le champ `is_stopping` et publie `stopping` pendant un arrêt demandé (voir §3).
 
 `GET /sequence/status` :
 
@@ -177,7 +178,7 @@ produit l'objet `error`.
 `GET /api/cache/search` : `{"number": "115", "matches": ["..."], "best_match": "/mnt/cache/115 Camille"}`.
 `GET /api/cache/list_today` : `{"folders": [{"path": "...", "name": "...", "number": "115", "mtime": "..."}]}`.
 `POST /api/cache/open` : `{"success": true, "message": "..."}` ; corps `{"path": "...", "select_parent": false}`.
-`GET /api/ping` : `{"status": "pong", "worker_type": "ubuntu_new"}`.
+`GET /api/ping` : `{"status": "pong", "worker_type": "ubuntu_new"}` ; le serveur Rust ajoute `"runtime": "rust"`.
 
 Les formes de `/api/performance/metrics`, `/api/stats/dashboard` et `/api/stats/history` sont définies par `PerformanceService` ; les clés de premier niveau sont `profiling_stats`, `cache_stats`, `system_performance`, `performance_history`, `alerts`, `timestamp` pour les métriques, et `summary`, `api_metrics`, `system_metrics`, `step_history`, `alerts`, `cache_stats`, `profiling_summary`, `timestamp` pour le tableau de bord.
 
@@ -203,7 +204,7 @@ Les messages français sont utilisés par le frontend (`"en cours"`, `"inconnue"
 
 `WorkflowState` contient, par étape :
 
-- `status` parmi `idle`, `starting`, `running`, `completed`, `failed`, `cancelled`, plus `stopped` et `initiated` utilisés par le service.
+- `status` parmi `idle`, `starting`, `running`, `completed`, `failed`, `cancelled`, plus `stopped` et `initiated` utilisés par le service. Le serveur Rust ajoute `stopping` entre la demande d'arrêt et la mort effective du sous-processus ; `stopped` n'est publié qu'ensuite.
 - `log`, `deque(maxlen=300)`, lignes déjà échappées en HTML.
 - `return_code`, `process`, `progress_current`, `progress_total`, `progress_text`, `start_time_epoch`, `duration_str`, `progress_current_fractional`, `files_completed`.
 
@@ -216,7 +217,7 @@ Règles de concurrence observées :
 - Deux étapes différentes peuvent être lancées simultanément par l'API. Le frontend ne le fait pas, mais le contrat le permet. La nouvelle application doit sérialiser les étapes lourdes pour protéger le GPU et le TPU ; c'est un durcissement volontaire, à documenter.
 - Une séquence s'arrête à la première étape en échec.
 - Le lancement d'une étape positionne `initiated`, puis le thread passe à `starting` et `running`.
-- Un arrêt manuel positionne `stopped` et `return_code = -1`.
+- Un arrêt manuel positionne `stopped` et `return_code = -1` ; côté Rust, `return_code` passe à `-1` dès la phase `stopping`.
 
 Après la fin d'un processus, l'exécuteur force une durée minimale de 0,6 s avant de publier le statut final, pour éviter un clignotement de l'interface.
 
@@ -320,7 +321,7 @@ Points d'attention :
 | STEP7 | `env/bin/python workflow_scripts/step7/finalize_and_copy.py` | `<BASE>/projets_extraits` | 1800 s |
 | STEP8 | `env/bin/python workflow_scripts/step8/run_mediasolution_ec.py` | `<BASE>` | 14400 s |
 
-Le lot 6 exécute STEP1 par `workflow-cli step1 run --source-dir <source>`, avec un timeout de 14400 s. Les commandes Python ci-dessus restent la référence comportementale ; elles ne sont plus lancées par l'application Rust.
+Le lot 6 exécute STEP1 par `workflow-cli step1 run --source-dir <source>`, avec un timeout de 14400 s. Le serveur Rust applique `steps.default_timeout_s` à toutes les étapes, sauf STEP1, STEP7 et STEP8, qui utilisent respectivement `steps.step1.timeout_s`, `steps.step7.timeout_s` et `steps.step8.timeout_s` (14400 s par défaut). Les commandes Python ci-dessus restent la référence comportementale ; elles ne sont plus lancées par l'application Rust.
 
 Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYTHONUTF8=1`, `PYTHONUNBUFFERED=1`, `ROOT_SCAN_DIR`, `FOLDER_KEYWORD`, `SUBFOLDER_NAME`, `TRACKING_DISABLE_GPU`, `TRACKING_CPU_WORKERS`, `LD_LIBRARY_PATH` (incluant les répertoires `nvidia/*/lib` du venv), `PYTORCH_CUDA_ALLOC_CONF` (STEP2 et STEP3), `AUDIO_PARTIAL_SUCCESS_OK=1`, `AUDIO_GPU_ISOLATION`.
 
@@ -387,7 +388,7 @@ Webhook : `WEBHOOK_JSON_URL` vaut en production `https://webhook.kidpixel.fr/web
 
 Le cache est valable `WEBHOOK_CACHE_TTL` secondes. Trois tentatives avec backoff. Le statut exposé contient `available`, `last_fetch_ts`, `error`, `records`.
 
-Téléchargement : R2 en priorité, Dropbox en repli. Le nom de fichier vient de `Content-Disposition`, puis de l'URL, puis de `original_filename`. Les conflits sont résolus par suffixe. Un fichier `.part` permet la reprise. La taille minimale d'un ZIP est `DOWNLOAD_MIN_ZIP_SIZE_BYTES`, et `DOWNLOAD_VALIDATE_ZIP` active la vérification. Les échecs alimentent `download_failures` et déclenchent le cooldown décrit plus haut.
+Téléchargement : R2 en priorité, Dropbox en repli. Le nom de fichier vient de `Content-Disposition`, puis de l'URL, puis de `original_filename`. Les conflits sont résolus par suffixe. Un fichier `.part` permet la reprise. La taille minimale d'un ZIP est `DOWNLOAD_MIN_ZIP_SIZE_BYTES`, et `DOWNLOAD_VALIDATE_ZIP` active la vérification. Les échecs alimentent `download_failures` et déclenchent le cooldown décrit plus haut. Le résolveur DNS n'accepte que des adresses publiques et les redirections sont limitées à trois ; `download.allow_private_hosts = true` est réservé aux tests locaux.
 
 EffectCraft : STEP8 appelle `effectcraft-cli` en headless, dans une session
 `run prefs.set … file.runScript` (aucun bridge TCP, aucune application lancée),
@@ -404,6 +405,9 @@ Sections prévues : `[server]`, `[paths]`, `[webhook]`, `[download]`, `[steps.st
 Correspondance complète dans `config/env.map.toml`. Les règles de validation sont les suivantes :
 
 - Refus de démarrer si `worker_token` est vide, égal à `dev-internal-worker-token`, ou commence par `dev-`.
+- Refus de démarrer si `server.host` n'est pas une adresse loopback, sauf avec `server.allow_remote = true`.
+- Refus de tout `hardware.lock_path` dont le nom de fichier est `workflow-hw.lock`, quel que soit le répertoire.
+- `server.secret_key` est optionnel : aucun mécanisme de session ne l'utilise.
 - Refus de démarrer si un chemin obligatoire n'existe pas ou n'est pas accessible en écriture.
 - `port` entre 1024 et 65535, `fps` entier positif, `threshold` dans `[0, 1]`.
 - `require_edgetpu = true` par défaut pour STEP3 et STEP4.
@@ -424,7 +428,7 @@ Clés à ne pas porter : `STEP3_METHOD`, `STEP3_USE_LEMONFOX`, `STEP3_DEEPINFRA_
 - Le no-op de STEP4 quand aucune vidéo n'a besoin de tracking.
 - Le 204 sur `/favicon.ico`.
 - Le jeton dans la balise meta et l'en-tête `X-Worker-Token`.
-- La CSP déclarée dans le template.
+- La CSP déclarée dans le template ; le serveur Rust l'émet aussi en en-tête HTTP (`Content-Security-Policy`), avec `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` et `Permissions-Policy` restreignant caméra, micro et géolocalisation.
 
 Corrections assumées dans la version Rust :
 

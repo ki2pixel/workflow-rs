@@ -56,10 +56,10 @@ Questions :
 ### Analyser un verrou
 
 ```text
-STEP2/3/4 prennent /tmp/workflow-rs-hw.lock
+STEP1 (normalisation) et STEP2/3/4 prennent /tmp/workflow-rs-hw.lock
 → le serveur sérialise les étapes
 → une deuxième étape renvoie 409
-→ stop/cancel envoie SIGTERM
+→ stop/cancel passe par `stopping`, puis SIGTERM/SIGKILL
 ```
 
 Questions :

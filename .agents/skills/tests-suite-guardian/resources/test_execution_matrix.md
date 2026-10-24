@@ -4,7 +4,7 @@
 | --- | --- | --- | --- |
 | Format | `cargo fmt --check` | `rustfmt` | Aucun diff |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` | Dépendances compilées | Aucun warning |
-| Suite complète | `cargo test --workspace` | Aucun matériel | 233 tests verts |
+| Suite complète | `cargo test --workspace` | Aucun matériel | 280 tests verts |
 | STEP1 | `cargo test -p workflow-steps step1 --lib` | Aucun matériel | Tests module step1 |
 | STEP2 | `cargo test -p workflow-steps step2 --lib` | Aucun GPU | Tests fenêtres/CSV/CPU |
 | STEP3 | `cargo test -p workflow-steps step3 --lib` | Aucun TPU | Tests mel/VAD/AHC/writer |
@@ -17,12 +17,13 @@
 | Ingestion | `cargo test -p workflow-ingest --lib` | Aucun réseau | Tests URL/SQLite/cooldown |
 | Sync | `cargo test -p workflow-sync --lib` | Aucun serveur | Tests fusion/dry-run |
 | Bridge | `cargo test -p workflow-bridge` | Aucun AE | Tests cuts/manifeste |
-| TPU FFI | `cargo test -p workflow-tpu --lib` | Aucun `/dev/apex_0` | 0 test unitaire ; valider avec `workflow-tpu-spike` |
+| CLI | `cargo test -p workflow-cli --bins` | Aucun matériel | Tests parsing/config |
+| TPU FFI | `cargo test -p workflow-tpu --lib` | Aucun `/dev/apex_0` | 2 tests de contrat ; matériel via `workflow-tpu-spike` |
 
 ## Pré-checklist
 
 - [ ] `cargo build --workspace` passe.
-- [ ] Aucun processus STEP2/3/4 ou serveur de test ne tourne.
+- [ ] Aucun processus STEP1 (normalisation), STEP2/3/4 ou serveur de test ne tourne.
 - [ ] Les tests n'écrivent pas dans `runtime/` ni `/mnt/cache`.
 - [ ] Les chemins temporaires sont sous `tempfile` ou `/tmp/opencode`.
 - [ ] Les variables d'environnement de production ne sont pas chargées par

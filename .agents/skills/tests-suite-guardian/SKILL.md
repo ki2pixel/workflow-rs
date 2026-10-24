@@ -7,12 +7,13 @@ description: Maintenir et exécuter la suite de tests Rust de workflow-rs (tests
 
 ## Portée
 
-- **233 tests** : 210 `#[test]` + 23 `#[tokio::test]`.
+- **280 tests** : 249 `#[test]` + 31 `#[tokio::test]`.
 - Tests **inline** dans les modules, sous `#[cfg(test)]`. Il n'y a pas de
   dossier `tests/` d'intégration.
 - Crates avec tests : `workflow-core`, `workflow-schema`, `workflow-steps`,
-  `workflow-server`, `workflow-ingest`, `workflow-sync`, `workflow-bridge`.
-  `workflow-tpu` n'a pas de test unitaire : sa validation est le spike manuel.
+  `workflow-server`, `workflow-ingest`, `workflow-sync`, `workflow-bridge`,
+  `workflow-cli` et `workflow-tpu`. Le spike TPU reste la validation matérielle
+  de référence ; les tests unitaires ne chargent ni modèle, ni GPU, ni Coral.
 - Les tests ne couvrent ni les modèles, ni le GPU, ni le Coral réel.
 - La parité réelle est mesurée par les scripts de shadow/validation, pas par
   `cargo test`.
@@ -40,6 +41,7 @@ cargo test -p workflow-server --lib
 cargo test -p workflow-ingest --lib
 cargo test -p workflow-sync --lib
 cargo test -p workflow-bridge
+cargo test -p workflow-cli --bins
 cargo test -p workflow-tpu --lib
 ```
 

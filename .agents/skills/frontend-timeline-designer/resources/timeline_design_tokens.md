@@ -101,7 +101,7 @@
 | `#step-STEPn` | Carte d'étape, ne pas renommer |
 | `.timeline-step` | Sélecteur de carte |
 | `[data-step-key]` | Clé d'étape |
-| `[data-status]` | `idle`, `running`, `completed`, `failed`, `stopped` |
+| `[data-status]` | `idle`, `starting`, `running`, `stopping`, `completed`, `failed`, `stopped`, `cancelled`, `initiated` |
 | `.run-button` | Lancement |
 | `.specific-log-button` | Logs spécifiques |
 | `.custom-sequence-checkbox` | Sélection de séquence |

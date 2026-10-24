@@ -29,7 +29,7 @@ navigateur / curl
        ▼
 workflow-server (axum, port 5004)
   ├── WorkflowState (RwLock, logs bornés à 300 lignes)
-  ├── RunControl (PID, demande d'arrêt)
+  ├── RunControl (RunId, PID, demande d'arrêt)
   ├── Sequence runner (une étape à la fois)
   ├── SQLite runtime/download_history.sqlite3
   └── workflow-cli stepN ... (sous-processus isolé)
@@ -59,9 +59,9 @@ collecter la sortie et publier l'état.
 | Verrou matériel | `$XDG_RUNTIME_DIR/workflow-hw.lock` | `/tmp/workflow-rs-hw.lock` |
 | Livrable final | `/mnt/cache` | `/mnt/cache` (partagé, requis) |
 
-`validate_isolation` refuse un port 5003, une base hors de `paths.base` et le
-verrou Python connu. Les tests utilisent une base et un verrou dans un
-`tempdir`.
+`validate_isolation` refuse un port 5003, une base hors de `paths.base` et tout
+verrou dont le nom de fichier est `workflow-hw.lock`, quel que soit le
+répertoire. Les tests utilisent une base et un verrou dans un `tempdir`.
 
 Le verrou Rust est distinct de celui du harnais Python. Par conséquent, une
 exécution simultanée de STEP2/3/4 sur les deux piles n'est pas protégée : la
@@ -78,7 +78,7 @@ Les routes et formes de réponse sont celles de `docs/CONTRAT-ENVIRONNEMENT.md`.
 | `POST /run/<STEP>` | oui | 202, 404, 409 ; STEP1 porté au lot 6 |
 | `GET /status/<STEP>` | non | statut + `log`, en-têtes no-cache |
 | `GET /api/step_status/<STEP>` | non | statut sans `log` |
-| `POST /stop/<STEP>` | oui | arrêt SIGTERM, statut `stopped`, code -1 |
+| `POST /stop/<STEP>` | oui | arrêt SIGTERM, statut `stopping` puis `stopped`, code -1 |
 | `POST /cancel/<STEP>` | oui | alias avec code 400 en cas de refus |
 | `POST /run_custom_sequence` | oui | 202 ; validation stricte des clés |
 | `GET /sequence/status` | non | `never_run`, succès, erreur ou arrêt manuel |
@@ -151,10 +151,13 @@ dans `/mnt/cache`. Le contrôle est reproductible avec :
   après le démarrage courant, pour ne pas rejouer les anciennes erreurs.
 - Progression dérivée des lignes `TOTAL_*`, `PROCESSING_VIDEO`,
   `REDUCING_JSON`, `PREPROCESS_AE`, `INTERNAL_PROGRESS`, `Succès`, `MS_BATCH_*`.
-- Timeout par étape : `steps.default_timeout_s`, sauf STEP8
+- Timeout par étape : `steps.default_timeout_s`, sauf STEP1
+  (`steps.step1.timeout_s`), STEP7 (`steps.step7.timeout_s`) et STEP8
   (`steps.step8.timeout_s`).
-- Arrêt : SIGTERM, puis SIGKILL après 5 s. Le statut est publié immédiatement
-  comme `stopped` ; le worker ne peut pas l'écraser.
+- Arrêt : SIGTERM, puis SIGKILL après 5 s. L'état passe à `stopping`
+  (`return_code = -1`) et conserve le créneau jusqu'à la mort réelle du
+  sous-processus ; `stopped` n'est publié qu'ensuite. Un `finish_step` périmé
+  (`RunId` d'une exécution précédente) est ignoré.
 - Une séquence s'arrête à la première étape non `completed`.
 - Le résultat est écrit dans `orchestrator_runs` (SQLite) pour audit.
 

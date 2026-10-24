@@ -21,7 +21,12 @@
   production aligné sur Rust `:5004`.
 - Remédiation de l'audit backend du 2026-10-24 : 33 constats corrigés,
   3 documentés (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`,
-  clippy strict, 278 tests et `config check` verts.
+  clippy strict, 280 tests et `config check` verts.
+- Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
+  sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
+  D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
+  les 22 `SKILL.md` alignés (tests 280, `max_workers` retiré, verrou STEP1,
+  gate EffectCraft, legacy en lecture seule).
 - **Aucune tâche active.**
 
 ## Chronologie de migration
@@ -51,7 +56,7 @@
 | 3 | Parité : `round_to` STEP3, RAR streamé | 0,1 % sur 1,8 s/3 600 s, faux `unrar` multi-Mio |
 | 4 | Sécurité/contrats : CSP, constant-time, SSRF, quotas, symlinks, logs, fsync, timeout STEP7 | tests headers, IP privées, zip bomb, symlink hors logs |
 | 5 | Robustesse : canal borné, writer bloquant, rotation, progression, purge orphelins, `media.rs`, regex, cache resize | ligne 64 Kio, rotation en cours, progression 3 étapes |
-| 6 | Clôture : `unwrap` STEP2, TraceLayer, tests CLI/TPU, docs | 278 tests, clippy/fmt, D-025 à D-027 |
+| 6 | Clôture : `unwrap` STEP2, TraceLayer, tests CLI/TPU, docs | 278 tests à la clôture, 280 après les deux commits suivants, clippy/fmt, D-025 à D-027 |
 
 ## Détails des validations
 

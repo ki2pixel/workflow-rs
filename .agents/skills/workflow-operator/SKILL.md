@@ -102,13 +102,17 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
 - `GET /sequence/status` : état de la séquence.
 - `GET /api/ping` : authentifié avec `X-Worker-Token`.
 - Les routes mutantes exigent `X-Worker-Token`.
-- Les logs par étape sont sous `runtime/logs/stepN/`.
+- Les journaux serveur par étape sont `runtime/logs/step_STEPx.log` (rotation) ;
+  les journaux de traitement restent sous `runtime/logs/stepN/`.
 - Le serveur sérialise les étapes : un deuxième lancement renvoie **409**.
+- Un arrêt expose `stopping` puis `stopped` ; le créneau reste occupé jusqu'à
+  la mort réelle du sous-processus.
 
 ## 5. Sécurité et production
 
-- Le serveur refuse le port 5003, une base hors `paths.base`, le verrou Python
-  et les jetons par défaut.
+- Le serveur refuse le port 5003, une base hors `paths.base`, tout verrou nommé
+  `workflow-hw.lock` et les jetons par défaut. Un hôte non-loopback exige
+  `server.allow_remote = true`.
 - Le moniteur webhook refuse une base vide et exige
   `steps.step1.source_dir == paths.downloads`.
 - `step1 run` supprime les archives après succès par défaut.
@@ -129,7 +133,7 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
 
 ## 7. Tests et docs
 
-- `cargo test --workspace` (233 tests, sans matériel).
+- `cargo test --workspace` (280 tests, sans matériel).
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`.
 - Parité : `scripts/shadow-step56.py`, `scripts/validate-lot5.py`,
   `scripts/validate-step1.py`, `tools/parity/parity.py`.

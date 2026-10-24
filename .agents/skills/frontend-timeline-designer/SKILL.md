@@ -1,6 +1,6 @@
 ---
 name: frontend-timeline-designer
-description: Maintenir la copie du frontend legacy (timeline, AppState, DOMBatcher, Minijinja) sans diverger du dépôt Python.
+description: Maintenir la copie du frontend legacy (timeline, AppState, DOMBatcher, Minijinja) en documentant les écarts assumés.
 ---
 
 # Frontend Timeline Designer
@@ -27,11 +27,16 @@ Le contexte injecte aussi les cartes d'étapes et le jeton worker.
 
 ## Principe directeur
 
-**Ne pas diverger.** Une évolution UI se fait dans le dépôt Python legacy, puis
-est recopiée dans `assets/web`. Le serveur Rust doit rester un miroir.
+**Rester un miroir, avec des écarts explicites.** Le dépôt Python est en
+lecture seule : une évolution UI est recopiée depuis le legacy si elle y existe
+déjà, sinon elle est faite dans `assets/web` et documentée dans
+`memory-bank/systemPatterns.md`. Le serveur Rust doit rester un miroir, sauf
+adaptations assumées (par exemple l'auto-ouverture des logs désactivée par
+défaut).
 
-Si une adaptation Rust est indispensable (par exemple un chemin d'API), la
-documenter et la tester, mais ne pas réécrire la logique UI.
+Si une adaptation Rust est indispensable (par exemple un chemin d'API ou une
+préférence par défaut), la documenter et la tester, mais ne pas réécrire la
+logique UI.
 
 ## Structure clé
 
@@ -66,9 +71,10 @@ documenter et la tester, mais ne pas réécrire la logique UI.
 
 ## Workflow de modification
 
-1. Vérifier si le changement existe déjà dans le dépôt Python.
+1. Vérifier si le changement existe déjà dans le dépôt Python (lecture seule).
 2. Si oui, recopier le fichier depuis le legacy.
-3. Si non, faire le changement dans le legacy, puis recopier.
+3. Si non, faire le changement dans `assets/web` et le documenter dans
+   `memory-bank/systemPatterns.md` ; ne jamais écrire dans le dépôt Python.
 4. Relancer les tests de rendu du crate `workflow-server`.
 5. Vérifier que `index_new.html` ne contient plus `url_for(` ni `| tojson`.
 6. Vérifier que les IDs/classes consommés par le JS n'ont pas changé.

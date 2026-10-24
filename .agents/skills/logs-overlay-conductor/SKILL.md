@@ -24,7 +24,9 @@ L'overlay de logs vit dans la copie frontend `assets/web` :
 2. Focus trap complet et restauration du focus à la fermeture.
 3. Header contextuel : étape active, statut, timer.
 4. Boutons « logs spécifiques » regroupés et accessibles au clavier.
-5. Auto-ouverture configurable via `AppState.getAutoOpenLogOverlay()`.
+5. Auto-ouverture configurable via `AppState.getAutoOpenLogOverlay()`. La copie
+   Rust la désactive par défaut (`ui.autoOpenLogOverlay = false`) ; le toggle
+   Settings et la préférence persistée restent effectifs.
 6. `prefers-reduced-motion` respecté.
 7. Mobile : `95vw` × `90vh` sous 900 px (`logs.css`).
 
@@ -37,7 +39,8 @@ L'overlay de logs vit dans la copie frontend `assets/web` :
 - [ ] Fermeture par Échap et bouton `#close-log-panel`.
 - [ ] Restauration du focus.
 - [ ] Header mis à jour via `AppState`/`uiUpdater`.
-- [ ] Auto-ouverture respectée.
+- [ ] Auto-ouverture désactivée par défaut, toggle et préférence persistée
+      respectés.
 - [ ] Styles via variables CSS, pas de couleurs en dur.
 - [ ] Test de rendu serveur vert.
 
@@ -45,7 +48,8 @@ L'overlay de logs vit dans la copie frontend `assets/web` :
 
 1. Vérifier si le changement existe dans le dépôt Python legacy.
 2. Si oui, recopier le fichier dans `assets/web`.
-3. Si non, faire le changement dans le legacy, puis recopier.
+3. Si non, faire le changement dans `assets/web` et le documenter ; ne jamais
+   écrire dans le dépôt Python.
 4. Relancer `cargo test -p workflow-server --lib`.
 5. Vérifier le rendu avec une config isolée.
 

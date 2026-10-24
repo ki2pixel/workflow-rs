@@ -9,6 +9,7 @@ legacy, qui reste active et fonctionnelle.
 | Donnée | Emplacement par défaut | Rétention | Nettoyage |
 | --- | --- | --- | --- |
 | Projets sources | `runtime/projets_extraits` | Supprimés après STEP7 réussi ; orphelins après 48 h d'inactivité | `retention apply` |
+| Résidus d'exécution interrompue | `runtime/` (`_temp_*`, `*.part`, `*.tmp*`) | 24 h | Purge au démarrage du serveur |
 | Archives d'analyses | `runtime/archives` | 90 jours | `retention apply` |
 | Journaux `.log` | `runtime/logs` | 30 jours | `retention apply` |
 | Rapports STEP7/STEP8 | `runtime/logs/step7`, `runtime/logs/step8` | 90 jours | `retention apply` |
@@ -23,6 +24,11 @@ Les seuils sont configurables dans `[retention]` de `config/config.toml`. Le
 seuil des orphelins reste `steps.step7.cleanup_threshold_hours`. Une valeur
 `0` désactive le nettoyage correspondant. Le manifeste STEP7 le plus récent et
 le dernier rapport STEP8 sont toujours conservés, même au-delà de 90 jours.
+
+Au démarrage, le serveur purge aussi les `_temp_*`, `*.part` et `*.tmp*` de
+plus de `server.orphan_max_age_hours` (24 h par défaut) sous `runtime/` ; une
+valeur `0` désactive cette purge. Les fichiers récents sont conservés pour ne
+pas interrompre une extraction ou un téléchargement en cours.
 
 Le nettoyage des téléchargements est désactivé par défaut (`downloads_days =
 0`). Le moniteur Rust écrit dans `runtime/downloads`, sous `paths.base` : ce

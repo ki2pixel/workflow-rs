@@ -106,7 +106,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   ne modifie ni `runtime/`, ni `/mnt/cache`, ni le dépôt Python legacy.
 - **Validation** : `cargo check`, `cargo fmt --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`,
-  `cargo test --workspace` (233/233), `cargo tree -d`.
+  `cargo test --workspace` (233/233 à l'audit), `cargo tree -d`.
 
 ## 2026-10-24 — Commandes de parité et état de production
 
@@ -244,7 +244,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Conséquence** : `workflow-bridge` reste un contrat disponible ; le CEP
   continue d'appeler Python.
 
-## Écarts legacy (D-001 → D-024)
+## Écarts legacy (D-001 → D-027)
 
 | ID | Sujet | Décision Rust |
 | --- | --- | --- |
@@ -272,6 +272,9 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 | D-022 | Validation Windows/CEP | Abandonnée. |
 | D-023 | Racines séparées | Sync explicite. |
 | D-024 | STEP4 `153 Camille` | Ne pas utiliser `--prefer-raw` sur ce projet. |
+| D-025 | `/sound-design` hors racine | 404 standard de `ServeDir`, pas de middleware dédié. |
+| D-026 | Frontières d'erreur | `thiserror` pour ingest/sync ; `anyhow` interne STEP2/3/4/7/8. |
+| D-027 | Arrêt manuel CLI | Groupes de processus, SIGTERM puis SIGKILL ; STEP8 garde son gestionnaire. |
 
 ## Références
 

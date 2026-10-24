@@ -114,7 +114,7 @@ curl -fs -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 - [ ] Un seul backend avec le webhook.
 - [ ] `:5004` répond si Rust est démarré.
 - [ ] `:5003` est arrêté si le moniteur Rust est actif.
-- [ ] Aucun processus STEP2/3/4 orphelin.
+- [ ] Aucun processus STEP1 (normalisation), STEP2/3/4 ou serveur de test ne tourne.
 
 ## 10. Checklist finale
 

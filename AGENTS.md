@@ -47,7 +47,7 @@ do not "clean them up". Start with `README.md` for scope/status and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 233 unit tests, no hardware
+cargo test --workspace                                    # 280 unit tests, no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -100,7 +100,8 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
   `projects`/`archives`/`logs`/`downloads` still win, so use a full temp TOML
   for isolation.
 - The server rejects `:5003`, a history DB outside `paths.base`, the Python
-  hardware lock `/tmp/workflow-hw.lock`, and default/`dev-` worker tokens.
+  hardware lock `/tmp/workflow-hw.lock`, and default/`dev-` worker tokens; a
+  non-loopback `server.host` also requires `server.allow_remote = true`.
 - Do not edit `/home/kidpixel/workflow_mediapipe`; it is the production
   fallback. The only intended writer is an explicit `sync --apply`.
 - Operational detail lives in `docs/SYNC-BACKENDS.md`, `docs/RETENTION.md` and

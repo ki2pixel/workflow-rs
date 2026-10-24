@@ -19,8 +19,9 @@ alwaysApply: true
 - **CLI** : `workflow-cli` est l'unique point d'entrée opérationnel des huit
   étapes. Le serveur et les scripts l'invoquent. Aucun fallback Python.
 - **Config** : `config/config.toml`, types TOML avec `deny_unknown_fields`.
-  Les secrets viennent de l'environnement (`WORKFLOW_SERVER_SECRET_KEY`,
-  `WORKFLOW_SERVER_WORKER_TOKEN`), jamais du TOML. `--config` est global.
+  Les secrets sont injectés par l'environnement
+  (`WORKFLOW_SERVER_SECRET_KEY`, `WORKFLOW_SERVER_WORKER_TOKEN`) et ne sont
+  jamais versionnés dans le TOML. `--config` est global.
 - **Données** : SQLite via `rusqlite` pour l'ingestion ; JSON via `serde_json`
   avec la feature `preserve_order` ; arrondis via
   `workflow_schema::round::{round2, round4, round_to}`.
@@ -56,9 +57,11 @@ alwaysApply: true
 
 - `cargo fmt` est obligatoire ; `cargo clippy --workspace --all-targets --
   -D warnings` doit passer.
-- Erreurs : `thiserror` dans les bibliothèques, `anyhow` aux frontières CLI,
-  serveur et scripts. Pas de `unwrap()` en production. Un `expect()` n'est
-  toléré que pour un invariant local, avec un message explicite.
+- Erreurs : `thiserror` aux frontières des bibliothèques (`IngestError`,
+  `SyncError`, `StepError`) et `anyhow` aux frontières CLI, serveur et scripts ;
+  STEP2/3/4/7/8 conservent `anyhow` en interne (D-026). Pas de `unwrap()` en
+  production. Un `expect()` n'est toléré que pour un invariant local, avec un
+  message explicite.
 - Pas de `println!` de debug dans les étapes ou le serveur : utiliser `tracing`.
   Les sorties machine contractuelles (`TOTAL_*`, `MS_BATCH_*`, le passthrough
   `effectcraft-cli`) et `config check`/`config show` restent des exceptions.
@@ -78,18 +81,21 @@ alwaysApply: true
   `config.paths.resolve()`. Ne pas recalculer les chemins à la main.
 - **Isolation** : `paths.base`, `history_db`, `projects`, `archives`, `logs` et
   `downloads` restent sous la racine Rust. Le serveur refuse une base hors
-  `paths.base`, le port 5003, le verrou Python `/tmp/workflow-hw.lock` et les
-  jetons par défaut.
+  `paths.base`, le port 5003, tout verrou nommé `workflow-hw.lock`, les jetons
+  par défaut et un hôte non-loopback sans `server.allow_remote = true`.
 - **Verrou matériel** : `HardwareLock` sur `hardware.lock_path`
-  (`/tmp/workflow-rs-hw.lock`) autour de STEP2/3/4. Jamais le verrou Python.
+  (`/tmp/workflow-rs-hw.lock`) autour de STEP1 (normalisation vidéo) et
+  STEP2/3/4. Jamais le verrou Python.
 - **Serveur** : une seule étape à la fois, deuxième lancement refusé en 409 ;
-  une séquence s'arrête au premier échec ; `stop`/`cancel` envoient SIGTERM et
-  attendent la fin.
+  une séquence s'arrête au premier échec ; `stop`/`cancel` passent par
+  `stopping`, envoient SIGTERM puis SIGKILL et conservent le créneau jusqu'à la
+  mort du sous-processus ; un `finish_step` périmé (`RunId`) est ignoré.
 - **Sous-processus** : le serveur et STEP2 utilisent `tokio::process` avec
   `kill_on_drop`, sorties pompées vers les logs et timeout par étape. STEP1/3/4
   et STEP8 utilisent `std::process` avec threads dédiés et arrêt explicite
   (groupe de processus et watchdog pour EffectCraft). Codes de retour et
-  progression `progress_patterns` conservés.
+  progression du serveur (`TOTAL_*`, `PROCESSING_VIDEO`, `INTERNAL_PROGRESS`,
+  `MS_BATCH_*`) conservés.
 - **Ingestion** : un seul moniteur actif (Python ou Rust). Le moniteur Rust
   refuse une base vide (`require_history`) et exige
   `steps.step1.source_dir == paths.downloads`.
@@ -142,8 +148,10 @@ alwaysApply: true
 - STEP7 archive par SHA-256 de la vidéo, copie vers `paths.finalized`, écrit le
   manifeste `finalized_projects_<ts>.json`, puis supprime la source
   (`--no-delete`/`--dry-run` pour les tests).
-- STEP8 est headless : `effectcraft-cli script`, panel `MediaSolution.jsx`
-  concaténé à un driver, lignes `MS_BATCH_*`, SIGTERM vers le groupe enfant.
+- STEP8 est headless : `effectcraft-cli run prefs.set … file.runScript`
+  (le gate `scripting.allowScriptsWriteFiles` est activé par `prefs.set`), panel
+  `MediaSolution.jsx` concaténé à un driver, lignes `MS_BATCH_*`, SIGTERM vers
+  le groupe enfant.
 
 ## 6. Frontend et After Effects
 

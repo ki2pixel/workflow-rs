@@ -43,6 +43,7 @@ pgrep -af 'workflow-server|app_new.py|gunicorn' || true
 - Le serveur refuse `server.port = 5003`.
 - Le jeton `WORKFLOW_SERVER_WORKER_TOKEN` ne doit pas être vide ni préfixé
   `dev-`.
+- Un hôte non-loopback exige `server.allow_remote = true`.
 - Un seul backend avec le webhook : Python `:5003` ou Rust `:5004`.
 
 ### 3. Binaires et build
@@ -132,7 +133,8 @@ ls -l /tmp/workflow-rs-hw.lock /tmp/workflow-hw.lock 2>/dev/null || true
 lsof /tmp/workflow-rs-hw.lock 2>/dev/null || true
 ```
 
-- Le verrou matériel `/tmp/workflow-rs-hw.lock` est pris par STEP2/3/4.
+- Le verrou matériel `/tmp/workflow-rs-hw.lock` est pris par STEP1
+  (normalisation vidéo) et STEP2/3/4.
 - La sync prend `/tmp/workflow-sync.lock` et refuse de démarrer si `:5003` ou
   `:5004` écoute (sauf `--allow-running`).
 - Ne jamais supprimer un verrou tenu par un processus vivant.

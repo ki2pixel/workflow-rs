@@ -96,7 +96,7 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## État de validation
 
-- 233 tests unitaires, sans matériel.
+- 280 tests unitaires, sans matériel.
 - Parité STEP2/3/4/5/6 sur les corpus de référence.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
 - Shadow STEP5/6 `162/162` sur 20 projets.

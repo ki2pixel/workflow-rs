@@ -23,7 +23,7 @@ cargo run -p workflow-cli -- --config config/config.toml config show | \
 - `yamnet_split = true`.
 - `require_edgetpu = true`.
 - `embedding_stride = 1`.
-- `max_workers = 1`.
+- Traitement séquentiel : aucune clé `max_workers` dans le TOML.
 - `vad_threshold = 0.2`.
 - `clustering_threshold = 0.32`.
 

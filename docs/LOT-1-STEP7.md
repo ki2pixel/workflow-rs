@@ -52,6 +52,14 @@ Le 2026-10-22, un projet 250 reconstruit à partir de `docs/` de production a
 Les tests unitaires couvrent aussi la sélection par mode, la normalisation des
 fichiers racine vers `docs/`, l'archivage, la restauration et la suppression.
 
+## Sécurité et durabilité
+
+- Un lien symbolique rencontré dans l'arborescence source est refusé
+  (`symlink interdit pendant la finalisation STEP7`), au lieu d'être suivi.
+- Le manifeste STEP7 est écrit via `write_atomic` : fichier temporaire,
+  `sync_all`, renommage, puis fsync du répertoire parent quand la plateforme
+  le permet.
+
 ## Limites
 
 - Le warning Python « média préservé uniquement » n'est pas repris : les

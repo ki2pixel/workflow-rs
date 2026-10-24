@@ -19,8 +19,9 @@
 ## 0. Statut de remédiation (2026-10-24)
 
 Après l'audit, les six lots du plan ont été appliqués sans toucher au dépôt
-Python legacy, à `runtime/` ni à `/mnt/cache`. La suite passe de 233 à 275
-tests, `cargo fmt --check` et
+Python legacy, à `runtime/` ni à `/mnt/cache`. La suite est passée de 233 à
+275 tests lors de la remédiation, puis à 280 après les deux commits de
+journalisation et de métriques GPU ; `cargo fmt --check` et
 `cargo clippy --workspace --all-targets -- -D warnings` sont verts, et
 `workflow-cli config check` valide la configuration de production.
 

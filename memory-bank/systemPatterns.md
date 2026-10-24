@@ -23,7 +23,8 @@ comportement legacy sont dans `parity/DRIFT.md`.
   `models`, `cache_root` et `finalized` restent explicites (`finalized` vaut
   `/mnt/cache` par défaut).
 - Le serveur refuse une base hors `paths.base`, le port 5003, le verrou Python
-  et les jetons par défaut.
+  et les jetons par défaut. Un hôte non-loopback exige
+  `server.allow_remote = true`.
 - `runtime/` est la production locale ; `/mnt/cache` est la sortie finalisée.
 - Les tests utilisent `tempfile` ou `/tmp/opencode`, jamais `runtime/` ni
   `/mnt/cache`.
@@ -54,7 +55,9 @@ comportement legacy sont dans `parity/DRIFT.md`.
   applique le timeout et met à jour l'état.
 - Une seule étape à la fois : deuxième lancement → 409.
 - Une séquence s'arrête au premier échec.
-- `stop`/`cancel` envoient SIGTERM et attendent.
+- `stop`/`cancel` passent par `stopping`, envoient SIGTERM puis SIGKILL et
+  conservent le créneau jusqu'à la mort du sous-processus. Un `finish_step`
+  d'une génération précédente est ignoré (`RunId`).
 - Les routes mutantes exigent `X-Worker-Token`.
 - Les logs sont stockés sous `runtime/logs/stepN/`.
 
@@ -109,7 +112,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 233 tests.
+- `cargo test --workspace` : 280 tests.
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.

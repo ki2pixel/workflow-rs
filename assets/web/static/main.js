@@ -8,7 +8,7 @@ import { showSequenceSummaryUI } from './popupManager.js';
 import { scrollToStepImmediate } from './scrollManager.js';
 
 import { initializeSoundManager } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js';
+import { pollingManager } from './utils/PollingManager.js?v=20261025a';
 import { errorHandler } from './utils/ErrorHandler.js';
 import { performanceMonitor } from './utils/PerformanceMonitor.js';
 import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'localDownloadsStatus',
             pollLocalDownloadsStatus,
             LOCAL_DOWNLOAD_POLLING_INTERVAL,
-            { immediate: true }
+            { immediate: true, pauseWhenHidden: true }
         );
     }
 
@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'systemMonitor',
                 pollSystemMonitor,
                 SYSTEM_MONITOR_POLLING_INTERVAL,
-                { immediate: true }
+                { immediate: true, pauseWhenHidden: true }
             );
             return true;
         } else {

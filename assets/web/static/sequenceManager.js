@@ -6,7 +6,7 @@ import { formatElapsedTime } from './utils.js';
 import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
 
 import { appState } from './state/AppState.js';
-import { pollingManager } from './utils/PollingManager.js';
+import { pollingManager } from './utils/PollingManager.js?v=20261025a';
 
 import { soundEvents } from './soundManager.js';
 

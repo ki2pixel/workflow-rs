@@ -118,12 +118,9 @@ impl TrayStatus {
             return Self::degraded(snapshot, "Statut d’étape indisponible");
         }
 
-        if let Some(terminal) = &snapshot.last_terminal {
-            if let Some(status) = Self::from_terminal(terminal, snapshot.observed_at) {
-                return status;
-            }
-        }
-
+        // Une séquence active prime sur le dernier terminal : entre deux
+        // étapes, `last_terminal` peut encore décrire la séquence précédente
+        // et afficherait un faux « Succès » pendant que la nouvelle tourne.
         if let Some(sequence) = &snapshot.sequence {
             if sequence.is_running {
                 let progress = TrayProgress::from_counts(
@@ -141,6 +138,12 @@ impl TrayStatus {
                     last_outcome: None,
                     updated_at: snapshot.observed_at,
                 };
+            }
+        }
+
+        if let Some(terminal) = &snapshot.last_terminal {
+            if let Some(status) = Self::from_terminal(terminal, snapshot.observed_at) {
+                return status;
             }
         }
 
@@ -376,6 +379,22 @@ mod tests {
         let status = TrayStatus::from_snapshot(&snapshot);
         assert_eq!(status.state, TrayState::Success);
         assert!(status.headline.contains("Séquence"));
+    }
+
+    #[test]
+    fn running_sequence_ignores_stale_terminal_between_steps() {
+        let mut snapshot = snapshot();
+        snapshot.sequence.as_mut().unwrap().is_running = true;
+        snapshot.sequence.as_mut().unwrap().current_step = None;
+        snapshot.last_terminal = Some(TerminalOutcome {
+            kind: TerminalKind::Sequence,
+            status: "success".to_string(),
+            message: Some("Séquence précédente".to_string()),
+            step: None,
+        });
+        let status = TrayStatus::from_snapshot(&snapshot);
+        assert_eq!(status.state, TrayState::Running);
+        assert!(status.headline.starts_with("Séquence"));
     }
 
     #[test]

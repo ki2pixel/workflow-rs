@@ -193,8 +193,13 @@ impl StatusWatcher {
                         .max_errors
                         .map(|max| snapshot.consecutive_errors >= max)
                         .unwrap_or(false);
-                    let _ = self.tx.send(snapshot);
                     self.stats.ticks.fetch_add(1, Ordering::Relaxed);
+                    // Sans récepteur, le watcher n'a plus de raison de
+                    // interroger le serveur : on s'arrête au lieu de tourner
+                    // indéfiniment (le tray a disparu ou a paniqué).
+                    if self.tx.send(snapshot).is_err() {
+                        break;
+                    }
                     if stop {
                         break;
                     }
@@ -444,5 +449,28 @@ mod tests {
         assert_eq!(snapshot.ticks, 42);
         assert_eq!(snapshot.errors, 2);
         assert_eq!(snapshot.last_latency_ms, 7);
+    }
+
+    #[tokio::test]
+    async fn watcher_stops_when_receiver_is_dropped() {
+        let client = DesktopClient::with_default_http(
+            url::Url::parse("http://127.0.0.1:1/").expect("URL loopback"),
+        )
+        .expect("client");
+        let config = PollingConfig {
+            interval: Duration::from_millis(20),
+            max_errors: None,
+            request_timeout: Duration::from_millis(20),
+        };
+        let (watcher, receiver) = StatusWatcher::new(client, config);
+        let stats = watcher.stats();
+        let handle = watcher.spawn();
+        drop(receiver);
+
+        tokio::time::timeout(Duration::from_secs(2), handle)
+            .await
+            .expect("le watcher doit s'arrêter sans récepteur")
+            .expect("tâche watcher");
+        assert!(stats.ticks.load(Ordering::Relaxed) >= 1);
     }
 }

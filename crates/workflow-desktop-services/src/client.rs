@@ -216,6 +216,11 @@ pub fn validate_base_url(url: &Url) -> Result<(), ServicesError> {
             "A-Strict: seul http:// est autorisé pour le serveur local".into(),
         ));
     }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(ServicesError::Config(
+            "A-Strict: identifiants dans l'URL interdits".into(),
+        ));
+    }
     match url.host_str() {
         Some("127.0.0.1") | Some("::1") | Some("[::1]") => Ok(()),
         Some(host) => Err(ServicesError::Config(format!(
@@ -236,5 +241,8 @@ mod tests {
         assert!(validate_base_url(&Url::parse("https://127.0.0.1:5005/").unwrap()).is_err());
         assert!(validate_base_url(&Url::parse("http://192.168.1.10:5005/").unwrap()).is_err());
         assert!(validate_base_url(&Url::parse("http://example.com:5005/").unwrap()).is_err());
+        assert!(
+            validate_base_url(&Url::parse("http://user:pass@127.0.0.1:5005/").unwrap()).is_err()
+        );
     }
 }

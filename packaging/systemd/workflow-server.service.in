@@ -1,0 +1,27 @@
+[Unit]
+Description=Serveur workflow-rs (workflow-server)
+Documentation=file://@ROOT@/docs/SWITCH-PUBLIC.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+EnvironmentFile=@ENV_FILE@
+ExecStart=@ROOT@/target/release/workflow-server --config @CONFIG@
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=60
+KillMode=mixed
+NoNewPrivileges=true
+ProtectSystem=full
+# ProtectHome reste désactivé : CUDA, effectcraft et les caches utilisateur
+# peuvent écrire sous $HOME. Le serveur reste confiné par l'utilisateur.
+# PrivateTmp doit rester désactivé : /tmp/workflow-rs-hw.lock est partagé
+# avec le stack Python et le verrou matériel doit rester visible.
+PrivateTmp=false
+
+[Install]
+WantedBy=default.target

@@ -643,3 +643,42 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   avec les seuils recalibrés, `cleanup_ok=true` ; 316 tests workspace
   (280 pipeline + 36 services), fmt/clippy verts, build release.
   Rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.
+
+## 2026-10-25 — J5 : paquet .deb, supervision systemd user et décision Tauri
+
+- **Contexte** : clôture du PoC Tauri A-Strict par le packaging `.deb`, la
+  validation de l'extraction sans root et la supervision du serveur en PoC
+  (`switch-rust.sh`) et en MVP (`systemd --user`), sans que le GUI soit
+  jamais le parent du serveur.
+- **Décision** : **Tauri A-Strict est conservé pour le MVP.** Le client reste
+  un client HTTP de `workflow-server` ; le serveur, les modèles et les
+  dépendances CUDA/TPU restent hors du paquet GUI.
+- **Paquet** : `workflow-manager_0.1.0_amd64.deb`, construit par Tauri CLI
+  2.12.4, 5 857 424 octets (5,59 Mio), 15 227 Kio installés. Binaire
+  `/usr/bin/workflow-gui-tauri` strippé, `.desktop`
+  `workflow-manager.desktop`, icônes 32/128/256/512, dépendances
+  `libasound2`, `libssl3`, `libayatana-appindicator3-1`,
+  `libwebkit2gtk-4.1-0`, `libgtk-3-0`. Aucun serveur, config, secret ou
+  chemin de production dans le paquet.
+- **Télémétrie** : défaut conforme XDG
+  (`$XDG_STATE_HOME/workflow-manager` ou
+  `~/.local/state/workflow-manager`) au lieu de `/tmp/opencode/poc-gui`.
+- **Supervision** :
+  1. PoC : `scripts/switch-rust.sh` (check/start/stop), serveur lancé avec
+     `setsid`, PID file, `/api/ping` ; testé sur `:5005`.
+  2. MVP : `packaging/systemd/workflow-server.service.in` et
+     `scripts/install-systemd-user.sh` ; secrets 0600 par `EnvironmentFile`,
+     préflight port/webhook, `Restart=on-failure`, `KillMode=mixed`,
+     `ProtectSystem=full`, `PrivateTmp=false` (verrou matériel partagé),
+     `ProtectHome` désactivé (caches CUDA/EffectCraft).
+- **Validation** : extraction et exécution sans root, `desktop-file-validate`
+  rc=0, `systemd-analyze --user verify` rc=0, GUI chargé avec tray `Idle`,
+  serveur PPID 1644 (`systemd --user`), serveur toujours actif après
+  fermeture du GUI, préflight port occupé et secrets 0644 refusés,
+  désinstallation idempotente, 316 tests, fmt/clippy/build verts.
+- **Conséquences** : le PoC J1–J5 est clos. Le MVP devra traiter la
+  croissance `WebKitNetworkProcess` (polling du frontend legacy en
+  arrière-plan), le single-instance, l'installation réelle du `.deb` et les
+  runs STEP2/STEP8 sous l'unité systemd.
+- **Validation documentaire** : `docs/PACKAGING-GUI.md` et
+  `docs/audits/2026-10-25-poc-tauri-j5.md`.

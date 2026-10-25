@@ -2,22 +2,41 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J4 terminé, acceptation conforme après recalibrage
-ratifié.** Tray D-Bus, `StatusWatcher` à 1 Hz, matrice d'états de 5 min
-validée et soak de 2 h avec fenêtre minimisée (`_NET_WM_STATE_HIDDEN`). Le
-soak est conforme sur la dérive (p95 0,310 ms), l'hôte (+0,03 Mio),
-WebKitWeb (+3,35 Mio), la VRAM, les logs et l'icône D-Bus. L'enveloppe GUI a
-été recalibrée le 2026-10-25 : PSS ≤ 32 Mio (aligné sur le plafond RSS) et
-pente ≤ 0,267 Mio/min (32 Mio / 120 min) ; le PSS mesuré (+25,46 Mio) et la
-pente (0,221 Mio/min) sont conformes. La croissance de
-`WebKitNetworkProcess` (+22,06 Mio), attribuée au polling du frontend legacy
-en arrière-plan, reste un point de vigilance MVP ; l'hôte/watcher est plat.
+**PoC Tauri A-Strict — J5 terminé, décision Tauri A-Strict pour le MVP.**
+Le `.deb` `workflow-manager_0.1.0_amd64.deb` est construit par Tauri CLI
+2.12.4 (5,59 Mio, 15 227 Kio installés), s'extrait et s'exécute sans root,
+et passe `desktop-file-validate` et `systemd-analyze --user verify`. Le
+client charge la page, le tray passe à `Idle`, et le serveur est supervisé
+indépendamment par `switch-rust.sh` (PoC) ou `systemd --user` (MVP) : son
+PPID est `systemd --user`, jamais le GUI. Il survit à la fermeture du GUI.
+Le `.deb` ne contient ni serveur, ni config, ni secret. Le seul point de
+vigilance reste la croissance `WebKitNetworkProcess` du soak J4, à traiter
+au MVP.
 
-**Prochain jalon** : J5 — packaging `.deb` Tauri, supervision serveur PoC et
-MVP systemd user.
+**Prochain jalon** : MVP — pause du polling page masquée, single-instance,
+installation réelle du `.deb` et runs STEP2/STEP8 sous l'unité systemd.
 
 ## Dernière session
 
+- [2026-10-25] **PoC Tauri A-Strict — J5** :
+  - bundle `deb` Tauri : `productName=workflow-manager`, icônes 32/128/256/512,
+    `.desktop` `workflow-manager.desktop`, dépendances `libasound2`,
+    `libssl3`, AppIndicator/WebKit/GTK ;
+  - `strip = "symbols"` pour le paquet GUI ; télémétrie par défaut XDG ;
+  - `packaging/systemd/workflow-server.service.in` et
+    `scripts/install-systemd-user.sh` (préflight port/webhook, secrets 0600,
+    `--start`, `--uninstall`) ;
+  - `.deb` 5,59 Mio / 15 227 Kio installés, extraction sans root, `--help`
+    et `--version` OK, `desktop-file-validate` rc=0 ;
+  - unité systemd test `:5005` : `systemd-analyze verify` rc=0, serveur
+    PPID 1644, GUI chargé, tray Idle, GUI tué, serveur actif ;
+  - `switch-rust.sh` test `:5005` : check/start/stop rc=0, serveur PPID 1644,
+    GUI tué, serveur actif ;
+  - préflight : port occupé refusé avant installation, secrets 0644 refusés,
+    désinstallation idempotente ;
+  - décision : Tauri A-Strict conservé pour le MVP ;
+  - rapports `docs/audits/2026-10-25-poc-tauri-j5.md` et
+    `docs/PACKAGING-GUI.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J4** :
   - `workflow-desktop-services::tray` : politique pure du tray, réducteur
     `StatusSnapshot` → état visuel, `TrayPresenter`/`NoopTray` ;

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Workflow Manager
+Comment={{comment}}
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+Keywords=workflow;video;mediapipe;
+StartupNotify=true
+StartupWMClass=workflow-gui-tauri

@@ -3,6 +3,8 @@ name = "workflow-gui-tauri"
 version.workspace = true
 edition.workspace = true
 rust-version = "1.90"
+description = "Client desktop Linux de workflow-server (A-Strict)"
+authors = ["Camille Moine <ki2pixel@gmail.com>"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.4", features = [] }

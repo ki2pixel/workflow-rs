@@ -1,0 +1,176 @@
+# Packaging et supervision du client desktop
+
+Ce document couvre le `.deb` Tauri du client `workflow-manager` et les deux
+modes de supervision du serveur. Le client ne démarre, n'arrête et ne
+surveille jamais le processus serveur : il reste un client HTTP de
+`workflow-server`.
+
+## Prérequis de build
+
+- Rust 1.90 ou plus récent pour `workflow-gui-tauri`.
+- Tauri CLI 2.12 (via `npx`, aucun paquet global nécessaire).
+- Paquets de développement : `libwebkit2gtk-4.1-dev`,
+  `libayatana-appindicator3-dev`, `libasound2-dev`, `libssl-dev`,
+  `librsvg2-dev`, `libxdo-dev`.
+- `dpkg-deb` et `fakeroot` (fournis par `dpkg`).
+
+Le serveur et le CLI doivent être construits avant le paquet :
+
+```sh
+cargo build --release -p workflow-server -p workflow-cli
+```
+
+## Construire le `.deb`
+
+```sh
+cd crates/workflow-gui-tauri/src-tauri
+npx --yes @tauri-apps/cli@2.12.4 build --bundles deb --ci
+```
+
+Artefact :
+
+```text
+target/release/bundle/deb/workflow-manager_0.1.0_amd64.deb
+```
+
+Le bundle est configuré dans `tauri.conf.json` :
+
+- `productName = workflow-manager`, `identifier = org.workflow.desktop` ;
+- icônes 32, 128, 256 et 512 px ;
+- `.desktop` `workflow-manager.desktop`, `StartupWMClass=workflow-gui-tauri` ;
+- dépendances Debian : `libasound2`, `libssl3`,
+  `libayatana-appindicator3-1`, `libwebkit2gtk-4.1-0`, `libgtk-3-0` ;
+- binaire GUI strippé via `[profile.release.package.workflow-gui-tauri]`
+  (`strip = "symbols"`), sans impact sur le serveur ni le CLI.
+
+Le paquet contient uniquement :
+
+```text
+/usr/bin/workflow-gui-tauri
+/usr/share/applications/workflow-manager.desktop
+/usr/share/icons/hicolor/{32x32,128x128,256x256,512x512}/apps/workflow-gui-tauri.png
+```
+
+Il ne contient ni serveur, ni `config.toml`, ni `launcher.env`, ni secret, ni
+chemin `/home/kidpixel` ou `/mnt/cache`.
+
+## Vérifier sans root
+
+L'extraction et l'exécution ne demandent aucun privilège :
+
+```sh
+DEB=target/release/bundle/deb/workflow-manager_0.1.0_amd64.deb
+rm -rf /tmp/workflow-manager-deb
+dpkg-deb -x "$DEB" /tmp/workflow-manager-deb
+/tmp/workflow-manager-deb/usr/bin/workflow-gui-tauri --version
+desktop-file-validate \
+  /tmp/workflow-manager-deb/usr/share/applications/workflow-manager.desktop
+dpkg-deb -f "$DEB" Package Version Architecture Depends
+```
+
+## Installer et lancer
+
+L'installation système demande root :
+
+```sh
+sudo apt install ./workflow-manager_0.1.0_amd64.deb
+```
+
+Le client se lance par l'entrée « Workflow Manager » ou par
+`workflow-gui-tauri`. Il charge `http://127.0.0.1:5004/` par défaut.
+
+Options utiles :
+
+```sh
+workflow-gui-tauri --server-url http://127.0.0.1:5005
+workflow-gui-tauri --telemetry-dir ~/.local/state/workflow-manager
+workflow-gui-tauri --log-file ~/.local/state/workflow-manager/host.log
+workflow-gui-tauri --no-tray --no-close-to-tray
+workflow-gui-tauri --notifications
+workflow-gui-tauri --audio --sound-dir /chemin/vers/assets/web/sound-design
+```
+
+Par défaut, l'état et la télémétrie vont dans
+`$XDG_STATE_HOME/workflow-manager` ou `~/.local/state/workflow-manager`.
+Les notifications et l'audio restent opt-in. Le paquet n'embarque pas les MP3 ;
+`--audio` exige donc un `--sound-dir` valide.
+
+## Supervision du serveur
+
+Le serveur n'est jamais un enfant du GUI. Deux modes sont supportés ; ils ne
+doivent pas tourner ensemble.
+
+### PoC : `switch-rust.sh`
+
+```sh
+set -a
+source config/launcher.env
+set +a
+export WORKFLOW_RUST_CONFIG="$PWD/config/config.toml"
+./scripts/switch-rust.sh check
+./scripts/switch-rust.sh start
+./scripts/switch-rust.sh status
+./scripts/switch-rust.sh stop
+```
+
+Le script lance le serveur avec `setsid`, écrit un PID file et vérifie
+`/api/ping`. Il refuse de démarrer si Python répond sur `:5003` alors que le
+webhook Rust est activé.
+
+### MVP : systemd --user
+
+Le modèle d'unité est `packaging/systemd/workflow-server.service.in`. Le script
+d'installation génère l'unité, copie les secrets en 0600 et peut démarrer le
+service après préflight :
+
+```sh
+./scripts/install-systemd-user.sh            # installe sans démarrer
+./scripts/install-systemd-user.sh --start    # préflight + démarrage
+systemctl --user status workflow-server.service
+systemctl --user enable workflow-server.service
+journalctl --user -u workflow-server.service -f
+./scripts/install-systemd-user.sh --uninstall
+```
+
+Options : `--config`, `--env-file`, `--env-dest`, `--unit-name`, `--url`.
+Le script refuse un fichier de secrets non 0600, un port déjà occupé et un
+démarrage si Python répond sur `:5003` avec le webhook activé. Il ne démarre
+jamais le serveur sans `--start`.
+
+L'unité utilise :
+
+- `EnvironmentFile` 0600 pour les secrets, jamais le GUI ;
+- `WorkingDirectory` et `ExecStart` vers le dépôt et le binaire release ;
+- `Restart=on-failure`, `KillMode=mixed`, `TimeoutStopSec=60` ;
+- `ProtectSystem=full`, `NoNewPrivileges=true` ;
+- `PrivateTmp=false`, car `/tmp/workflow-rs-hw.lock` est partagé avec le
+  stack Python ;
+- `ProtectHome` désactivé, car CUDA, EffectCraft et les caches utilisateur
+  peuvent écrire sous `$HOME`.
+
+Le GUI peut être fermé ou tué : le service reste actif et le client se
+resynchronise au prochain lancement.
+
+## Désinstallation
+
+```sh
+sudo apt remove workflow-manager
+./scripts/install-systemd-user.sh --uninstall
+```
+
+La désinstallation du `.deb` ne touche ni `runtime/`, ni `/mnt/cache`, ni les
+secrets systemd. Le script `--uninstall` retire l'unité mais conserve le
+fichier de secrets pour éviter une suppression accidentelle.
+
+## Limites connues
+
+- Le `.deb` ne contient que le client ; le serveur, les modèles et les
+  dépendances CUDA/TPU restent dans le dépôt.
+- Le paquet est construit pour `amd64` sur Ubuntu 22.04 ; il n'est pas
+  portable tel quel.
+- L'audio hôte est opt-in et n'embarque pas les MP3.
+- Le single-instance reste différé au MVP.
+- L'installation via `sudo apt install` et les étapes CUDA/TPU sous l'unité
+  systemd n'ont pas été exécutées en J5 ; la validation J5 porte sur
+  l'extraction sans root, le lancement du client, `systemd-analyze verify` et
+  un serveur de test sur `:5005`.

@@ -141,6 +141,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
+- `docs/PACKAGING-GUI.md` : construction du `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, désinstallation et limites.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
 - `docs/ETUDE-GUI-NATIVE-LINUX.md` : faisabilité d'une interface desktop native (inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui, modèles d'intégration, feuille de route).
 - `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` : confrontation de l'étude interne avec l'étude indépendante, faits vérifiés, corrections et règle de décision Tauri/GTK4.
@@ -150,6 +151,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/audits/2026-10-25-poc-tauri-j2.md` : stress-test J2 (35 lancements, 125 bascules, quatre profils WebKit, canari `AcceleratedSurface`, isolation et restauration GNOME).
 - `docs/audits/2026-10-25-poc-tauri-j3.md` : coexistence J3 Tauri + STEP2 CUDA (baseline Firefox, 5 runs, RSS/PSS, pic VRAM 2 392 Mio, aucun OOM).
 - `docs/audits/2026-10-25-poc-tauri-j4.md` : tray D-Bus, `StatusWatcher` 1 Hz, matrice d'états, fermeture vers le tray et soak d'endurance 2 h avec WebView inactive.
+- `docs/audits/2026-10-25-poc-tauri-j5.md` : paquet `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, décision Tauri A-Strict.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -169,6 +171,10 @@ Les secrets sont générés au premier lancement dans `config/launcher.env`
 set -a; source config/launcher.env; set +a
 ./scripts/switch-rust.sh status
 ```
+
+Pour le MVP, `scripts/install-systemd-user.sh` installe une unité
+`workflow-server.service` indépendante du GUI (secrets 0600, préflight
+port/webhook, `--start` optionnel). Voir `docs/PACKAGING-GUI.md`.
 
 En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
 

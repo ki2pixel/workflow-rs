@@ -51,6 +51,13 @@
   (PSS ≤ 32 Mio, pente ≤ 0,267 Mio/min) ; l'hôte/watcher est plat, la
   croissance est portée par `WebKitNetworkProcess` et le polling du frontend
   legacy. Rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.
+- PoC Tauri A-Strict J5 (2026-10-25) : `.deb` `workflow-manager` construit
+  par Tauri CLI 2.12.4 (5,59 Mio, 15 227 Kio installés), extraction sans
+  root, `desktop-file-validate` et `systemd-analyze --user verify` verts ;
+  unité systemd user et `switch-rust.sh` testés sur `:5005`, serveur PPID
+  `systemd --user`, survit à la fermeture du GUI ; décision Tauri A-Strict
+  pour le MVP. Rapports `docs/PACKAGING-GUI.md` et
+  `docs/audits/2026-10-25-poc-tauri-j5.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
@@ -74,10 +81,9 @@
   mesurable par `--query-compute-apps`, corrections MSRV/AppIndicator/token,
   gates VRAM/RSS relatifs. Décision : PoC Tauri A-Strict 5 jours d'abord,
   GTK4 en repli, crate `workflow-desktop-services` dès J1.
-- **Aucune tâche active.** Prochain jalon : J5 — packaging `.deb` Tauri,
-  supervision du serveur PoC via `switch-rust.sh` et MVP systemd user. Le
-  PoC Tauri A-Strict J1–J4 est implémenté et accepté ; la décision binaire
-  finale sera consignée après J5. Point de vigilance MVP : croissance de
+- **PoC Tauri A-Strict J1–J5 terminé.** Prochain jalon : MVP — pause du
+  polling page masquée, single-instance, installation réelle du `.deb` et
+  runs STEP2/STEP8 sous l'unité systemd. Point de vigilance : croissance de
   `WebKitNetworkProcess` due au polling du frontend legacy en arrière-plan.
 
 ## Chronologie de migration

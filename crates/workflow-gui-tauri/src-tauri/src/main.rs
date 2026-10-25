@@ -23,8 +23,8 @@ pub(crate) struct Args {
     #[arg(long, default_value = "http://127.0.0.1:5004")]
     pub server_url: Url,
 
-    /// Dossier des artefacts de télémétrie et d'audit du PoC.
-    #[arg(long, default_value = "/tmp/opencode/poc-gui")]
+    /// Dossier des artefacts de télémétrie et d'audit.
+    #[arg(long, default_value_os_t = default_telemetry_dir())]
     pub telemetry_dir: PathBuf,
 
     /// Écrit l'URL d'audit dès que le hash `#poc=` est capturé.
@@ -68,6 +68,17 @@ fn main() {
     if let Err(error) = run() {
         eprintln!("error: {error:#}");
         std::process::exit(1);
+    }
+}
+
+/// Répertoire d'état conforme XDG, utilisable hors du dépôt et hors `/tmp`.
+fn default_telemetry_dir() -> PathBuf {
+    if let Some(state) = std::env::var_os("XDG_STATE_HOME").filter(|value| !value.is_empty()) {
+        PathBuf::from(state).join("workflow-manager")
+    } else if let Some(home) = std::env::var_os("HOME").filter(|value| !value.is_empty()) {
+        PathBuf::from(home).join(".local/state/workflow-manager")
+    } else {
+        PathBuf::from("/tmp/workflow-manager")
     }
 }
 

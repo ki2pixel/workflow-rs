@@ -35,6 +35,12 @@
   `force-dmabuf` 5/5 solide avec 183 lignes `AcceleratedSurface` ;
   `force-dmabuf-shm` 5/5 normal ; `gsettings` restaurés, ports libres,
   token absent. Rapport `docs/audits/2026-10-25-poc-tauri-j2.md`.
+- PoC Tauri A-Strict J3 (2026-10-25) : baseline Firefox snap, GUI Tauri et
+  5 runs STEP2 CUDA sur vidéo `testsrc2` 30 s 1280×720 ; 5/5 CSV identiques,
+  0 OOM, pic VRAM global 2 392 Mio, libre min 1 508 Mio ; GUI ~410 Mio RSS /
+  ~227 Mio PSS, ratio ~0,32× Firefox ; aucun orphelin, ports libres, verrou
+  non tenu, `gsettings` inchangés. Rapport
+  `docs/audits/2026-10-25-poc-tauri-j3.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et

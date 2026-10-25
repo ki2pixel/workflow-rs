@@ -564,3 +564,30 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `token-check=ok`, 35/35 sticky, 125/125 bascules, 0 orphelin, `gsettings`
   avant/après identiques, ports libres. Rapport
   `docs/audits/2026-10-25-poc-tauri-j2.md`.
+
+## 2026-10-25 — J3 : Tauri + STEP2 CUDA sur 4 Gio
+
+- **Contexte** : 5 runs STEP2 TransNetV2 CUDA avec le GUI Tauri ouvert, sur
+  une vidéo `testsrc2` 30 s 1280×720, après une baseline Firefox snap
+  fraîche et une baseline GUI.
+- **Mesures** :
+  1. Firefox : RSS médian 1 283,4 Mio, PSS 706,1 Mio, VRAM +174 Mio.
+  2. Tauri : RSS médian 409,5 Mio, PSS 226,0 Mio, VRAM +2 Mio.
+  3. STEP2 : RSS max 803,6 Mio, PSS 798,7 Mio.
+  4. Pic VRAM global 2 392 Mio, libre min 1 508 Mio, 0 OOM, 0 échantillon
+     ≥ 3 900 Mio.
+- **Constats** :
+  - le GUI n’est pas le facteur limitant VRAM ;
+  - les 5 CSV sont identiques octet pour octet (`7d3897…`) ;
+  - le contrat des trois processus GUI tient sur tous les échantillons ;
+  - le profil Firefox snap doit vivre sous
+    `/home/kidpixel/snap/firefox/common/` car `/tmp/opencode` n’est pas
+    visible dans son namespace ;
+  - le fichier `/tmp/workflow-rs-hw.lock` persiste après STEP2 : l’acceptation
+    teste `flock`, pas l’existence du fichier.
+- **Conséquences** : aucun levier de contingence n’est nécessaire ; les
+  niveaux `disable-dmabuf`, batch 4, cuDNN heuristique et batch 2/1 restent
+  documentés pour J4/J5. Le monitor J3 devient la référence pour les mesures
+  RAM/VRAM.
+- **Validation** : run `j3-20261025-025201`, acceptance globale `true`.
+  Rapport `docs/audits/2026-10-25-poc-tauri-j3.md`.

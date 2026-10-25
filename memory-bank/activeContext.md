@@ -2,17 +2,30 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J2 terminé.** 35 lancements et 125 bascules validés :
-`default` 20/20 stable, `disable-dmabuf` 5/5 stable, canari `force-dmabuf`
-reproductible (aplat solide + 183 erreurs `AcceleratedSurface`), aucun
-SIGSEGV, aucun orphelin, `gsettings` restaurés. `force-dmabuf-shm` rend
-normalement dans ce run.
+**PoC Tauri A-Strict — J3 terminé.** Baseline Firefox fraîche et 5 runs STEP2
+CUDA validés : CSV identiques, aucun OOM, pic VRAM global 2 392 Mio, marge
+1 508 Mio avant 3 900 Mio. Le GUI reste à ~410 Mio RSS / ~227 Mio PSS pendant
+l’inférence, soit ~0,32× Firefox. Aucun orphelin, ports libres, verrou non
+tenu, `gsettings` inchangés.
 
-**Prochain jalon** : J3 — 5 runs STEP2 sur vidéo 30 s 1280×720, serveur `:5005`,
-baseline Firefox fraîche et mesure VRAM (`nvidia-smi`, `pmon`, `fuser`).
+**Prochain jalon** : J4 — 2 h de polling à 1 s, tray D-Bus, notifications et
+audio opt-in.
 
 ## Dernière session
 
+- [2026-10-25] **PoC Tauri A-Strict — J3** :
+  - `scripts/poc/j3-monitor.py` : RSS/PSS à 1 Hz, VRAM à 200 ms, contrat des
+    trois processus GUI, suivi STEP2 + ffmpeg, alerte 3 900 MiB ;
+  - `scripts/poc/j3-firefox-baseline.sh` : profil snap isolé, un onglet,
+    capture et nettoyage ;
+  - `scripts/poc/j3-runbook.py` : serveur `:5005`, vidéo `testsrc2` 30 s
+    1280×720, baseline Firefox, baseline GUI, 5 runs STEP2 CUDA, acceptance ;
+  - 5/5 runs exit 0, 5/5 CSV identiques (`7d3897…`), 0 OOM, pic VRAM
+    2 392 Mio, libre min 1 508 Mio ;
+  - Firefox : RSS médian 1 283,4 Mio, PSS 706,1 Mio, VRAM +174 Mio ;
+  - Tauri : RSS médian 409,5 Mio, PSS 226,0 Mio, VRAM +2 Mio ;
+  - STEP2 : RSS max 803,6 Mio, PSS 798,7 Mio ; ratio GUI/STEP2 ~0,513 RSS ;
+  - rapport `docs/audits/2026-10-25-poc-tauri-j3.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J2** :
   - harness `scripts/poc/j2-stress.py` : sessions dédiées, sticky vérifié,
     trap `gsettings`, capture par bureau, contrôle des orphelins ;
@@ -187,8 +200,6 @@ baseline Firefox fraîche et mesure VRAM (`nvidia-smi`, `pmon`, `fuser`).
 
 ## Prochaines actions
 
-- **J3** : 5 runs STEP2 sur projet isolé, baseline Firefox fraîche, VRAM
-  mesurée par `nvidia-smi pmon`, `fuser /dev/nvidia0` et VRAM globale.
 - **J4** : 2 h de polling, tray D-Bus, notifications et audio opt-in.
 - **J5** : packaging `.deb`, extraction sans root, décision go/no-go.
 - Ratifier le passage des séquences côté serveur (`/run_custom_sequence`,

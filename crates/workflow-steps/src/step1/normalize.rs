@@ -718,18 +718,13 @@ mod tests {
 
     #[cfg(unix)]
     fn fake_ffmpeg(temp: &tempfile::TempDir, exit_code: u8) -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
         let path = temp.path().join("fake-ffmpeg");
-        fs::write(
+        crate::test_support::write_executable(
             &path,
-            format!(
+            &format!(
                 "#!/bin/sh\nfor last; do :; done\nprintf converted > \"$last\"\nexit {exit_code}\n"
             ),
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&path).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&path, permissions).unwrap();
+        );
         path
     }
 

@@ -591,3 +591,49 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   RAM/VRAM.
 - **Validation** : run `j3-20261025-025201`, acceptance globale `true`.
   Rapport `docs/audits/2026-10-25-poc-tauri-j3.md`.
+
+## 2026-10-25 — J4 : tray D-Bus, StatusWatcher 1 Hz et endurance 2 h
+
+- **Contexte** : tray natif sous GNOME, polling d'état à 1 Hz sans solliciter
+  la WebView, matrice d'états, fermeture vers le tray et soak de 2 h.
+- **Décisions** :
+  1. La politique du tray (`TrayState`, `TrayStatus`, `TrayVisualKey`,
+     `TrayPresenter`) reste dans `workflow-desktop-services`, sans toolkit ;
+     l'adaptateur `tauri::tray` / `tray-icon` / `libayatana-appindicator3`
+     reste dans l'hôte Tauri.
+  2. `StatusWatcher` publie des `StatusSnapshot` dans un
+     `tokio::sync::watch` à un slot ; tick de 1 s ancré sur une échéance
+     absolue, `max_errors = None` pour le tray, statistiques ticks/succès/
+     erreurs/skipped.
+  3. Fermeture vers le tray par défaut ; `--no-close-to-tray` restaure la
+     fermeture native pour les scripts ; `--no-tray` utilise `NoopTray`.
+  4. Notifications et audio opt-in (`--notifications`, `--audio`,
+     `--sound-dir`) ; `TransitionGate` déduplique par `terminal_seq` ;
+     `RodioAudio` lit les MP3 locaux.
+  5. Single-instance différé au MVP.
+  6. `libayatana-appindicator3-dev` installé (0.5.90) ; l'extension
+     `ubuntu-appindicators@ubuntu.com` et `org.kde.StatusNotifierWatcher`
+     restent les prérequis.
+- **Mesures** :
+  1. Matrice 5 min `j4-matrix-final-20261025-050025` : Idle, Running,
+     Success, Error, Stopping, Offline, reconnexion et fermeture/restauration
+     par le menu D-Bus validés ; durée 299,028 s ; item D-Bus
+     `:1.1662/org/ayatana/NotificationItem/tray_icon_tray_app_main`.
+  2. Soak 7 200 s `j4-soak-20261025-025624` : dérive p95 0,310 ms, hôte
+     +0,03 Mio, WebKitNetwork +22,06 Mio, WebKitWeb +3,35 Mio, PSS GUI
+     +25,46 Mio, pente GUI 0,221 Mio/min, VRAM pic 199 Mio, 0 OOM, 0 erreur
+     watcher, D-Bus stable.
+- **Constat** : l'acceptation stricte du soak est **non** sur deux seuils de
+  l'enveloppe GUI (PSS 25,46 > 24 Mio ; pente 0,221 > 0,20 Mio/min). L'hôte
+  (watcher/tray) est plat ; la croissance est portée par
+  `WebKitNetworkProcess` (+22,1 Mio) et attribuée au polling du frontend
+  legacy qui continue en arrière-plan (`/api/system_monitor` 5 s,
+  téléchargements 1 s).
+- **Conséquences** : le tray et le watcher sont conformes ; l'écart réseau
+  WebKit doit être traité avant J5 (pause du polling quand la fenêtre est
+  masquée, exception documentée ou révision des seuils). Le single-instance
+  reste différé au MVP.
+- **Validation** : matrice `matrix_ok=true`, soak `soak_ok=false` (strict),
+  `cleanup_ok=true` ; 316 tests workspace (280 pipeline + 36 services),
+  fmt/clippy verts, build release.
+  Rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.

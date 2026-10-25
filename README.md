@@ -149,6 +149,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/audits/2026-10-25-poc-tauri-j1.md` : exécution J1 du PoC Tauri A-Strict (scaffold, auth par HTML, audit DOM, baseline RSS/PSS/VRAM, résultats d'acceptation).
 - `docs/audits/2026-10-25-poc-tauri-j2.md` : stress-test J2 (35 lancements, 125 bascules, quatre profils WebKit, canari `AcceleratedSurface`, isolation et restauration GNOME).
 - `docs/audits/2026-10-25-poc-tauri-j3.md` : coexistence J3 Tauri + STEP2 CUDA (baseline Firefox, 5 runs, RSS/PSS, pic VRAM 2 392 Mio, aucun OOM).
+- `docs/audits/2026-10-25-poc-tauri-j4.md` : tray D-Bus, `StatusWatcher` 1 Hz, matrice d'états, fermeture vers le tray et soak d'endurance 2 h avec WebView inactive.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.

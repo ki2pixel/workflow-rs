@@ -1,12 +1,14 @@
 mod host;
 mod poc_driver;
 mod services;
+mod tray;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use std::io::IsTerminal;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::fs::{File, OpenOptions};
+use std::io::{IsTerminal, Write};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use url::Url;
 use workflow_desktop_services::validate_base_url;
 
@@ -36,6 +38,30 @@ pub(crate) struct Args {
     /// Filtre de logs `tracing` (ex: info, debug).
     #[arg(long, default_value = "info")]
     pub log_level: String,
+
+    /// Fichier de log hôte, avec rotation 8 Mio + 1 archive.
+    #[arg(long)]
+    pub log_file: Option<PathBuf>,
+
+    /// Désactive la fermeture vers le tray (utile aux scripts J3).
+    #[arg(long)]
+    pub no_close_to_tray: bool,
+
+    /// Démarre sans tray (contrôle ou environnement sans AppIndicator).
+    #[arg(long)]
+    pub no_tray: bool,
+
+    /// Active les notifications natives sur les terminaux (opt-in).
+    #[arg(long)]
+    pub notifications: bool,
+
+    /// Active les sons locaux sur les terminaux (opt-in).
+    #[arg(long)]
+    pub audio: bool,
+
+    /// Dossier des sons MP3 (utilisé seulement avec `--audio`).
+    #[arg(long, default_value = "assets/web/sound-design")]
+    pub sound_dir: PathBuf,
 }
 
 fn main() {
@@ -60,7 +86,7 @@ fn run() -> Result<()> {
         }
     }
 
-    init_tracing(&args.log_level);
+    init_tracing(&args.log_level, args.log_file.as_deref());
 
     let runtime = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
@@ -69,24 +95,129 @@ fn run() -> Result<()> {
             .context("création du runtime Tokio")?,
     );
 
-    let services = services::AppServices::bootstrap(
+    let services = services::AppServices::bootstrap(services::BootstrapOptions {
         runtime,
-        args.server_url.clone(),
-        args.telemetry_dir.clone(),
-        args.ready_file.clone(),
-        args.poc_driver.clone(),
-    )?;
-    services.start_background();
+        server_url: args.server_url.clone(),
+        out_dir: args.telemetry_dir.clone(),
+        ready_file: args.ready_file.clone(),
+        poc_driver: args.poc_driver.clone(),
+        notifications: args.notifications,
+        audio: args.audio,
+        sound_dir: args.sound_dir.clone(),
+    })?;
 
     host::run(args, services)
 }
 
-fn init_tracing(level: &str) {
+fn init_tracing(level: &str, log_file: Option<&Path>) {
     let filter = tracing_subscriber::EnvFilter::try_new(level)
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(std::io::stderr)
-        .with_ansi(std::io::stderr().is_terminal())
-        .init();
+    if let Some(path) = log_file {
+        let writer = RotatingWriter::new(path.to_path_buf(), 8 * 1024 * 1024, 1)
+            .expect("initialisation du log hôte");
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_ansi(false)
+            .with_writer(writer)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_writer(std::io::stderr)
+            .with_ansi(std::io::stderr().is_terminal())
+            .init();
+    }
+}
+
+#[derive(Clone)]
+struct RotatingWriter {
+    inner: Arc<Mutex<RotatingInner>>,
+}
+
+struct RotatingInner {
+    path: PathBuf,
+    file: File,
+    size: u64,
+    max_bytes: u64,
+    backups: usize,
+}
+
+impl RotatingWriter {
+    fn new(path: PathBuf, max_bytes: u64, backups: usize) -> std::io::Result<Self> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
+        let size = file.metadata()?.len();
+        Ok(Self {
+            inner: Arc::new(Mutex::new(RotatingInner {
+                path,
+                file,
+                size,
+                max_bytes: max_bytes.max(1),
+                backups: backups.max(1),
+            })),
+        })
+    }
+
+    fn rotate(inner: &mut RotatingInner) -> std::io::Result<()> {
+        inner.file.flush()?;
+        let name = inner
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "nom de fichier de log invalide",
+                )
+            })?
+            .to_string();
+        for index in (1..inner.backups).rev() {
+            let from = inner.path.with_file_name(format!("{name}.{index}"));
+            let to = inner.path.with_file_name(format!("{name}.{}", index + 1));
+            if from.exists() {
+                std::fs::rename(from, to)?;
+            }
+        }
+        let first = inner.path.with_file_name(format!("{name}.1"));
+        std::fs::rename(&inner.path, &first)?;
+        inner.file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&inner.path)?;
+        inner.size = 0;
+        Ok(())
+    }
+}
+
+impl Write for RotatingWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("verrou de log"))?;
+        if inner.size + buf.len() as u64 > inner.max_bytes {
+            Self::rotate(&mut inner)?;
+        }
+        let written = inner.file.write(buf)?;
+        inner.size += written as u64;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner
+            .lock()
+            .map_err(|_| std::io::Error::other("verrou de log"))?
+            .file
+            .flush()
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::writer::MakeWriter<'a> for RotatingWriter {
+    type Writer = RotatingWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
 }

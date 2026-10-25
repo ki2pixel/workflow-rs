@@ -1,10 +1,11 @@
 //! Lecture des sons du workflow.
 //!
-//! Le frontend legacy joue déjà ses sons dans la WebView. Cette abstraction
-//! sert au repli GTK4 et aux événements hôte ; l'implémentation `rodio` est
-//! prévue au J4 pour ne pas alourdir le J1.
+//! Le frontend legacy joue ses sons dans la WebView ; côté hôte, la lecture
+//! est opt-in et passe par `rodio` (MP3 via Symphonia). Le dossier des sons
+//! reste celui du serveur (`assets/web/sound-design` par défaut).
 
 use crate::error::ServicesError;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SoundEvent {
@@ -46,6 +47,36 @@ impl AudioPlayer for NoopAudio {
     }
 }
 
+/// Lecteur MP3 local, sans dépendance à la WebView.
+#[derive(Debug, Clone)]
+pub struct RodioAudio {
+    dir: PathBuf,
+}
+
+impl RodioAudio {
+    pub fn new(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+}
+
+impl AudioPlayer for RodioAudio {
+    fn play(&self, event: SoundEvent) -> Result<(), ServicesError> {
+        let path = self.dir.join(event.file_name());
+        let file = std::fs::File::open(&path).map_err(|error| {
+            ServicesError::Config(format!("son introuvable {}: {error}", path.display()))
+        })?;
+        let mut sink = rodio::DeviceSinkBuilder::open_default_sink()
+            .map_err(|error| ServicesError::Config(format!("sortie audio: {error}")))?;
+        sink.log_on_drop(false);
+        let player = rodio::Player::connect_new(sink.mixer());
+        let decoder = rodio::Decoder::new(std::io::BufReader::new(file))
+            .map_err(|error| ServicesError::Config(format!("décodage MP3: {error}")))?;
+        player.append(decoder);
+        player.sleep_until_end();
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,5 +95,12 @@ mod tests {
         ] {
             assert!(event.file_name().ends_with(".mp3"));
         }
+    }
+
+    #[test]
+    fn rodio_audio_reports_missing_file_before_opening_device() {
+        let player = RodioAudio::new(std::path::PathBuf::from("/nonexistent/sound-design"));
+        let error = player.play(SoundEvent::WorkflowStart).unwrap_err();
+        assert!(matches!(error, ServicesError::Config(_)));
     }
 }

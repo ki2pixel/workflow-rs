@@ -9,11 +9,12 @@ tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 anyhow.workspace = true
+chrono.workspace = true
 clap.workspace = true
 percent-encoding.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tauri = { version = "2.12.5", default-features = false, features = ["wry", "x11", "dbus"] }
+tauri = { version = "2.12.5", default-features = false, features = ["wry", "x11", "dbus", "tray-icon", "image-png"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true

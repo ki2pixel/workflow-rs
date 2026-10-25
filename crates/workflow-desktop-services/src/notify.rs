@@ -1,6 +1,7 @@
 //! Notifications natives (D-Bus `org.freedesktop.Notifications`).
 
 use crate::error::ServicesError;
+use crate::polling::{TerminalKind, TerminalOutcome};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Urgency {
@@ -41,6 +42,43 @@ pub struct NoopNotifier;
 impl Notifier for NoopNotifier {
     fn notify(&self, _notification: &Notification) -> Result<(), ServicesError> {
         Ok(())
+    }
+}
+
+/// Filtre les terminaux pour qu'une notification ne parte qu'une fois par
+/// exécution, même si `last_terminal` reste présent dans les snapshots.
+#[derive(Debug, Default)]
+pub struct TransitionGate {
+    last_seq: u64,
+}
+
+impl TransitionGate {
+    pub fn observe(
+        &mut self,
+        terminal: Option<&TerminalOutcome>,
+        terminal_seq: u64,
+    ) -> Option<Notification> {
+        let terminal = terminal?;
+        if terminal_seq == 0 || terminal_seq == self.last_seq {
+            return None;
+        }
+        self.last_seq = terminal_seq;
+        let subject = match terminal.kind {
+            TerminalKind::Step => terminal.step.clone().unwrap_or_else(|| "Étape".to_string()),
+            TerminalKind::Sequence => "Séquence".to_string(),
+        };
+        let (summary, label, urgency) = match terminal.status.as_str() {
+            "success" | "completed" => ("Workflow terminé", "terminé", Urgency::Normal),
+            "error" | "failed" => ("Workflow en échec", "en échec", Urgency::Critical),
+            "stopped" => ("Workflow arrêté", "arrêté", Urgency::Low),
+            _ => return None,
+        };
+        let body = terminal
+            .message
+            .clone()
+            .filter(|message| !message.is_empty())
+            .unwrap_or_else(|| format!("{subject} {label}"));
+        Some(Notification::new(summary, body).with_urgency(urgency))
     }
 }
 
@@ -94,5 +132,39 @@ mod tests {
         assert_eq!(captured.len(), 1);
         assert_eq!(captured[0].summary, "titre");
         assert_eq!(captured[0].urgency, Urgency::Critical);
+    }
+
+    fn terminal(status: &str) -> TerminalOutcome {
+        TerminalOutcome {
+            kind: TerminalKind::Step,
+            status: status.to_string(),
+            message: Some("2. Analyse des transitions".to_string()),
+            step: Some("STEP2".to_string()),
+        }
+    }
+
+    #[test]
+    fn transition_gate_notifies_once_per_terminal() {
+        let mut gate = TransitionGate::default();
+        assert!(gate.observe(None, 0).is_none());
+        let notification = gate.observe(Some(&terminal("success")), 1).unwrap();
+        assert_eq!(notification.summary, "Workflow terminé");
+        assert_eq!(notification.urgency, Urgency::Normal);
+        assert!(gate.observe(Some(&terminal("success")), 1).is_none());
+    }
+
+    #[test]
+    fn transition_gate_notifies_a_new_terminal_even_if_identical() {
+        let mut gate = TransitionGate::default();
+        assert!(gate.observe(Some(&terminal("failed")), 1).is_some());
+        let second = gate.observe(Some(&terminal("failed")), 2).unwrap();
+        assert_eq!(second.summary, "Workflow en échec");
+        assert_eq!(second.urgency, Urgency::Critical);
+    }
+
+    #[test]
+    fn transition_gate_ignores_non_terminal_statuses() {
+        let mut gate = TransitionGate::default();
+        assert!(gate.observe(Some(&terminal("running")), 1).is_none());
     }
 }

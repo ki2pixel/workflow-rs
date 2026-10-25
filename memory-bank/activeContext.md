@@ -2,17 +2,45 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J3 terminé.** Baseline Firefox fraîche et 5 runs STEP2
-CUDA validés : CSV identiques, aucun OOM, pic VRAM global 2 392 Mio, marge
-1 508 Mio avant 3 900 Mio. Le GUI reste à ~410 Mio RSS / ~227 Mio PSS pendant
-l’inférence, soit ~0,32× Firefox. Aucun orphelin, ports libres, verrou non
-tenu, `gsettings` inchangés.
+**PoC Tauri A-Strict — J4 implémenté, acceptation stricte partielle.** Tray
+D-Bus, `StatusWatcher` à 1 Hz, matrice d'états de 5 min validée et soak de
+2 h avec fenêtre minimisée (`_NET_WM_STATE_HIDDEN`). Le soak est conforme sur
+la dérive (p95 0,310 ms), l'hôte (+0,03 Mio), WebKitWeb (+3,35 Mio), la VRAM,
+les logs et l'icône D-Bus. Il échoue sur deux seuils de l'enveloppe GUI :
+PSS GUI +25,46 Mio (seuil 24) et pente RSS GUI 0,221 Mio/min (seuil 0,20).
+La croissance est portée par `WebKitNetworkProcess` (+22,06 Mio), alors que
+l'hôte/watcher est plat ; elle est attribuée au polling du frontend legacy
+(`/api/system_monitor` 5 s, téléchargements 1 s) qui continue en arrière-plan.
+La décision (exception documentée, pause du polling page masquée ou révision
+des seuils) reste ouverte avant J5.
 
-**Prochain jalon** : J4 — 2 h de polling à 1 s, tray D-Bus, notifications et
-audio opt-in.
+**Prochain jalon** : J5 — packaging `.deb` Tauri, supervision serveur PoC et
+MVP systemd user, après arbitrage sur l'écart réseau WebKit.
 
 ## Dernière session
 
+- [2026-10-25] **PoC Tauri A-Strict — J4** :
+  - `workflow-desktop-services::tray` : politique pure du tray, réducteur
+    `StatusSnapshot` → état visuel, `TrayPresenter`/`NoopTray` ;
+  - `workflow-desktop-services::polling` : `StatusWatcher` à 1 Hz sur canal
+    `watch`, tick ancré, `max_errors = None`, statistiques et
+    `terminal_seq` pour les notifications ;
+  - `workflow-gui-tauri` : adaptateur `tauri::tray`/`tray-icon`/
+    `libayatana-appindicator3`, six icônes, menu natif, fermeture vers le
+    tray, restauration par événement D-Bus ;
+  - notifications et audio opt-in : `TransitionGate`, `NotifyRustNotifier`,
+    `RodioAudio` (MP3 locaux) ;
+  - scripts `j4-runbook.py` et `j4-monitor.py` : matrice, soak 2 h, RSS/PSS
+    1 Hz, VRAM 200 ms, `_NET_WM_STATE_HIDDEN`, CSV streamé ;
+  - matrice 5 min `j4-matrix-final-20261025-050025` : 8/8 états, fermeture
+    `IsUnMapped`, restauration D-Bus `IsViewable`, durée 299,028 s ;
+  - soak `j4-soak-20261025-025624` : 7 200 échantillons, dérive p95 0,310 ms,
+    hôte +0,03 Mio, WebKitNetwork +22,06 Mio, WebKitWeb +3,35 Mio, PSS GUI
+    +25,46 Mio, pente GUI 0,221 Mio/min, D-Bus stable, 0 OOM ;
+  - acceptation stricte **non** sur PSS GUI (25,46 > 24 Mio) et pente GUI
+    (0,221 > 0,20 Mio/min) ; l'hôte et le watcher sont plats, la croissance
+    est portée par `WebKitNetworkProcess` et le polling du frontend legacy ;
+  - rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J3** :
   - `scripts/poc/j3-monitor.py` : RSS/PSS à 1 Hz, VRAM à 200 ms, contrat des
     trois processus GUI, suivi STEP2 + ffmpeg, alerte 3 900 MiB ;

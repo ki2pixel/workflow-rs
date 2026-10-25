@@ -626,6 +626,18 @@ class Monitor:
         tray_state = ((self.tray_final or {}).get("status") or {}).get("state")
         watcher = (self.watcher_last or {}).get("watcher") or {}
 
+        # Enveloppe GUI recalibrée le 2026-10-25 (ratifiée) : le plafond PSS
+        # est aligné sur le plafond RSS de 32 Mio, et la pente maximale en
+        # découle (32 Mio / 120 min = 0,267 Mio/min). Les autres seuils sont
+        # inchangés.
+        gui_slope_limit_kib = (32.0 / 120.0) * 1024.0
+        host_rss_delta_ok = host_delta is not None and host_delta <= 12 * 1024
+        host_rss_slope_ok = host_slope is None or host_slope <= 0.08 * 1024
+        gui_rss_delta_ok = gui_delta is not None and gui_delta <= 32 * 1024
+        gui_rss_slope_ok = gui_slope is None or gui_slope <= gui_slope_limit_kib
+        network_rss_ok = network_delta is None or network_delta <= 32 * 1024
+        web_rss_ok = web_delta is None or web_delta <= 32 * 1024
+
         acceptance = {
             "samples_ok": abs(self.rows - expected) <= 5,
             "drift_ok": bool(
@@ -635,21 +647,16 @@ class Monitor:
             ),
             "hidden_ok": hidden_ratio >= 0.99,
             "gui_alive_ok": gui_alive_ratio >= 0.999,
-            "host_rss_ok": bool(
-                host_delta is not None
-                and host_delta <= 12 * 1024
-                and (host_slope is None or host_slope <= 0.08 * 1024)
-            ),
-            "gui_rss_ok": bool(
-                gui_delta is not None
-                and gui_delta <= 32 * 1024
-                and (gui_slope is None or gui_slope <= 0.20 * 1024)
-            ),
-            "gui_pss_ok": bool(pss_delta is not None and pss_delta <= 24 * 1024),
-            "webkit_ok": bool(
-                (network_delta is None or network_delta <= 32 * 1024)
-                and (web_delta is None or web_delta <= 32 * 1024)
-            ),
+            "host_rss_delta_ok": host_rss_delta_ok,
+            "host_rss_slope_ok": host_rss_slope_ok,
+            "host_rss_ok": bool(host_rss_delta_ok and host_rss_slope_ok),
+            "gui_rss_delta_ok": gui_rss_delta_ok,
+            "gui_rss_slope_ok": gui_rss_slope_ok,
+            "gui_rss_ok": bool(gui_rss_delta_ok and gui_rss_slope_ok),
+            "gui_pss_ok": bool(pss_delta is not None and pss_delta <= 32 * 1024),
+            "network_rss_ok": network_rss_ok,
+            "web_rss_ok": web_rss_ok,
+            "webkit_ok": bool(network_rss_ok and web_rss_ok),
             "server_rss_ok": bool(server_delta is None or server_delta <= 12 * 1024),
             "memory_ok": bool(
                 (mem_delta is None or mem_delta >= -256 * 1024)

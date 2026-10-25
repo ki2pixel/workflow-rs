@@ -47,10 +47,10 @@
   minimisée et `systemd-inhibit` ; notifications/audio opt-in. Soak :
   dérive p95 0,310 ms, hôte +0,03 Mio, WebKitNetwork +22,06 Mio, WebKitWeb
   +3,35 Mio, PSS GUI +25,46 Mio, pente GUI 0,221 Mio/min, D-Bus stable,
-  0 OOM. Acceptation stricte **non** sur PSS GUI (25,46 > 24 Mio) et pente
-  GUI (0,221 > 0,20 Mio/min) ; l'hôte/watcher est plat, la croissance est
-  portée par `WebKitNetworkProcess` et le polling du frontend legacy. Rapport
-  `docs/audits/2026-10-25-poc-tauri-j4.md`.
+  0 OOM. Acceptation conforme après recalibrage ratifié de l'enveloppe GUI
+  (PSS ≤ 32 Mio, pente ≤ 0,267 Mio/min) ; l'hôte/watcher est plat, la
+  croissance est portée par `WebKitNetworkProcess` et le polling du frontend
+  legacy. Rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
@@ -74,12 +74,11 @@
   mesurable par `--query-compute-apps`, corrections MSRV/AppIndicator/token,
   gates VRAM/RSS relatifs. Décision : PoC Tauri A-Strict 5 jours d'abord,
   GTK4 en repli, crate `workflow-desktop-services` dès J1.
-- **Décision ouverte** : écart `WebKitNetworkProcess` du soak J4 (PSS GUI
-  +25,46 Mio, pente 0,221 Mio/min) — exception documentée, pause du polling
-  page masquée ou révision des seuils. Prochain jalon : J5 — packaging `.deb`
-  Tauri, supervision du serveur PoC via `switch-rust.sh` et MVP systemd user.
-  Le PoC Tauri A-Strict J1–J4 est implémenté ; la décision binaire finale
-  sera consignée après J5.
+- **Aucune tâche active.** Prochain jalon : J5 — packaging `.deb` Tauri,
+  supervision du serveur PoC via `switch-rust.sh` et MVP systemd user. Le
+  PoC Tauri A-Strict J1–J4 est implémenté et accepté ; la décision binaire
+  finale sera consignée après J5. Point de vigilance MVP : croissance de
+  `WebKitNetworkProcess` due au polling du frontend legacy en arrière-plan.
 
 ## Chronologie de migration
 

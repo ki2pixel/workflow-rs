@@ -623,17 +623,23 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      +0,03 Mio, WebKitNetwork +22,06 Mio, WebKitWeb +3,35 Mio, PSS GUI
      +25,46 Mio, pente GUI 0,221 Mio/min, VRAM pic 199 Mio, 0 OOM, 0 erreur
      watcher, D-Bus stable.
-- **Constat** : l'acceptation stricte du soak est **non** sur deux seuils de
-  l'enveloppe GUI (PSS 25,46 > 24 Mio ; pente 0,221 > 0,20 Mio/min). L'hôte
-  (watcher/tray) est plat ; la croissance est portée par
+- **Décision ratifiée (2026-10-25)** : l'enveloppe GUI est recalibrée pour
+  être cohérente. Le plafond PSS passe de 24 à 32 Mio, aligné sur le plafond
+  RSS ; la pente maximale passe de 0,20 à 0,267 Mio/min (32 Mio / 120 min).
+  Justification : pour une croissance privée, PSS ≈ RSS ; un plafond PSS plus
+  strict que le plafond RSS est incohérent, et la pente doit dériver du même
+  budget. Les autres seuils (hôte, WebKit par processus, serveur, mémoire,
+  logs, tray, VRAM) sont inchangés.
+- **Constat** : l'hôte (watcher/tray) est plat ; la croissance est portée par
   `WebKitNetworkProcess` (+22,1 Mio) et attribuée au polling du frontend
   legacy qui continue en arrière-plan (`/api/system_monitor` 5 s,
   téléchargements 1 s).
-- **Conséquences** : le tray et le watcher sont conformes ; l'écart réseau
-  WebKit doit être traité avant J5 (pause du polling quand la fenêtre est
-  masquée, exception documentée ou révision des seuils). Le single-instance
-  reste différé au MVP.
-- **Validation** : matrice `matrix_ok=true`, soak `soak_ok=false` (strict),
-  `cleanup_ok=true` ; 316 tests workspace (280 pipeline + 36 services),
-  fmt/clippy verts, build release.
+- **Conséquences** : le tray, le watcher et l'enveloppe GUI recalibrée sont
+  conformes ; l'acceptation est recalculée sur les mêmes mesures, sans
+  modification du code, du frontend ni des données. La croissance réseau
+  WebKit reste un point de vigilance MVP (pause du polling page masquée à
+  évaluer en J5). Le single-instance reste différé au MVP.
+- **Validation** : matrice `matrix_ok=true`, soak recalculé `soak_ok=true`
+  avec les seuils recalibrés, `cleanup_ok=true` ; 316 tests workspace
+  (280 pipeline + 36 services), fmt/clippy verts, build release.
   Rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.

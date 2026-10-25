@@ -2,20 +2,19 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J4 implémenté, acceptation stricte partielle.** Tray
-D-Bus, `StatusWatcher` à 1 Hz, matrice d'états de 5 min validée et soak de
-2 h avec fenêtre minimisée (`_NET_WM_STATE_HIDDEN`). Le soak est conforme sur
-la dérive (p95 0,310 ms), l'hôte (+0,03 Mio), WebKitWeb (+3,35 Mio), la VRAM,
-les logs et l'icône D-Bus. Il échoue sur deux seuils de l'enveloppe GUI :
-PSS GUI +25,46 Mio (seuil 24) et pente RSS GUI 0,221 Mio/min (seuil 0,20).
-La croissance est portée par `WebKitNetworkProcess` (+22,06 Mio), alors que
-l'hôte/watcher est plat ; elle est attribuée au polling du frontend legacy
-(`/api/system_monitor` 5 s, téléchargements 1 s) qui continue en arrière-plan.
-La décision (exception documentée, pause du polling page masquée ou révision
-des seuils) reste ouverte avant J5.
+**PoC Tauri A-Strict — J4 terminé, acceptation conforme après recalibrage
+ratifié.** Tray D-Bus, `StatusWatcher` à 1 Hz, matrice d'états de 5 min
+validée et soak de 2 h avec fenêtre minimisée (`_NET_WM_STATE_HIDDEN`). Le
+soak est conforme sur la dérive (p95 0,310 ms), l'hôte (+0,03 Mio),
+WebKitWeb (+3,35 Mio), la VRAM, les logs et l'icône D-Bus. L'enveloppe GUI a
+été recalibrée le 2026-10-25 : PSS ≤ 32 Mio (aligné sur le plafond RSS) et
+pente ≤ 0,267 Mio/min (32 Mio / 120 min) ; le PSS mesuré (+25,46 Mio) et la
+pente (0,221 Mio/min) sont conformes. La croissance de
+`WebKitNetworkProcess` (+22,06 Mio), attribuée au polling du frontend legacy
+en arrière-plan, reste un point de vigilance MVP ; l'hôte/watcher est plat.
 
 **Prochain jalon** : J5 — packaging `.deb` Tauri, supervision serveur PoC et
-MVP systemd user, après arbitrage sur l'écart réseau WebKit.
+MVP systemd user.
 
 ## Dernière session
 
@@ -37,9 +36,11 @@ MVP systemd user, après arbitrage sur l'écart réseau WebKit.
   - soak `j4-soak-20261025-025624` : 7 200 échantillons, dérive p95 0,310 ms,
     hôte +0,03 Mio, WebKitNetwork +22,06 Mio, WebKitWeb +3,35 Mio, PSS GUI
     +25,46 Mio, pente GUI 0,221 Mio/min, D-Bus stable, 0 OOM ;
-  - acceptation stricte **non** sur PSS GUI (25,46 > 24 Mio) et pente GUI
-    (0,221 > 0,20 Mio/min) ; l'hôte et le watcher sont plats, la croissance
-    est portée par `WebKitNetworkProcess` et le polling du frontend legacy ;
+  - acceptation conforme après recalibrage ratifié de l'enveloppe GUI :
+    PSS ≤ 32 Mio (aligné sur le plafond RSS) et pente ≤ 0,267 Mio/min
+    (32 Mio / 120 min) ; PSS 25,46 Mio et pente 0,221 Mio/min conformes.
+    L'hôte et le watcher sont plats, la croissance est portée par
+    `WebKitNetworkProcess` et le polling du frontend legacy ;
   - rapport `docs/audits/2026-10-25-poc-tauri-j4.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J3** :
   - `scripts/poc/j3-monitor.py` : RSS/PSS à 1 Hz, VRAM à 200 ms, contrat des

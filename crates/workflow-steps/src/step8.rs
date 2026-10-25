@@ -1064,8 +1064,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn timeout_terminates_effectcraft_cli_and_writes_failure_report() {
-        use std::os::unix::fs::PermissionsExt;
-
         let dir = tempfile::tempdir().unwrap();
         let folder = dir.path().join("projet");
         fs::create_dir_all(folder.join("docs")).unwrap();
@@ -1074,14 +1072,10 @@ mod tests {
         let config = dir.path().join("mediasolution_ec.json");
         fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
         let cli = dir.path().join("effectcraft-cli");
-        fs::write(
+        crate::test_support::write_executable(
             &cli,
             "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi\nsleep 20\nprintf '%s' '[]'\n",
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&cli).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&cli, permissions).unwrap();
+        );
 
         let options = Step8Options {
             manifest: None,
@@ -1111,8 +1105,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn runs_effectcraft_cli_and_writes_report() {
-        use std::os::unix::fs::PermissionsExt;
-
         let dir = tempfile::tempdir().unwrap();
         let folder = dir.path().join("projet");
         fs::create_dir_all(folder.join("docs")).unwrap();
@@ -1121,17 +1113,13 @@ mod tests {
         let config = dir.path().join("mediasolution_ec.json");
         fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
         let cli = dir.path().join("effectcraft-cli");
-        fs::write(
+        crate::test_support::write_executable(
             &cli,
             r#"#!/bin/sh
 if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi
 printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles":true}},{"command":"file.runScript","result":{"ok":true,"error":null,"result":"step8-ok","output":"[INFO] 12:00:00 | Batch démarré : 1 projet(s)\n[INFO] 12:00:01 | --- 1/1 : projet\n[INFO] 12:00:02 | Projet enregistré : projet_9x16.ecproj (0.1s)\nMS_BATCH_RESULT: {\"ok\": true, \"errors\": []}"}}]'
 "#,
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&cli).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&cli, permissions).unwrap();
+        );
 
         let options = Step8Options {
             manifest: None,

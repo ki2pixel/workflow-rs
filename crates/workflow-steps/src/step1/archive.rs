@@ -1012,22 +1012,16 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn rar_member_is_streamed_and_partial_file_removed_on_failure() {
-        use std::os::unix::fs::PermissionsExt;
-
         let temp = tempfile::tempdir().unwrap();
         let archive = temp.path().join("17_Camille.rar");
         fs::write(&archive, b"fake rar").unwrap();
         let projects = temp.path().join("projects");
         fs::create_dir_all(&projects).unwrap();
         let unrar = temp.path().join("unrar");
-        fs::write(
+        crate::test_support::write_executable(
             &unrar,
             "#!/bin/sh\nif [ \"$1\" = \"lb\" ]; then echo 'root/clip.bin'; exit 0; fi\nif [ \"$1\" = \"p\" ]; then head -c 8388608 /dev/zero; exit 0; fi\nexit 2\n",
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&unrar).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&unrar, permissions).unwrap();
+        );
 
         let logger = RunLogger::new(None);
         let outcome = extract_archive(
@@ -1045,14 +1039,10 @@ mod tests {
         let second = temp.path().join("18_Camille.rar");
         fs::write(&second, b"fake rar").unwrap();
         let failing = temp.path().join("unrar-fail");
-        fs::write(
+        crate::test_support::write_executable(
             &failing,
             "#!/bin/sh\nif [ \"$1\" = \"lb\" ]; then echo 'root/broken.bin'; exit 0; fi\nif [ \"$1\" = \"p\" ]; then head -c 4096 /dev/zero; echo boom >&2; exit 1; fi\nexit 2\n",
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&failing).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&failing, permissions).unwrap();
+        );
         assert!(extract_archive(
             &second,
             &projects,

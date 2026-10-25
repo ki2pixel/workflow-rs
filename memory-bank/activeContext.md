@@ -2,22 +2,43 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J5 terminé, décision Tauri A-Strict pour le MVP.**
-Le `.deb` `workflow-manager_0.1.0_amd64.deb` est construit par Tauri CLI
-2.12.4 (5,59 Mio, 15 227 Kio installés), s'extrait et s'exécute sans root,
-et passe `desktop-file-validate` et `systemd-analyze --user verify`. Le
-client charge la page, le tray passe à `Idle`, et le serveur est supervisé
-indépendamment par `switch-rust.sh` (PoC) ou `systemd --user` (MVP) : son
-PPID est `systemd --user`, jamais le GUI. Il survit à la fermeture du GUI.
-Le `.deb` ne contient ni serveur, ni config, ni secret. Le seul point de
-vigilance reste la croissance `WebKitNetworkProcess` du soak J4, à traiter
-au MVP.
+**MVP — transition ouverte : polling masqué neutralisé et socle partagé
+gelé v0.1.0.** `PollingManager` suspend désormais `systemMonitor` et
+`localDownloadsStatus` sur `visibilitychange` (`pauseWhenHidden`) et les
+rafraîchit au focus. Validation live : 0 requête sur 8 s masquées ; soak
+10 min : 600 échantillons, 100 % masqué, `WebKitNetworkProcess` **0 Kio**
+(contre +22,06 Mio en J4), hôte +4 Kio, GUI PSS +73 Kio, acceptation
+`true`. `Cache-Control: no-store` sur `/static/` et les imports
+`PollingManager.js?v=20261025a` évitent les modules ES périmés. Le crate
+`workflow-desktop-services` est revu et gelé : 3 corrections P2,
+`#[non_exhaustive]`, 38 tests.
 
-**Prochain jalon** : MVP — pause du polling page masquée, single-instance,
-installation réelle du `.deb` et runs STEP2/STEP8 sous l'unité systemd.
+**Prochain jalon** : MVP — installation réelle du `.deb`, single-instance,
+runs STEP2/STEP8 sous l'unité systemd, puis soak 2 h de confirmation avant
+bascule publique. Toute évolution de `polling.rs`/`tray.rs` rejoue J4.
 
 ## Dernière session
 
+- [2026-10-25] **Transition MVP — polling masqué + gel du crate** :
+  - `PollingManager` : option `pauseWhenHidden`, suspension des intervalles
+    et des backoffs, reprise immédiate, nettoyage `stopPolling`/`destroy`,
+    statistiques `paused`/`totalPaused` ;
+  - `main.js` : opt-in pour `systemMonitor` et `localDownloadsStatus` ; les
+    pollers d'étapes/séquence restent actifs pour l'auto-mode ;
+  - `workflow-server` : `Cache-Control: no-store` sur `/static/` ; imports
+    `PollingManager.js?v=20261025a` dans les sept consommateurs pour que
+    WebKit recharge le module après mise à jour ;
+  - validation live `scripts/poc/verify-visibility-polling.py` : 0/0 en
+    masqué, reprise au focus ;
+  - soak 10 min `mvp-frontend-soak10-20261025` : 600 échantillons, dérive
+    p95 0,323 ms, hôte +4 Kio, GUI PSS +73 Kio, réseau 0 Kio, watcher
+    602/0/0, VRAM pic 368 Mio, acceptation `true` ;
+  - revue `workflow-desktop-services` : terminal obsolète corrigé, watcher
+    arrêté si le récepteur `watch` disparaît, identifiants d'URL refusés,
+    `#[non_exhaustive]` ; 38 tests ;
+  - 319 tests workspace, fmt/clippy/build verts ; docs
+    `docs/MVP-FRONTEND-POLLING.md` et
+    `docs/audits/2026-10-25-revue-workflow-desktop-services.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J5** :
   - bundle `deb` Tauri : `productName=workflow-manager`, icônes 32/128/256/512,
     `.desktop` `workflow-manager.desktop`, dépendances `libasound2`,

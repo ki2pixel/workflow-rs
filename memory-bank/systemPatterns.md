@@ -148,6 +148,16 @@ comportement legacy sont dans `parity/DRIFT.md`.
   Contrairement au legacy, la copie Rust désactive l'auto-ouverture par
   défaut (`ui.autoOpenLogOverlay = false`) ; le toggle Settings reste
   fonctionnel et une valeur persistée par l'opérateur reste prioritaire.
+- `PollingManager` accepte `pauseWhenHidden` (opt-in) : les pollers
+  `systemMonitor` et `localDownloadsStatus` sont suspendus sur
+  `visibilitychange` (`document.hidden`) et rafraîchis au focus. Les pollers
+  d'étapes et de séquence restent actifs pour ne pas bloquer l'auto-mode
+  quand la fenêtre est dans le tray. C'est un écart assumé avec le legacy
+  (qui continue à poller en arrière-plan) ; validation dans
+  `docs/MVP-FRONTEND-POLLING.md`.
+- Les imports de `PollingManager.js` portent `?v=20261025a` : incrémenter ce
+  suffixe à chaque modification du module, sinon WebKit peut servir l'ancien
+  module malgré `Cache-Control: no-store`.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
 
 ## 15. After Effects

@@ -7,7 +7,7 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 316 tests workspace (280 pipeline + 36 services), sans matériel.
+- 319 tests workspace (281 pipeline + 38 services), sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
@@ -58,6 +58,22 @@
   `systemd --user`, survit à la fermeture du GUI ; décision Tauri A-Strict
   pour le MVP. Rapports `docs/PACKAGING-GUI.md` et
   `docs/audits/2026-10-25-poc-tauri-j5.md`.
+- Transition MVP (2026-10-25) : `PollingManager` suspend les pollers
+  `systemMonitor` et `localDownloadsStatus` sur `visibilitychange`
+  (`pauseWhenHidden`), avec reprise immédiate au focus ; imports
+  `PollingManager.js?v=20261025a` et `Cache-Control: no-store` sur
+  `/static/` pour contourner le cache de modules WebKit. Validation live :
+  0 requête `system_monitor`/`csv_downloads` sur 8 s masquées, reprise au
+  focus. Soak 10 min : 600 échantillons, 100 % masqué, dérive p95
+  0,323 ms, hôte +4 Kio, GUI PSS +73 Kio, `WebKitNetworkProcess`
+  **0 Kio** (contre +22,06 Mio en J4), watcher 602 ticks/0 erreur,
+  acceptation `true`. Revue du crate `workflow-desktop-services` :
+  3 corrections P2 (terminal obsolète, arrêt du watcher sans récepteur,
+  identifiants dans l'URL), `#[non_exhaustive]`, 38 tests ; 319 tests
+  workspace, fmt/clippy/build verts. Les exécutables factices des tests
+  `workflow-steps` sont écrits par un processus `sh` séparé pour éviter
+  `ETXTBSY`. Docs `docs/MVP-FRONTEND-POLLING.md` et
+  `docs/audits/2026-10-25-revue-workflow-desktop-services.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et

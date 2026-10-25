@@ -682,3 +682,44 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   runs STEP2/STEP8 sous l'unité systemd.
 - **Validation documentaire** : `docs/PACKAGING-GUI.md` et
   `docs/audits/2026-10-25-poc-tauri-j5.md`.
+
+## 2026-10-25 — MVP : polling masqué et gel de workflow-desktop-services
+
+- **Contexte** : le soak J4 avait mesuré +22,06 Mio sur
+  `WebKitNetworkProcess`, causés par `/api/system_monitor` (5 s) et
+  `/api/csv_downloads_status` (1 s) qui continuaient quand la WebView était
+  minimisée dans le tray. Le crate partagé devait être revu avant d'être figé
+  comme socle du client Tauri et d'un futur repli GTK4.
+- **Décision 1 — suspension opt-in** : `PollingManager` accepte
+  `pauseWhenHidden`. Seuls `systemMonitor` et `localDownloadsStatus`
+  l'activent ; les pollers d'étapes et de séquence restent actifs pour ne pas
+  bloquer l'auto-mode. Les intervalles et backoffs sont suspendus, puis
+  l'intervalle est recréé avec un rafraîchissement immédiat au focus.
+- **Décision 2 — cache** : `Cache-Control: no-store` sur `/static/` et
+  imports `PollingManager.js?v=20261025a` dans ses sept consommateurs. Le
+  `cache_buster` de `main.js` ne couvre pas les imports ES internes ; un
+  premier essai avec `no-cache` seul a montré que WebKit réutilisait encore
+  l'ancien module après un HEAD 200. Changer la clé d'URL est la garantie
+  effective ; incrémenter le suffixe à chaque modification du module.
+- **Décision 3 — gel du crate** : `workflow-desktop-services` 0.1.0 est
+  gelé. Trois corrections P2 appliquées avant gel :
+  1. `tray.rs` : une séquence active prime sur `last_terminal` pour éviter
+     un faux « Succès » entre deux étapes ;
+  2. `polling.rs` : le watcher s'arrête si le récepteur `watch` disparaît ;
+  3. `client.rs` : les identifiants dans l'URL loopback sont refusés.
+  `ServicesError` devient `#[non_exhaustive]` pour autoriser des variantes
+  additives. Toute évolution de `polling.rs`/`tray.rs` rejoue la matrice J4
+  et, si la charge change, le soak 2 h.
+- **Validation** : live 0 requête `system_monitor`/`csv_downloads` sur 8 s
+  masquées et reprise au focus ; soak 10 min `mvp-frontend-soak10-20261025`
+  (600 échantillons, 100 % masqué, dérive p95 0,323 ms, hôte +4 Kio, GUI PSS
+  +73 Kio, réseau 0 Kio, watcher 602 ticks/0 erreur, VRAM pic 368 Mio,
+  acceptation `true`) ; 38 tests services, 319 tests workspace, fmt/clippy/
+  build verts.
+- **Conséquences** : la cause de la dérive J4 est neutralisée ; le soak 2 h
+  de confirmation reste à rejouer avant la bascule publique. Le
+  single-instance, l'installation réelle du `.deb` et les runs STEP2/STEP8
+  sous systemd restent au MVP.
+- **Validation documentaire** : `docs/MVP-FRONTEND-POLLING.md`,
+  `docs/audits/2026-10-25-revue-workflow-desktop-services.md`,
+  `memory-bank/systemPatterns.md`.

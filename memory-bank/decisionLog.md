@@ -515,3 +515,23 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
     une fois par thread et par couple de dimensions, puis réutilisés.
   - L'allocation de l'image de sortie reste inhérente au retour d'un
     `RgbImage` possédé ; elle est la seule allocation par frame conservée.
+
+## 2026-10-25 — A-Strict Tauri : neutraliser aussi le handler IPC natif de wry
+
+- **Contexte** : le stub `Builder::invoke_system` neutralise
+  `window.__TAURI_INTERNALS__.postMessage`, mais wry expose en plus
+  `window.ipc` (objet gelé par `Object.defineProperty`) et
+  `window.webkit.messageHandlers.ipc`. L'audit J1 a montré que
+  `window.ipc.postMessage(...)` résolvait encore, alors que `invoke(...)`
+  était déjà rejeté.
+- **Décision** : dans le script d'initialisation `A_STRICT_SCRUB`, remplacer
+  `window.webkit.messageHandlers.ipc.postMessage` par une fonction qui lève
+  `IPC natif désactivé (A-Strict)`. L'objet `window.ipc` étant gelé et non
+  configurable, on ne peut pas le supprimer ; on neutralise son handler natif.
+- **Conséquences** : `window.__TAURI_INTERNALS__`, `window.ipc` et
+  `window.isTauri` restent présents (injection wry non configurable), mais
+  `invoke`, `postMessage`, `window.ipc.postMessage` et le handler natif
+  échouent tous. Aucune capability, commande ou plugin n'est exposé.
+- **Validation** : audit J1 réel sur `:5005` ; les quatre chemins d'envoi sont
+  rejetés, `tauri=undefined`, `token-check=ok`. Rapport
+  `docs/audits/2026-10-25-poc-tauri-j1.md`.

@@ -400,6 +400,8 @@ Le plan E3 est bon dans son principe, mais :
   `WEBKIT_FORCE_DMABUF_RENDERER=1 WEBKIT_DMABUF_RENDERER_FORCE_SHM=1`.
   Le profil par défaut est le mode livré ; `FORCE_DMABUF=1` est un canari,
   pas une option de production.
+  **Mise à jour du 2026-10-25** : le protocole J2 ratifié porte sur
+  35 lancements au total et 25 balayages de 5 bureaux GNOME (125 bascules).
 - 2 h de polling à 2 Hz sur `/status/<step>` avec l'overlay ouvert.
 - Critère d'échec : tout écran blanc, écran noir ou SIGSEGV reproductible sur
   le profil par défaut ; erreur DRM/GBM dans stderr.

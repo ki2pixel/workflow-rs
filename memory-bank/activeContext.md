@@ -2,15 +2,34 @@
 
 ## Tâche en cours
 
-**Aucune.** La migration Rust est terminée pour les huit étapes et
-l'infrastructure d'agents/memory-bank vient d'être initialisée.
+**PoC Tauri A-Strict — J1 terminé.** Le scaffold
+`workflow-desktop-services` + `workflow-gui-tauri`, l'authentification par
+parsing HTML, l'hôte A-Strict et l'audit DOM sont validés. La baseline GUI est
+mesurée (RSS médian 430 552 Kio, PSS 243 140 Kio, VRAM globale 190 Mio).
 
-**Prochain jalon** : arbitrer « widgets natifs : exigence ou confort ? », puis
-lancer le PoC Tauri A-Strict de 5 jours décrit dans
-`docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md`.
+**Prochain jalon** : J2 — stress-test de rendu sur les quatre profils WebKit,
+35 lancements au total et 25 balayages de 5 bureaux GNOME (125 bascules).
 
 ## Dernière session
 
+- [2026-10-25] **PoC Tauri A-Strict — J1** :
+  - ajout de `crates/workflow-desktop-services` (client HTTP typé, auth,
+    modèles, polling, logs, notifications, télémétrie) et de
+    `crates/workflow-gui-tauri/src-tauri` (Tauri 2.12.5, `invoke_system`
+    neutralisé, `build.rs` garde-fou capabilities) ;
+  - `tauri.conf.json` A-Strict : URL distante, `withGlobalTauri=false`, aucune
+    capability/plugin/commande, `create=false`, `dragDropEnabled=false`,
+    `devtools=false`, `freezePrototype=true` ;
+  - token lu dans le HTML Minijinja, digest SHA-256 vérifié dans le DOM ;
+    aucun token brut dans l'URL ou les artefacts ;
+  - audit : `tauri=undefined`, `invoke`, `postMessage`, `rawIpc` et
+    `nativeIpc` rejetés, digest `ok`, screenshot non blanc (1440×900,
+    stddev 0,104) ;
+  - `cargo test --workspace` : 299 tests ; `cargo fmt --all --check` et
+    `cargo clippy --workspace --all-targets -- -D warnings` verts ;
+  - serveur de test isolé sur `:5005`, webhook désactivé, chemins `/tmp` ;
+    aucun accès `runtime/` ni `/mnt/cache` ; rapport
+    `docs/audits/2026-10-25-poc-tauri-j1.md`.
 - [2026-10-24] **Analyse du rapport Deep Search GUI** :
   - `docs/audits/Analyse_Architecturale_GUI_Linux.md` (E3) analysé et
     confronté au code, à E1/E2/C et à des mesures locales ; résultat dans
@@ -153,12 +172,12 @@ lancer le PoC Tauri A-Strict de 5 jours décrit dans
 
 ## Prochaines actions
 
-- Arbitrer « widgets natifs : exigence ou confort ? ». Si confort, lancer le
-  PoC Tauri A-Strict de 5 jours (J1–J5) ; si exigence contractuelle, passer
-  directement à GTK4/Relm4 avec le crate `workflow-desktop-services`.
-- Le PoC Tauri doit mesurer la VRAM avec `nvidia-smi pmon` et
-  `fuser /dev/nvidia0`, comparer à la baseline Firefox, et couvrir 20 cycles,
-  5 bascules d'espace de travail et 2 h de polling.
+- **J2** : stress-test de rendu sur les quatre profils WebKit, 35 lancements
+  et 25 balayages de 5 bureaux GNOME (125 bascules).
+- **J3** : 5 runs STEP2 sur projet isolé, baseline Firefox fraîche, VRAM
+  mesurée par `nvidia-smi pmon`, `fuser /dev/nvidia0` et VRAM globale.
+- **J4** : 2 h de polling, tray D-Bus, notifications et audio opt-in.
+- **J5** : packaging `.deb`, extraction sans root, décision go/no-go.
 - Ratifier le passage des séquences côté serveur (`/run_custom_sequence`,
   `/sequence/status`) et ajouter le test associé.
 - Diagnostiquer D-024 sans modifier les données de production.

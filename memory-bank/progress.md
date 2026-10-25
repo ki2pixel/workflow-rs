@@ -7,7 +7,7 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 280 tests unitaires, sans matériel.
+- 299 tests workspace (280 pipeline + 19 services), sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
@@ -22,6 +22,13 @@
 - Remédiation de l'audit backend du 2026-10-24 : 33 constats corrigés,
   3 documentés (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`,
   clippy strict, 280 tests et `config check` verts.
+- PoC Tauri A-Strict J1 (2026-10-25) : `workflow-desktop-services` et
+  `workflow-gui-tauri` créés ; token lu dans le HTML Minijinja et vérifié par
+  digest SHA-256 ; `invoke_system` et handler IPC natif neutralisés, aucune
+  capability/plugin/commande ; audit `tauri=undefined`, `invoke`, `postMessage`,
+  `rawIpc` et `nativeIpc` rejetés, `token-check=ok` ; baseline GUI RSS médian
+  430 552 Kio, PSS 243 140 Kio, VRAM globale 190 Mio ; 299 tests workspace,
+  fmt/clippy verts. Rapport `docs/audits/2026-10-25-poc-tauri-j1.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
@@ -106,6 +113,9 @@
 
 ## Prochaines actions
 
+- **PoC Tauri J2/J3** : stress-test de rendu (4 profils WebKit, 35 lancements,
+  25 balayages de 5 bureaux GNOME), puis 5 runs STEP2 avec baseline Firefox
+  fraîche et surveillance VRAM (`pmon`, `fuser`, VRAM globale).
 1. **D-024** : diagnostiquer l'écart STEP4 Python sur `153 Camille`
    (4 977 objets contre 11 853). Ne pas utiliser `--prefer-raw` sur ce projet
    tant que la configuration d'origine n'est pas retrouvée.

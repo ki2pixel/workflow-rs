@@ -10,6 +10,20 @@ members = [
     "crates/workflow-ingest",
     "crates/workflow-server",
     "crates/workflow-sync",
+    "crates/workflow-desktop-services",
+    "crates/workflow-gui-tauri/src-tauri",
+]
+
+default-members = [
+    "crates/workflow-core",
+    "crates/workflow-schema",
+    "crates/workflow-steps",
+    "crates/workflow-cli",
+    "crates/workflow-bridge",
+    "crates/workflow-tpu",
+    "crates/workflow-ingest",
+    "crates/workflow-server",
+    "crates/workflow-sync",
 ]
 
 [workspace.package]

@@ -38,6 +38,10 @@ do not "clean them up". Start with `README.md` for scope/status and
   history, resumable R2/Dropbox downloads.
 - `crates/workflow-sync`: merges Python/Rust history, STEP1 list and STEP7
   archives before a backend switch.
+- `crates/workflow-desktop-services`: logique non graphique du client desktop
+  (client HTTP typé, auth, polling, logs, notifications, télémétrie).
+- `crates/workflow-gui-tauri`: hôte Tauri v2 A-Strict du PoC GUI (URL
+  distante, aucune capability/commande/plugin).
 - `crates/workflow-bridge`: After Effects JSON bridge (`cuts` and manifest
   modes). The CEP panel still calls Python (D-022).
 - `crates/workflow-tpu`: dynamic TFLite/Edge TPU FFI plus the spike binary.
@@ -47,7 +51,8 @@ do not "clean them up". Start with `README.md` for scope/status and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 280 unit tests, no hardware
+cargo test                                                # 280 tests pipeline, sans matériel
+cargo test --workspace                                    # 299 tests (pipeline + services), sans matériel
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -56,9 +61,10 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
 ```
 
 - There is no CI; run fmt + clippy + tests manually before finishing.
-- MSRV is Rust 1.86 (edition 2021). Use `--release` for STEP2/3/4, STEP8 and
-  the server; `config/config.toml` points the server at
-  `target/release/workflow-cli`.
+- MSRV pipeline is Rust 1.86 (edition 2021); `workflow-desktop-services`
+  requires 1.89 and `workflow-gui-tauri` 1.90 (GUI derogation). Use `--release`
+  for STEP2/3/4, STEP8 and the server; `config/config.toml` points the server
+  at `target/release/workflow-cli`.
 - `--config` is global; its default `config/config.toml` is relative to the
   current directory, so pass it explicitly when running from `/tmp`.
 - Full server preflight (secrets, Python stopped, tools, TPU libs) is
@@ -140,6 +146,9 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
 - TFLite C API: `scripts/build-tflite-c.sh` produces
   `vendor/libtensorflowlite_c.so`. STEP3/4 also need
   `vendor/libedgetpu.so.1` and an accessible `/dev/apex_0`.
+- GUI Tauri: `libwebkit2gtk-4.1-dev`, `libjavascriptcoregtk-4.1-dev` and
+  `libsoup-3.0-dev` (J1 PoC). `cargo test --workspace` builds the GUI crate and
+  therefore needs these headers; `cargo test` (pipeline) does not.
 - STEP2 needs an ONNX Runtime 1.23 CUDA library (path in `[steps.step2]`) and a
   CUDA GPU. CPU devices are diagnostic/test paths, not the production config.
 - STEP1–STEP4 need `ffmpeg`/`ffprobe`; RAR archives need `unrar`; STEP8 needs

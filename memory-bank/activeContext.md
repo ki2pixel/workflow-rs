@@ -2,16 +2,31 @@
 
 ## Tâche en cours
 
-**PoC Tauri A-Strict — J1 terminé.** Le scaffold
-`workflow-desktop-services` + `workflow-gui-tauri`, l'authentification par
-parsing HTML, l'hôte A-Strict et l'audit DOM sont validés. La baseline GUI est
-mesurée (RSS médian 430 552 Kio, PSS 243 140 Kio, VRAM globale 190 Mio).
+**PoC Tauri A-Strict — J2 terminé.** 35 lancements et 125 bascules validés :
+`default` 20/20 stable, `disable-dmabuf` 5/5 stable, canari `force-dmabuf`
+reproductible (aplat solide + 183 erreurs `AcceleratedSurface`), aucun
+SIGSEGV, aucun orphelin, `gsettings` restaurés. `force-dmabuf-shm` rend
+normalement dans ce run.
 
-**Prochain jalon** : J2 — stress-test de rendu sur les quatre profils WebKit,
-35 lancements au total et 25 balayages de 5 bureaux GNOME (125 bascules).
+**Prochain jalon** : J3 — 5 runs STEP2 sur vidéo 30 s 1280×720, serveur `:5005`,
+baseline Firefox fraîche et mesure VRAM (`nvidia-smi`, `pmon`, `fuser`).
 
 ## Dernière session
 
+- [2026-10-25] **PoC Tauri A-Strict — J2** :
+  - harness `scripts/poc/j2-stress.py` : sessions dédiées, sticky vérifié,
+    trap `gsettings`, capture par bureau, contrôle des orphelins ;
+  - 35 lancements, 25 balayages, 125 bascules ; 35/35 audits `token-check=ok`,
+    35/35 sticky, 125/125 bascules ;
+  - `default` : 20/20, 0 blanc, 0 SIGSEGV, 0 orphelin ; RSS médian ~410,8 Mio,
+    PSS ~226,7 Mio ;
+  - `disable-dmabuf` : 5/5, 25/25, 0 blanc, 0 orphelin ;
+  - `force-dmabuf` : 5/5, 5 captures solides (`mean=0,172549`, 1 couleur),
+    183 lignes `AcceleratedSurface was unable to construct a complete framebuffer` ;
+  - `force-dmabuf-shm` : 5/5, rendu normal, 0 `AcceleratedSurface` ;
+  - `gsettings` avant/après identiques (`dynamic-workspaces=true`,
+    `num-workspaces=4`), ports libres, token absent ; rapport
+    `docs/audits/2026-10-25-poc-tauri-j2.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J1** :
   - ajout de `crates/workflow-desktop-services` (client HTTP typé, auth,
     modèles, polling, logs, notifications, télémétrie) et de
@@ -172,8 +187,6 @@ mesurée (RSS médian 430 552 Kio, PSS 243 140 Kio, VRAM globale 190 Mio).
 
 ## Prochaines actions
 
-- **J2** : stress-test de rendu sur les quatre profils WebKit, 35 lancements
-  et 25 balayages de 5 bureaux GNOME (125 bascules).
 - **J3** : 5 runs STEP2 sur projet isolé, baseline Firefox fraîche, VRAM
   mesurée par `nvidia-smi pmon`, `fuser /dev/nvidia0` et VRAM globale.
 - **J4** : 2 h de polling, tray D-Bus, notifications et audio opt-in.

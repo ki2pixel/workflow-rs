@@ -29,6 +29,12 @@
   `rawIpc` et `nativeIpc` rejetés, `token-check=ok` ; baseline GUI RSS médian
   430 552 Kio, PSS 243 140 Kio, VRAM globale 190 Mio ; 299 tests workspace,
   fmt/clippy verts. Rapport `docs/audits/2026-10-25-poc-tauri-j1.md`.
+- PoC Tauri A-Strict J2 (2026-10-25) : harness `scripts/poc/j2-stress.py` ;
+  35 lancements, 25 balayages, 125 bascules ; `default` 20/20 stable et
+  `disable-dmabuf` 5/5 stable (0 blanc, 0 SIGSEGV, 0 orphelin) ; canari
+  `force-dmabuf` 5/5 solide avec 183 lignes `AcceleratedSurface` ;
+  `force-dmabuf-shm` 5/5 normal ; `gsettings` restaurés, ports libres,
+  token absent. Rapport `docs/audits/2026-10-25-poc-tauri-j2.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et

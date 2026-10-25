@@ -535,3 +535,32 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Validation** : audit J1 réel sur `:5005` ; les quatre chemins d'envoi sont
   rejetés, `tauri=undefined`, `token-check=ok`. Rapport
   `docs/audits/2026-10-25-poc-tauri-j1.md`.
+
+## 2026-10-25 — J2 : rendu stable, canari DMA-BUF et `FORCE_SHM`
+
+- **Contexte** : stress-test de rendu du PoC Tauri A-Strict sur 35 lancements
+  et 125 bascules de bureaux GNOME, quatre profils WebKit, avec vérification
+  sticky et restauration `gsettings`.
+- **Constat** :
+  1. `default` (20 lancements, 100 bascules) et `disable-dmabuf`
+     (5 lancements, 25 bascules) sont stables : aucun écran blanc, noir ou
+     solide, aucun SIGSEGV, aucun orphelin.
+  2. `force-dmabuf` est un canari reproductible : capture finale solide
+     (`mean=0,172549`, une couleur) et 183 lignes
+     `AcceleratedSurface was unable to construct a complete framebuffer`.
+     La détection par capture et par stderr fonctionne.
+  3. `force-dmabuf-shm` rend normalement dans ce run, sans erreur
+     `AcceleratedSurface`. Le constat E1 « `FORCE_SHM` inopérant » n'est donc
+     pas reproduit ici ; il reste à confirmer en J3/J4 et ne justifie pas de
+     changer le profil de production.
+  4. Le profil par défaut reste le mode livré ; les profils forcés restent des
+     canaris de diagnostic.
+- **Conséquences** : le harness `scripts/poc/j2-stress.py` devient la référence
+  du stress-test ; il vérifie `_NET_WM_STATE_STICKY` après un délai, isole
+  chaque GUI dans sa session et restaure `dynamic-workspaces` et
+  `num-workspaces` dans un `trap`. Les captures ne doivent pas être considérées
+  comme valides si `sticky=false`.
+- **Validation** : run final `j2-20261025-021328` ; 35/35 audits
+  `token-check=ok`, 35/35 sticky, 125/125 bascules, 0 orphelin, `gsettings`
+  avant/après identiques, ports libres. Rapport
+  `docs/audits/2026-10-25-poc-tauri-j2.md`.

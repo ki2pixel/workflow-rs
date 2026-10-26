@@ -2,7 +2,7 @@
 // Dedicated module for managing step execution timers
 
 import { appState } from './state/AppState.js';
-import { pollingManager } from './utils/PollingManager.js';
+import { pollingManager } from './utils/PollingManager.js?v=20261025a';
 import { formatElapsedTime } from './utils.js';
 import { domBatcher } from './utils/DOMBatcher.js';
 

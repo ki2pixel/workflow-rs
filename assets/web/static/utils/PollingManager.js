@@ -14,6 +14,8 @@ class PollingManager {
         this.timeouts = new Map();
         this.isDestroyed = false;
         this.pendingResumes = new Map();
+        this.pausedPollers = new Map();
+        this.pauseOnHide = new Set();
         this.errorCounts = new Map();
         this.inFlight = new Set();
         this.skippedTicks = new Map();
@@ -33,6 +35,9 @@ class PollingManager {
      * @param {Object} options - Additional options
      * @param {boolean} options.immediate - Whether to call callback immediately
      * @param {number} options.maxErrors - Maximum consecutive errors before stopping
+     * @param {boolean} options.pauseWhenHidden - Suspend this poller while the
+     *   document is hidden (WebView minimised in the tray) and refresh it when
+     *   the document becomes visible again
      * @returns {string|null} - Polling ID or null if manager is destroyed
      */
     startPolling(name, callback, interval, options = {}) {
@@ -45,8 +50,15 @@ class PollingManager {
 
         const {
             immediate = false,
-            maxErrors = this.maxErrorCount
+            maxErrors = this.maxErrorCount,
+            pauseWhenHidden = false
         } = options;
+
+        if (pauseWhenHidden) {
+            this.pauseOnHide.add(name);
+        } else {
+            this.pauseOnHide.delete(name);
+        }
 
         this.errorCounts.set(name, 0);
 
@@ -95,6 +107,19 @@ class PollingManager {
             }
         };
 
+        // Une WebView minimisée dans le tray reste vivante : sans cette
+        // suspension, /api/system_monitor et le suivi des téléchargements
+        // continuent d'interroger le serveur et font grossir
+        // WebKitNetworkProcess pendant toute la durée du soak.
+        if (pauseWhenHidden && this._isPageHidden()) {
+            this.pausedPollers.set(name, {
+                callback: wrappedCallback,
+                interval: interval
+            });
+            console.debug(`Started polling paused (page hidden): ${name}`);
+            return name;
+        }
+
         if (immediate) {
             wrappedCallback();
         }
@@ -126,11 +151,24 @@ class PollingManager {
             clearInterval(existing.id);
             this.intervals.delete(name);
         }
-        if (this.pendingResumes.has(name)) {
-            clearTimeout(this.pendingResumes.get(name));
+        const pending = this.pendingResumes.get(name);
+        if (pending) {
+            clearTimeout(pending.id);
+            this.pendingResumes.delete(name);
+        }
+
+        // Un backoff ne doit pas réveiller un poller suspendu : on le garde
+        // en attente et la reprise au focus repartira de zéro.
+        if (this.pauseOnHide.has(name) && this._isPageHidden()) {
+            this.pausedPollers.set(name, {
+                callback: callback,
+                interval: interval
+            });
+            return;
         }
 
         const resumeId = setTimeout(() => {
+            this.pendingResumes.delete(name);
             if (!this.isDestroyed && !this.intervals.has(name)) {
                 const newIntervalId = setInterval(callback, interval);
                 this.intervals.set(name, {
@@ -139,11 +177,14 @@ class PollingManager {
                     interval: interval,
                     startTime: Date.now()
                 });
-                this.pendingResumes.delete(name);
                 console.debug(`Resumed polling: ${name} after ${delayMs}ms backoff`);
             }
         }, delayMs);
-        this.pendingResumes.set(name, resumeId);
+        this.pendingResumes.set(name, {
+            id: resumeId,
+            callback: callback,
+            interval: interval
+        });
     }
 
     /**
@@ -154,7 +195,9 @@ class PollingManager {
      */
     stopPolling(name) {
         const pollingInfo = this.intervals.get(name);
-        const wasPending = this.pendingResumes.has(name) || this.inFlight.has(name);
+        const wasPending = this.pendingResumes.has(name)
+            || this.pausedPollers.has(name)
+            || this.inFlight.has(name);
         if (!pollingInfo && !wasPending) {
             return false;
         }
@@ -166,8 +209,11 @@ class PollingManager {
         }
         this.errorCounts.delete(name);
         this.skippedTicks.delete(name);
-        if (this.pendingResumes.has(name)) {
-            clearTimeout(this.pendingResumes.get(name));
+        this.pausedPollers.delete(name);
+        this.pauseOnHide.delete(name);
+        const pending = this.pendingResumes.get(name);
+        if (pending) {
+            clearTimeout(pending.id);
             this.pendingResumes.delete(name);
         }
         return true;
@@ -254,8 +300,10 @@ class PollingManager {
                 delay: info.delay,
                 timeRemaining: Math.max(0, (info.startTime + info.delay) - now)
             })),
+            paused: Array.from(this.pausedPollers.keys()),
             totalIntervals: this.intervals.size,
-            totalTimeouts: this.timeouts.size
+            totalTimeouts: this.timeouts.size,
+            totalPaused: this.pausedPollers.size
         };
     }
 
@@ -269,8 +317,10 @@ class PollingManager {
         return {
             totalIntervals: ops.totalIntervals,
             totalTimeouts: ops.totalTimeouts,
+            totalPaused: ops.totalPaused,
             intervals: ops.intervals,
-            timeouts: ops.timeouts
+            timeouts: ops.timeouts,
+            paused: ops.paused
         };
     }
 
@@ -299,9 +349,11 @@ class PollingManager {
         this.errorCounts.clear();
         this.skippedTicks.clear();
         this.inFlight.clear();
+        this.pausedPollers.clear();
+        this.pauseOnHide.clear();
 
-        this.pendingResumes.forEach((timeoutId, name) => {
-            clearTimeout(timeoutId);
+        this.pendingResumes.forEach((pending, name) => {
+            clearTimeout(pending.id);
             console.debug(`Cleared pending resume: ${name}`);
         });
         this.pendingResumes.clear();
@@ -327,10 +379,112 @@ class PollingManager {
 
         if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
             document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    console.debug('Page hidden, polling continues in background');
-                }
+                this._handleVisibilityChange();
             });
+        }
+    }
+
+    /**
+     * Whether the document is currently hidden (WebView minimised in the tray).
+     * @returns {boolean}
+     * @private
+     */
+    _isPageHidden() {
+        if (typeof document === 'undefined') {
+            return false;
+        }
+        if (typeof document.hidden === 'boolean') {
+            return document.hidden;
+        }
+        return document.visibilityState === 'hidden';
+    }
+
+    /**
+     * Suspend only the pollers that opted in with `pauseWhenHidden`.
+     * @private
+     */
+    _handleVisibilityChange() {
+        if (this.isDestroyed) {
+            return;
+        }
+        if (this._isPageHidden()) {
+            this._suspendPausedPollers();
+        } else {
+            this._resumePausedPollers();
+        }
+    }
+
+    /**
+     * Move opted-in active intervals and backoffs to the paused set.
+     * @private
+     */
+    _suspendPausedPollers() {
+        let suspended = 0;
+
+        for (const [name, info] of Array.from(this.intervals.entries())) {
+            if (!this.pauseOnHide.has(name)) {
+                continue;
+            }
+            clearInterval(info.id);
+            this.intervals.delete(name);
+            this.pausedPollers.set(name, {
+                callback: info.callback,
+                interval: info.interval
+            });
+            suspended += 1;
+        }
+
+        for (const [name, pending] of Array.from(this.pendingResumes.entries())) {
+            if (!this.pauseOnHide.has(name)) {
+                continue;
+            }
+            clearTimeout(pending.id);
+            this.pendingResumes.delete(name);
+            this.pausedPollers.set(name, {
+                callback: pending.callback,
+                interval: pending.interval
+            });
+            suspended += 1;
+        }
+
+        if (suspended > 0) {
+            console.debug(`Page hidden, suspended ${suspended} polling operation(s)`);
+        }
+    }
+
+    /**
+     * Restart opted-in pollers and refresh them immediately on focus.
+     * @private
+     */
+    _resumePausedPollers() {
+        if (this.pausedPollers.size === 0) {
+            return;
+        }
+
+        let resumed = 0;
+        for (const [name, info] of Array.from(this.pausedPollers.entries())) {
+            if (this.isDestroyed) {
+                break;
+            }
+            this.pausedPollers.delete(name);
+            if (this.intervals.has(name) || this.pendingResumes.has(name)) {
+                continue;
+            }
+            const intervalId = setInterval(info.callback, info.interval);
+            this.intervals.set(name, {
+                id: intervalId,
+                callback: info.callback,
+                interval: info.interval,
+                startTime: Date.now()
+            });
+            // Évite un état périmé si la séquence a progressé pendant que la
+            // fenêtre était masquée ; le tick suivant reprend le rythme normal.
+            info.callback();
+            resumed += 1;
+        }
+
+        if (resumed > 0) {
+            console.debug(`Page visible, resumed ${resumed} polling operation(s)`);
         }
     }
 

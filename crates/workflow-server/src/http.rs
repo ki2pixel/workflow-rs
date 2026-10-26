@@ -142,6 +142,18 @@ async fn security_headers(request: Request, next: Next) -> Response {
         HeaderName::from_static("permissions-policy"),
         HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
     );
+    // `main.js` est versionné par `cache_buster`, mais ses imports ES
+    // (`./utils/PollingManager.js`, etc.) ne portent pas ce paramètre. WebKit
+    // a réutilisé un module ancien malgré `no-cache` (HEAD 200 puis cache) :
+    // `no-store` est nécessaire pour garantir le chargement de la nouvelle
+    // version après une mise à jour du frontend.
+    if path.starts_with("/static/") {
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
+        );
+        headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    }
     response
 }
 
@@ -910,6 +922,26 @@ mod tests {
             "nosniff"
         );
         assert_eq!(response.headers().get("x-frame-options").unwrap(), "DENY");
+    }
+
+    #[tokio::test]
+    async fn given_static_asset_when_served_then_cache_control_forces_revalidation() {
+        let (_dir, app) = test_app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/static/app.js")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("cache-control").unwrap(),
+            "no-store, no-cache, must-revalidate, max-age=0"
+        );
+        assert_eq!(response.headers().get("pragma").unwrap(), "no-cache");
     }
 
     #[tokio::test]

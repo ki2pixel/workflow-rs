@@ -3,7 +3,7 @@ import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
 import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLogOverlay } from './state.js';
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
-import { pollingManager } from './utils/PollingManager.js';
+import { pollingManager } from './utils/PollingManager.js?v=20261025a';
 import { parseAndStyleLogContent as _parseAndStyleLogContent } from './utils/logParserUtils.js';
 import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
 export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer };

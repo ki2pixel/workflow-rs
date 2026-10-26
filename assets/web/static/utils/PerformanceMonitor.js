@@ -5,7 +5,7 @@
 
 import { performanceOptimizer } from './PerformanceOptimizer.js';
 import { domBatcher } from './DOMBatcher.js';
-import { pollingManager } from './PollingManager.js';
+import { pollingManager } from './PollingManager.js?v=20261025a';
 import { errorHandler } from './ErrorHandler.js';
 
 class PerformanceMonitor {

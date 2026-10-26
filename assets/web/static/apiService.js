@@ -4,7 +4,7 @@ import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
 import { showNotification, sendBrowserNotification } from './utils.js';
 import { soundEvents } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js';
+import { pollingManager } from './utils/PollingManager.js?v=20261025a';
 import { errorHandler } from './utils/ErrorHandler.js';
 
 

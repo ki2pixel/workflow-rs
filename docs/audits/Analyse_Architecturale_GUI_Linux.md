@@ -1,5 +1,13 @@
 # **Analyse architecturale et décisionnelle pour la migration du client graphique Linux de workflow-rs**
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Étude externe |
+| Statut | Historique — non normative |
+| Date | 2026-10-24 |
+| Portée | Rapport de recherche externe Deep Search Tauri/GTK4. |
+| Voir aussi | `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`, `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md` |
+
 ## **Synthèse exécutive**
 
 L'évaluation architecturale porte sur le remplacement de l'interface web locale (Minijinja et JavaScript vanilla) servie par le démon Rust workflow-server (127.0.0.1:5004) sur une station de travail Ubuntu 22.04.5 LTS équipée d'un processeur AMD Ryzen Threadripper 1920X (24 threads), de 62 Go de RAM et d'une carte graphique NVIDIA GTX 1650 (4 Go de VRAM, pilote propriétaire 535\) sous GNOME 421.  
@@ -23,7 +31,7 @@ Afin de garantir la falsifiabilité de l'analyse, les affirmations techniques d�
 | Debian et Ubuntu appliquent disable-nvidia-dmabuf.patch dans leur paquet webkit2gtk, qui vide le mode de transport dès que isNVIDIA() est vrai, avant la lecture de WEBKIT\_DMABUF\_RENDERER\_FORCE\_SHM3. | block/buzz\#3654 (https\://github.com/block/buzz/issues/3654)3 | 29 juillet – 21 septembre 2026 | Paquets webkit2gtk Debian/Ubuntu | **Vérifié / Moyenne à Élevée** (Comportement exact sur 2.50.4 Jammy : **Inconnu** avant test local) |
 | La désactivation de DMA-BUF ou du compositing (WEBKIT\_DISABLE\_COMPOSITING\_MODE=1) entraîne une dégradation sévère de fluidité CSS/JS (latence jusqu'à 1 s sur animations complexes)14. | tauri-apps/tauri\#9304 (https\://github.com/tauri-apps/tauri/issues/9304), https\://bugs.webkit.org/show\_bug.cgi?id=30381114 | Juin 2024 – Octobre 2026 | WebKitGTK 2.44 – 2.52 | **Vérifié / Élevée** |
 | Une WebView WebKitGTK consomme \~169 Mo de RAM avec WEBKIT\_DISABLE\_COMPOSITING\_MODE=1 et jusqu'à 721 Mo sans ce flag sur des charges soutenues18. | WebKit Bugzilla \#328065 (https\://bugs.webkit.org/show\_bug.cgi?id=328065), Études internes E1/E21 | 2026 | WebKitGTK 2.50.4 – 2.52.6 | **Vérifié / Élevée** |
-| GSK\_RENDERER=cairo dans GTK4 force une rastérisation purement logicielle CPU, garantissant 0 Mio de VRAM applicative sur le GPU NVIDIA pendant l'exécution de STEP2 (qui consomme 2 203 Mio sur 4 096 Mio)1. | Études internes docs/LOT-2-STEP2.md:99, Confrontation E1/E2 (uploaded:2026-10-24-confrontation-etudes-gui-linux.md)1 | 24 octobre 2026 | GTK 4.6.9 / Pilote NVIDIA 535 | **Supporté et fonctionne / Élevée** |
+| GSK\_RENDERER=cairo dans GTK4 force une rastérisation purement logicielle CPU, garantissant 0 Mio de VRAM applicative sur le GPU NVIDIA pendant l'exécution de STEP2 (qui consomme 2 203 Mio sur 4 096 Mio)1. | Études internes docs/pipeline/LOT-2-STEP2.md:107, Confrontation E1/E2 (uploaded:2026-10-24-confrontation-etudes-gui-linux.md)1 | 24 octobre 2026 | GTK 4.6.9 / Pilote NVIDIA 535 | **Supporté et fonctionne / Élevée** |
 
 ### **Écosystème GTK 4.6, Relm4, Tauri v2 et paquets Ubuntu 22.04 LTS**
 

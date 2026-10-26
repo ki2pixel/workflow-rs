@@ -1,5 +1,13 @@
 # Lot 1 — STEP5 audio et vidéo
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Réducteur STEP5 audio/vidéo, parité, performance et limites. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
+
 ## Périmètre livré
 
 - Réduction audio : `frames_analysis` filtré sur `frame` et `audio_info`, comptage des locuteurs, conservation de `speaker_embeddings`, écriture atomique.

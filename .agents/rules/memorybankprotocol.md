@@ -50,7 +50,7 @@ Cinq fichiers, pas plus, à la racine de `memory-bank/` :
 - **`systemPatterns.md`** : patrons récurrents (Rust, config, JSON, serveur,
   TPU, tests, docs, frontend, sync).
 - **`decisionLog.md`** : décisions techniques, alternatives rejetées, renvois
-  vers `parity/DRIFT.md` et `docs/LOT-*.md`.
+  vers `parity/DRIFT.md` et `docs/pipeline/LOT-*.md`.
 - **`progress.md`** : état d'avancement (terminé, en cours, prochain, problèmes).
 
 Ne pas créer de nouveaux types de fichiers à la racine sans autorisation.
@@ -82,8 +82,9 @@ Ne pas créer de nouveaux types de fichiers à la racine sans autorisation.
 - **Déclencheur** : question sur `docs`, `README`, `guide`, `référence API`.
 - **Instruction** : annoncer « Je consulte la documentation interne du
   projet. » avant de répondre.
-- **Priorité** : `README.md`, `AGENTS.md`, `docs/CONTRAT-ENVIRONNEMENT.md`,
-  `docs/LOT-*.md`, `parity/DRIFT.md`.
+- **Priorité** : `README.md`, `AGENTS.md`, `docs/README.md`,
+  `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/pipeline/LOT-*.md`,
+  `parity/DRIFT.md`.
 - **Conflit** : si le code et la doc divergent, citer les deux et demander
   arbitrage.
 
@@ -119,7 +120,7 @@ Annoncer explicitement l'intention lors des lectures :
 
 ## 7. Ce que la memory-bank n'est pas
 
-- Un doublon de `README.md` ou des `docs/LOT-*.md`.
+- Un doublon de `README.md` ou des `docs/pipeline/LOT-*.md`.
 - Un journal exhaustif de chaque commit.
 - Un espace de brouillon pour les expérimentations.
 - Une source de vérité pour les secrets ou les données de production.

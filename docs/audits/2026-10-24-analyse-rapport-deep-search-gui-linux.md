@@ -1,10 +1,17 @@
 # Rapport Deep Search GUI Linux — analyse critique et vérifications locales
 
-- **Date** : 2026-10-24
+| Champ | Valeur |
+| --- | --- |
+| Type | Preuve |
+| Statut | Preuve |
+| Date | 2026-10-24 |
+| Portée | Analyse critique de E3 et vérifications locales `MiniBrowser`. |
+| Voir aussi | `docs/audits/Analyse_Architecturale_GUI_Linux.md`, `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` |
+
 - **Objet** : analyse de `docs/audits/Analyse_Architecturale_GUI_Linux.md` (E3),
   rapport de recherche externe sur le remplacement de `assets/web` par un
   client desktop Linux.
-- **Documents liés** : `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1, v1.1),
+- **Documents liés** : `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` (E1, v1.1),
   `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` (E2),
   `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` (C).
 - **Périmètre** : aucune source fonctionnelle modifiée, aucun accès à

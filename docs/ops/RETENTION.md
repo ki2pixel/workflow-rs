@@ -1,5 +1,13 @@
 # Rétention des données de travail
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Politique |
+| Statut | Actif |
+| Date | 2026-10-24 |
+| Portée | Rétention des données de travail Rust et cohabitation avec Python. |
+| Voir aussi | `docs/ops/SYNC-BACKENDS.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md` |
+
 Cette politique couvre uniquement les données de travail du pipeline Rust. Elle
 ne supprime jamais un livrable finalisé et ne cible jamais l'application Python
 legacy, qui reste active et fonctionnelle.

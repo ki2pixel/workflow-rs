@@ -1,6 +1,6 @@
 [Unit]
 Description=Serveur workflow-rs (workflow-server)
-Documentation=file://@ROOT@/docs/SWITCH-PUBLIC.md
+Documentation=file://@ROOT@/docs/ops/SWITCH-PUBLIC.md
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=60

@@ -2,7 +2,11 @@
 
 | Champ | Valeur |
 | --- | --- |
+| Type | Runbook |
+| Statut | Prêt — non déployé |
 | Date | 2026-10-23 |
+| Portée | Bascule publique par reverse proxy Nginx, canari et rollback. |
+| Voir aussi | `docs/ops/SWITCH-SYSTEMD.md`, `docs/ops/SYNC-BACKENDS.md` |
 | Objet | Router le trafic public vers Rust 5004, avec Python 5003 en rollback |
 | Principe | Un seul backend actif pour les routes workflow, jamais de répartition par requête |
 | Prérequis | Les deux serveurs restent liés à `127.0.0.1` ; seul le proxy écoute sur 80/443 |
@@ -14,7 +18,7 @@ l'unité systemd --user `workflow-server.service` depuis le 2026-10-26. Python
 `http://127.0.0.1:5003` reste le rollback. Aucun reverse proxy n'est installé
 sur la machine (`nginx`, `caddy` et `cloudflared` sont absents). Il n'y a donc
 pas encore de « trafic public » à basculer. La procédure systemd, le smoke
-webhook et le rollback sont détaillés dans `docs/SWITCH-SYSTEMD.md`.
+webhook et le rollback sont détaillés dans `docs/ops/SWITCH-SYSTEMD.md`.
 
 Deux cas concrets :
 

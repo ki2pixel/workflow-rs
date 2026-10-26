@@ -1,5 +1,13 @@
 # Lot 1 — shadow STEP5/STEP6
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Preuve |
+| Statut | Preuve — validation shadow |
+| Date | 2026-10-24 |
+| Portée | Validation shadow STEP5/STEP6 sur 19 vidéos et 57/57 vérifications identiques. |
+| Voir aussi | `docs/pipeline/LOT-1-STEP5.md`, `docs/pipeline/LOT-1-STEP6.md`, `parity/BASELINE.md` |
+
 ## Commande
 
 ```sh

@@ -1,5 +1,13 @@
 # Lot 1 — STEP8 EffectCraft via `effectcraft-cli`
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-22 |
+| Portée | Pilotage headless EffectCraft, gate scripting, timeout et annulation. |
+| Voir aussi | `docs/pipeline/LOT-1-STEP7.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md` |
+
 ## Périmètre livré
 
 STEP8 génère les projets `<video>_9x16.ecproj` en pilotant

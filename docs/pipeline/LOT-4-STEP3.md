@@ -1,5 +1,13 @@
 # Lot 4 — STEP3 audio
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-22 |
+| Portée | VAD YAMNet Split, ECAPA-TDNN, AHC et projection STEP5 audio. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/pipeline/LOT-1-STEP5.md`, `parity/DRIFT.md` |
+
 ## Objectif
 
 Porter `workflow_scripts/step3/run_audio_diarization_tpu.py` en Rust, avec un

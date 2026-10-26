@@ -65,7 +65,8 @@ hors périmètre Rust sans le signaler.
 1. `workflow-operator` pour l'exploitation.
 2. Skills d'étape ou de domaine (STEP3, STEP4, Coral, ONNX, ingestion...).
 3. `codingstandards.md` et les règles du dépôt.
-4. `docs/LOT-*.md`, `docs/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md`.
+4. `docs/README.md`, `docs/pipeline/LOT-*.md`,
+   `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md`.
 5. Skills génériques (documentation, debugging, JSON, planification,
    `rust-patterns`).
 

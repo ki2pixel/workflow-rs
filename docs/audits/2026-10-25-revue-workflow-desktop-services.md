@@ -1,6 +1,13 @@
 # Revue finale — crate `workflow-desktop-services`
 
-Date : 2026-10-25
+| Champ | Valeur |
+| --- | --- |
+| Type | Revue |
+| Statut | Preuve — gel v0.1.0 |
+| Date | 2026-10-25 |
+| Portée | Revue finale du crate `workflow-desktop-services` avant gel. |
+| Voir aussi | `docs/audits/2026-10-25-poc-tauri-j4.md`, `docs/audits/2026-10-25-poc-tauri-j5.md` |
+
 Périmètre : `crates/workflow-desktop-services` au commit `b2d9ffd`, complété
 par les corrections de gel ci-dessous.
 Méthode : lecture ligne à ligne, revue des frontières HTTP/tray/audio,
@@ -220,7 +227,7 @@ Toute modification de `polling.rs` ou `tray.rs` doit rejouer la matrice J4
 - Risques résiduels : couverture async du watcher, duplication `StepKey`,
   body d'erreur non borné, CSRF non zéroïsé, single-instance différé.
 - La dérive `WebKitNetworkProcess` est traitée côté frontend par
-  `pauseWhenHidden` (voir `docs/MVP-FRONTEND-POLLING.md`) ; le crate partagé
+  `pauseWhenHidden` (voir `docs/desktop/MVP-FRONTEND-POLLING.md`) ; le crate partagé
   n'est pas modifié pour ce point.
 
 ## 9. Conclusion

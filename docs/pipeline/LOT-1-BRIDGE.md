@@ -1,5 +1,13 @@
 # Lot 1 — pont After Effects (`workflow-bridge`)
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence — disponible, hors production (D-022) |
+| Date | 2026-10-22 |
+| Portée | Pont After Effects `cuts` et `analyze_manifest` ; parité et limites. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
+
 ## Périmètre livré
 
 Le binaire `workflow-bridge` remplace les deux analyses JSON appelées par le

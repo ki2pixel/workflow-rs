@@ -1,5 +1,13 @@
 # Validation STEP2 sous Windows (optionnelle)
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Protocole |
+| Statut | Historique — non exécuté (D-022) |
+| Date | 2026-10-22 |
+| Portée | Protocole de validation STEP2 CUDA sous Windows, différé. |
+| Voir aussi | `docs/pipeline/LOT-2-STEP2.md`, `parity/DRIFT.md` |
+
 État au 2026-10-22 : **hors périmètre immédiat**. La cible de production est
 Linux uniquement ; la validation Windows est différée et non bloquante.
 `cargo check --target x86_64-pc-windows-msvc -p workflow-cli` passe depuis

@@ -1,6 +1,13 @@
 # MVP J1 — `.deb` réel, single-instance D-Bus et cache CUDA systemd
 
-Date : 2026-10-26
+| Champ | Valeur |
+| --- | --- |
+| Type | Preuve MVP |
+| Statut | Preuve — accepté |
+| Date | 2026-10-26 |
+| Portée | `.deb` réel, single-instance D-Bus et cache CUDA systemd. |
+| Voir aussi | `docs/desktop/PACKAGING-GUI.md`, `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` |
+
 Branche : `staging`
 Périmètre : premier jalon MVP du client desktop Tauri A-Strict.
 

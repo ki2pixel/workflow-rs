@@ -2,14 +2,17 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.4 |
+| Type | Contrat |
+| Statut | Référence — normatif |
 | Date | 2026-10-24 |
+| Portée | Ce que l'application Rust doit reproduire pour remplacer Flask sans régression. |
+| Voir aussi | `parity/DRIFT.md`, `AGENTS.md` |
+| Version | 1.4 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
-| Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
 Ce document décrit le comportement observable, pas l'implémentation Python. Il sert de cahier des charges au lot 1 et de référence au harnais de parité. Les chemins cités sont relatifs à `<BASE>`, la racine de l'application actuelle.
 
-Voir aussi `../parity/DRIFT.md` pour les écarts mesurés pendant la baseline et les décisions de portage associées.
+Voir aussi `../../parity/DRIFT.md` pour les écarts mesurés pendant la baseline et les décisions de portage associées.
 
 ## 1. Topologie
 
@@ -351,7 +354,7 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > le modèle quantifié et reste un mode de test explicite. ECAPA-TDNN tourne sur
 > CPU via ONNX Runtime. Le traitement des vidéos est séquentiel ; le module est
 > branché à l'orchestrateur depuis le lot 5. Détail et mesures dans
-> `docs/LOT-4-STEP3.md`.
+> `docs/pipeline/LOT-4-STEP3.md`.
 >
 > Sur la machine de référence, `config/config.toml` pointe
 > `[steps.step3].edgetpu` et `[steps.step4].edgetpu` vers

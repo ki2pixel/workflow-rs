@@ -48,7 +48,7 @@ Pour chaque fichier révisé, analyser systématiquement :
 
 - **Statut** : conforme / non conforme.
 - **Invariant architectural violé** : le cas échéant, citer la règle
-  (`codingstandards.md`, `parity/DRIFT.md`, `docs/CONTRAT-ENVIRONNEMENT.md`).
+  (`codingstandards.md`, `parity/DRIFT.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md`).
 
 Présenter chaque problème majeur dans un tableau :
 

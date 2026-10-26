@@ -4,8 +4,9 @@ Rust rewrite of the Python `workflow_mediapipe` pipeline. The Python app at
 `/home/kidpixel/workflow_mediapipe` is the legacy production reference and the
 rollback path; Rust artifacts must match its outputs (JSON comparator tolerance
 `1e-6`, media/CSV as applicable). `parity/DRIFT.md` lists intentional quirks;
-do not "clean them up". Start with `README.md` for scope/status and
-`docs/CONTRAT-ENVIRONNEMENT.md` for the HTTP/artifact contract.
+do not "clean them up". Start with `README.md` for scope/status,
+`docs/README.md` for the documentation map, and
+`docs/contracts/CONTRAT-ENVIRONNEMENT.md` for the HTTP/artifact contract.
 
 ## Agents, skills and memory
 
@@ -47,6 +48,8 @@ do not "clean them up". Start with `README.md` for scope/status and
 - `crates/workflow-tpu`: dynamic TFLite/Edge TPU FFI plus the spike binary.
 - `assets/web` is a copy of the legacy frontend; `assets/models/*` binaries and
   `vendor/*.so*` are gitignored. Only the model manifest/README are versioned.
+- `docs/`: documentation map in `docs/README.md`; `contracts/`, `pipeline/`,
+  `ops/`, `desktop/` and `audits/` hold the detailed documents.
 
 ## Commands
 
@@ -110,8 +113,9 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
   non-loopback `server.host` also requires `server.allow_remote = true`.
 - Do not edit `/home/kidpixel/workflow_mediapipe`; it is the production
   fallback. The only intended writer is an explicit `sync --apply`.
-- Operational detail lives in `docs/SYNC-BACKENDS.md`, `docs/RETENTION.md` and
-  `docs/SWITCH-PUBLIC.md`; read the relevant one before changing deployed state.
+- Operational detail lives in `docs/ops/SYNC-BACKENDS.md`,
+  `docs/ops/RETENTION.md` and `docs/ops/SWITCH-PUBLIC.md`; read the relevant
+  one before changing deployed state.
 
 ## Parity contracts
 
@@ -161,5 +165,5 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
 - Add step behavior in the relevant `crates/workflow-steps/src/stepN` module
   (directory or `stepN.rs`), CLI wiring in `crates/workflow-cli/src/main.rs`,
   and server command mapping in `crates/workflow-server/src/catalog.rs`.
-- Read the relevant `docs/LOT-*.md` before changing a step; it records the
+- Read the relevant `docs/pipeline/LOT-*.md` before changing a step; it records the
   validated scope, limits and parity evidence.

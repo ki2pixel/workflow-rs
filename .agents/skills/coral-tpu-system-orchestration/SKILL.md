@@ -86,7 +86,7 @@ cargo run -p workflow-cli -- --config config/config.toml config show | \
 
 - `crates/workflow-tpu/src/session.rs`
 - `crates/workflow-core/src/lock.rs`
-- `docs/LOT-3-STEP4.md`
-- `docs/LOT-4-STEP3.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/pipeline/LOT-3-STEP4.md`
+- `docs/pipeline/LOT-4-STEP3.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
 - `.agents/skills/coral-tpu-model-compiler/SKILL.md`

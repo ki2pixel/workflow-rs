@@ -78,6 +78,6 @@ L'overlay de logs vit dans la copie frontend `assets/web` :
 
 - `assets/web/README.md`
 - `crates/workflow-server/src/http.rs`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
 - `.agents/skills/frontend-timeline-designer/SKILL.md`
 - `resources/overlay_focus_playbook.md`

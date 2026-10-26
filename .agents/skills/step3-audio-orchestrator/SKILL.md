@@ -92,7 +92,7 @@ Options utiles :
 
 - `.agents/skills/coral-tpu-system-orchestration/SKILL.md`
 - `.agents/skills/coral-tpu-hybrid-algorithms/SKILL.md`
-- `docs/LOT-4-STEP3.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/pipeline/LOT-4-STEP3.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
 - `parity/DRIFT.md` (D-002, D-007)
 - `resources/audio_triage.md`

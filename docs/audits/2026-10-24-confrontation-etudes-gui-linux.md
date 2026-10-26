@@ -2,11 +2,14 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.0 |
+| Type | Preuve |
+| Statut | Preuve — confrontation close, décision Tauri A-Strict |
 | Date | 2026-10-24 |
-| Objet | Comparer `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1) et `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` (E2) |
+| Portée | Comparaison E1/E2, faits vérifiés et règle de décision Tauri/GTK4. |
+| Voir aussi | `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`, `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` |
+| Version | 1.0 |
+| Objet | Comparer `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` (E1) et `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` (E2) |
 | Méthode | Relecture contradictoire, vérification à HEAD, mesures locales, aucun code modifié |
-| Statut | Résultat de confrontation ; recommandation consolidée soumise à arbitrage |
 
 ## 1. Synthèse en dix lignes
 
@@ -431,9 +434,9 @@ seule piste est financée : B si « natif » est une exigence, A sinon.
 | `var()` GTK depuis 4.16 | Docs GTK « Custom Properties » |
 | `GtkFileLauncher` depuis 4.10 | Docs GTK |
 | Iced sans AT-SPI | `iced-rs/iced#552` |
-| STEP2 2 203 Mio VRAM | `docs/LOT-2-STEP2.md:99` |
-| STEP4 199,5 Mio RSS | `docs/LOT-3-STEP4.md:139` |
-| 82 segments STEP8 | `docs/LOT-1-STEP8.md:72` |
+| STEP2 2 203 Mio VRAM | `docs/pipeline/LOT-2-STEP2.md:107` |
+| STEP4 199,5 Mio RSS | `docs/pipeline/LOT-3-STEP4.md:147` |
+| 82 segments STEP8 | `docs/pipeline/LOT-1-STEP8.md:80` |
 | `max_concurrent = 4` | `config/config.toml:83` |
 | Threadripper 1920X | `lscpu` |
 | Verrou fichier persistant | `crates/workflow-core/src/lock.rs` |

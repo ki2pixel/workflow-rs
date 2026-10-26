@@ -1,5 +1,13 @@
 # Synchronisation Python ↔ Rust
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Runbook |
+| Statut | Actif |
+| Date | 2026-10-24 |
+| Portée | Fusion de l'historique, de la liste STEP1 et des archives STEP7 avant bascule. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md`, `docs/ops/SWITCH-SYSTEMD.md` |
+
 La cohabitation retenue est une **synchronisation au changement**, pas un
 partage des racines Python. Les deux backends gardent leur base, leurs
 téléchargements, leurs journaux, leurs projets et leurs archives STEP7. Avant

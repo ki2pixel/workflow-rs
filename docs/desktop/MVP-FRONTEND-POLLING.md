@@ -1,5 +1,13 @@
 # MVP — suspension du polling quand la WebView est masquée
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Note |
+| Statut | Référence |
+| Date | 2026-10-25 |
+| Portée | Suspension opt-in des pollers quand la WebView est masquée. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/desktop/PACKAGING-GUI.md` |
+
 ## Contexte
 
 Le soak J4 a mesuré une croissance de `WebKitNetworkProcess` de +22,06 Mio

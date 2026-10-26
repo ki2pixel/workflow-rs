@@ -2,7 +2,11 @@
 
 | Champ | Valeur |
 | --- | --- |
+| Type | Runbook |
+| Statut | Actif — production depuis 2026-10-26 |
 | Date | 2026-10-26 |
+| Portée | Unité systemd `workflow-server.service`, secrets, webhook réel et rollback. |
+| Voir aussi | `docs/ops/SWITCH-PUBLIC.md`, `docs/ops/SYNC-BACKENDS.md`, `docs/desktop/PACKAGING-GUI.md` |
 | Objet | Exploiter `workflow-server` comme unité systemd --user de production |
 | Backend | Rust `127.0.0.1:5004`, webhook réel actif |
 | Rollback | Python `127.0.0.1:5003`, après arrêt et synchronisation |

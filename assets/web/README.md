@@ -16,7 +16,7 @@ les fichiers puis relancer les tests de rendu du crate `workflow-server`.
 - `PollingManager` accepte `pauseWhenHidden` : `systemMonitor` et
   `localDownloadsStatus` sont suspendus quand `document.hidden` passe à vrai,
   puis rafraîchis au focus. Le legacy continue à poller en arrière-plan. Voir
-  `docs/MVP-FRONTEND-POLLING.md`.
+  `docs/desktop/MVP-FRONTEND-POLLING.md`.
 - `PollingManager.js` est importé avec `?v=20261025a` dans ses sept
   consommateurs : incrémenter ce suffixe à chaque modification du module pour
   éviter un ancien module dans le cache WebKit.

@@ -85,6 +85,6 @@ edgetpu_compiler -s model_quantized.tflite
 
 - `assets/models/README.md`
 - `assets/models/manifest.toml`
-- `docs/LOT-3-STEP4.md`
-- `docs/LOT-4-STEP3.md`
+- `docs/pipeline/LOT-3-STEP4.md`
+- `docs/pipeline/LOT-4-STEP3.md`
 - `.agents/skills/coral-tpu-system-orchestration/SKILL.md`

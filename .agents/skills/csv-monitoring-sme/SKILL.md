@@ -118,8 +118,8 @@ Routes serveur :
 
 ## Références
 
-- `docs/LOT-8-INGESTION.md`
-- `docs/SYNC-BACKENDS.md`
+- `docs/pipeline/LOT-8-INGESTION.md`
+- `docs/ops/SYNC-BACKENDS.md`
 - `parity/DRIFT.md` (D-018, D-019, D-020, D-021, D-023)
 - `crates/workflow-ingest/src/`
 - `resources/sqlite_triage_commands.md`

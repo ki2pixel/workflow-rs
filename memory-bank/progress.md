@@ -19,6 +19,9 @@
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
 - Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de
   production aligné sur Rust `:5004`.
+- Restructuration documentaire du 2026-10-26 : hub `docs/README.md`,
+  23 chemins déplacés, 217 références analysées (156 réécrites), 7 renvois
+  ligne recalés.
 - Remédiation de l'audit backend du 2026-10-24 : 33 constats corrigés,
   3 documentés (C3 → D-025, C4 → D-015, C8 → D-024). `cargo fmt --check`,
   clippy strict, 280 tests et `config check` verts.
@@ -56,7 +59,7 @@
   root, `desktop-file-validate` et `systemd-analyze --user verify` verts ;
   unité systemd user et `switch-rust.sh` testés sur `:5005`, serveur PPID
   `systemd --user`, survit à la fermeture du GUI ; décision Tauri A-Strict
-  pour le MVP. Rapports `docs/PACKAGING-GUI.md` et
+  pour le MVP. Rapports `docs/desktop/PACKAGING-GUI.md` et
   `docs/audits/2026-10-25-poc-tauri-j5.md`.
 - Transition MVP (2026-10-25) : `PollingManager` suspend les pollers
   `systemMonitor` et `localDownloadsStatus` sur `visibilitychange`
@@ -72,7 +75,7 @@
   identifiants dans l'URL), `#[non_exhaustive]`, 38 tests ; 319 tests
   workspace, fmt/clippy/build verts. Les exécutables factices des tests
   `workflow-steps` sont écrits par un processus `sh` séparé pour éviter
-  `ETXTBSY`. Docs `docs/MVP-FRONTEND-POLLING.md` et
+  `ETXTBSY`. Docs `docs/desktop/MVP-FRONTEND-POLLING.md` et
   `docs/audits/2026-10-25-revue-workflow-desktop-services.md`.
 - MVP J2 (2026-10-26) : P1 `env_remove` (4 secrets), STEP8 sous unité
   systemd isolée (`.ecproj` 1080×1920, `ProtectSystem=full`, aucune écriture
@@ -83,13 +86,13 @@
   0600/0700, `systemctl --user restart` validé. 326 tests workspace,
   fmt/clippy/build verts. Rapports
   `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` et
-  `docs/SWITCH-SYSTEMD.md`.
+  `docs/ops/SWITCH-SYSTEMD.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
   les 22 `SKILL.md` alignés (tests 280, `max_workers` retiré, verrou STEP1,
   gate EffectCraft, legacy en lecture seule).
-- Étude d'interface desktop Linux livrée (`docs/ETUDE-GUI-NATIVE-LINUX.md`) :
+- Étude d'interface desktop Linux livrée (`docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`) :
   inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui,
   recommandation d'une coque Tauri v2 cliente de `:5004` et option native
   GTK4/Relm4. Aucun code fonctionnel modifié.
@@ -201,10 +204,11 @@
    (4 977 objets contre 11 853). Ne pas utiliser `--prefer-raw` sur ce projet
    tant que la configuration d'origine n'est pas retrouvée.
 5. **Reverse proxy** : aucun nginx/caddy/cloudflared n'est installé. La bascule
-   publique reste à faire ; voir `docs/SWITCH-PUBLIC.md` et
-   `docs/SWITCH-SYSTEMD.md`.
-6. **Documentation** : maintenir `README.md`, `docs/LOT-*.md`,
-   `docs/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md` à jour.
+   publique reste à faire ; voir `docs/ops/SWITCH-PUBLIC.md` et
+   `docs/ops/SWITCH-SYSTEMD.md`.
+6. **Documentation** : maintenir `README.md`, `docs/README.md`,
+   `docs/pipeline/LOT-*.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md` et
+   `parity/DRIFT.md` à jour.
 7. **Memory-bank** : mettre à jour `activeContext.md` et ce fichier à chaque
    session significative.
 

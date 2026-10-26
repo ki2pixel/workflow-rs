@@ -1,8 +1,16 @@
 # Lot 5 — Orchestrateur Rust et bascule contrôlée
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Serveur axum, contrat HTTP, isolation, séquence et bascule contrôlée. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/pipeline/LOT-7-INTEGRATION.md`, `docs/ops/SWITCH-SYSTEMD.md` |
+
 > Mise à jour lot 6 : STEP1 est désormais porté en Rust. Les mentions
 > d'indisponibilité de STEP1 ci-dessous décrivent l'état livré au lot 5 et sont
-> levées par `docs/LOT-6-STEP1.md`.
+> levées par `docs/pipeline/LOT-6-STEP1.md`.
 
 ## Objectif
 
@@ -70,7 +78,7 @@ la fois. C'est une contrainte d'exploitation documentée, pas un fallback.
 
 ## Contrat HTTP
 
-Les routes et formes de réponse sont celles de `docs/CONTRAT-ENVIRONNEMENT.md`.
+Les routes et formes de réponse sont celles de `docs/contracts/CONTRAT-ENVIRONNEMENT.md`.
 
 | Route | Auth | Comportement Rust |
 | --- | --- | --- |
@@ -178,7 +186,7 @@ cargo build --release -p workflow-server -p workflow-cli
 basculement du trafic public (reverse proxy, DNS ou port) reste une opération
 externe. En cas d'échec Rust, il suffit de continuer à router vers 5003.
 La validation réelle de cette coexistence (Rust sur 5004, Python sur 5003,
-rollback après arrêt) est décrite dans `docs/LOT-7-INTEGRATION.md`.
+rollback après arrêt) est décrite dans `docs/pipeline/LOT-7-INTEGRATION.md`.
 
 `check` exige que le binaire `workflow-cli` et le gabarit existent, que la base
 et le verrou soient isolés, et que le jeton soit configuré. Il signale aussi la

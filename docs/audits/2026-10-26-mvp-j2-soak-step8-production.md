@@ -1,9 +1,15 @@
 # MVP J2 — soak 2 h, STEP8 systemd et bascule production
 
-Date : 2026-10-26
+| Champ | Valeur |
+| --- | --- |
+| Type | Preuve MVP |
+| Statut | Preuve — accepté |
+| Date | 2026-10-26 |
+| Portée | Soak 2 h, STEP8 systemd et bascule production. |
+| Voir aussi | `docs/ops/SWITCH-SYSTEMD.md`, `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md` |
+
 Branche : `staging`
 Périmètre : clôture du MVP J2 avant bascule publique.
-Statut : **accepté**.
 
 ## Décisions ratifiées
 

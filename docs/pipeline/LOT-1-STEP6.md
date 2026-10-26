@@ -1,5 +1,13 @@
 # Lot 1 — STEP6
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Construction de `<stem>_ae.json`, index tracking/audio et recommandations de segments. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/pipeline/LOT-1-STEP5.md`, `parity/DRIFT.md` |
+
 ## Périmètre livré
 
 - Construction de `<stem>_ae.json` à partir de `<stem>_tracking.json`, `<stem>_audio.json` et `<stem>.csv`.

@@ -2,9 +2,13 @@
 
 | Champ | Valeur |
 | --- | --- |
+| Type | Outil de recherche |
+| Statut | Historique |
 | Date | 2026-10-24 |
+| Portée | Prompt autoportant pour produire le rapport externe E3. |
+| Voir aussi | `docs/audits/Analyse_Architecturale_GUI_Linux.md`, `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md` |
 | Objet | Réduire l'incertitude technique avant l'arbitrage « widgets natifs : exigence ou confort ? » |
-| Documents liés | `docs/ETUDE-GUI-NATIVE-LINUX.md`, `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md`, `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` |
+| Documents liés | `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`, `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md`, `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` |
 | Pièce jointe recommandée | `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` (facultative ; le prompt est autoportant) |
 | Mode d'emploi | Copier le bloc ci-dessous dans Gemini Deep Research ; joindre la confrontation si l'outil l'accepte ; exiger des sources datées |
 

@@ -132,8 +132,12 @@ comportement legacy sont dans `parity/DRIFT.md`.
 
 - Docs en français, code/commandes en anglais.
 - `README.md` : état et commandes.
-- `docs/LOT-*.md` : périmètre, parité, performance, limites.
-- `docs/CONTRAT-ENVIRONNEMENT.md` : contrat HTTP/artefacts.
+- `docs/README.md` : index, statuts et parcours de lecture.
+- `docs/pipeline/LOT-*.md` : périmètre, parité, performance, limites.
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md` : contrat HTTP/artefacts.
+- `docs/ops/` : bascule, synchronisation et rétention.
+- `docs/desktop/` : packaging Tauri et comportement de la WebView.
+- `docs/audits/` : preuves et rapports datés.
 - `parity/DRIFT.md` : écarts et décisions D-xxx.
 - `memory-bank/` : état courant, décisions, progrès.
 - `AGENTS.md` : résumé opérationnel pour les agents.
@@ -154,7 +158,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
   d'étapes et de séquence restent actifs pour ne pas bloquer l'auto-mode
   quand la fenêtre est dans le tray. C'est un écart assumé avec le legacy
   (qui continue à poller en arrière-plan) ; validation dans
-  `docs/MVP-FRONTEND-POLLING.md`.
+  `docs/desktop/MVP-FRONTEND-POLLING.md`.
 - Les imports de `PollingManager.js` portent `?v=20261025a` : incrémenter ce
   suffixe à chaque modification du module, sinon WebKit peut servir l'ancien
   module malgré `Cache-Control: no-store`.

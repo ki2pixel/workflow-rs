@@ -4,12 +4,13 @@
 
 - [ ] `README.md` : état des lots, commandes, prérequis, liens.
 - [ ] `AGENTS.md` : layout, commandes, safety rails, conventions.
-- [ ] `docs/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers.
-- [ ] `docs/LOT-*.md` : périmètre, parité, performance, limites.
-- [ ] `docs/SYNC-BACKENDS.md` : fusion Python ↔ Rust.
-- [ ] `docs/SWITCH-PUBLIC.md` : bascule et rollback.
-- [ ] `docs/RETENTION.md` : rétention.
-- [ ] `docs/VALIDATION-STEP1-8.md` : validation de bout en bout.
+- [ ] `docs/README.md` : index, statuts et parcours à jour.
+- [ ] `docs/contracts/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers.
+- [ ] `docs/pipeline/LOT-*.md` : périmètre, parité, performance, limites.
+- [ ] `docs/ops/SYNC-BACKENDS.md` : fusion Python ↔ Rust.
+- [ ] `docs/ops/SWITCH-PUBLIC.md` : bascule et rollback.
+- [ ] `docs/ops/RETENTION.md` : rétention.
+- [ ] `docs/pipeline/VALIDATION-STEP1-8.md` : validation de bout en bout.
 - [ ] `parity/DRIFT.md` : écarts et décisions D-xxx.
 - [ ] `parity/BASELINE.md` : mesures de référence.
 - [ ] `.agents/` : règles, skills, workflows.
@@ -47,6 +48,7 @@ cargo run -p workflow-cli -- webhook --help
 ## 4. Liens et chemins
 
 - [ ] Les liens relatifs pointent vers des fichiers existants.
+- [ ] Chaque nouveau document est indexé dans `docs/README.md` avec son statut.
 - [ ] Les chemins absolus sont ceux de la machine de production.
 - [ ] Les exemples sous `/tmp/opencode` ne sont pas présentés comme production.
 - [ ] Les secrets ne sont jamais cités.

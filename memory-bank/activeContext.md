@@ -21,6 +21,15 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
 
 ## Dernière session
 
+- [2026-10-26] **Restructuration documentaire de `docs/`** :
+  - 23 documents racine déplacés dans `contracts/`, `pipeline/`, `ops/` et
+    `desktop/` ; `audits/` conservé ;
+  - hubs `docs/README.md` et `docs/audits/README.md` ; 37 documents indexés
+    avec les statuts Actif/Prêt/Référence/Preuve/Historique ;
+  - 217 références analysées dans 44 fichiers avec une allowlist (156
+    réécrites, 61 vers `docs/audits/` inchangées), 7 renvois
+    `fichier:ligne` recalés, 1 orphelin résolu ; template systemd et unité
+    installée mis à jour sans redémarrage ; fmt/clippy/326 tests verts.
 - [2026-10-26] **MVP J2 — soak, STEP8 systemd, bascule production** :
   - P1 `env_remove` pour `WORKFLOW_SERVER_WORKER_TOKEN`,
     `WORKFLOW_SERVER_SECRET_KEY`, `FLASK_SECRET_KEY` et
@@ -44,7 +53,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
   - validation : fmt/clippy rc 0, 326 tests workspace, build release
     inchangé ; rapport
     `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` et procédure
-    `docs/SWITCH-SYSTEMD.md`.
+    `docs/ops/SWITCH-SYSTEMD.md`.
 - [2026-10-26] **MVP J1 — `.deb`, single-instance, cache CUDA** :
   - paquet final 6,29 Mio / 17 159 Kio installé, `desktop-file-validate`
     rc 0, `xdg-mime` `application/x-desktop`, `Gio.DesktopAppInfo` OK,
@@ -64,7 +73,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
     sonde PTX systemd, hashes/mtimes identiques après restart et seconde
     sonde ; STEP2 n'ajoute aucun fichier (SASS précompilé) ;
   - 325 tests workspace (281 pipeline + 38 services + 6 GUI), fmt/clippy/
-    build release/.deb verts ; docs `docs/PACKAGING-GUI.md` et
+    build release/.deb verts ; docs `docs/desktop/PACKAGING-GUI.md` et
     `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`.
 - [2026-10-25] **Transition MVP — polling masqué + gel du crate** :
   - `PollingManager` : option `pauseWhenHidden`, suspension des intervalles
@@ -84,7 +93,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
     arrêté si le récepteur `watch` disparaît, identifiants d'URL refusés,
     `#[non_exhaustive]` ; 38 tests ;
   - 319 tests workspace, fmt/clippy/build verts ; docs
-    `docs/MVP-FRONTEND-POLLING.md` et
+    `docs/desktop/MVP-FRONTEND-POLLING.md` et
     `docs/audits/2026-10-25-revue-workflow-desktop-services.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J5** :
   - bundle `deb` Tauri : `productName=workflow-manager`, icônes 32/128/256/512,
@@ -104,7 +113,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
     désinstallation idempotente ;
   - décision : Tauri A-Strict conservé pour le MVP ;
   - rapports `docs/audits/2026-10-25-poc-tauri-j5.md` et
-    `docs/PACKAGING-GUI.md`.
+    `docs/desktop/PACKAGING-GUI.md`.
 - [2026-10-25] **PoC Tauri A-Strict — J4** :
   - `workflow-desktop-services::tray` : politique pure du tray, réducteur
     `StatusSnapshot` → état visuel, `TrayPresenter`/`NoopTray` ;
@@ -195,7 +204,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
     fonctionnel modifié, aucun accès à `runtime/` ni `/mnt/cache`.
 - [2026-10-24] **Confrontation des deux études GUI** :
   - `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` compare
-    `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1) et
+    `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` (E1) et
     `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` (E2) ;
   - consensus architectural (modèle 1, serveur headless) ; désaccord limité au
     toolkit et à l'effort ;
@@ -210,7 +219,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
   - décision consignée dans `decisionLog.md` ; aucun code fonctionnel modifié,
     aucun accès à `runtime/` ni `/mnt/cache`.
 - [2026-10-24] **Étude d'interface desktop Linux** :
-  - livrable `docs/ETUDE-GUI-NATIVE-LINUX.md` : inventaire réel du frontend,
+  - livrable `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` : inventaire réel du frontend,
     mesures (logs 5,4 l/s max, 300 lignes bornées, VRAM bureau ~933 Mio),
     matrice pondérée Tauri/Slint/Iced/GTK4/egui, modèles d'intégration ;
   - recommandation : coque Tauri v2 en mode URL distante (client de `:5004`),
@@ -321,7 +330,7 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
 - Ratifier le passage des séquences côté serveur (`/run_custom_sequence`,
   `/sequence/status`) et ajouter le test associé.
 - Diagnostiquer D-024 sans modifier les données de production.
-- Lire `docs/SWITCH-PUBLIC.md` avant toute bascule publique.
+- Lire `docs/ops/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.
 - Maintenir `memory-bank/progress.md` et `decisionLog.md` à jour.
 
@@ -338,8 +347,9 @@ single-instance rejoue `scripts/poc/verify-single-instance.sh`.
 
 - `AGENTS.md`
 - `README.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
-- `docs/LOT-*.md`
+- `docs/README.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
+- `docs/pipeline/LOT-*.md`
 - `parity/DRIFT.md`
 - `memory-bank/progress.md`
 - `memory-bank/decisionLog.md`

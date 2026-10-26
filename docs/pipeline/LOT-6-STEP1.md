@@ -1,5 +1,13 @@
 # Lot 6 — STEP1 Rust : extraction et normalisation
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Extraction ZIP/RAR/TAR, assainissement des chemins et normalisation vidéo. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
+
 ## Objectif
 
 Porter STEP1 sans modifier le serveur Python legacy :

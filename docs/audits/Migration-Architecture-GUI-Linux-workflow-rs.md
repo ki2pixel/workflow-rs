@@ -1,12 +1,18 @@
 # ADR-001 : Étude de Faisabilité et Architecture de Migration vers un Client GUI Linux Natif (X11 / Wayland)
 
-* **Statut** : Proposé
-* **Date** : 24 octobre 2026
+| Champ | Valeur |
+| --- | --- |
+| Type | Étude externe |
+| Statut | Historique — non normative |
+| Date | 2026-10-24 |
+| Portée | ADR-001 : faisabilité et architecture d'un client GUI Linux natif. |
+| Voir aussi | `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`, `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` |
+
 * **Auteur** : Principal Rust & Linux Systems Architect
 * **Cible** : Workspace `workflow-rs` (Rust 1.86+, Linux Workstation Ubuntu/Debian, X11 & Wayland)
 
 
-* **Références contractuelles** : `docs/CONTRAT-ENVIRONNEMENT.md`, `.agents/rules/codingstandards.md`, `parity/DRIFT.md`
+* **Références contractuelles** : `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `.agents/rules/codingstandards.md`, `parity/DRIFT.md`
 
 
 
@@ -268,7 +274,7 @@ L'application graphique est compilée dans un binaire distinct (`crates/workflow
 2. **Survie des pipelines longs** : Une séquence `STEP1` $\to$ `STEP8` dure plusieurs minutes à plusieurs heures. En Topologie A, l'opérateur peut fermer la GUI, redémarrer sa session graphique X11/Wayland et rouvrir `workflow-gui` : la GUI se resynchronise instantanément sur l'étape en cours et reprend l'affichage du flux de logs.
 
 
-3. **Zéro régression sur les contrats d'exploitation** : Les scripts `scripts/switch-rust.sh`, `scripts/sync-backends.sh`, `scripts/validate-lot5.py` et le contrat `docs/CONTRAT-ENVIRONNEMENT.md` continuent de fonctionner sans modification.
+3. **Zéro régression sur les contrats d'exploitation** : Les scripts `scripts/switch-rust.sh`, `scripts/sync-backends.sh`, `scripts/validate-lot5.py` et le contrat `docs/contracts/CONTRAT-ENVIRONNEMENT.md` continuent de fonctionner sans modification.
 
 
 4. **Isolation des verrous et du matériel** : Seul `workflow-server` spawne `workflow-cli`, qui seul acquiert `/tmp/workflow-rs-hw.lock`.
@@ -454,7 +460,7 @@ Comme établi en section 1.1, `workflow-server` n'implémente pas `/api/system_m
 
 ### 4.4. Communication temps réel : Migration du Polling vers SSE (`Server-Sent Events`)
 
-Actuellement, `apiService.js` effectue jusqu'à 5 requêtes HTTP par seconde (`200 ms`) sur `/status/<step>`. Bien que le contrat de polling (`docs/CONTRAT-ENVIRONNEMENT.md`) doive être intégralement conservé pour les scripts de validation et le frontend web de secours, nous pouvons enrichir `workflow-server` d'un **flux SSE unidirectionnel (`GET /api/events`)** sans casser aucune route existante.
+Actuellement, `apiService.js` effectue jusqu'à 5 requêtes HTTP par seconde (`200 ms`) sur `/status/<step>`. Bien que le contrat de polling (`docs/contracts/CONTRAT-ENVIRONNEMENT.md`) doive être intégralement conservé pour les scripts de validation et le frontend web de secours, nous pouvons enrichir `workflow-server` d'un **flux SSE unidirectionnel (`GET /api/events`)** sans casser aucune route existante.
 
 * **Pourquoi SSE plutôt que WebSocket ?**
 * Les actions de contrôle (`run`, `cancel`, `stop`, `run_custom_sequence`) sont ponctuelles et bénéficient de la sémantique HTTP REST standard (codes de statut explicites `200`, `401`, `409 Conflict`).
@@ -547,7 +553,7 @@ impl StepKey {
     }
 }
 
-/// Statuts contractuels alignés sur docs/CONTRAT-ENVIRONNEMENT.md et constants.js.
+/// Statuts contractuels alignés sur docs/contracts/CONTRAT-ENVIRONNEMENT.md et constants.js.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StepStatus {
@@ -952,4 +958,4 @@ Conformément à `.agents/rules/architecte.md`, voici les réponses aux trois qu
 
 
 3. **Le changement casse-t-il la compatibilité JSON, le contrat HTTP, le verrou ou un invariant de parité ?**
-* **Aucun contrat n'est rompu** : grâce au choix de la **Topologie A (Client GUI Découplé)**, `workflow-steps`, `workflow-cli`, `workflow-ingest`, `workflow-sync`, les formats JSON/CSV (`preserve_order`, `round_to`), le verrou `/tmp/workflow-rs-hw.lock`, le contrat `docs/CONTRAT-ENVIRONNEMENT.md` et le chemin de rollback Python (`/home/kidpixel/workflow_mediapipe`) demeurent **strictement intacts**.
+* **Aucun contrat n'est rompu** : grâce au choix de la **Topologie A (Client GUI Découplé)**, `workflow-steps`, `workflow-cli`, `workflow-ingest`, `workflow-sync`, les formats JSON/CSV (`preserve_order`, `round_to`), le verrou `/tmp/workflow-rs-hw.lock`, le contrat `docs/contracts/CONTRAT-ENVIRONNEMENT.md` et le chemin de rollback Python (`/home/kidpixel/workflow_mediapipe`) demeurent **strictement intacts**.

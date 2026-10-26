@@ -165,8 +165,8 @@ lsof /tmp/workflow-rs-hw.lock 2>/dev/null || true
 
 - `AGENTS.md`
 - `.agents/rules/codingstandards.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
-- `docs/SWITCH-PUBLIC.md`
-- `docs/RETENTION.md`
-- `docs/SYNC-BACKENDS.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
+- `docs/ops/SWITCH-PUBLIC.md`
+- `docs/ops/RETENTION.md`
+- `docs/ops/SYNC-BACKENDS.md`
 - `resources/env_health_checklist.md`

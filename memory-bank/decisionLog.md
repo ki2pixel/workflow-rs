@@ -78,7 +78,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Contexte** : une étude indépendante
   (`docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md`, E2) recommande
   GTK4/Relm4 et conteste l'orientation Tauri de
-  `docs/ETUDE-GUI-NATIVE-LINUX.md` (E1). Les deux documents ont été confrontés
+  `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` (E1). Les deux documents ont été confrontés
   ligne à ligne et vérifiés contre le code à HEAD ; le résultat est consigné
   dans `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md`.
 - **Décision** :
@@ -176,7 +176,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   - Les paquets de développement (`libwebkit2gtk-4.1-dev`, `libxdo-dev`,
     `libayatana-appindicator3-dev`) sont absents de la machine mais
     installables ; les bibliothèques runtime sont déjà présentes.
-  - La documentation de référence est `docs/ETUDE-GUI-NATIVE-LINUX.md`.
+  - La documentation de référence est `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md`.
 - **Validation** : aucune exécution de prototype à ce stade. Les mesures
   (logs 5,4 l/s max, 300 lignes bornées, `nvidia-smi` 10–20 ms, VRAM bureau
   ~933 Mio) et les versions de frameworks sont consignées dans l'étude. Le
@@ -226,7 +226,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
     processus pour une métrique machine.
   - Supprimer le toggle : l'opérateur doit pouvoir réactiver l'auto-ouverture.
 - **Conséquences** : `/api/system_monitor` peut être routé vers le backend
-  actif (voir `docs/SWITCH-PUBLIC.md`) ; la divergence de valeur par défaut
+  actif (voir `docs/ops/SWITCH-PUBLIC.md`) ; la divergence de valeur par défaut
   est consignée dans `systemPatterns.md`.
 - **Validation** : endpoint réel sur GTX 1650 (30 %, 0,41/4,0 Go, 44 °C),
   tests serveur GPU, page rendue avec la case décochée.
@@ -453,11 +453,11 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 ## Références
 
 - `parity/DRIFT.md` (détails et preuves)
-- `docs/LOT-*.md`
-- `docs/SYNC-BACKENDS.md`
-- `docs/SWITCH-PUBLIC.md`
-- `docs/RETENTION.md`
-- `docs/VALIDATION-STEP1-8.md`
+- `docs/pipeline/LOT-*.md`
+- `docs/ops/SYNC-BACKENDS.md`
+- `docs/ops/SWITCH-PUBLIC.md`
+- `docs/ops/RETENTION.md`
+- `docs/pipeline/VALIDATION-STEP1-8.md`
 
 ## Remédiation de l'audit backend du 2026-10-24
 
@@ -680,7 +680,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   croissance `WebKitNetworkProcess` (polling du frontend legacy en
   arrière-plan), le single-instance, l'installation réelle du `.deb` et les
   runs STEP2/STEP8 sous l'unité systemd.
-- **Validation documentaire** : `docs/PACKAGING-GUI.md` et
+- **Validation documentaire** : `docs/desktop/PACKAGING-GUI.md` et
   `docs/audits/2026-10-25-poc-tauri-j5.md`.
 
 ## 2026-10-25 — MVP : polling masqué et gel de workflow-desktop-services
@@ -720,7 +720,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   de confirmation reste à rejouer avant la bascule publique. Le
   single-instance, l'installation réelle du `.deb` et les runs STEP2/STEP8
   sous systemd restent au MVP.
-- **Validation documentaire** : `docs/MVP-FRONTEND-POLLING.md`,
+- **Validation documentaire** : `docs/desktop/MVP-FRONTEND-POLLING.md`,
   `docs/audits/2026-10-25-revue-workflow-desktop-services.md`,
   `memory-bank/systemPatterns.md`.
 
@@ -761,7 +761,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Conséquences** : le jalon MVP J1 est clos. Restent le soak 2 h, le run
   STEP8 sous unité, puis l'installation de l'unité de production lors de la
   bascule publique.
-- **Validation documentaire** : `docs/PACKAGING-GUI.md`,
+- **Validation documentaire** : `docs/desktop/PACKAGING-GUI.md`,
   `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`,
   `memory-bank/activeContext.md`, `memory-bank/progress.md`.
 
@@ -793,7 +793,44 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   verts.
 - **Conséquences** : `main` peut être poussé après `GO PUSH MAIN <SHA>`.
   Le manifeste STEP7 de production reste à régénérer avant un STEP8 réel.
-- **Validation documentaire** : `docs/SWITCH-SYSTEMD.md`,
+- **Validation documentaire** : `docs/ops/SWITCH-SYSTEMD.md`,
   `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md`,
-  `docs/PACKAGING-GUI.md`, `docs/SWITCH-PUBLIC.md`,
+  `docs/desktop/PACKAGING-GUI.md`, `docs/ops/SWITCH-PUBLIC.md`,
   `memory-bank/activeContext.md`, `memory-bank/progress.md`.
+
+## 2026-10-26 — Restructuration physique de `docs/`
+
+- **Contexte** : 23 documents à la racine de `docs/`, 14 rapports d'audit et
+  217 références croisées dans 44 fichiers. Aucun lien Markdown interne : les
+  chemins sont cités en backticks, donc une casse serait silencieuse. Le seul
+  consommateur non-Markdown est
+  `packaging/systemd/workflow-server.service.in`.
+- **Décision** : déplacer les 23 documents dans `docs/contracts/`,
+  `docs/pipeline/`, `docs/ops/` et `docs/desktop/`, conserver `docs/audits/`,
+  puis ajouter `docs/README.md` et `docs/audits/README.md`. Les 37 documents
+  portent un cartouche uniforme `Type`, `Statut`, `Date`, `Portée`,
+  `Voir aussi`.
+- **Statuts** : `Actif`, `Prêt`, `Référence`, `Preuve`, `Historique`. Un audit
+  est une preuve datée et non normative ; le contrat et `parity/DRIFT.md`
+  priment en cas de conflit.
+- **Réécriture** : allowlist de 23 chemins et de 4 motifs génériques ; 217
+  références analysées dans 44 fichiers, dont 156 réécrites et 61 vers
+  `docs/audits/` inchangées ; 22 occurrences de motifs génériques ou de
+  chemins relatifs et 1 commande mises à jour ; 7 renvois `fichier:ligne`
+  recalés.
+  Aucun remplacement global de `docs/`, qui désigne aussi `<projet>/docs/`
+  dans les documents de production.
+- **Alternatives rejetées** : hub sans déplacement (racine plate, mais moins de
+  churn) ; symlinks aux anciens chemins (duplication dans `docs/*.md`,
+  comportement variable de `rg`/`find`, archives moins lisibles).
+- **Conséquences** : tout nouveau document va dans un sous-répertoire et doit
+  être indexé dans le hub ; les audits datés restent inchangés sur le fond ;
+  l'unité systemd installée met à jour son lien `Documentation=` sans
+  redémarrage.
+- **Validation** : 217/217 références résolues, 37/37 documents indexés,
+  7/7 renvois ligne vérifiés. `git diff --check`, `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings` et
+  `cargo test --workspace` exécutés après la migration (326 tests, 0 échec).
+- **Validation documentaire** : `docs/README.md`, `docs/audits/README.md`,
+  `README.md`, `AGENTS.md`, `memory-bank/activeContext.md`,
+  `memory-bank/progress.md`.

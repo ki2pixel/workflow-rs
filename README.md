@@ -42,7 +42,7 @@ Linux et le panneau CEP continue d'appeler Python.
   (244, 245, 249, 250). STEP4 brut pour 244/245 ; idempotence sur 249/250.
 - Performance release : 0,096 s (5,9×) sur 244, 0,101 s sur 245, 0,072 s sur
   249, 0,039 s sur 250, RSS 16 Mio. Détail et décision ouverte dans
-  `docs/LOT-1-STEP5.md`.
+  `docs/pipeline/LOT-1-STEP5.md`.
 - Lot 1.3 terminé : STEP6 `_ae.json` avec index tracking/audio, enrichissement
   `is_speaking`/`tier`, parse CSV et recommandations de segments. Identique à la
   production sur les quatre projets ; 0,108 s et 44 Mio sur 244.
@@ -50,7 +50,7 @@ Linux et le panneau CEP continue d'appeler Python.
   identiques sur 19 vidéos (148, 151, 152, 244, 245, 249, 250, 253, 254, 257),
   sans écriture dans `/mnt/cache`. Le passage `--prefer-raw` reproduit aussi les
   19 `_tracking.json` depuis les STEP4 bruts. Détail dans
-  `docs/LOT-1-SHADOW.md`.
+  `docs/pipeline/LOT-1-SHADOW.md`.
 - Lot 1.4 terminé : `workflow-bridge` pour les cuts CSV et `analyze_manifest`.
   Parité sur 273 calques, les quatre entrées `_ae.json` et les overrides de
   configuration ; cuts 21× plus rapide que Python.
@@ -65,51 +65,51 @@ Linux et le panneau CEP continue d'appeler Python.
   `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
   sur les quatre cas ; VRAM pic sous la baseline. Détail dans
-  `docs/LOT-2-STEP2.md`.
+  `docs/pipeline/LOT-2-STEP2.md`.
 - Lot 3 terminé : STEP4 Coral Edge TPU avec modèles co-compilés BlazeFace et
   FaceMesh, crop affine 192×192, 52 blendshapes filtrées One-Euro, EfficientDet
   avec hystérésis, suivi `obj_N`, détection de parole et JSON en streaming
   atomique. Parité complète à `1e-6` sur `face_pan`, `real_244` et `real_245` ;
   blendshapes à `5,96e-7`, objets IoU 1,0, RSS 199,5 Mio sur `real_244`.
-  Détail dans `docs/LOT-3-STEP4.md`.
+  Détail dans `docs/pipeline/LOT-3-STEP4.md`.
 - Lot 4 terminé : STEP3 YAMNet Split Coral, frontend log-mel NPY, VAD médian
   avec hangover, ECAPA-TDNN ONNX CPU, AHC average et writer JSON atomique.
   JSON brut identique sur `vox_2spk`, `real_244` et `real_245` ; projection
   STEP5 audio identique sur les deux projets. Le chemin CPU YAMNet reste un
   mode de test explicite. Détail, performance et limites dans
-  `docs/LOT-4-STEP3.md`.
+  `docs/pipeline/LOT-4-STEP3.md`.
 - Lot 5 terminé : `workflow-server` (axum) expose le contrat de polling sur
   le port 5004, avec base et racine Rust, verrou `/tmp/workflow-rs-hw.lock`,
   séquence sérialisée, arrêt SIGTERM, timeout et logs. STEP5/STEP6 disposent
   d'un mode batch ; 12/12 artefacts identiques aux copies de production 244,
-  245, 249 et 250. Détail dans `docs/LOT-5-ORCHESTRATOR.md`.
+  245, 249 et 250. Détail dans `docs/pipeline/LOT-5-ORCHESTRATOR.md`.
 - Lot 6 terminé : STEP1 Rust extrait les archives ZIP/RAR/TAR avec
   assainissement des chemins, réinitialisation mensuelle et suppression après
   succès, puis normalise les vidéos (ffprobe, GPU avec repli CPU, `yadif`) en
   préservant les `.mov` alpha ou listés. Validation réelle sur une archive
-  synthétique et via le serveur 5004. Détail dans `docs/LOT-6-STEP1.md`.
+  synthétique et via le serveur 5004. Détail dans `docs/pipeline/LOT-6-STEP1.md`.
 - Lot 7 terminé : séquence STEP2 → STEP8 sur une copie de 244, STEP5/6
   rejoués sur les artefacts Rust avec `_ae.json`, `_audio.json` et
   `_tracking.json` identiques sémantiquement à la production, puis bascule
   contrôlée 5003/5004 avec rollback vérifié. Détail dans
-  `docs/LOT-7-INTEGRATION.md`.
+  `docs/pipeline/LOT-7-INTEGRATION.md`.
 - Lot 8 terminé : ingestion webhook, normalisation d'URL, historique SQLite,
   échecs/cooldown, téléchargement `.part` + `Range`, validation ZIP et routes
   `/api/csv_*`. Import réel de 911 URL identiques à la base Python, audit de
   normalisation à 0 changement, webhook réel à 462 enregistrements. Le dernier
   lien du webhook (`276 Camille.zip`, 175 Mo) a été téléchargé via R2 puis via
   Dropbox, et le moniteur a été validé bout en bout sur une base isolée, y
-  compris le repli R2 → Dropbox. Détail dans `docs/LOT-8-INGESTION.md`.
+  compris le repli R2 → Dropbox. Détail dans `docs/pipeline/LOT-8-INGESTION.md`.
 - Synchronisation Python ↔ Rust : `workflow-cli sync` fusionne l'historique,
   la liste STEP1 et les analyses STEP7 avant chaque bascule. Première fusion
   réelle le 2026-10-23 : 911 URL, 96 archives traitées et 640 hash STEP7
-  (1,8 Go) de chaque côté. Détail dans `docs/SYNC-BACKENDS.md`.
+  (1,8 Go) de chaque côté. Détail dans `docs/ops/SYNC-BACKENDS.md`.
 - Validation isolée de bout en bout le 2026-10-23 : téléchargement HTTP →
   STEP1 → STEP7 → sync, puis corpus 153, 154, 155, 156, 158, 159 et 1720
   préparés ; shadow STEP5/6 162/162 sur 20 projets.
 - Chaîne complète validée : STEP1 → STEP8 sur `1720 Camille.zip` (8/8 étapes,
   4 `.ecproj`, aucune écriture dans `/mnt/cache`). Détail dans
-  `docs/VALIDATION-STEP1-8.md`.
+  `docs/pipeline/VALIDATION-STEP1-8.md`.
 - Validation Windows/After Effects abandonnée (D-022) : le pont Python et le
   panneau CEP restent en place, sans dépendance Rust.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
@@ -119,37 +119,60 @@ Linux et le panneau CEP continue d'appeler Python.
 
 ## Documents
 
-- `docs/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers, intégrations.
+Le point d'entrée de la documentation est `docs/README.md` : taxonomie en cinq
+domaines, statuts, parcours par profil et correspondance des anciens chemins.
+
+### Contrats et architecture
+
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers, intégrations.
 - `config/config.toml` : configuration typée ; secrets par variables d'environnement.
 - `config/env.map.toml` : correspondance entre l'ancien `.env` et le futur `config.toml`.
 - `assets/models/manifest.toml` : rôles, tailles et SHA-256 des modèles copiés.
-- `docs/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
-- `docs/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
-- `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
-- `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
-- `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
-- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
-- `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
-- `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
-- `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
-- `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
-- `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
-- `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
-- `docs/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
-- `docs/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
-- `docs/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
-- `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
-- `docs/SWITCH-SYSTEMD.md` : unité de production `workflow-server.service`, smoke webhook désactivé, activation du moniteur réel, redémarrage et rollback.
-- `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
-- `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
-- `docs/PACKAGING-GUI.md` : construction du `.deb` Tauri, installation réelle, single-instance D-Bus, cache CUDA systemd, supervision serveur `switch-rust.sh`/`systemd --user`, désinstallation et limites.
-- `docs/MVP-FRONTEND-POLLING.md` : suspension opt-in des pollers `system_monitor` et téléchargements quand la WebView est masquée, validation live et limites.
-- `docs/audits/2026-10-25-revue-workflow-desktop-services.md` : revue finale du crate partagé, corrections avant gel et contrat de stabilité v0.1.0.
+- `parity/README.md` : corpus, commandes et sécurité du harnais.
+- `parity/BASELINE.md` : mesures de référence.
+- `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
+
+### Lots du pipeline
+
+- `docs/pipeline/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
+- `docs/pipeline/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
+- `docs/pipeline/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
+- `docs/pipeline/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
+- `docs/pipeline/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
+- `docs/pipeline/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
+- `docs/pipeline/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
+- `docs/pipeline/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
+- `docs/pipeline/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
+- `docs/pipeline/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
+- `docs/pipeline/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
+- `docs/pipeline/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
+- `docs/pipeline/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
+- `docs/pipeline/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
+- `docs/pipeline/annexes/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
+
+### Exploitation et bascule
+
+- `docs/ops/SWITCH-SYSTEMD.md` : unité de production `workflow-server.service`, smoke webhook désactivé, activation du moniteur réel, redémarrage et rollback.
+- `docs/ops/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
+- `docs/ops/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
+- `docs/ops/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
+
+### Desktop et packaging
+
+- `docs/desktop/PACKAGING-GUI.md` : construction du `.deb` Tauri, installation réelle, single-instance D-Bus, cache CUDA systemd, supervision serveur `switch-rust.sh`/`systemd --user`, désinstallation et limites.
+- `docs/desktop/MVP-FRONTEND-POLLING.md` : suspension opt-in des pollers `system_monitor` et téléchargements quand la WebView est masquée, validation live et limites.
+- `docs/desktop/ETUDE-GUI-NATIVE-LINUX.md` : faisabilité d'une interface desktop native (inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui, modèles d'intégration, feuille de route).
+
+### Audits et preuves
+
+- `docs/audits/README.md` : index chronologique et thématique des rapports.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
-- `docs/ETUDE-GUI-NATIVE-LINUX.md` : faisabilité d'une interface desktop native (inventaire du frontend, mesures, matrice Tauri/Slint/Iced/GTK4/egui, modèles d'intégration, feuille de route).
+- `docs/audits/2026-10-25-revue-workflow-desktop-services.md` : revue finale du crate partagé, corrections avant gel et contrat de stabilité v0.1.0.
 - `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` : confrontation de l'étude interne avec l'étude indépendante, faits vérifiés, corrections et règle de décision Tauri/GTK4.
-- `docs/audits/Analyse_Architecturale_GUI_Linux.md` : rapport de recherche externe (Deep Search) sur Tauri/GTK4, veille WebKitGTK/NVIDIA, sécurité IPC, tray, PoC et registre de risques.
 - `docs/audits/2026-10-24-analyse-rapport-deep-search-gui-linux.md` : analyse critique du rapport externe, vérifications locales `MiniBrowser`, corrections de seuils/MSRV et PoC Tauri révisé.
+- `docs/audits/Analyse_Architecturale_GUI_Linux.md` : rapport de recherche externe (Deep Search) sur Tauri/GTK4, veille WebKitGTK/NVIDIA, sécurité IPC, tray, PoC et registre de risques.
+- `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md` : ADR-001 externe sur la faisabilité et l'architecture du client GUI Linux.
+- `docs/audits/2026-10-24-prompt-deep-search-gui-linux.md` : prompt autoportant utilisé pour produire le rapport externe.
 - `docs/audits/2026-10-25-poc-tauri-j1.md` : exécution J1 du PoC Tauri A-Strict (scaffold, auth par HTML, audit DOM, baseline RSS/PSS/VRAM, résultats d'acceptation).
 - `docs/audits/2026-10-25-poc-tauri-j2.md` : stress-test J2 (35 lancements, 125 bascules, quatre profils WebKit, canari `AcceleratedSurface`, isolation et restauration GNOME).
 - `docs/audits/2026-10-25-poc-tauri-j3.md` : coexistence J3 Tauri + STEP2 CUDA (baseline Firefox, 5 runs, RSS/PSS, pic VRAM 2 392 Mio, aucun OOM).
@@ -157,9 +180,6 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/audits/2026-10-25-poc-tauri-j5.md` : paquet `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, décision Tauri A-Strict.
 - `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md` : installation réelle du `.deb` MVP, single-instance `org.workflow.desktop`, focus X11, cache CUDA `%C/workflow-rs/cuda-compute`, run STEP2 sous unité de test et métriques de persistance.
 - `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` : étanchéité des secrets, STEP8 sous unité systemd, soak 2 h (réseau 0 Kio), bascule `workflow-server.service` avec webhook réel.
-- `parity/README.md` : corpus, commandes et sécurité du harnais.
-- `parity/BASELINE.md` : mesures de référence.
-- `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
 
 ## Lanceurs locaux
 
@@ -182,8 +202,8 @@ Pour le MVP, `scripts/install-systemd-user.sh` installe une unité
 port/webhook, `--start` optionnel). Depuis le 2026-10-26, c'est le mode de
 production : l'unité est activée avec le webhook réel et `Linger=yes`. Le
 lanceur `scripts/start-rust.sh` reste un mode PoC/manuel et ne doit pas
-tourner en parallèle. Voir `docs/SWITCH-SYSTEMD.md` et
-`docs/PACKAGING-GUI.md`.
+tourner en parallèle. Voir `docs/ops/SWITCH-SYSTEMD.md` et
+`docs/desktop/PACKAGING-GUI.md`.
 
 En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
 
@@ -200,7 +220,7 @@ En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
   tester un projet, le copier dans cette racine, jamais l'inverse.
 
 La procédure complète, les options et les sauvegardes sont décrites dans
-`docs/SYNC-BACKENDS.md`.
+`docs/ops/SYNC-BACKENDS.md`.
 
 ## CLI
 

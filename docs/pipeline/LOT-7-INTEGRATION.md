@@ -1,5 +1,13 @@
 # Lot 7 — Intégration réelle et bascule contrôlée
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-23 |
+| Portée | Séquence réelle STEP2 → STEP8 et bascule contrôlée 5003/5004. |
+| Voir aussi | `docs/pipeline/LOT-5-ORCHESTRATOR.md`, `docs/ops/SYNC-BACKENDS.md` |
+
 ## Objectif
 
 Vérifier que les étapes Rust s'enchaînent sur des données de production sans

@@ -2,7 +2,11 @@
 
 | Champ | Valeur |
 | --- | --- |
+| Type | Preuve |
+| Statut | Preuve — 8/8 étapes |
 | Date | 2026-10-23 |
+| Portée | Chaîne STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/pipeline/LOT-7-INTEGRATION.md`, `parity/DRIFT.md` |
 | Archive | `/mnt/cache/old/1720 Camille.zip` |
 | Taille | 1 717 852 006 octets |
 | Contenu | 4 MP4 1080p H.264 25 fps, 1 PNG, entrée racine `/` |

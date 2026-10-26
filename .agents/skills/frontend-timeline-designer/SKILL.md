@@ -118,6 +118,6 @@ cargo test -p workflow-server real_index_template_renders_with_existing_frontend
 
 - `assets/web/README.md`
 - `crates/workflow-server/src/http.rs`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
 - `.agents/skills/logs-overlay-conductor/SKILL.md`
 - `resources/timeline_design_tokens.md`

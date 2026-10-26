@@ -101,6 +101,6 @@ Performance release sur 244 : cuts 21× plus rapide que Python.
 - `crates/workflow-bridge/src/main.rs`
 - `crates/workflow-bridge/src/cuts.rs`
 - `crates/workflow-steps/src/step6.rs` (`analyze_manifest_value`)
-- `docs/LOT-1-BRIDGE.md`
+- `docs/pipeline/LOT-1-BRIDGE.md`
 - `parity/DRIFT.md` (D-022)
 - `.agents/skills/after-effects-json-contract/SKILL.md`

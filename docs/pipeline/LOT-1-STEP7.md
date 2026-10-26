@@ -1,5 +1,13 @@
 # Lot 1 — STEP7 finalisation
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Archivage SHA-256, publication vers `/mnt/cache` et manifeste STEP7. |
+| Voir aussi | `docs/pipeline/LOT-1-STEP8.md`, `docs/ops/SYNC-BACKENDS.md` |
+
 ## Périmètre livré
 
 - Sélection des projets prêts selon `lenient`, `strict` ou `videos`.

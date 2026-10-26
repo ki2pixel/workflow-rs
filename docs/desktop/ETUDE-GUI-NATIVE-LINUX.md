@@ -2,11 +2,13 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.1 |
+| Type | Étude |
+| Statut | Historique — étude close, décision Tauri A-Strict |
 | Date | 2026-10-24 |
-| Statut | Proposition soumise à décision ; aucun code fonctionnel modifié |
-| Portée | Remplacement de l'interface web `assets/web` par une application desktop Linux (X11/Wayland) |
-| Références | `AGENTS.md`, `docs/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/activeContext.md`, `memory-bank/decisionLog.md` |
+| Portée | Remplacement de l'interface web `assets/web` par une application desktop Linux (X11/Wayland). |
+| Voir aussi | `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md`, `memory-bank/decisionLog.md` |
+| Version | 1.1 |
+| Références | `AGENTS.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/activeContext.md`, `memory-bank/decisionLog.md` |
 | Confrontation | `docs/audits/2026-10-24-confrontation-etudes-gui-linux.md` (avec `docs/audits/Migration-Architecture-GUI-Linux-workflow-rs.md`) |
 | Décision consignée | `memory-bank/decisionLog.md`, entrée « Interface desktop Linux » du 2026-10-24 |
 
@@ -976,7 +978,7 @@ synthétiques, Cairo, Orca), puis comparaison VRAM pendant STEP2.
   `sound-design/*.mp3`.
 - Serveur : `crates/workflow-server/src/{http,state,runner,progress,catalog,sequence,lib}.rs`.
 - CLI : `crates/workflow-cli/src/main.rs` (surface des commandes).
-- Contrats : `docs/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/{activeContext,
+- Contrats : `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/{activeContext,
   decisionLog,systemPatterns,productContext,progress}.md`, `AGENTS.md`,
   `.agents/rules/codingstandards.md`, `.agents/skills/*`.
 - Lanceurs : `scripts/start-rust.sh`, `scripts/switch-rust.sh`, `README.md`.

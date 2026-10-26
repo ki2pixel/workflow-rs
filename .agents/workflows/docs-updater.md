@@ -34,7 +34,8 @@ find crates -maxdepth 3 -type f -name '*.rs' | sort
 
 ```sh
 find crates -name '*.rs' -print0 | xargs -0 wc -l | tail -1
-wc -l README.md AGENTS.md docs/*.md parity/*.md
+find docs -name '*.md' -print0 | xargs -0 wc -l
+wc -l README.md AGENTS.md parity/*.md
 ```
 
 ### Complexité et dette
@@ -54,9 +55,9 @@ git log --since='30 days ago' --name-only --pretty=format: | sort -u
 
 | Source | Rôle | Outil |
 | --- | --- | --- |
-| Intention | Le « pourquoi » | `memory-bank/activeContext.md`, `docs/LOT-*.md` |
+| Intention | Le « pourquoi » | `memory-bank/activeContext.md`, `docs/pipeline/LOT-*.md` |
 | Réalité | Le « quoi » et le « comment » | code, `cargo metadata`, `rg` |
-| Existant | L'état documenté | `README.md`, `docs/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
+| Existant | L'état documenté | `README.md`, `docs/README.md`, `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
 
 Identifier les divergences :
 
@@ -85,7 +86,7 @@ Produire un plan avant d'appliquer :
 ## Plan de mise à jour
 
 ### Audit
-- Cible : `docs/LOT-4-STEP3.md`
+- Cible : `docs/pipeline/LOT-4-STEP3.md`
 - Constat : la commande `--edgetpu` n'est plus à jour.
 
 ### Modifications
@@ -144,6 +145,7 @@ Après :
 - `.agents/skills/workflow-docs-updater-plus/SKILL.md`
 - `.agents/skills/documentation/SKILL.md`
 - `AGENTS.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/README.md`
+- `docs/contracts/CONTRAT-ENVIRONNEMENT.md`
 - `parity/DRIFT.md`
 - `memory-bank/`

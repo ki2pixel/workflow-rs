@@ -113,7 +113,7 @@ python3 scripts/validate-step1.py
 
 - `.agents/rules/test-strategy.md`
 - `AGENTS.md`
-- `docs/LOT-*.md`
+- `docs/pipeline/LOT-*.md`
 - `parity/README.md`
 - `parity/BASELINE.md`
 - `parity/DRIFT.md`

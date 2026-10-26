@@ -2,10 +2,12 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.0 |
+| Type | Lot |
+| Statut | Référence — implémenté et validé, moniteur désactivé par défaut |
 | Date | 2026-10-23 |
-| Portée | Moniteur webhook, normalisation d'URL, historique SQLite, échecs/cooldown, téléchargement R2/Dropbox, statuts CSV |
-| Statut | Implémenté et validé sur la base réelle ; moniteur désactivé par défaut |
+| Portée | Moniteur webhook, normalisation d'URL, historique SQLite, cooldown et téléchargement R2/Dropbox. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/ops/SYNC-BACKENDS.md`, `parity/DRIFT.md` |
+| Version | 1.0 |
 
 ## 1. Pourquoi ce lot
 
@@ -168,7 +170,7 @@ webhook. Le polling frontend existant est inchangé.
 | D-020 | concurrence bornée à 4, statut final après repli, `error` remis à null | éviter les threads illimités et un faux échec R2 |
 | D-021 | migration explicite, échecs non importés | empêcher un téléchargement massif |
 
-Détail dans `../parity/DRIFT.md`.
+Détail dans `../../parity/DRIFT.md`.
 
 ## 7. Validation
 

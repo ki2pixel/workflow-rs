@@ -1,5 +1,13 @@
 # Lot 3 : STEP4 tracking Coral
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Lot |
+| Statut | Référence |
+| Date | 2026-10-24 |
+| Portée | Cascade Coral STEP4, suivi, parole, backend CPU de test et limites. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md` |
+
 > Mise à jour lot 5 : STEP4 est branché à l'orchestrateur Rust
 > (`workflow-server`, route `/run/STEP4`). Les mentions « pas encore branché »
 > ci-dessous décrivent l'état livré au lot 3.

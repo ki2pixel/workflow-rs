@@ -1,5 +1,13 @@
 # Packaging et supervision du client desktop
 
+| Champ | Valeur |
+| --- | --- |
+| Type | Guide |
+| Statut | Actif |
+| Date | 2026-10-26 |
+| Portée | `.deb` Tauri, single-instance D-Bus, cache CUDA systemd et supervision serveur. |
+| Voir aussi | `docs/contracts/CONTRAT-ENVIRONNEMENT.md`, `docs/ops/SWITCH-SYSTEMD.md` |
+
 Ce document couvre le `.deb` Tauri du client `workflow-manager` et les deux
 modes de supervision du serveur. Le client ne démarre, n'arrête et ne
 surveille jamais le processus serveur : il reste un client HTTP de
@@ -184,7 +192,7 @@ resynchronise au prochain lancement. Le cache CUDA est créé et conservé par
 systemd ; il n'est jamais supprimé par `--uninstall`.
 
 La procédure de bascule, de smoke webhook désactivé, d'activation du moniteur
-réel et de rollback est détaillée dans `docs/SWITCH-SYSTEMD.md`.
+réel et de rollback est détaillée dans `docs/ops/SWITCH-SYSTEMD.md`.
 
 ## Désinstallation
 

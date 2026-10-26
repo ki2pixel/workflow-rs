@@ -28,6 +28,13 @@ use workflow_core::Config;
 const LOG_CHANNEL_CAPACITY: usize = 256;
 /// Taille maximale d'une ligne conservée (au-delà, elle est tronquée).
 const MAX_LINE_BYTES: usize = 64 * 1024;
+/// Secrets du serveur qui ne doivent jamais atteindre les étapes.
+const CHILD_SECRET_ENV: [&str; 4] = [
+    "WORKFLOW_SERVER_WORKER_TOKEN",
+    "WORKFLOW_SERVER_SECRET_KEY",
+    "FLASK_SECRET_KEY",
+    "INTERNAL_WORKER_COMMS_TOKEN",
+];
 
 #[derive(Debug, Clone)]
 pub struct StepOutcome {
@@ -216,6 +223,10 @@ impl Runner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        // Le CLI et ses enfants (ffmpeg, EffectCraft, Python) n'ont aucun
+        // besoin des secrets HTTP du serveur. Les retirer limite l'exposition
+        // aux outils tiers tout en conservant l'environnement CUDA/cache.
+        sanitize_child_environment(&mut process);
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
@@ -648,6 +659,12 @@ fn absolute_from_cwd(path: &Path) -> Result<PathBuf> {
     }
 }
 
+fn sanitize_child_environment(command: &mut Command) {
+    for key in CHILD_SECRET_ENV {
+        command.env_remove(key);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -660,6 +677,37 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&path, permissions).unwrap();
         path
+    }
+
+    #[test]
+    fn child_environment_excludes_server_secrets_but_keeps_cache_vars() {
+        let mut command = Command::new("/bin/true");
+        command.env("CUDA_CACHE_PATH", "/tmp/cuda-cache");
+        for key in CHILD_SECRET_ENV {
+            command.env(key, "secret-de-test");
+        }
+        sanitize_child_environment(&mut command);
+
+        let envs: Vec<_> = command
+            .as_std()
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.map(|value| value.to_string_lossy().to_string()),
+                )
+            })
+            .collect();
+        for key in CHILD_SECRET_ENV {
+            assert!(
+                envs.iter()
+                    .any(|(name, value)| name == key && value.is_none()),
+                "secret encore présent: {key}"
+            );
+        }
+        assert!(envs.iter().any(|(name, value)| {
+            name == "CUDA_CACHE_PATH" && value.as_deref() == Some("/tmp/cuda-cache")
+        }));
     }
 
     fn test_runner(script: &str) -> (tempfile::TempDir, Arc<Runner>) {

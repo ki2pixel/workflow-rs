@@ -47,7 +47,7 @@ do not "clean them up". Start with `README.md` for scope/status and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 280 unit tests, no hardware
+cargo test --workspace                                    # 282 unit tests, no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings

@@ -8,11 +8,11 @@
   disponible).
 - Interface : page web legacy `assets/web` uniquement ; client desktop Tauri
   abandonné (D-028).
-- Rollback au commit `a93a554` validé : 280 tests, fmt/clippy, `config check`
-  et build release.
+- Rollback au commit `a93a554` validé : 280 tests au checkpoint, 282 après
+  correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 280 tests unitaires, sans matériel.
+- 282 tests unitaires, sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
@@ -42,10 +42,11 @@
   de sauvegarde `backup/tauri-abandon-20261026` sur `1613b17`.
 - Crates desktop, paquet `workflow-manager`, unité `workflow-server.service`,
   scripts PoC et documentation desktop retirés ; `target/` purgé (3,8 Gio).
-- Validation : 280 tests, fmt/clippy, `config check`, build release, serveur
-  `:5004` seul.
-- Suivi séparé : `514e2d6` (ETXTBSY) et `4ddb91b` (secrets) à réappliquer ;
-  le second portera la suite à 281 tests.
+- Validation : 280 tests au checkpoint, 282 après correctifs, fmt/clippy,
+  `config check`, build release, serveur `:5004` seul.
+- Correctifs réappliqués : `514e2d6` (ETXTBSY), `4ddb91b` (secrets, 281)
+  et `713b6bc` (polling web masqué, 282). La réorg docs reste dans la
+  branche de sauvegarde.
 
 ## Chronologie de migration
 

@@ -91,26 +91,29 @@ supplémentaire, sans contrat métier nouveau.
 - `git reset --hard a93a554c4c5ed5e17805575cf15ac533d7cd50a3`.
 - `cargo fmt --check` et
   `cargo clippy --workspace --all-targets -- -D warnings` verts.
-- `cargo test --workspace` : 280 tests, 0 échec.
+- `cargo test --workspace` : 280 tests, 0 échec au rollback strict, puis
+  282 après réapplication des correctifs indépendants.
 - `cargo run -p workflow-cli -- config check` : configuration valide.
 - `cargo build --release -p workflow-server -p workflow-cli` : binaires
   reconstruits sans dépendance desktop.
 - Serveur relancé seul sur `:5004` via `scripts/switch-rust.sh` ; Python
   `:5003` arrêté.
 
-## Suivi séparé
+## Correctifs indépendants réappliqués
 
-Deux correctifs indépendants du client desktop restent disponibles dans la
-branche de sauvegarde et seront réappliqués dans une tâche distincte :
+Trois correctifs indépendants du client desktop ont été réappliqués après le
+rollback strict :
 
 - `514e2d6` : écriture des exécutables factices hors du processus de test,
   contre le flake `ETXTBSY` ;
-- `4ddb91b` : retrait des secrets du serveur de l'environnement des étapes.
+- `4ddb91b` : retrait des secrets du serveur de l'environnement des étapes
+  (281 tests) ;
+- `713b6bc` : suspension du polling web quand la page est masquée, avec
+  `Cache-Control: no-store` sur `/static/` (282 tests).
 
-Le second ajoute un test et portera la suite à 281 tests. La réorganisation
-documentaire (`687eaf9`, `1613b17`) et le correctif de polling web
-(`713b6bc`) restent également dans la branche de sauvegarde ; ils ne sont pas
-réappliqués dans ce rollback.
+La réorganisation documentaire (`687eaf9`, `1613b17`) reste dans la branche de
+sauvegarde et n'est pas réappliquée. Le script PoC de validation du polling
+n'est pas réintroduit.
 
 ## Restauration
 

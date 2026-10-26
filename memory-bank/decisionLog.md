@@ -46,14 +46,13 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   lecture seule, secrets opérationnels, cache CUDA
   `~/.cache/workflow-rs/cuda-compute` et lanceurs pré-Tauri.
 - **Validation** : dépôt ramené à
-  `a93a554c4c5ed5e17805575cf15ac533d7cd50a3` ; 280 tests pipeline, 0 échec ;
-  fmt/clippy verts ; `config check` valide ; binaires release reconstruits ;
-  serveur relancé seul sur `:5004` via `scripts/switch-rust.sh`, Python
-  `:5003` arrêté.
-- **Suivi séparé** : `514e2d6` (correctif ETXTBSY) et `4ddb91b` (retrait des
-  secrets de l'environnement des étapes) restent à réappliquer ; le second
-  portera la suite à 281 tests. `687eaf9`/`1613b17` (réorg docs) et
-  `713b6bc` (polling web) restent dans la branche de sauvegarde.
+  `a93a554c4c5ed5e17805575cf15ac533d7cd50a3` ; 280 tests au rollback strict,
+  282 après correctifs, 0 échec ; fmt/clippy verts ; `config check` valide ;
+  binaires release reconstruits ; serveur relancé seul sur `:5004` via
+  `scripts/switch-rust.sh`, Python `:5003` arrêté.
+- **Correctifs réappliqués** : `514e2d6` (ETXTBSY), `4ddb91b` (secrets,
+  281 tests) et `713b6bc` (polling web masqué et Cache-Control, 282 tests).
+  `687eaf9`/`1613b17` (réorg docs) restent dans la branche de sauvegarde.
 - **Sauvegarde** : branche `backup/tauri-abandon-20261026` sur `1613b17`.
 - **Référence** : `docs/DECISION-ABANDON-TAURI.md`.
 

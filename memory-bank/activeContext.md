@@ -14,11 +14,13 @@ production est revenue à la stack Rust headless avec l'interface web legacy.
     PoC ;
   - dépôt ramené à `a93a554` ; branche de sauvegarde
     `backup/tauri-abandon-20261026` sur `1613b17` ;
-  - validation : 280 tests, fmt/clippy, `config check`, build release ;
+  - validation : 280 tests au rollback strict, 282 après correctifs ;
+    fmt/clippy, `config check`, build release ;
   - production : Rust `:5004` relancé via `scripts/switch-rust.sh`, Python
     `:5003` arrêté, aucun client desktop ;
-  - suivi séparé : `514e2d6` (ETXTBSY) et `4ddb91b` (secrets) à réappliquer,
-    le second portant la suite à 281 tests.
+  - correctifs réappliqués : `514e2d6` (ETXTBSY), `4ddb91b` (secrets,
+    281 tests) et `713b6bc` (polling web masqué, 282 tests) ; réorg docs
+    conservée dans la branche de sauvegarde.
 - [2026-10-24] **Synchronisation documentaire** :
   - chiffre de tests aligné sur la mesure
     (`cargo test --workspace -- --list`) : 280 ;
@@ -95,7 +97,7 @@ production est revenue à la stack Rust headless avec l'interface web legacy.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 280 tests unitaires ; pas de CI.
+- 282 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

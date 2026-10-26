@@ -3,8 +3,13 @@
 ## Statut actuel
 
 - Migration Rust terminée pour les 8 étapes.
-- Backend de production configuré : Rust `:5004` ; Python legacy `:5003` en
-  rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
+- Backend de production : Rust `:5004` headless via
+  `scripts/switch-rust.sh` ; Python legacy `:5003` arrêté (rollback
+  disponible).
+- Interface : page web legacy `assets/web` uniquement ; client desktop Tauri
+  abandonné (D-028).
+- Rollback au commit `a93a554` validé : 280 tests, fmt/clippy, `config check`
+  et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
 - 280 tests unitaires, sans matériel.
@@ -28,6 +33,19 @@
   les 22 `SKILL.md` alignés (tests 280, `max_workers` retiré, verrou STEP1,
   gate EffectCraft, legacy en lecture seule).
 - **Aucune tâche active.**
+
+## Rollback Tauri (2026-10-26)
+
+- Décision D-028 : abandon du client desktop Tauri et retour à la stack Rust
+  headless avec `assets/web`.
+- `git reset --hard` sur `a93a554c4c5ed5e17805575cf15ac533d7cd50a3` ; branche
+  de sauvegarde `backup/tauri-abandon-20261026` sur `1613b17`.
+- Crates desktop, paquet `workflow-manager`, unité `workflow-server.service`,
+  scripts PoC et documentation desktop retirés ; `target/` purgé (3,8 Gio).
+- Validation : 280 tests, fmt/clippy, `config check`, build release, serveur
+  `:5004` seul.
+- Suivi séparé : `514e2d6` (ETXTBSY) et `4ddb91b` (secrets) à réappliquer ;
+  le second portera la suite à 281 tests.
 
 ## Chronologie de migration
 
@@ -99,6 +117,8 @@
    `docs/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md` à jour.
 5. **Memory-bank** : mettre à jour `activeContext.md` et ce fichier à chaque
    session significative.
+6. **Interface** : ne pas réintroduire de client desktop Tauri/GTK/WebKit ;
+   D-028 reste la référence.
 
 ## Politique de rétention
 

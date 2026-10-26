@@ -106,6 +106,9 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
   fallback. The only intended writer is an explicit `sync --apply`.
 - Operational detail lives in `docs/SYNC-BACKENDS.md`, `docs/RETENTION.md` and
   `docs/SWITCH-PUBLIC.md`; read the relevant one before changing deployed state.
+- No native desktop client: the Tauri/GTK/WebKit PoC was abandoned (D-028).
+  The UI is `assets/web` served by the server; do not reintroduce Tauri, GTK,
+  WebKit or zbus dependencies without a new decision.
 
 ## Parity contracts
 

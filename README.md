@@ -30,6 +30,8 @@ Linux et le panneau CEP continue d'appeler Python.
 
 ## État
 
+- Interface : page web legacy `assets/web` ; aucun client desktop natif n'est
+  maintenu (décision D-028).
 - Lot 0.1 validé : `libtensorflowlite_c.so` compilé, BlazeFace et FaceMesh identiques au bit près aux références Python, 10 000 invocations stables.
 - Lot 0.2 terminé : contrat d'environnement et table de correspondance des clés.
 - Lot 0.3 terminé : 23 cas de parité, 14 étapes réelles sur quatre projets (244, 245, 249, 250) identiques à la production, 9 cas synthétiques déterministes.
@@ -142,20 +144,25 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
+- `docs/DECISION-ABANDON-TAURI.md` : décision D-028, motifs de l'abandon du client desktop Tauri et procédure de restauration.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
 
 ## Lanceurs locaux
 
-Le raccourci Python `~/Bureau/Lancer_Workflow.desktop` reste inchangé : il
+Le raccourci Python `~/Bureau/Legacy_Workflow.desktop` reste inchangé : il
 lance `workflow_mediapipe/start_workflow.sh` sur 5003.
 
-Le raccourci Rust `~/Bureau/Lancer_Workflow_Rust.desktop` appelle
+Le raccourci Rust `~/Bureau/Rust_Workflow.desktop` appelle
 `scripts/start-rust.sh` : vérification, démarrage sur 5004, ouverture de
 Firefox et suivi des logs. Ctrl+C ou fermeture du terminal arrête le serveur.
 Les secrets sont générés au premier lancement dans `config/launcher.env`
-(non versionné, `chmod 600`). Pour utiliser `switch-rust.sh` manuellement :
+(non versionné, `chmod 600`).
+
+Le client desktop Tauri et son paquet `workflow-manager` ont été retirés
+(D-028) ; le serveur reste headless et s'utilise via `start-rust.sh` ou
+`switch-rust.sh`. Pour utiliser `switch-rust.sh` manuellement :
 
 ```sh
 set -a; source config/launcher.env; set +a

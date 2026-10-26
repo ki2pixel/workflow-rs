@@ -149,6 +149,8 @@ comportement legacy sont dans `parity/DRIFT.md`.
   défaut (`ui.autoOpenLogOverlay = false`) ; le toggle Settings reste
   fonctionnel et une valeur persistée par l'opérateur reste prioritaire.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
+- Pas de client desktop natif (D-028) : ne pas ajouter de dépendance
+  GTK/WebKit/zbus/Tauri ; `assets/web` est l'unique interface.
 
 ## 15. After Effects
 

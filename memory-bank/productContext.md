@@ -81,6 +81,8 @@ artefacts compatibles et permettre une bascule contrôlée.
 - Overlay de logs avec focus trap et auto-ouverture configurable.
 - Polling via `PollingManager`.
 - Frontend copié du legacy ; pas de logique Rust spécifique.
+- Pas de client desktop natif (Tauri/GTK/WebKit) : décision D-028 ;
+  l'interface reste la page web legacy servie par le serveur.
 
 ## Modèle de production
 

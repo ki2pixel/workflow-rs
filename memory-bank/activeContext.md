@@ -2,11 +2,23 @@
 
 ## Tâche en cours
 
-**Aucune.** La migration Rust est terminée pour les huit étapes et
-l'infrastructure d'agents/memory-bank vient d'être initialisée.
+**Aucune.** Le rollback du client desktop Tauri est terminé et validé. La
+production est revenue à la stack Rust headless avec l'interface web legacy.
 
 ## Dernière session
 
+- [2026-10-26] **Rollback Tauri et retour au headless (D-028)** :
+  - abandon du client desktop Tauri, des crates
+    `workflow-desktop-services`/`workflow-gui-tauri`, du paquet
+    `workflow-manager`, de l'unité `workflow-server.service` et des scripts
+    PoC ;
+  - dépôt ramené à `a93a554` ; branche de sauvegarde
+    `backup/tauri-abandon-20261026` sur `1613b17` ;
+  - validation : 280 tests, fmt/clippy, `config check`, build release ;
+  - production : Rust `:5004` relancé via `scripts/switch-rust.sh`, Python
+    `:5003` arrêté, aucun client desktop ;
+  - suivi séparé : `514e2d6` (ETXTBSY) et `4ddb91b` (secrets) à réappliquer,
+    le second portant la suite à 281 tests.
 - [2026-10-24] **Synchronisation documentaire** :
   - chiffre de tests aligné sur la mesure
     (`cargo test --workspace -- --list`) : 280 ;
@@ -76,8 +88,11 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 
 ## État du système
 
-- Backend de production : Rust `:5004` ; Python legacy `:5003` en rollback.
-  Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
+- Backend de production : Rust `:5004` headless via
+  `scripts/switch-rust.sh` ; Python legacy `:5003` arrêté (rollback
+  disponible).
+- Interface : page web legacy `assets/web` uniquement ; aucun client desktop
+  natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
 - 280 tests unitaires ; pas de CI.
@@ -114,6 +129,9 @@ l'infrastructure d'agents/memory-bank vient d'être initialisée.
 - Ne pas lancer les moniteurs Python et Rust simultanément.
 - Ne pas lancer STEP2/3/4 matérielles des deux stacks en même temps.
 - Ne pas nettoyer les quirks D-001, D-002, D-004, D-016.
+- Ne pas réintroduire de client desktop Tauri/GTK/WebKit/zbus (D-028).
+- Le serveur headless est lancé par `scripts/switch-rust.sh` ; ne pas
+  réinstaller `workflow-server.service` sans nouvelle décision.
 - Lire `.agents/rules/codingstandards.md` avant toute modification de code.
 
 ## Références

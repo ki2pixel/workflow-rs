@@ -8,6 +8,55 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-10-26 — D-028 : abandon du client desktop Tauri
+
+- **Contexte** : le PoC Tauri A-Strict (J1 à J5) puis le MVP J1/J2 ont ajouté
+  `workflow-desktop-services`, `workflow-gui-tauri`, un paquet `.deb`
+  `workflow-manager`, une unité systemd utilisateur et des scripts de soak.
+  Le client devait fournir une fenêtre native, un tray D-Bus et un polling
+  1 Hz du serveur headless. L'usage réel a montré une instabilité du client et
+  un coût de maintenance disproportionné par rapport au besoin.
+- **Décision** : abandonner le client desktop Tauri et revenir à la stack
+  headless Rust (`workflow-server` `:5004`, `workflow-cli`) avec l'interface
+  web legacy `assets/web`. Retirer les crates desktop, les dépendances
+  GTK/WebKit/Tauri, le paquet système, l'unité systemd, les scripts PoC et la
+  documentation desktop.
+- **Motifs** :
+  1. instabilité constatée à l'usage, non couverte par les soaks (tray,
+     minimisation, focus X11, changements de page) ;
+  2. croissance `WebKitNetworkProcess` mesurée en J4 (+22,1 Mio) et correction
+     par suspension du polling, avec un cache et un cycle de vie spécifiques
+     à la WebView ;
+  3. surface fonctionnelle inutile (tray D-Bus, single-instance, focus X11,
+     `.deb`, systemd utilisateur, cache CUDA) pour un client qui affiche la
+     page servie par Rust ;
+  4. seconde toolchain Tauri 2/GTK3/WebKitGTK 4.1/zbus/x11rb/notify-rust/
+     sysinfo et MSRV 1.90 contre 1.86 pour le pipeline ;
+  5. duplication de `assets/web`, qui couvre déjà le besoin métier ;
+  6. surface de sécurité et de packaging hors périmètre du pipeline.
+- **Périmètre retiré** : crates `workflow-desktop-services` et
+  `workflow-gui-tauri`, entrées Cargo associées, `workflow-manager 0.1.0`,
+  `/usr/bin/workflow-gui-tauri`, `workflow-server.service`,
+  `packaging/systemd/`, `scripts/install-systemd-user.sh`, `scripts/poc/`,
+  `docs/desktop/`, études et audits GUI des 2026-10-25/26, résidus
+  `~/.local/share/org.workflow.desktop` et
+  `~/.local/state/workflow-manager`.
+- **Conservé** : STEP1 à STEP8, CLI, serveur, `assets/web`, contrats
+  JSON/CSV/HTTP, tolérance `1e-6`, `runtime/`, `/mnt/cache`, dépôt Python en
+  lecture seule, secrets opérationnels, cache CUDA
+  `~/.cache/workflow-rs/cuda-compute` et lanceurs pré-Tauri.
+- **Validation** : dépôt ramené à
+  `a93a554c4c5ed5e17805575cf15ac533d7cd50a3` ; 280 tests pipeline, 0 échec ;
+  fmt/clippy verts ; `config check` valide ; binaires release reconstruits ;
+  serveur relancé seul sur `:5004` via `scripts/switch-rust.sh`, Python
+  `:5003` arrêté.
+- **Suivi séparé** : `514e2d6` (correctif ETXTBSY) et `4ddb91b` (retrait des
+  secrets de l'environnement des étapes) restent à réappliquer ; le second
+  portera la suite à 281 tests. `687eaf9`/`1613b17` (réorg docs) et
+  `713b6bc` (polling web) restent dans la branche de sauvegarde.
+- **Sauvegarde** : branche `backup/tauri-abandon-20261026` sur `1613b17`.
+- **Référence** : `docs/DECISION-ABANDON-TAURI.md`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

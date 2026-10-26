@@ -10,6 +10,13 @@ StartLimitBurst=3
 Type=simple
 WorkingDirectory=@ROOT@
 EnvironmentFile=@ENV_FILE@
+# Cache JIT PTX→SASS de CUDA/NVVM, partagé par les runs STEP2/3/4.
+# %C vaut $XDG_CACHE_HOME (ou ~/.cache) ; le plafond de 1 Gio est le défaut
+# NVIDIA et couvre largement les noyaux utilisés par TransNetV2, YAMNet et
+# ECAPA. Il n'existe pas de NVVM_CACHE_PATH : le cache NVVM est le cache CUDA.
+CacheDirectory=workflow-rs/cuda-compute
+Environment=CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute
+Environment=CUDA_CACHE_MAXSIZE=1073741824
 ExecStart=@ROOT@/target/release/workflow-server --config @CONFIG@
 Restart=on-failure
 RestartSec=2

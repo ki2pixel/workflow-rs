@@ -1,7 +1,9 @@
 mod host;
 mod poc_driver;
 mod services;
+mod single_instance;
 mod tray;
+mod x11_activation;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -51,6 +53,10 @@ pub(crate) struct Args {
     #[arg(long)]
     pub no_tray: bool,
 
+    /// Désactive le single-instance D-Bus (diagnostic).
+    #[arg(long)]
+    pub no_single_instance: bool,
+
     /// Active les notifications natives sur les terminaux (opt-in).
     #[arg(long)]
     pub notifications: bool,
@@ -89,6 +95,26 @@ fn run() -> Result<()> {
     args.server_url.set_fragment(None);
     validate_base_url(&args.server_url).context("validation de l'URL serveur")?;
 
+    let runtime = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .context("création du runtime Tokio")?,
+    );
+
+    // L'acquisition D-Bus doit précéder le bootstrap HTTP : un second
+    // lancement doit pouvoir focaliser l'instance active même si le serveur
+    // est momentanément indisponible.
+    let (primary, single_instance_warning) = if args.no_single_instance {
+        (None, None)
+    } else {
+        match runtime.block_on(single_instance::acquire(&args))? {
+            single_instance::Acquire::Primary(primary) => (Some(primary), None),
+            single_instance::Acquire::Secondary => return Ok(()),
+            single_instance::Acquire::Unavailable(reason) => (None, Some(reason)),
+        }
+    };
+
     std::fs::create_dir_all(&args.telemetry_dir)
         .with_context(|| format!("création du dossier {}", args.telemetry_dir.display()))?;
     if let Some(ready) = &args.ready_file {
@@ -98,13 +124,9 @@ fn run() -> Result<()> {
     }
 
     init_tracing(&args.log_level, args.log_file.as_deref());
-
-    let runtime = Arc::new(
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .context("création du runtime Tokio")?,
-    );
+    if let Some(reason) = single_instance_warning {
+        tracing::warn!(%reason, "single-instance désactivé");
+    }
 
     let services = services::AppServices::bootstrap(services::BootstrapOptions {
         runtime,
@@ -117,7 +139,7 @@ fn run() -> Result<()> {
         sound_dir: args.sound_dir.clone(),
     })?;
 
-    host::run(args, services)
+    host::run(args, services, primary)
 }
 
 fn init_tracing(level: &str, log_file: Option<&Path>) {

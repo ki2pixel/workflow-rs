@@ -112,7 +112,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 280 tests.
+- `cargo test --workspace` : 325 tests (281 pipeline + 38 services + 6 GUI).
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.
@@ -166,3 +166,25 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - Le format de sortie et le préfixe `[PY] Error:` sont contractuels.
 - Le panneau CEP et les JSX restent Python (D-022).
 - Ne pas modifier les scripts AE pour adapter une sortie Rust.
+
+## 16. Client desktop Tauri
+
+- Le client reste un client HTTP de `workflow-server` : URL distante, aucune
+  capability/plugin/commande Tauri, IPC neutralisé. Le serveur n'est jamais un
+  enfant du GUI.
+- Single-instance : le premier processus possède `org.workflow.desktop` et
+  sert `org.freedesktop.Application` à `/org/workflow/desktop`. Le second
+  transmet `argv`, `cwd`, `server-url`, `explicit-server-url` et se termine.
+  L'acquisition D-Bus précède `AppServices::bootstrap` pour fonctionner
+  serveur arrêté. `--no-single-instance` désactive le mécanisme.
+- Focus X11 : après `show()`/`unminimize()`, envoyer `_NET_ACTIVE_WINDOW`
+  (source 2) avec `check()` + `sync()`, après un délai de 500 ms. GTK
+  `present_with_time(0)` seul ne déminimise pas de façon fiable sous GNOME.
+  Wayland n'est pas validé.
+- Unité systemd : `CacheDirectory=workflow-rs/cuda-compute`,
+  `CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute`,
+  `CUDA_CACHE_MAXSIZE=1073741824`. Le cache JIT PTX→SASS persiste entre les
+  redémarrages ; STEP2 peut ne pas le peupler si les bibliothèques CUDA
+  fournissent du SASS pour l'architecture GPU.
+- Le `.desktop` reste `workflow-manager.desktop` et `DBusActivatable=false` :
+  l'activation par le bus est différée.

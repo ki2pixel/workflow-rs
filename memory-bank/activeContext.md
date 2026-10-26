@@ -2,23 +2,50 @@
 
 ## Tâche en cours
 
-**MVP — transition ouverte : polling masqué neutralisé et socle partagé
-gelé v0.1.0.** `PollingManager` suspend désormais `systemMonitor` et
-`localDownloadsStatus` sur `visibilitychange` (`pauseWhenHidden`) et les
-rafraîchit au focus. Validation live : 0 requête sur 8 s masquées ; soak
-10 min : 600 échantillons, 100 % masqué, `WebKitNetworkProcess` **0 Kio**
-(contre +22,06 Mio en J4), hôte +4 Kio, GUI PSS +73 Kio, acceptation
-`true`. `Cache-Control: no-store` sur `/static/` et les imports
-`PollingManager.js?v=20261025a` évitent les modules ES périmés. Le crate
-`workflow-desktop-services` est revu et gelé : 3 corrections P2,
-`#[non_exhaustive]`, 38 tests.
+**MVP J1 — `.deb` réel, single-instance D-Bus et cache CUDA systemd
+validés.** Le paquet final (`6 595 548` octets, SHA-256
+`66da7031…201439f8`) est installé via `sudo apt install` et l'entrée GNOME est
+visible. Le client possède `org.workflow.desktop`, sert
+`org.freedesktop.Application` et restaure/focalise la fenêtre au second
+lancement (53 ms, un seul processus) ; une URL divergente est rejetée en
+`InvalidArgs`, et l'activation fonctionne serveur arrêté. L'unité systemd
+ajoute `CacheDirectory=workflow-rs/cuda-compute`,
+`CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute` et
+`CUDA_CACHE_MAXSIZE=1073741824` ; STEP2 sous unité de test produit le CSV
+attendu. Le cache JIT est validé par une sonde PTX (15 794 octets `du -sb`,
+2 fichiers) et persiste après redémarrage, mais STEP2 lui-même n'a pas peuplé
+le cache (SASS `sm_75` précompilé). 325 tests workspace, fmt/clippy/build
+verts.
 
-**Prochain jalon** : MVP — installation réelle du `.deb`, single-instance,
-runs STEP2/STEP8 sous l'unité systemd, puis soak 2 h de confirmation avant
-bascule publique. Toute évolution de `polling.rs`/`tray.rs` rejoue J4.
+**Prochain jalon** : soak 2 h de confirmation, run STEP8 sous l'unité
+systemd, puis installation de l'unité de production `workflow-server.service`
+lors de la bascule publique. Toute évolution de `polling.rs`/`tray.rs` rejoue
+J4 ; toute évolution du single-instance rejoue
+`scripts/poc/verify-single-instance.sh`.
 
 ## Dernière session
 
+- [2026-10-26] **MVP J1 — `.deb`, single-instance, cache CUDA** :
+  - paquet final 6,29 Mio / 17 159 Kio installé, `desktop-file-validate`
+    rc 0, `xdg-mime` `application/x-desktop`, `Gio.DesktopAppInfo` OK,
+    icônes 32/128/256/512, entrée GNOME visible ;
+  - `single_instance.rs` (zbus 5.19) : `org.workflow.desktop`,
+    `/org/workflow/desktop`, `org.freedesktop.Application`, payload `a{sv}`,
+    `DoNotQueue`, validation de taille, `--no-single-instance` ;
+  - `x11_activation.rs` : `_NET_ACTIVE_WINDOW` source 2, `check()` + `sync()`,
+    activation différée après `show()`/`unminimize()` ;
+  - preuves : introspection 1 091 octets, second lancement 53 ms,
+    `gui_processes=1`, état `_NET_WM_STATE_FOCUSED`, URL divergente
+    `InvalidArgs`, activation serveur arrêté, nom libéré à l'arrêt ;
+  - unité systemd : `CacheDirectory`, `CUDA_CACHE_PATH=%C/...`,
+    `CUDA_CACHE_MAXSIZE=1 Gio`, env serveur et `workflow-cli` enfant
+    vérifiés ; STEP2 7 s puis 2 s après restart, CSV identique à la fixture ;
+  - cache : 4 096 octets/0 fichier avant, 15 794 octets/2 fichiers après
+    sonde PTX systemd, hashes/mtimes identiques après restart et seconde
+    sonde ; STEP2 n'ajoute aucun fichier (SASS précompilé) ;
+  - 325 tests workspace (281 pipeline + 38 services + 6 GUI), fmt/clippy/
+    build release/.deb verts ; docs `docs/PACKAGING-GUI.md` et
+    `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`.
 - [2026-10-25] **Transition MVP — polling masqué + gel du crate** :
   - `PollingManager` : option `pauseWhenHidden`, suspension des intervalles
     et des backoffs, reprise immédiate, nettoyage `stopPolling`/`destroy`,

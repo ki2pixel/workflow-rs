@@ -86,6 +86,7 @@ workflow-gui-tauri --server-url http://127.0.0.1:5005
 workflow-gui-tauri --telemetry-dir ~/.local/state/workflow-manager
 workflow-gui-tauri --log-file ~/.local/state/workflow-manager/host.log
 workflow-gui-tauri --no-tray --no-close-to-tray
+workflow-gui-tauri --no-single-instance
 workflow-gui-tauri --notifications
 workflow-gui-tauri --audio --sound-dir /chemin/vers/assets/web/sound-design
 ```
@@ -94,6 +95,30 @@ Par défaut, l'état et la télémétrie vont dans
 `$XDG_STATE_HOME/workflow-manager` ou `~/.local/state/workflow-manager`.
 Les notifications et l'audio restent opt-in. Le paquet n'embarque pas les MP3 ;
 `--audio` exige donc un `--sound-dir` valide.
+
+### Single-instance D-Bus
+
+Le premier processus possède `org.workflow.desktop` sur le bus de session et
+sert `org.freedesktop.Application` à l'objet `/org/workflow/desktop`. Un second
+lancement transmet `argv`, `cwd`, `server-url` et `explicit-server-url` à
+l'instance active, puis se termine sans créer de second processus.
+
+- même URL : la fenêtre est restaurée, déminimisée et focalisée ;
+- URL explicitement divergente : le second lancement échoue avec
+  `org.freedesktop.DBus.Error.InvalidArgs` ;
+- serveur HTTP arrêté : l'activation D-Bus précède `AppServices::bootstrap`,
+  donc le second lancement fonctionne quand même ;
+- `--no-single-instance` désactive le mécanisme pour le diagnostic.
+
+Le `.desktop` reste `workflow-manager.desktop` et ne déclare pas
+`DBusActivatable=true` : le nom D-Bus ne correspond pas au nom du fichier.
+L'activation D-Bus réelle (lancement par le bus) est donc différée ; le
+single-instance au sens « deuxième lancement » est actif.
+
+Sous X11/GNOME, le focus utilise `_NET_ACTIVE_WINDOW` avec l'indication
+« pager » (2), après `show()`/`unminimize()`. `present_with_time(0)` de GTK ne
+suffit pas quand la fenêtre est minimisée. Le repli Wayland reste
+`set_focus()` et n'est pas validé.
 
 ## Supervision du serveur
 
@@ -146,10 +171,17 @@ L'unité utilise :
 - `PrivateTmp=false`, car `/tmp/workflow-rs-hw.lock` est partagé avec le
   stack Python ;
 - `ProtectHome` désactivé, car CUDA, EffectCraft et les caches utilisateur
-  peuvent écrire sous `$HOME`.
+  peuvent écrire sous `$HOME` ;
+- `CacheDirectory=workflow-rs/cuda-compute`,
+  `CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute` et
+  `CUDA_CACHE_MAXSIZE=1073741824` (1 Gio). `%C` vaut `$XDG_CACHE_HOME` ou
+  `~/.cache` ; le cache JIT PTX→SASS est partagé par STEP2/STEP3/STEP4 et
+  persiste entre les redémarrages. Il n'existe pas de `NVVM_CACHE_PATH` : le
+  cache NVVM est le cache CUDA.
 
 Le GUI peut être fermé ou tué : le service reste actif et le client se
-resynchronise au prochain lancement.
+resynchronise au prochain lancement. Le cache CUDA est créé et conservé par
+systemd ; il n'est jamais supprimé par `--uninstall`.
 
 ## Désinstallation
 
@@ -169,8 +201,14 @@ fichier de secrets pour éviter une suppression accidentelle.
 - Le paquet est construit pour `amd64` sur Ubuntu 22.04 ; il n'est pas
   portable tel quel.
 - L'audio hôte est opt-in et n'embarque pas les MP3.
-- Le single-instance reste différé au MVP.
-- L'installation via `sudo apt install` et les étapes CUDA/TPU sous l'unité
-  systemd n'ont pas été exécutées en J5 ; la validation J5 porte sur
-  l'extraction sans root, le lancement du client, `systemd-analyze verify` et
-  un serveur de test sur `:5005`.
+- `DBusActivatable=true` n'est pas activé : le `.desktop` devrait être renommé
+  `org.workflow.desktop.desktop` et un service D-Bus ajouté. Le
+  single-instance « deuxième lancement » est validé, pas l'activation par le
+  bus.
+- Le focus single-instance est validé sous X11/GNOME ; Wayland n'est pas
+  validé.
+- Le run STEP2 sous l'unité de test n'a pas peuplé le cache JIT (SASS
+  précompilé pour `sm_75`). Une sonde PTX séparée a validé le chemin et la
+  persistance ; un GPU/driver différent peut peupler le cache pendant STEP2.
+- Le soak 2 h de confirmation et le run STEP8 sous l'unité restent à rejouer
+  avant la bascule publique.

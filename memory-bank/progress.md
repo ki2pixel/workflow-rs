@@ -119,6 +119,25 @@
 | Lanceur | 2026-10-23 | `f827d53` | `start-rust.sh`, secrets, Firefox | Lancement réel |
 | Sync | 2026-10-23 | `28287af`, `6b6e5e1` | Fusion Python ↔ Rust | 911/96/640, 1,8 Go |
 | Shadow | 2026-10-23/24 | `01fbbf2`, `b7b594b` | Corpus 153–159 et 1720 | 162/162 sur 20 projets |
+| MVP GUI | 2026-10-25/26 | `9be0b02` + commit J1 | Polling masqué, `.deb` réel, single-instance D-Bus, cache CUDA systemd | 325 tests, `verify-single-instance.sh` OK sur binaire installé, STEP2 CSV identique |
+
+## MVP client desktop (2026-10-26)
+
+- Paquet final `workflow-manager_0.1.0_amd64.deb` : 6 595 548 octets,
+  SHA-256 `66da7031…201439f8`, installé par `sudo apt install`.
+- `desktop-file-validate` rc 0, `xdg-mime` `application/x-desktop`,
+  `Gio.DesktopAppInfo` OK, icônes 32/128/256/512, entrée GNOME visible.
+- Single-instance `org.workflow.desktop` / `org.freedesktop.Application` :
+  second lancement 53 ms, un processus, fenêtre restaurée/focalisée, URL
+  divergente rejetée en `InvalidArgs`, activation serveur arrêté.
+- Unité systemd : `CacheDirectory=workflow-rs/cuda-compute`,
+  `CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute`,
+  `CUDA_CACHE_MAXSIZE=1073741824`. STEP2 sous unité de test : 7 s puis 2 s
+  après restart, CSV identique à `short_2997_step2`.
+- Cache JIT : 4 096 o/0 fichier avant, 15 794 o/2 fichiers après sonde PTX
+  systemd, hashes/mtimes identiques après restart et seconde sonde. STEP2
+  n'ajoute aucun fichier (SASS `sm_75` précompilé).
+- Rapport : `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`.
 
 ## Remédiation audit backend (2026-10-24)
 

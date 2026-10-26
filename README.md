@@ -141,7 +141,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
-- `docs/PACKAGING-GUI.md` : construction du `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, désinstallation et limites.
+- `docs/PACKAGING-GUI.md` : construction du `.deb` Tauri, installation réelle, single-instance D-Bus, cache CUDA systemd, supervision serveur `switch-rust.sh`/`systemd --user`, désinstallation et limites.
 - `docs/MVP-FRONTEND-POLLING.md` : suspension opt-in des pollers `system_monitor` et téléchargements quand la WebView est masquée, validation live et limites.
 - `docs/audits/2026-10-25-revue-workflow-desktop-services.md` : revue finale du crate partagé, corrections avant gel et contrat de stabilité v0.1.0.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
@@ -154,6 +154,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/audits/2026-10-25-poc-tauri-j3.md` : coexistence J3 Tauri + STEP2 CUDA (baseline Firefox, 5 runs, RSS/PSS, pic VRAM 2 392 Mio, aucun OOM).
 - `docs/audits/2026-10-25-poc-tauri-j4.md` : tray D-Bus, `StatusWatcher` 1 Hz, matrice d'états, fermeture vers le tray et soak d'endurance 2 h avec WebView inactive.
 - `docs/audits/2026-10-25-poc-tauri-j5.md` : paquet `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, décision Tauri A-Strict.
+- `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md` : installation réelle du `.deb` MVP, single-instance `org.workflow.desktop`, focus X11, cache CUDA `%C/workflow-rs/cuda-compute`, run STEP2 sous unité de test et métriques de persistance.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.

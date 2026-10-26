@@ -723,3 +723,44 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Validation documentaire** : `docs/MVP-FRONTEND-POLLING.md`,
   `docs/audits/2026-10-25-revue-workflow-desktop-services.md`,
   `memory-bank/systemPatterns.md`.
+
+## 2026-10-26 — MVP J1 : `.deb`, single-instance, cache CUDA
+
+- **Contexte** : le PoC J5 avait validé le paquet sans installation réelle, et
+  le single-instance, l'installation du `.deb` et les runs CUDA sous unité
+  systemd restaient au MVP. Les quatre choix du protocole ont été ratifiés par
+  la direction.
+- **Décision 1 — identité D-Bus** : nom `org.workflow.desktop`, objet
+  `/org/workflow/desktop`, interface `org.freedesktop.Application`,
+  `DBusActivatable=false`. Le `.desktop` reste `workflow-manager.desktop` ;
+  l'activation par le bus exigerait un renommage et un service D-Bus, différé.
+- **Décision 2 — arguments** : le second lancement transmet `argv`, `cwd`,
+  `server-url` et `explicit-server-url`. Même URL : focus strict. URL
+  explicitement divergente : `InvalidArgs` immédiat. Sans URL explicite, le
+  lancement depuis le menu est accepté même si l'instance active utilise un
+  port de test.
+- **Décision 3 — cache CUDA** : `CacheDirectory=workflow-rs/cuda-compute`,
+  `CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute`,
+  `CUDA_CACHE_MAXSIZE=1073741824` (1 Gio). `%C` vaut `$XDG_CACHE_HOME` ou
+  `~/.cache`. Il n'existe pas de `NVVM_CACHE_PATH` : le cache NVVM est le
+  cache JIT CUDA.
+- **Décision 4 — cycle du paquet** : le `.deb` de référence J5 a été installé,
+  validé (GIO/GNOME), puis désinstallé. Le paquet MVP final a été reconstruit,
+  installé et validé sur le binaire `/usr/bin/workflow-gui-tauri`.
+- **Décision 5 — focus X11** : `present_with_time(0)` de GTK ne déminimise pas
+  de façon fiable sous GNOME. `x11_activation.rs` envoie `_NET_ACTIVE_WINDOW`
+  avec l'indication « pager » (2), `check()` + `sync()`, après un délai de
+  500 ms. Le repli Wayland reste `set_focus()`.
+- **Validation** : paquet 6 595 548 octets / 17 159 Kio, SHA-256
+  `66da7031601e66591a27c9fa03bbb9cee1ae9f46a5022d3381dc5640201439f8` ;
+  introspection 1 091 octets ; second lancement 53 ms, un processus, fenêtre
+  focalisée ; URL divergente `InvalidArgs` ; activation serveur arrêté ;
+  STEP2 7 s puis 2 s, CSV identique ; cache 4 096 o/0 → 15 794 o/2 fichiers
+  après sonde PTX, persistant après restart ; 325 tests, fmt/clippy/build
+  verts.
+- **Conséquences** : le jalon MVP J1 est clos. Restent le soak 2 h, le run
+  STEP8 sous unité, puis l'installation de l'unité de production lors de la
+  bascule publique.
+- **Validation documentaire** : `docs/PACKAGING-GUI.md`,
+  `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`,
+  `memory-bank/activeContext.md`, `memory-bank/progress.md`.

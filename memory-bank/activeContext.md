@@ -2,29 +2,49 @@
 
 ## Tâche en cours
 
-**MVP J1 — `.deb` réel, single-instance D-Bus et cache CUDA systemd
-validés.** Le paquet final (`6 595 548` octets, SHA-256
-`66da7031…201439f8`) est installé via `sudo apt install` et l'entrée GNOME est
-visible. Le client possède `org.workflow.desktop`, sert
-`org.freedesktop.Application` et restaure/focalise la fenêtre au second
-lancement (53 ms, un seul processus) ; une URL divergente est rejetée en
-`InvalidArgs`, et l'activation fonctionne serveur arrêté. L'unité systemd
-ajoute `CacheDirectory=workflow-rs/cuda-compute`,
-`CUDA_CACHE_PATH=%C/workflow-rs/cuda-compute` et
-`CUDA_CACHE_MAXSIZE=1073741824` ; STEP2 sous unité de test produit le CSV
-attendu. Le cache JIT est validé par une sonde PTX (15 794 octets `du -sb`,
-2 fichiers) et persiste après redémarrage, mais STEP2 lui-même n'a pas peuplé
-le cache (SASS `sm_75` précompilé). 325 tests workspace, fmt/clippy/build
-verts.
+**MVP J2 — soak 2 h, STEP8 systemd et bascule production validés.** Le
+correctif P1 retire les quatre secrets HTTP de l'environnement des
+sous-processus (`runner.rs`, test unitaire dédié). STEP8 tourne sous une unité
+systemd isolée (`ProtectSystem=full`, `NoNewPrivileges=yes`, cache CUDA
+`%C/workflow-rs/cuda-compute`) et produit un `.ecproj` 1080×1920 valide, sans
+écriture dans `/mnt/cache` ni `runtime/`. Le soak de 7 200 s donne 7 200/7 200
+échantillons, dérive p95 0,237 ms, **delta `WebKitNetworkProcess` 0 Kio**,
+GUI +1,68 Mio, serveur 0 Kio, 0 OOM, tray Idle. L'unité de production
+`workflow-server.service` est installée, activée, `Linger=yes`, secrets
+0600/0700, webhook réel `running` (462 enregistrements, `planned=0`) et
+redémarrage validé. 326 tests workspace, fmt/clippy/build verts.
 
-**Prochain jalon** : soak 2 h de confirmation, run STEP8 sous l'unité
-systemd, puis installation de l'unité de production `workflow-server.service`
-lors de la bascule publique. Toute évolution de `polling.rs`/`tray.rs` rejoue
-J4 ; toute évolution du single-instance rejoue
-`scripts/poc/verify-single-instance.sh`.
+**Prochain jalon** : push de `main` après l'ordre explicite
+`GO PUSH MAIN <SHA>`, puis surveillance du moniteur webhook en production.
+Toute évolution de `polling.rs`/`tray.rs` rejoue J4 ; toute évolution du
+single-instance rejoue `scripts/poc/verify-single-instance.sh`.
 
 ## Dernière session
 
+- [2026-10-26] **MVP J2 — soak, STEP8 systemd, bascule production** :
+  - P1 `env_remove` pour `WORKFLOW_SERVER_WORKER_TOKEN`,
+    `WORKFLOW_SERVER_SECRET_KEY`, `FLASK_SECRET_KEY` et
+    `INTERNAL_WORKER_COMMS_TOKEN` ; test unitaire d'étanchéité, wrapper STEP8
+    avec les quatre secrets à `<unset>` et `CUDA_CACHE_PATH` conservé ;
+  - STEP8 sous `workflow-server-step8-test.service` : rapport `success=true`,
+    mode `headless`, `bridge_port=null`, `.ecproj` 26 726 octets 1080×1920,
+    `effectcraft-cli 0.17.0`, permissions `ProtectSystem=full` vérifiées,
+    aucune écriture `/mnt/cache`/`runtime/`, unité retirée ;
+  - soak 2 h `soak-2h-20261026` : 7 200 échantillons, durée 7 199,131 s,
+    dérive p95 0,237 ms / max 1,201 ms, réseau 0 Kio, GUI RSS +1 716 Kio,
+    GUI PSS +1 701 Kio, WebKitWeb +1 692 Kio, serveur 0 Kio, MemAvailable
+    -115,56 Mio, VRAM pic 222 Mio, 0 OOM, watcher 7 202/0, D-Bus stable,
+    nettoyage complet ;
+  - bascule : `sync-backends.sh --apply` (911 URL, 97 archives, 1 008
+    doublons STEP7, sauvegarde `runtime/backups/sync/20261026_035127`),
+    smoke webhook désactivé, puis unité de production avec webhook réel
+    `running` (462 enregistrements, `planned=0`), `:5004` loopback, un seul
+    processus, `systemctl --user restart` 175295 → 175480, secrets
+    0600/0700, unité `enabled` ;
+  - validation : fmt/clippy rc 0, 326 tests workspace, build release
+    inchangé ; rapport
+    `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` et procédure
+    `docs/SWITCH-SYSTEMD.md`.
 - [2026-10-26] **MVP J1 — `.deb`, single-instance, cache CUDA** :
   - paquet final 6,29 Mio / 17 159 Kio installé, `desktop-file-validate`
     rc 0, `xdg-mime` `application/x-desktop`, `Gio.DesktopAppInfo` OK,

@@ -764,3 +764,36 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Validation documentaire** : `docs/PACKAGING-GUI.md`,
   `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md`,
   `memory-bank/activeContext.md`, `memory-bank/progress.md`.
+
+## 2026-10-26 — MVP J2 : soak, STEP8 systemd, bascule production
+
+- **Contexte** : clôturer le MVP avant le push de `main`. Les quatre arbitrages
+  du protocole J2 ont été ratifiés : P1 obligatoire, push sur le SHA final
+  (option A), `systemctl --user restart` au lieu d'un reboot, codification des
+  runbooks.
+- **Décision 1 — secrets** : `runner.rs` retire
+  `WORKFLOW_SERVER_WORKER_TOKEN`, `WORKFLOW_SERVER_SECRET_KEY`,
+  `FLASK_SECRET_KEY` et `INTERNAL_WORKER_COMMS_TOKEN` de l'environnement du
+  `workflow-cli` enfant. Les variables CUDA/cache restent transmises.
+- **Décision 2 — STEP8** : le run de validation utilise une unité
+  `workflow-server-step8-test.service` isolée, un port `5007`, un manifeste
+  STEP7 et un verrou matériel sous `/tmp/opencode`. Le `.ecproj` est ouvert
+  par `effectcraft-cli` pour vérifier 1080×1920.
+- **Décision 3 — soak** : gate GO MVP strict `delta WebKitNetworkProcess
+  ≤ 0 Kio` en plus des gates J4. Le gate `gui_proc_count == 1` a été remplacé
+  par « un seul PID hôte + membres de session stables » : le CSV compte le
+  processus hôte et les deux processus WebKit (3).
+- **Décision 4 — production** : smoke avec `[webhook] enabled = false`, puis
+  installation de l'unité avec `config/config.toml` (`enabled = true`,
+  `dry_run = false`). Secrets `~/.config/workflow-rs` 0700 et
+  `launcher.env` 0600. `systemctl --user enable` et `Linger=yes`.
+- **Validation** : soak 7 200 échantillons, réseau 0 Kio, GUI +1,68 Mio,
+  serveur 0 Kio, 0 OOM ; STEP8 `.ecproj` 26 726 octets ; webhook réel
+  `running`, 462 enregistrements, `planned=0` ; 326 tests, fmt/clippy/build
+  verts.
+- **Conséquences** : `main` peut être poussé après `GO PUSH MAIN <SHA>`.
+  Le manifeste STEP7 de production reste à régénérer avant un STEP8 réel.
+- **Validation documentaire** : `docs/SWITCH-SYSTEMD.md`,
+  `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md`,
+  `docs/PACKAGING-GUI.md`, `docs/SWITCH-PUBLIC.md`,
+  `memory-bank/activeContext.md`, `memory-bank/progress.md`.

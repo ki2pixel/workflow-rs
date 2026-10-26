@@ -139,6 +139,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
 - `docs/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
 - `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
+- `docs/SWITCH-SYSTEMD.md` : unité de production `workflow-server.service`, smoke webhook désactivé, activation du moniteur réel, redémarrage et rollback.
 - `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `docs/PACKAGING-GUI.md` : construction du `.deb` Tauri, installation réelle, single-instance D-Bus, cache CUDA systemd, supervision serveur `switch-rust.sh`/`systemd --user`, désinstallation et limites.
@@ -155,6 +156,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/audits/2026-10-25-poc-tauri-j4.md` : tray D-Bus, `StatusWatcher` 1 Hz, matrice d'états, fermeture vers le tray et soak d'endurance 2 h avec WebView inactive.
 - `docs/audits/2026-10-25-poc-tauri-j5.md` : paquet `.deb` Tauri, extraction sans root, supervision serveur `switch-rust.sh` et `systemd --user`, décision Tauri A-Strict.
 - `docs/audits/2026-10-26-mvp-j1-deb-single-instance-systemd.md` : installation réelle du `.deb` MVP, single-instance `org.workflow.desktop`, focus X11, cache CUDA `%C/workflow-rs/cuda-compute`, run STEP2 sous unité de test et métriques de persistance.
+- `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` : étanchéité des secrets, STEP8 sous unité systemd, soak 2 h (réseau 0 Kio), bascule `workflow-server.service` avec webhook réel.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -177,7 +179,11 @@ set -a; source config/launcher.env; set +a
 
 Pour le MVP, `scripts/install-systemd-user.sh` installe une unité
 `workflow-server.service` indépendante du GUI (secrets 0600, préflight
-port/webhook, `--start` optionnel). Voir `docs/PACKAGING-GUI.md`.
+port/webhook, `--start` optionnel). Depuis le 2026-10-26, c'est le mode de
+production : l'unité est activée avec le webhook réel et `Linger=yes`. Le
+lanceur `scripts/start-rust.sh` reste un mode PoC/manuel et ne doit pas
+tourner en parallèle. Voir `docs/SWITCH-SYSTEMD.md` et
+`docs/PACKAGING-GUI.md`.
 
 En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
 

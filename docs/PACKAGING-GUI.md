@@ -183,6 +183,9 @@ Le GUI peut être fermé ou tué : le service reste actif et le client se
 resynchronise au prochain lancement. Le cache CUDA est créé et conservé par
 systemd ; il n'est jamais supprimé par `--uninstall`.
 
+La procédure de bascule, de smoke webhook désactivé, d'activation du moniteur
+réel et de rollback est détaillée dans `docs/SWITCH-SYSTEMD.md`.
+
 ## Désinstallation
 
 ```sh
@@ -210,5 +213,11 @@ fichier de secrets pour éviter une suppression accidentelle.
 - Le run STEP2 sous l'unité de test n'a pas peuplé le cache JIT (SASS
   précompilé pour `sm_75`). Une sonde PTX séparée a validé le chemin et la
   persistance ; un GPU/driver différent peut peupler le cache pendant STEP2.
-- Le soak 2 h de confirmation et le run STEP8 sous l'unité restent à rejouer
-  avant la bascule publique.
+- Le soak 2 h de confirmation et le run STEP8 sous l'unité ont été validés le
+  2026-10-26 (7 200 échantillons, delta `WebKitNetworkProcess` 0 Kio,
+  `.ecproj` 1080×1920). Voir
+  `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md`.
+- `effectcraft-cli` est installé en 0.17.0 ; la documentation historique
+  mentionne 0.13. Le run STEP8 J2 a été validé avec 0.17.0.
+- Le manifeste STEP7 de production peut référencer un projet absent de
+  `/mnt/cache` ; STEP8 échouera alors jusqu'à un STEP7 courant.

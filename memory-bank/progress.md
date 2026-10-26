@@ -7,7 +7,7 @@
   rollback. Aucun serveur n'écoutait lors du bootstrap du 2026-10-24.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 319 tests workspace (281 pipeline + 38 services), sans matériel.
+- 326 tests workspace (pipeline + services + GUI), sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
@@ -74,6 +74,16 @@
   `workflow-steps` sont écrits par un processus `sh` séparé pour éviter
   `ETXTBSY`. Docs `docs/MVP-FRONTEND-POLLING.md` et
   `docs/audits/2026-10-25-revue-workflow-desktop-services.md`.
+- MVP J2 (2026-10-26) : P1 `env_remove` (4 secrets), STEP8 sous unité
+  systemd isolée (`.ecproj` 1080×1920, `ProtectSystem=full`, aucune écriture
+  `/mnt/cache`/`runtime/`), soak 2 h `soak-2h-20261026` (7 200 échantillons,
+  dérive p95 0,237 ms, **réseau 0 Kio**, GUI +1,68 Mio, serveur 0 Kio,
+  0 OOM, tray Idle, D-Bus stable), bascule `workflow-server.service` avec
+  webhook réel `running` (462 enregistrements, `planned=0`), secrets
+  0600/0700, `systemctl --user restart` validé. 326 tests workspace,
+  fmt/clippy/build verts. Rapports
+  `docs/audits/2026-10-26-mvp-j2-soak-step8-production.md` et
+  `docs/SWITCH-SYSTEMD.md`.
 - Synchronisation documentaire du 2026-10-24 : statut `stopping`, en-têtes de
   sécurité, `server.allow_remote`, quotas STEP1, purge des résidus et index
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
@@ -179,20 +189,23 @@
 
 ## Prochaines actions
 
-- **PoC Tauri J2/J3** : stress-test de rendu (4 profils WebKit, 35 lancements,
-  25 balayages de 5 bureaux GNOME), puis 5 runs STEP2 avec baseline Firefox
-  fraîche et surveillance VRAM (`pmon`, `fuser`, VRAM globale).
-1. **D-024** : diagnostiquer l'écart STEP4 Python sur `153 Camille`
+1. **Push `main`** : attendre l'ordre explicite `GO PUSH MAIN <SHA>` sur le SHA
+   final consolidé (option A), sans force.
+2. **Surveillance production** : vérifier le moniteur webhook
+   `workflow-server.service` après quelques jours, les téléchargements et la
+   cohérence de l'historique.
+3. **STEP7/STEP8 production** : produire un manifeste STEP7 courant avant de
+   cliquer STEP8 ; le manifeste `20261024_160353` référence un projet absent
+   de `/mnt/cache`.
+4. **D-024** : diagnostiquer l'écart STEP4 Python sur `153 Camille`
    (4 977 objets contre 11 853). Ne pas utiliser `--prefer-raw` sur ce projet
    tant que la configuration d'origine n'est pas retrouvée.
-2. **Reverse proxy** : aucun nginx/caddy/cloudflared n'est installé. La bascule
-   publique reste à faire ; voir `docs/SWITCH-PUBLIC.md`.
-3. **Surveillance production** : vérifier le moniteur webhook Rust après
-   quelques jours d'activité, les téléchargements et la cohérence de
-   l'historique.
-4. **Documentation** : maintenir `README.md`, `docs/LOT-*.md`,
+5. **Reverse proxy** : aucun nginx/caddy/cloudflared n'est installé. La bascule
+   publique reste à faire ; voir `docs/SWITCH-PUBLIC.md` et
+   `docs/SWITCH-SYSTEMD.md`.
+6. **Documentation** : maintenir `README.md`, `docs/LOT-*.md`,
    `docs/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md` à jour.
-5. **Memory-bank** : mettre à jour `activeContext.md` et ce fichier à chaque
+7. **Memory-bank** : mettre à jour `activeContext.md` et ce fichier à chaque
    session significative.
 
 ## Politique de rétention

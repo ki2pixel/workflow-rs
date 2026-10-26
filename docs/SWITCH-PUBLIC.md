@@ -9,10 +9,12 @@
 
 ## 0. Situation actuelle
 
-Le backend de production est Rust sur `http://127.0.0.1:5004` ; Python
+Le backend de production est Rust sur `http://127.0.0.1:5004`, servi par
+l'unité systemd --user `workflow-server.service` depuis le 2026-10-26. Python
 `http://127.0.0.1:5003` reste le rollback. Aucun reverse proxy n'est installé
 sur la machine (`nginx`, `caddy` et `cloudflared` sont absents). Il n'y a donc
-pas encore de « trafic public » à basculer.
+pas encore de « trafic public » à basculer. La procédure systemd, le smoke
+webhook et le rollback sont détaillés dans `docs/SWITCH-SYSTEMD.md`.
 
 Deux cas concrets :
 
@@ -281,7 +283,8 @@ STEP5/6 sur un projet existant) et vérifier `/status/<step>` et les logs.
 curl -fs -X POST -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
   http://127.0.0.1:5004/sequence/stop
 
-# 2. Synchroniser l'état Rust vers Python avant de démarrer Python.
+# 2. Arrêter l'unité systemd Rust, puis synchroniser l'état vers Python.
+systemctl --user stop workflow-server.service
 cd /home/kidpixel/workflow-rs
 ./scripts/sync-backends.sh --apply
 

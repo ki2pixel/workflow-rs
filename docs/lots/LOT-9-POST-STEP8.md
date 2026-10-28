@@ -1,7 +1,7 @@
 # Lot 9 — post-traitement A5/A6 après STEP8
 
 > Statut : intégré à la production le 2026-10-27 ; bypass direct SDM ajouté
-> le 2026-10-28.
+> le 2026-10-28, bypass archive-only LPHDF le 2026-10-29.
 > Décisions : **D-030** (A3 en review, A1/A2 durcis), **D-031** (A5 v2,
 > hash échantillonné, A6 mesuré), **D-032** (écriture du projet assisté),
 > **D-034** (bypass direct des vidéos SDM).
@@ -172,17 +172,51 @@ Validation :
 | 340 | CSV `1,00:00:00.000,00:00:21.200,1,531` ; brut et assist rendus, logo et panneaux conformes |
 | Lot mixte 303 + 340 | non-SDM `.ecproj` et `_assist.ecproj` identiques octet pour octet à l'ancien pipeline (chemins normalisés) ; rendu identique à 10/60 s ; SDM `apply` A6, audit `pass` |
 
+## Bypass archive-only (LPHDF)
+
+La famille `W9 - LPHDF` n'a besoin d'aucun `.ecproj` : son template sans
+découpe est géré manuellement. Quand `direct = true` et que
+`archive_only_prefixes` contient `W9 - LPHDF`, la vidéo suit un bypass encore
+plus radical que SDM.
+
+- **STEP2 à STEP6** : même prédicat que SDM (MP4 H.264 1920×1080, SAR 1:1,
+  25 fps CFR, `nb_frames` valide), donc mêmes gains et mêmes rapports
+  `skipped_template`.
+- **STEP7** : readiness `lenient`, CSV mono-segment synthétisé et archivé
+  sous `<stem>_scenes.csv`, puis copié sous `<stem>.csv` dans la sortie
+  finale. La copie `/mnt/cache` et la suppression de source restent
+  inchangées : la vidéo reste disponible pour le montage manuel.
+- **STEP8** : aucun `.ecproj` n'est créé. Le skip est **basé sur le nom**,
+  indépendamment du profil : même un fichier hors profil ne produit jamais
+  de projet. Un dossier 100 % LPHDF n'appelle pas le panel ; un dossier
+  mixte l'appelle en injectant les noms LPHDF en minuscules dans
+  `videoSkipNames`.
+- **Post-traitement** : les dossiers 100 % LPHDF et les projets résiduels
+  dont le stem correspond à une vidéo LPHDF sont ignorés.
+- **Hors profil** : le fichier traverse STEP2–7 normalement pour produire un
+  vrai CSV, mais STEP8 l'ignore quand même.
+
+Validation :
+
+| Cas | Résultat |
+| --- | --- |
+| 341 LPHDF (4 vidéos) | 4 CSV archivés (`5259`, `5293`, `5240`, `5253` frames), `scenes_origin = "template"`, copie docs complète, aucun `projets/`, aucun appel `effectcraft-cli` |
+| 341 + 303 (mixte) | seul le projet ordinaire est produit ; `videoSkipNames` contient le nom LPHDF en minuscules ; projet ordinaire identique à l'ancien pipeline hors version EffectCraft et chemins |
+
 ## Configuration
 
 ```toml
 [steps.step8.post]
 enabled = true
-# Bypass direct des vidéos SDM (D-034). Validé sur 295/340 et un lot mixte.
+# Bypass direct SDM (D-034) et archive-only LPHDF (D-035).
+# Validé sur 295/340/341 et des lots mixtes.
 direct = true
 suffix = "_assist"
 projects_subfolder = "projets"
 artifacts_subfolder = "post"
 template_prefix = "M6 - SDM - "
+# Familles sans `.ecproj` : CSV de scènes archivé uniquement.
+archive_only_prefixes = ["W9 - LPHDF"]
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 a1_margin = 1.04
@@ -200,7 +234,7 @@ post-traitement est de 0,07–0,24× la durée de la vidéo (sans rendu).
 workflow-cli step8 run --folder /tmp/projet
 workflow-cli step8 run --folder /tmp/projet --no-post
 
-# Bypass direct SDM (ou via [steps.step8.post].direct = true).
+# Bypass direct SDM + archive-only (ou via [steps.step8.post].direct = true).
 workflow-cli step7 finalize --direct --work-dir /tmp/projets
 workflow-cli step8 run --direct --folder /tmp/projet
 workflow-cli post run --direct --folder /tmp/projet

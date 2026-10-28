@@ -52,13 +52,94 @@ impl TemplateProbe {
 }
 
 /// Vrai si le nom de fichier relève du template direct.
+///
+/// La frontière évite qu'un préfixe comme `W9 - LPHDF` capture
+/// `W9 - LPHDFX`. Un préfixe terminé par un séparateur (`M6 - SDM - `) n'a
+/// pas besoin de cette garde.
 pub fn matches_name(path: &Path, prefix: &str) -> bool {
     if prefix.is_empty() {
         return false;
     }
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name.starts_with(prefix))
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let Some(rest) = name.strip_prefix(prefix) else {
+        return false;
+    };
+    let prefix_ends_with_separator = prefix
+        .chars()
+        .last()
+        .is_some_and(|character| !character.is_alphanumeric());
+    prefix_ends_with_separator
+        || rest.is_empty()
+        || !rest
+            .chars()
+            .next()
+            .is_some_and(|character| character.is_alphanumeric())
+}
+
+/// Famille de bypass d'une vidéo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BypassMode {
+    /// Template SDM : brut `.ecproj` + assist A6 après STEP7.
+    Template,
+    /// Archive seule : aucun `.ecproj`, seul le CSV de scènes est conservé.
+    ArchiveOnly,
+}
+
+/// Préfixes actifs du bypass direct, résolus vers leur mode.
+#[derive(Debug, Clone, Default)]
+pub struct Bypass {
+    entries: Vec<(String, BypassMode)>,
+}
+
+impl Bypass {
+    pub fn new(template_prefix: &str, archive_only_prefixes: &[String]) -> Self {
+        let mut entries = Vec::new();
+        if !template_prefix.is_empty() {
+            entries.push((template_prefix.to_string(), BypassMode::Template));
+        }
+        for prefix in archive_only_prefixes {
+            if !prefix.is_empty() {
+                entries.push((prefix.clone(), BypassMode::ArchiveOnly));
+            }
+        }
+        Self { entries }
+    }
+
+    pub fn from_config(post: &workflow_core::config::PostConfig) -> Self {
+        Self::new(&post.template_prefix, &post.archive_only_prefixes)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    fn entry_for_name(&self, path: &Path) -> Option<(&str, BypassMode)> {
+        self.entries
+            .iter()
+            .find(|(prefix, _)| matches_name(path, prefix))
+            .map(|(prefix, mode)| (prefix.as_str(), *mode))
+    }
+
+    /// Mode associé au nom, sans sonde ffprobe.
+    pub fn mode_for_name(&self, path: &Path) -> Option<BypassMode> {
+        self.entry_for_name(path).map(|(_, mode)| mode)
+    }
+
+    /// Sonde la vidéo si son nom relève d'un préfixe actif et que le profil
+    /// 1920x1080 25 fps est valide.
+    pub fn probe(
+        &self,
+        ffprobe: &Path,
+        video: &Path,
+    ) -> Result<Option<(BypassMode, TemplateProbe)>> {
+        let Some((prefix, mode)) = self.entry_for_name(video) else {
+            return Ok(None);
+        };
+        Ok(probe_direct(ffprobe, video, prefix)?.map(|probe| (mode, probe)))
+    }
 }
 
 /// Sonde ffprobe commune aux étapes et au post-traitement.
@@ -444,6 +525,26 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         assert!(probe_direct(&ffprobe, &other, "M6 - SDM - ")
             .unwrap()
             .is_some());
+    }
+
+    #[test]
+    fn bypass_resolves_prefixes_and_boundaries() {
+        let bypass = Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        assert_eq!(
+            bypass.mode_for_name(Path::new("M6 - SDM - Leslie et Léo.mp4")),
+            Some(BypassMode::Template)
+        );
+        assert_eq!(
+            bypass.mode_for_name(Path::new("W9 - LPHDF - La découverte.mp4")),
+            Some(BypassMode::ArchiveOnly)
+        );
+        assert_eq!(
+            bypass.mode_for_name(Path::new("W9 - LPHDF  -Un bal deux possibilités .mp4")),
+            Some(BypassMode::ArchiveOnly)
+        );
+        assert_eq!(bypass.mode_for_name(Path::new("W9 - LPHDFX.mp4")), None);
+        assert_eq!(bypass.mode_for_name(Path::new("Autre.mp4")), None);
+        assert!(Bypass::default().is_empty());
     }
 
     #[cfg(unix)]

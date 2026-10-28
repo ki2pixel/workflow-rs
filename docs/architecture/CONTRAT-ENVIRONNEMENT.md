@@ -410,13 +410,17 @@ avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
 avec `workflow-cli post run`. Depuis D-034, `steps.step8.post.direct`
 court-circuite STEP2–STEP6 pour les vidéos SDM au profil 1920×1080 25 fps :
 STEP7 synthétise le CSV mono-segment et STEP8 construit le brut sans panel.
-Détail : `docs/lots/LOT-9-POST-STEP8.md`.
+Depuis D-035, `steps.step8.post.archive_only_prefixes` (par défaut
+`["W9 - LPHDF"]` dans la configuration de production) applique le même
+bypass mais sans aucun `.ecproj` : seul le CSV de scènes est archivé et
+copié, STEP8 ignore la vidéo par son nom. Détail :
+`docs/lots/LOT-9-POST-STEP8.md`.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée
 
-Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 162 clés ; `config/env.map.toml` documente 149 correspondances.
+Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 163 clés ; `config/env.map.toml` documente 150 correspondances.
 
 Sections : `[server]`, `[paths]`, `[legacy]`, `[webhook]`, `[download]`, `[steps]`, `[steps.filter]`, `[steps.stepN]` (dont `[steps.step8.post]`), `[retention]` et `[hardware]`.
 

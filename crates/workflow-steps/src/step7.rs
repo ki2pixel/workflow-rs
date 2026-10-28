@@ -68,8 +68,8 @@ pub struct Step7Options {
     pub restore_archives: bool,
     pub delete_source: bool,
     pub project_filter: Option<String>,
-    /// `Some(prefix)` active la lecture directe des vidéos du template.
-    pub template_prefix: Option<String>,
+    /// Préfixes actifs du bypass direct (SDM + archive-only).
+    pub bypass: template::Bypass,
     pub ffprobe: PathBuf,
 }
 
@@ -115,7 +115,7 @@ pub fn finalize_work_dir(options: &Step7Options) -> Result<Step7Report> {
         &options.work_dir,
         options.mode,
         options.project_filter.as_deref(),
-        options.template_prefix.as_deref(),
+        &options.bypass,
         &options.ffprobe,
     )?;
     let mut archive_cache = HashMap::new();
@@ -166,7 +166,7 @@ pub fn find_projects_to_finalize(
     work_dir: &Path,
     mode: FinalizeMode,
     project_filter: Option<&str>,
-    template_prefix: Option<&str>,
+    bypass: &template::Bypass,
     ffprobe: &Path,
 ) -> Result<Vec<PathBuf>> {
     let mut projects = Vec::new();
@@ -189,7 +189,7 @@ pub fn find_projects_to_finalize(
                 continue;
             }
         }
-        if project_is_ready(&path, mode, template_prefix, ffprobe)? {
+        if project_is_ready(&path, mode, bypass, ffprobe)? {
             projects.push(path);
         }
     }
@@ -199,7 +199,7 @@ pub fn find_projects_to_finalize(
 fn project_is_ready(
     project_dir: &Path,
     mode: FinalizeMode,
-    template_prefix: Option<&str>,
+    bypass: &template::Bypass,
     ffprobe: &Path,
 ) -> Result<bool> {
     let videos = find_mp4_videos(project_dir);
@@ -212,20 +212,16 @@ fn project_is_ready(
 
     for video in videos {
         // Le mode `strict` conserve sa sémantique : scènes + tracking réels.
-        // Seul `lenient` accepte une vidéo SDM valide comme projet prêt.
+        // Seul `lenient` accepte une vidéo bypassée valide comme projet prêt.
         if mode == FinalizeMode::Lenient {
-            if let Some(prefix) = template_prefix {
-                if template::matches_name(&video, prefix) {
-                    match template::probe_direct(ffprobe, &video, prefix) {
-                        Ok(Some(_)) => return Ok(true),
-                        Ok(None) => {}
-                        Err(error) => {
-                            tracing::warn!(
-                                "STEP7: sonde template impossible pour {}: {error:#}",
-                                video.display()
-                            );
-                        }
-                    }
+            match bypass.probe(ffprobe, &video) {
+                Ok(Some(_)) => return Ok(true),
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(
+                        "STEP7: sonde bypass impossible pour {}: {error:#}",
+                        video.display()
+                    );
                 }
             }
         }
@@ -481,14 +477,11 @@ fn move_file(source: &Path, target: &Path) -> Result<()> {
 }
 
 fn synthetic_scenes(project_dir: &Path, options: &Step7Options) -> SyntheticMap {
-    let Some(prefix) = options.template_prefix.as_deref() else {
+    if options.bypass.is_empty() {
         return HashMap::new();
-    };
+    }
     let mut synthetic = HashMap::new();
     for video in find_videos(project_dir) {
-        if !template::matches_name(&video, prefix) {
-            continue;
-        }
         let Some(stem) = video.file_stem().and_then(|stem| stem.to_str()) else {
             continue;
         };
@@ -497,8 +490,8 @@ fn synthetic_scenes(project_dir: &Path, options: &Step7Options) -> SyntheticMap 
         {
             continue;
         }
-        match template::probe_direct(&options.ffprobe, &video, prefix) {
-            Ok(Some(probe)) => match template::single_scene_csv_bytes(probe.frames) {
+        match options.bypass.probe(&options.ffprobe, &video) {
+            Ok(Some((_, probe))) => match template::single_scene_csv_bytes(probe.frames) {
                 Ok(bytes) => {
                     synthetic.insert(
                         video,
@@ -518,7 +511,7 @@ fn synthetic_scenes(project_dir: &Path, options: &Step7Options) -> SyntheticMap 
             Ok(None) => {}
             Err(error) => {
                 tracing::warn!(
-                    "STEP7: sonde template impossible pour {}: {error:#}",
+                    "STEP7: sonde bypass impossible pour {}: {error:#}",
                     video.display()
                 );
             }
@@ -883,11 +876,12 @@ mod tests {
         write(&mov_only.join("clip_tracking.json"), b"{}");
         fs::create_dir_all(dir.path().join("_temp_skip")).unwrap();
 
+        let empty = template::Bypass::default();
         let lenient = find_projects_to_finalize(
             dir.path(),
             FinalizeMode::Lenient,
             None,
-            None,
+            &empty,
             Path::new("ffprobe"),
         )
         .unwrap();
@@ -896,7 +890,7 @@ mod tests {
             dir.path(),
             FinalizeMode::Strict,
             None,
-            None,
+            &empty,
             Path::new("ffprobe"),
         )
         .unwrap();
@@ -906,7 +900,7 @@ mod tests {
             dir.path(),
             FinalizeMode::Videos,
             None,
-            None,
+            &empty,
             Path::new("ffprobe"),
         )
         .unwrap();
@@ -1018,7 +1012,7 @@ mod tests {
             restore_archives: false,
             delete_source: false,
             project_filter: None,
-            template_prefix: None,
+            bypass: template::Bypass::default(),
             ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
@@ -1045,7 +1039,7 @@ mod tests {
             restore_archives: false,
             delete_source: false,
             project_filter: None,
-            template_prefix: None,
+            bypass: template::Bypass::default(),
             ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
@@ -1073,7 +1067,7 @@ mod tests {
             restore_archives: false,
             delete_source: true,
             project_filter: None,
-            template_prefix: None,
+            bypass: template::Bypass::default(),
             ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
@@ -1097,23 +1091,14 @@ mod tests {
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let strict = find_projects_to_finalize(
-            &work,
-            FinalizeMode::Strict,
-            None,
-            Some("M6 - SDM - "),
-            &ffprobe,
-        )
-        .unwrap();
+        let bypass = template::Bypass::new("M6 - SDM - ", &[]);
+        let strict =
+            find_projects_to_finalize(&work, FinalizeMode::Strict, None, &bypass, &ffprobe)
+                .unwrap();
         assert!(strict.is_empty(), "strict garde scènes + tracking réels");
-        let lenient = find_projects_to_finalize(
-            &work,
-            FinalizeMode::Lenient,
-            None,
-            Some("M6 - SDM - "),
-            &ffprobe,
-        )
-        .unwrap();
+        let lenient =
+            find_projects_to_finalize(&work, FinalizeMode::Lenient, None, &bypass, &ffprobe)
+                .unwrap();
         assert_eq!(lenient.len(), 1);
         let archives = dir.path().join("archives");
         let output = dir.path().join("out");
@@ -1127,7 +1112,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             restore_archives: false,
             delete_source: false,
             project_filter: None,
-            template_prefix: Some("M6 - SDM - ".into()),
+            bypass: template::Bypass::new("M6 - SDM - ", &[]),
             ffprobe,
         };
         let report = finalize_work_dir(&options).unwrap();
@@ -1154,5 +1139,70 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             .join("340 Camille/docs/M6 - SDM - Leslie et Léo.csv")
             .is_file());
         assert!(!docs.join("M6 - SDM - Leslie et Léo.csv").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn archives_synthetic_scene_csv_for_archive_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let work = dir.path().join("work");
+        let project = work.join("341 Camille");
+        let docs = project.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        std::fs::write(docs.join("W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"5253","duration":"210.120000"}]}'
+"#,
+        );
+        let bypass = template::Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        let strict =
+            find_projects_to_finalize(&work, FinalizeMode::Strict, None, &bypass, &ffprobe)
+                .unwrap();
+        assert!(strict.is_empty(), "strict garde scènes + tracking réels");
+        let lenient =
+            find_projects_to_finalize(&work, FinalizeMode::Lenient, None, &bypass, &ffprobe)
+                .unwrap();
+        assert_eq!(lenient.len(), 1);
+        let archives = dir.path().join("archives");
+        let output = dir.path().join("out");
+        let options = Step7Options {
+            work_dir: work,
+            output_dir: output.clone(),
+            archives_dir: archives.clone(),
+            logs_dir: dir.path().join("logs"),
+            fallback_output_dir: dir.path().join("fallback"),
+            mode: FinalizeMode::Lenient,
+            restore_archives: false,
+            delete_source: false,
+            project_filter: None,
+            bypass,
+            ffprobe,
+        };
+        let report = finalize_work_dir(&options).unwrap();
+        assert_eq!(report.projects.len(), 1);
+        let archive_project = matching_archive_dirs(&archives, "341 Camille").remove(0);
+        let video = project.join("docs/W9 - LPHDF - La découverte.mp4");
+        let hash = compute_video_hash(&video).unwrap();
+        let csv = archive_project
+            .join(&hash)
+            .join("W9 - LPHDF - La découverte_scenes.csv");
+        assert_eq!(
+            fs::read_to_string(&csv).unwrap(),
+            "No,Timecode In,Timecode Out,Frame In,Frame Out\r\n\
+             1,00:00:00.000,00:03:30.080,1,5253\r\n"
+        );
+        let metadata: Value = serde_json::from_slice(
+            &fs::read(archive_project.join(&hash).join("metadata.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(metadata["scenes_origin"], "template");
+        assert!(metadata["copied"]["scenes"].is_string());
+        assert!(output
+            .join("341 Camille/docs/W9 - LPHDF - La découverte.csv")
+            .is_file());
+        assert!(!docs.join("W9 - LPHDF - La découverte.csv").exists());
     }
 }

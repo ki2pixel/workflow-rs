@@ -13,6 +13,7 @@ use crate::post::model::{
     now_iso, verdict, Action, AuditCheck, Decision, PostProjectOutcome, PostRunSummary, PostSummary,
 };
 use crate::post::{a1, a2, a3, a4, a6, detect, direct};
+use crate::template::{Bypass, BypassMode};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
@@ -37,6 +38,7 @@ pub struct PostOptions {
     pub docs_subfolder: String,
     pub artifacts_subfolder: String,
     pub template_prefix: String,
+    pub archive_only_prefixes: Vec<String>,
     pub a1_margin: f64,
     pub a2_margin: f64,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.
@@ -55,6 +57,7 @@ impl Default for PostOptions {
             docs_subfolder: "docs".into(),
             artifacts_subfolder: "post".into(),
             template_prefix: a6::DEFAULT_PREFIX.into(),
+            archive_only_prefixes: Vec::new(),
             a1_margin: 1.04,
             a2_margin: 1.05,
             report_only: false,
@@ -74,6 +77,7 @@ impl PostOptions {
             docs_subfolder: docs_subfolder.to_string(),
             artifacts_subfolder: config.artifacts_subfolder.clone(),
             template_prefix: config.template_prefix.clone(),
+            archive_only_prefixes: config.archive_only_prefixes.clone(),
             a1_margin: config.a1_margin,
             a2_margin: config.a2_margin,
             report_only: false,
@@ -98,13 +102,14 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
     if !options.enabled {
         return summary;
     }
-    if options.direct && !options.report_only {
+    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    if options.direct && !options.report_only && !bypass.is_empty() {
         let direct = direct::ensure_folder(
             folder,
             &options.docs_subfolder,
             &options.projects_subfolder,
             &options.ffprobe,
-            &options.template_prefix,
+            &bypass,
             false,
         );
         if direct.templates > 0 {
@@ -114,6 +119,13 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
                 direct.templates,
                 direct.created,
                 direct.existing
+            );
+        }
+        if direct.archive_only > 0 {
+            tracing::info!(
+                "Archive-only {}: {} vidéo(s), aucun brut",
+                folder.display(),
+                direct.archive_only
             );
         }
         if direct.failed > 0 {
@@ -170,6 +182,36 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
         projects.push(path);
     }
     projects.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
+    if options.direct && !bypass.is_empty() {
+        let archive_stems: std::collections::HashSet<String> =
+            crate::template::docs_videos(&folder.join(&options.docs_subfolder))
+                .into_iter()
+                .filter(|video| bypass.mode_for_name(video) == Some(BypassMode::ArchiveOnly))
+                .filter_map(|video| {
+                    video
+                        .file_stem()
+                        .and_then(|stem| stem.to_str())
+                        .map(str::to_string)
+                })
+                .collect();
+        if !archive_stems.is_empty() {
+            let before = projects.len();
+            projects.retain(|project| {
+                let Some(stem) = project.file_stem().and_then(|stem| stem.to_str()) else {
+                    return true;
+                };
+                let stem = stem.strip_suffix("_9x16").unwrap_or(stem);
+                !archive_stems.contains(stem)
+            });
+            let skipped = before - projects.len();
+            if skipped > 0 {
+                tracing::info!(
+                    "Post-traitement: {skipped} projet(s) archive-only ignoré(s) dans {}",
+                    folder.display()
+                );
+            }
+        }
+    }
     if projects.is_empty() {
         tracing::debug!(
             "Post-traitement: aucun .ecproj brut dans {}",
@@ -1406,6 +1448,30 @@ mod tests {
         assert!(!root
             .join("projets")
             .join("clip_9x16_assist.ecproj")
+            .exists());
+    }
+
+    #[test]
+    fn archive_only_project_is_not_post_processed() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("341 Camille");
+        fs::create_dir_all(root.join("projets")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(root.join("docs/W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        let project = root
+            .join("projets")
+            .join("W9 - LPHDF - La découverte_9x16.ecproj");
+        fs::write(&project, serde_json::to_vec(&project_doc()).unwrap()).unwrap();
+        let options = PostOptions {
+            direct: true,
+            archive_only_prefixes: vec!["W9 - LPHDF".into()],
+            ..PostOptions::default()
+        };
+        let summary = run_post_dir(&options, &root);
+        assert_eq!(summary.projects, 0);
+        assert!(!root
+            .join("projets")
+            .join("W9 - LPHDF - La découverte_9x16_assist.ecproj")
             .exists());
     }
 }

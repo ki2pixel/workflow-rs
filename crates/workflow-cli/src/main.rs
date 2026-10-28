@@ -1203,12 +1203,11 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
-                    template_prefix: config
-                        .steps
-                        .step8
-                        .post
-                        .direct
-                        .then(|| config.steps.step8.post.template_prefix.clone()),
+                    bypass: if config.steps.step8.post.direct {
+                        workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
+                    } else {
+                        workflow_steps::template::Bypass::default()
+                    },
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -1266,12 +1265,11 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
-                    template_prefix: config
-                        .steps
-                        .step8
-                        .post
-                        .direct
-                        .then(|| config.steps.step8.post.template_prefix.clone()),
+                    bypass: if config.steps.step8.post.direct {
+                        workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
+                    } else {
+                        workflow_steps::template::Bypass::default()
+                    },
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -1327,13 +1325,17 @@ fn run() -> Result<()> {
                     .parse::<FinalizeMode>()
                     .map_err(|error| anyhow::anyhow!(error))?;
 
+                let bypass = if direct || config.steps.step8.post.direct {
+                    workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
+                } else {
+                    workflow_steps::template::Bypass::default()
+                };
                 if dry_run {
                     let projects = find_projects_to_finalize(
                         &work_dir,
                         mode,
                         project.as_deref(),
-                        (direct || config.steps.step8.post.direct)
-                            .then_some(config.steps.step8.post.template_prefix.as_str()),
+                        &bypass,
                         &config.steps.step8.post.ffprobe,
                     )
                     .with_context(|| format!("analyse de {}", work_dir.display()))?;
@@ -1366,8 +1368,7 @@ fn run() -> Result<()> {
                     restore_archives: restore_archives || config.steps.step7.restore_archives,
                     delete_source: !no_delete && config.steps.step7.delete_source,
                     project_filter: project,
-                    template_prefix: (direct || config.steps.step8.post.direct)
-                        .then(|| config.steps.step8.post.template_prefix.clone()),
+                    bypass,
                     ffprobe: config.steps.step8.post.ffprobe.clone(),
                 };
                 let report = finalize_work_dir(&options)

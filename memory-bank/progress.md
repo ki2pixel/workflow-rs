@@ -12,7 +12,10 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 333 tests unitaires, sans matériel.
+- 341 tests unitaires, sans matériel.
+- Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
+  sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
+  aucun `.ecproj` (validé sur 295, 340, 341 et lots mixtes).
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture

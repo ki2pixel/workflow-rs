@@ -80,6 +80,8 @@ struct Step8Report {
     success: bool,
     direct_projects: usize,
     direct_created: usize,
+    archive_only_videos: usize,
+    archive_only_folders: usize,
     panel_skipped: bool,
     panel_folders: Vec<String>,
     post: Option<PostRunSummary>,
@@ -154,7 +156,8 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         .filter(|folder| !direct_summary.pure_folders.contains(folder))
         .cloned()
         .collect();
-    let panel_skipped = direct_summary.templates > 0 && panel_folders.is_empty();
+    let bypass_videos = direct_summary.templates + direct_summary.archive_only;
+    let panel_skipped = bypass_videos > 0 && panel_folders.is_empty();
     let mut config_json = config_json;
     if !direct_summary.names.is_empty() {
         config_json = inject_video_skip_names(config_json.as_deref(), &direct_summary.names);
@@ -178,11 +181,20 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             direct_summary.existing
         );
     }
+    if direct_summary.archive_only > 0 {
+        tracing::info!(
+            "Archive-only: {} vidéo(s) dans {} dossier(s), aucun brut.",
+            direct_summary.archive_only,
+            direct_summary.archive_only_folders
+        );
+    }
     if panel_skipped {
-        tracing::info!("Panel MediaSolution ignoré: tous les dossiers sont des templates directs.");
+        tracing::info!(
+            "Panel MediaSolution ignoré: tous les dossiers sont des templates directs ou archive-only."
+        );
     } else if panel_folders.len() != folders.len() {
         tracing::info!(
-            "Panel MediaSolution limité à {} dossier(s) non-template.",
+            "Panel MediaSolution limité à {} dossier(s) hors bypass.",
             panel_folders.len()
         );
     }
@@ -250,6 +262,7 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         }
         if panel_skipped {
             println!("DIRECT_TEMPLATE_TOTAL: {}", direct_summary.templates);
+            println!("ARCHIVE_ONLY_TOTAL: {}", direct_summary.archive_only);
         }
         return Ok(Step8Outcome {
             success: true,
@@ -281,8 +294,9 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         result = Some(json!({
             "ok": direct_summary.failed == 0,
             "errors": [],
-            "panel_skipped": "all_direct_templates",
+            "panel_skipped": "all_bypassed",
             "direct_templates": direct_summary.templates,
+            "archive_only": direct_summary.archive_only,
         }));
     } else {
         let timeout = (options.timeout_s > 0).then(|| Duration::from_secs(options.timeout_s));
@@ -371,7 +385,17 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         folders: folders.clone(),
         panel_jsx: panel_jsx_display,
         cli: cli_display,
-        mode: if panel_skipped { "direct" } else { "headless" },
+        mode: if panel_skipped {
+            if direct_summary.templates == 0 {
+                "archive_only"
+            } else if direct_summary.archive_only == 0 {
+                "direct"
+            } else {
+                "bypass"
+            }
+        } else {
+            "headless"
+        },
         bridge_port: Value::Null,
         app_launched: false,
         cli_version: version.clone(),
@@ -388,6 +412,8 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         success,
         direct_projects: direct_summary.templates,
         direct_created: direct_summary.created,
+        archive_only_videos: direct_summary.archive_only,
+        archive_only_folders: direct_summary.archive_only_folders,
         panel_skipped,
         panel_folders: panel_folders.clone(),
         post: post_summary.clone(),
@@ -1529,6 +1555,152 @@ printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles
         let driver = fs::read_to_string(report["driver"].as_str().unwrap()).unwrap();
         assert!(driver.contains("m6 - sdm - leslie et léo.mp4"));
         assert!(!driver.contains("M6 - SDM - Leslie et Léo.mp4"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn archive_only_folder_skips_panel_and_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("341 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder.clone()],
+            cli: dir.path().join("effectcraft-cli-introuvable"),
+            panel_jsx: dir.path().join("MediaSolution-introuvable.jsx"),
+            panel_config: None,
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                archive_only_prefixes: vec!["W9 - LPHDF".into()],
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert!(!folder.join("projets").exists());
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["mode"], "archive_only");
+        assert_eq!(report["panel_skipped"], true);
+        assert_eq!(report["direct_projects"], 0);
+        assert_eq!(report["archive_only_videos"], 1);
+        assert_eq!(report["archive_only_folders"], 1);
+        assert_eq!(report["panel_folders"].as_array().unwrap().len(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mixed_folder_keeps_panel_and_skips_archive_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("341 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        fs::write(folder.join("docs/Autre - Sujet.mp4"), b"video").unwrap();
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        crate::test_support::write_executable(
+            &cli,
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi
+printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles":true}},{"command":"file.runScript","result":{"ok":true,"error":null,"result":"step8-ok","output":"MS_BATCH_RESULT: {\"ok\": true, \"errors\": []}"}}]'
+"#,
+        );
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder.clone()],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                archive_only_prefixes: vec!["W9 - LPHDF".into()],
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["panel_skipped"], false);
+        assert_eq!(report["panel_folders"].as_array().unwrap().len(), 1);
+        assert_eq!(report["archive_only_videos"], 1);
+        let driver = fs::read_to_string(report["driver"].as_str().unwrap()).unwrap();
+        assert!(driver.contains("w9 - lphdf - la découverte.mp4"));
+        assert!(!driver.contains("W9 - LPHDF - La découverte.mp4"));
+        assert!(!folder
+            .join("projets/W9 - LPHDF - La découverte_9x16.ecproj")
+            .exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sdm_and_archive_only_folder_skips_panel_and_only_builds_sdm_raw() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("340 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/M6 - SDM - Leslie et Léo.mp4"), b"video").unwrap();
+        fs::write(folder.join("docs/W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
+"#,
+        );
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder.clone()],
+            cli: dir.path().join("effectcraft-cli-introuvable"),
+            panel_jsx: dir.path().join("MediaSolution-introuvable.jsx"),
+            panel_config: None,
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                ffprobe,
+                archive_only_prefixes: vec!["W9 - LPHDF".into()],
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert!(folder
+            .join("projets/M6 - SDM - Leslie et Léo_9x16.ecproj")
+            .is_file());
+        assert!(!folder
+            .join("projets/W9 - LPHDF - La découverte_9x16.ecproj")
+            .exists());
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["mode"], "bypass");
+        assert_eq!(report["panel_skipped"], true);
+        assert_eq!(report["direct_projects"], 1);
+        assert_eq!(report["archive_only_videos"], 1);
+        assert_eq!(report["archive_only_folders"], 1);
+        assert_eq!(report["panel_folders"].as_array().unwrap().len(), 0);
     }
 
     #[test]

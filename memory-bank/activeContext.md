@@ -2,16 +2,31 @@
 
 ## Tâche en cours
 
-**Post-traitement A5/A6 et bypass direct SDM en production.** STEP8 publie
-toujours un second `<stem>_assist.ecproj` à côté du brut intact, avec
-`post.json`/`review.json`/`audit.json` sous `docs/post/`. A1 letterbox, A2
-bannière, A3/A4 en revue, A6 template SDM. Depuis D-034, `post.direct`
+**Post-traitement A5/A6 et bypass direct SDM/archive-only en production.**
+STEP8 publie toujours un second `<stem>_assist.ecproj` à côté du brut intact,
+avec `post.json`/`review.json`/`audit.json` sous `docs/post/`. A1 letterbox,
+A2 bannière, A3/A4 en revue, A6 template SDM. Depuis D-034, `post.direct`
 court-circuite STEP2–STEP6 pour les vidéos `M6 - SDM - ` au profil
 1920×1080 25 fps ; STEP7 synthétise le CSV mono-segment et STEP8 construit
-le brut sans panel. Validation 295 au pixel, 340, lot mixte et non-SDM
-inchangés ; tests, fmt et clippy verts.
+le brut sans panel. Depuis D-035, `archive_only_prefixes` applique le même
+bypass à `W9 - LPHDF` mais sans aucun `.ecproj` : seul le CSV est archivé et
+copié, STEP8 ignore la vidéo par son nom. Validation 295 au pixel, 340, 341,
+lots mixtes et non-bypass inchangés ; tests, fmt et clippy verts.
 
 ## Dernière session
+
+- [2026-10-29] **Bypass archive-only LPHDF (D-035)** :
+  - `archive_only_prefixes = ["W9 - LPHDF"]` sous `[steps.step8.post]` ;
+  - STEP2–STEP6 : même prédicat que SDM, `SKIP_TEMPLATE` avant modèles ;
+  - STEP7 : CSV mono-segment archivé (`_scenes.csv`) et copié (`.csv`),
+    copie `/mnt/cache` et suppression de source inchangées ;
+  - STEP8 : skip par nom, aucun `.ecproj`, panel ignoré pour un dossier
+    100 % LPHDF, noms injectés en minuscules dans un dossier mixte ;
+  - post-traitement : dossiers/projets LPHDF résiduels ignorés ;
+  - validation 341 : 4 CSV (`5259`, `5293`, `5240`, `5253` frames), aucun
+    `projets/` ; mixte 303 + LPHDF : seul le projet ordinaire est produit,
+    identique hors version EffectCraft et chemins ;
+  - 341 tests, `fmt`, `clippy -D warnings` et `config check` verts.
 
 - [2026-10-28] **Bypass direct SDM (D-034)** :
   - `template.rs` : sonde ffprobe, prédicat MP4 H.264 1920×1080 SAR 1:1
@@ -268,7 +283,7 @@ inchangés ; tests, fmt et clippy verts.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 333 tests unitaires ; pas de CI.
+- 341 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

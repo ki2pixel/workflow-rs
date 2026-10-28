@@ -316,6 +316,41 @@ impl Config {
                     .into(),
             ));
         }
+        for (index, prefix) in self
+            .steps
+            .step8
+            .post
+            .archive_only_prefixes
+            .iter()
+            .enumerate()
+        {
+            if prefix.trim().is_empty() {
+                return Err(ConfigError::Invalid(
+                    "steps.step8.post.archive_only_prefixes ne peut pas contenir de préfixe vide"
+                        .into(),
+                ));
+            }
+            let template_prefix = &self.steps.step8.post.template_prefix;
+            let overlaps_template = !template_prefix.trim().is_empty()
+                && (prefix == template_prefix
+                    || prefix.starts_with(template_prefix)
+                    || template_prefix.starts_with(prefix));
+            let overlaps_other = self
+                .steps
+                .step8
+                .post
+                .archive_only_prefixes
+                .iter()
+                .skip(index + 1)
+                .any(|other| {
+                    other == prefix || other.starts_with(prefix) || prefix.starts_with(other)
+                });
+            if overlaps_template || overlaps_other {
+                return Err(ConfigError::Invalid(format!(
+                    "steps.step8.post: préfixe archive-only '{prefix}' ambigu (chevauchement)"
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -961,6 +996,9 @@ pub struct PostConfig {
     pub projects_subfolder: String,
     pub artifacts_subfolder: String,
     pub template_prefix: String,
+    /// Préfixes des vidéos qui ne produisent aucun `.ecproj` : STEP2 à STEP6
+    /// sont sautés et STEP7 n'archive que le CSV de scènes.
+    pub archive_only_prefixes: Vec<String>,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
     pub a1_margin: f64,
@@ -976,6 +1014,7 @@ impl Default for PostConfig {
             projects_subfolder: "projets".into(),
             artifacts_subfolder: "post".into(),
             template_prefix: "M6 - SDM - ".into(),
+            archive_only_prefixes: Vec::new(),
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
             a1_margin: 1.04,
@@ -1061,6 +1100,17 @@ mod tests {
     fn defaults_are_valid() {
         let config = Config::default();
         config.validate_common().expect("defaults valides");
+    }
+
+    #[test]
+    fn archive_only_prefixes_must_not_overlap() {
+        let mut config = Config::default();
+        config.steps.step8.post.archive_only_prefixes = vec!["M6 - SDM".into()];
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.archive_only_prefixes = vec!["W9 - LPHDF".into()];
+        assert!(config.validate_common().is_ok());
+        config.steps.step8.post.archive_only_prefixes = vec!["".into()];
+        assert!(config.validate_common().is_err());
     }
 
     #[test]

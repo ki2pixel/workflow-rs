@@ -68,8 +68,8 @@ pub struct Step4Options {
     /// Autorise un JSON partiel quand le CSV de scènes ou l'audio manquent.
     /// Désactivé par défaut : la production exige les deux entrées.
     pub allow_partial_speaking: bool,
-    /// `Some(prefix)` ignore les vidéos du template direct.
-    pub template_prefix: Option<String>,
+    /// Préfixes actifs du bypass direct (SDM + archive-only).
+    pub bypass: template::Bypass,
 }
 
 impl Step4Options {
@@ -194,12 +194,11 @@ impl Step4Options {
             skip_preserved_mov: config.steps.step1.skip_preserved_mov,
             preserved_mov_names,
             allow_partial_speaking: false,
-            template_prefix: config
-                .steps
-                .step8
-                .post
-                .direct
-                .then(|| config.steps.step8.post.template_prefix.clone()),
+            bypass: if config.steps.step8.post.direct {
+                template::Bypass::from_config(&config.steps.step8.post)
+            } else {
+                template::Bypass::default()
+            },
         })
     }
 }
@@ -276,21 +275,17 @@ pub fn run_step4(options: &Step4Options) -> Result<Step4Report> {
     let mut skipped_preserved = 0;
     let mut skipped_template = 0;
     for video in discover_videos(&options.input_dir)? {
-        if let Some(prefix) = options.template_prefix.as_deref() {
-            if template::matches_name(&video, prefix) {
-                match template::probe_direct(&options.ffprobe, &video, prefix) {
-                    Ok(Some(_)) => {
-                        logger.line(format_args!("SKIP_TEMPLATE: {}", video.display()));
-                        skipped_template += 1;
-                        continue;
-                    }
-                    Ok(None) => {}
-                    Err(error) => logger.line(format_args!(
-                        "WARN: sonde template impossible pour {}: {error:#}",
-                        video.display()
-                    )),
-                }
+        match options.bypass.probe(&options.ffprobe, &video) {
+            Ok(Some(_)) => {
+                logger.line(format_args!("SKIP_TEMPLATE: {}", video.display()));
+                skipped_template += 1;
+                continue;
             }
+            Ok(None) => {}
+            Err(error) => logger.line(format_args!(
+                "WARN: sonde bypass impossible pour {}: {error:#}",
+                video.display()
+            )),
         }
         if is_preserved_media(&video, options) {
             logger.line(format_args!("SKIP_PRESERVED: {}", video.display()));
@@ -945,7 +940,7 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
             allow_partial_speaking: false,
-            template_prefix: None,
+            bypass: template::Bypass::default(),
         };
         assert!(is_preserved_media(Path::new("M6+.MOV"), &options));
     }

@@ -5,7 +5,7 @@
 
 use crate::post::ecproj::save_bytes;
 use crate::post::run::PostOptions;
-use crate::template::{self, TemplateProbe};
+use crate::template::{self, Bypass, BypassMode, TemplateProbe};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::fs;
@@ -23,11 +23,16 @@ pub struct TemplateVideo {
 pub struct DirectSummary {
     pub folders: usize,
     pub templates: usize,
+    pub archive_only: usize,
+    pub archive_only_folders: usize,
     pub created: usize,
     pub existing: usize,
     pub failed: usize,
+    /// Tous les noms bypassés, injectés dans `videoSkipNames`.
     pub names: Vec<String>,
-    /// Dossiers dont toutes les vidéos sont des templates directs valides.
+    /// Noms des vidéos archive-only, pour filtrer le post-traitement.
+    pub archive_only_names: Vec<String>,
+    /// Dossiers dont toutes les vidéos sont bypassées (SDM ou archive-only).
     pub pure_folders: Vec<String>,
 }
 
@@ -35,48 +40,59 @@ impl DirectSummary {
     pub fn merge(&mut self, other: DirectSummary) {
         self.folders += other.folders;
         self.templates += other.templates;
+        self.archive_only += other.archive_only;
+        self.archive_only_folders += other.archive_only_folders;
         self.created += other.created;
         self.existing += other.existing;
         self.failed += other.failed;
         self.names.extend(other.names);
+        self.archive_only_names.extend(other.archive_only_names);
         self.pure_folders.extend(other.pure_folders);
     }
 }
 
-/// Vidéos du template direct dans `<folder>/<docs_subfolder>`.
-pub fn templates_in_folder(
+/// Résultat du scan d'un dossier `docs`.
+#[derive(Debug, Default)]
+pub struct FolderScan {
+    pub templates: Vec<TemplateVideo>,
+    pub archive_only: Vec<PathBuf>,
+}
+
+/// Sépare les vidéos SDM valides des vidéos archive-only.
+pub fn scan_folder(
     folder: &Path,
     docs_subfolder: &str,
     ffprobe: &Path,
-    prefix: &str,
-) -> Vec<TemplateVideo> {
+    bypass: &Bypass,
+) -> FolderScan {
     let docs = folder.join(docs_subfolder);
-    let mut templates = Vec::new();
+    let mut scan = FolderScan::default();
     for video in template::docs_videos(&docs) {
-        if !template::matches_name(&video, prefix) {
-            continue;
-        }
-        match template::probe_direct(ffprobe, &video, prefix) {
-            Ok(Some(probe)) => {
-                let Some(stem) = video
-                    .file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .map(str::to_string)
-                else {
-                    continue;
-                };
-                templates.push(TemplateVideo { video, stem, probe });
-            }
-            Ok(None) => {}
-            Err(error) => {
-                tracing::warn!(
-                    "Template direct: sonde ignorée pour {} ({error:#})",
-                    video.display()
-                );
-            }
+        match bypass.mode_for_name(&video) {
+            Some(BypassMode::ArchiveOnly) => scan.archive_only.push(video),
+            Some(BypassMode::Template) => match bypass.probe(ffprobe, &video) {
+                Ok(Some((_, probe))) => {
+                    let Some(stem) = video
+                        .file_stem()
+                        .and_then(|stem| stem.to_str())
+                        .map(str::to_string)
+                    else {
+                        continue;
+                    };
+                    scan.templates.push(TemplateVideo { video, stem, probe });
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(
+                        "Template direct: sonde ignorée pour {} ({error:#})",
+                        video.display()
+                    );
+                }
+            },
+            None => {}
         }
     }
-    templates
+    scan
 }
 
 pub fn ensure_for_folders(
@@ -88,6 +104,10 @@ pub fn ensure_for_folders(
     if !options.direct {
         return summary;
     }
+    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    if bypass.is_empty() {
+        return summary;
+    }
     for folder in folders {
         let folder = Path::new(folder);
         let folder_summary = ensure_folder(
@@ -95,7 +115,7 @@ pub fn ensure_for_folders(
             &options.docs_subfolder,
             &options.projects_subfolder,
             &options.ffprobe,
-            &options.template_prefix,
+            &bypass,
             dry_run,
         );
         summary.merge(folder_summary);
@@ -108,36 +128,59 @@ pub fn ensure_folder(
     docs_subfolder: &str,
     projects_subfolder: &str,
     ffprobe: &Path,
-    prefix: &str,
+    bypass: &Bypass,
     dry_run: bool,
 ) -> DirectSummary {
     let docs = folder.join(docs_subfolder);
-    let templates = templates_in_folder(folder, docs_subfolder, ffprobe, prefix);
-    let template_names: std::collections::HashSet<&str> = templates
+    let scan = scan_folder(folder, docs_subfolder, ffprobe, bypass);
+    let template_names: std::collections::HashSet<&str> = scan
+        .templates
         .iter()
         .filter_map(|template| template.video.file_name().and_then(|name| name.to_str()))
         .collect();
-    let pure = !templates.is_empty()
+    let archive_names = scan
+        .archive_only
+        .iter()
+        .filter_map(|video| video.file_name().and_then(|name| name.to_str()))
+        .collect::<std::collections::HashSet<&str>>();
+    let has_bypass = !scan.templates.is_empty() || !scan.archive_only.is_empty();
+    let pure = has_bypass
         && template::docs_videos(&docs).iter().all(|video| {
             video
                 .file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| template_names.contains(name))
+                .is_some_and(|name| template_names.contains(name) || archive_names.contains(name))
         });
+    let archive_only_names: Vec<String> = scan
+        .archive_only
+        .iter()
+        .filter_map(|video| {
+            video
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+        })
+        .collect();
+    let mut names: Vec<String> = scan
+        .templates
+        .iter()
+        .filter_map(|template| {
+            template
+                .video
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+        })
+        .collect();
+    names.extend(archive_only_names.iter().cloned());
     let projects = folder.join(projects_subfolder);
     let mut summary = DirectSummary {
-        folders: usize::from(!templates.is_empty()),
-        templates: templates.len(),
-        names: templates
-            .iter()
-            .filter_map(|template| {
-                template
-                    .video
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .map(str::to_string)
-            })
-            .collect(),
+        folders: usize::from(has_bypass),
+        templates: scan.templates.len(),
+        archive_only: scan.archive_only.len(),
+        archive_only_folders: usize::from(!scan.archive_only.is_empty()),
+        names,
+        archive_only_names,
         pure_folders: if pure {
             vec![folder.to_string_lossy().to_string()]
         } else {
@@ -145,7 +188,7 @@ pub fn ensure_folder(
         },
         ..DirectSummary::default()
     };
-    for template in templates {
+    for template in scan.templates {
         let raw = projects.join(format!("{}_9x16.ecproj", template.stem));
         if raw.is_file() {
             summary.existing += 1;
@@ -261,7 +304,8 @@ mod tests {
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let summary = ensure_folder(&folder, "docs", "projets", &ffprobe, "M6 - SDM - ", false);
+        let bypass = Bypass::new("M6 - SDM - ", &[]);
+        let summary = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
         assert_eq!(summary.templates, 1);
         assert_eq!(summary.created, 0);
         assert_eq!(summary.failed, 1);
@@ -282,7 +326,8 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let first = ensure_folder(&folder, "docs", "projets", &ffprobe, "M6 - SDM - ", false);
+        let bypass = Bypass::new("M6 - SDM - ", &[]);
+        let first = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
         assert_eq!(first.templates, 1);
         assert_eq!(first.created, 1);
         assert_eq!(first.existing, 0);
@@ -290,9 +335,36 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             .join("projets")
             .join("M6 - SDM - Leslie et Léo_9x16.ecproj")
             .is_file());
-        let second = ensure_folder(&folder, "docs", "projets", &ffprobe, "M6 - SDM - ", false);
+        let second = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
         assert_eq!(second.created, 0);
         assert_eq!(second.existing, 1);
         assert!(!docs.join("M6 - SDM - Leslie et Léo.csv").exists());
+    }
+
+    #[test]
+    fn archive_only_videos_are_scanned_without_raw() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("341 Camille");
+        let docs = folder.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
+        let bypass = Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        let summary = ensure_folder(
+            &folder,
+            "docs",
+            "projets",
+            Path::new("ffprobe"),
+            &bypass,
+            false,
+        );
+        assert_eq!(summary.templates, 0);
+        assert_eq!(summary.archive_only, 1);
+        assert_eq!(summary.archive_only_folders, 1);
+        assert_eq!(summary.pure_folders.len(), 1);
+        assert_eq!(summary.names, vec!["W9 - LPHDF - La découverte.mp4"]);
+        assert!(summary
+            .archive_only_names
+            .contains(&"W9 - LPHDF - La découverte.mp4".to_string()));
+        assert!(!folder.join("projets").exists());
     }
 }

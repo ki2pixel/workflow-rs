@@ -392,6 +392,43 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/template.rs`,
   `crates/workflow-steps/src/post/direct.rs`, `config/config.toml`.
 
+## 2026-10-29 — D-035 : bypass archive-only des vidéos LPHDF
+
+- **Contexte** : la famille récurrente `W9 - LPHDF` utilise un template sans
+  découpe géré manuellement. Elle traversait pourtant STEP2–STEP8, y compris
+  le panel, pour produire des `.ecproj` inutilisés. Le seul artefact
+  nécessaire est le CSV de scènes archivé.
+- **Décision** :
+  1. `steps.step8.post.archive_only_prefixes` (défaut vide) liste les
+     familles sans `.ecproj` ; `direct` reste l'interrupteur maître.
+     `config/config.toml` active `["W9 - LPHDF"]`.
+  2. STEP2 à STEP6 appliquent le même prédicat conservateur que SDM avant
+     modèles et verrou matériel.
+  3. STEP7 synthétise le CSV mono-segment pour les deux familles ; l'archive
+     reste `<stem>_scenes.csv` et la copie finale `<stem>.csv`. La copie
+     `/mnt/cache` et la suppression de source sont conservées.
+  4. STEP8 ignore les LPHDF **par leur nom**, sans sonde : aucun `.ecproj`
+     n'est créé, même hors profil. Un dossier 100 % LPHDF n'appelle pas le
+     panel ; un dossier mixte l'appelle avec `videoSkipNames`.
+  5. Le post-traitement ignore les dossiers 100 % LPHDF et les projets
+     résiduels dont le stem correspond à une vidéo LPHDF.
+  6. Un fichier LPHDF hors profil traverse STEP2–7 normalement pour fournir
+     un vrai CSV, puis STEP8 l'ignore quand même.
+- **Validation** :
+  - 341 : 4 CSV (`5259`, `5293`, `5240`, `5253` frames) archivés et copiés,
+    `scenes_origin = "template"`, aucun `projets/`, aucun appel
+    `effectcraft-cli` ;
+  - 341 + 303 : panel appelé pour la seule vidéo ordinaire, nom LPHDF en
+    minuscules dans `videoSkipNames`, projet ordinaire inchangé hors version
+    EffectCraft et chemins ;
+  - `cargo test --workspace`, `fmt` et `clippy -D warnings` verts.
+- **Limites** : préfixe `W9 - LPHDF` sans séparateur final, pour couvrir les
+  variantes à double espace ; la frontière évite `W9 - LPHDFX`. Le CSV
+  synthétique reste à 25 fps, comme STEP2.
+- **Références** : `docs/lots/LOT-9-POST-STEP8.md`,
+  `crates/workflow-steps/src/template.rs`,
+  `crates/workflow-steps/src/post/direct.rs`, `config/config.toml`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

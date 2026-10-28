@@ -25,8 +25,8 @@ pub struct Step5BatchOptions {
     pub skip_preserved_mov: bool,
     pub preserved_mov_names: Vec<String>,
     pub ffprobe: PathBuf,
-    /// `Some(prefix)` ignore les vidéos du template direct.
-    pub template_prefix: Option<String>,
+    /// Préfixes actifs du bypass direct (SDM + archive-only).
+    pub bypass: crate::template::Bypass,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize)]
@@ -179,17 +179,10 @@ fn videos_in(docs: &Path, options: &Step5BatchOptions) -> (Vec<PathBuf>, usize) 
         {
             continue;
         }
-        if let Some(prefix) = options.template_prefix.as_deref() {
-            if crate::template::matches_name(&path, prefix)
-                && matches!(
-                    crate::template::probe_direct(&options.ffprobe, &path, prefix),
-                    Ok(Some(_))
-                )
-            {
-                eprintln!("Template direct ignoré: {}", path.display());
-                skipped_template += 1;
-                continue;
-            }
+        if matches!(options.bypass.probe(&options.ffprobe, &path), Ok(Some(_))) {
+            eprintln!("Bypass direct ignoré: {}", path.display());
+            skipped_template += 1;
+            continue;
         }
         let preserved = crate::step2::is_preserved_media_with(
             &path,
@@ -259,7 +252,7 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe: PathBuf::from("ffprobe"),
-            template_prefix: None,
+            bypass: crate::template::Bypass::default(),
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.projects, 1);
@@ -274,6 +267,7 @@ mod tests {
         let docs = dir.path().join("100 Camille").join("docs");
         fs::create_dir_all(&docs).unwrap();
         fs::write(docs.join("M6 - SDM - clip.mp4"), b"video").unwrap();
+        fs::write(docs.join("W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
         let ffprobe = dir.path().join("ffprobe");
         crate::test_support::write_executable(
             &ffprobe,
@@ -291,10 +285,10 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe,
-            template_prefix: Some("M6 - SDM - ".into()),
+            bypass: crate::template::Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]),
         };
         let report = run_step5_batch(&options).unwrap();
-        assert_eq!(report.skipped_template, 1);
+        assert_eq!(report.skipped_template, 2);
         assert_eq!(report.files, 0);
         assert!(report.success());
     }
@@ -316,7 +310,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
             ffprobe: PathBuf::from("/nonexistent/ffprobe"),
-            template_prefix: None,
+            bypass: crate::template::Bypass::default(),
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.files, 0);
@@ -340,7 +334,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe: PathBuf::from("ffprobe"),
-            template_prefix: None,
+            bypass: crate::template::Bypass::default(),
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.files, 1);

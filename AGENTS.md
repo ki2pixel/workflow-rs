@@ -27,7 +27,8 @@ do not "clean them up". Start with `README.md` for scope/status and
 - `crates/workflow-schema`: JSON schemas and Python-compatible decimal rounding
   (`round.rs`).
 - `crates/workflow-steps`: STEP1–STEP8 implementations (modules `step1` …
-  `step8`).
+  `step8`) plus `post/` (A5/A6 post-traitement after STEP8: `_assist.ecproj`,
+  `post.json`, `review.json`, `audit.json`).
 - `crates/workflow-cli`: operational entrypoint for all eight steps; the
   server and scripts invoke it. There is no Python fallback.
 - `crates/workflow-server`: axum server on `:5004`. It serializes runs and
@@ -47,12 +48,13 @@ do not "clean them up". Start with `README.md` for scope/status and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 282 unit tests, no hardware
+cargo test --workspace                                    # 315 unit tests, no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build --release -p workflow-server -p workflow-cli  # required by launchers
 cargo run -p workflow-cli -- config check                 # no secrets needed
+cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
 ```
 
 - There is no CI; run fmt + clippy + tests manually before finishing.
@@ -88,6 +90,12 @@ cargo run -p workflow-cli -- config check                 # no secrets needed
   backend may run (Python `:5003`, Rust `:5004`), and `switch-rust.sh` refuses
   to start Rust while Python answers. Even with the monitor off, never run
   hardware STEP2/3/4 on both stacks at once (they use separate locks).
+- STEP8 always runs the A5/A6 post-traitement when it succeeds: it writes a
+  second `<stem>_assist.ecproj` and `docs/post/<stem>_assist/` artifacts. The
+  raw project is never modified. Use `--no-post` to disable it, or
+  `workflow-cli post run --report-only` to compute reports without publishing
+  an assisted project. Do not run either against `runtime/` or `/mnt/cache`
+  for experiments.
 - Before a switch: stop both servers (sync refuses if either `:5003` or
   `:5004` is listening), run `./scripts/sync-backends.sh` (dry-run), then
   `--apply`. `scripts/start-rust.sh` does this automatically when the Rust

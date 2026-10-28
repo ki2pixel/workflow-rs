@@ -158,3 +158,20 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - Le format de sortie et le préfixe `[PY] Error:` sont contractuels.
 - Le panneau CEP et les JSX restent Python (D-022).
 - Ne pas modifier les scripts AE pour adapter une sortie Rust.
+
+## 16. Post-traitement STEP8 (A5/A6)
+
+- `crates/workflow-steps/src/post/` lit le `.ecproj` brut et ne le modifie
+  jamais : il publie toujours un second `<stem>_assist.ecproj` (copie exacte
+  si aucune décision ne s'applique).
+- Les artefacts `post.json`, `review.json`, `audit.json` sont additifs sous
+  `<docs>/post/<projet_assisté>/` ; ils ne touchent ni `_ae.json`, ni
+  `_audio.json`, ni le CSV, ni le panneau.
+- A1/A2 ne changent que `Scale` et, pour A1, `Position Y` ; l'Anchor Point
+  STEP6 reste intact. A3/A4 sont en `review` uniquement. A6 applique le
+  template SDM mesuré et court-circuite A1–A4.
+- Un conflit A1/A2 part en `review`. Un échec de post-traitement fait échouer
+  STEP8 côté CLI.
+- Configuration : `[steps.step8.post]` ; `--no-post` désactive le hook ;
+  `workflow-cli post run --report-only` calcule les rapports sans publier.
+- Détail : `docs/LOT-9-POST-STEP8.md`.

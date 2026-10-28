@@ -10,6 +10,7 @@ use workflow_ingest::history::HistoryRepository;
 use workflow_ingest::monitor::{plan_downloads, PlanContext};
 use workflow_ingest::url::normalize_url;
 use workflow_ingest::webhook::WebhookClient;
+use workflow_steps::post::{run_post_dir, run_post_project, PostOptions};
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step1::{run_normalize_only, run_step1, Step1Options};
 use workflow_steps::step2::{run_step2, Step2Options};
@@ -68,6 +69,8 @@ enum Command {
     Step7(Step7Args),
     /// Génération des projets EffectCraft (STEP8, effectcraft-cli headless).
     Step8(Step8Args),
+    /// Post-traitement A5/A6 d'un projet ou d'un dossier (second `.ecproj`).
+    Post(PostArgs),
     /// Planifie ou applique la rétention des données de travail.
     Retention(RetentionArgs),
     /// Synchronise l'état Python legacy et l'état Rust, hors serveur.
@@ -620,6 +623,46 @@ enum Step8Command {
         /// Génère le driver et affiche les dossiers sans lancer EffectCraft.
         #[arg(long)]
         dry_run: bool,
+        /// Désactive le post-traitement A5/A6 après EffectCraft.
+        #[arg(long)]
+        no_post: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct PostArgs {
+    #[command(subcommand)]
+    command: PostCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum PostCommand {
+    /// Calcule A5/A6 et publie un `.ecproj` `_assist` par projet brut.
+    Run {
+        /// Dossier projet contenant `projets/` et `docs/` (répétable).
+        #[arg(long = "folder")]
+        folders: Vec<PathBuf>,
+        /// Projet `.ecproj` brut (répétable ; alternative à --folder).
+        #[arg(long = "project")]
+        projects: Vec<PathBuf>,
+        /// Dossier docs explicite (un seul --project).
+        #[arg(long)]
+        docs: Option<PathBuf>,
+        /// Préfixe du template A6 (défaut : configuration STEP8).
+        #[arg(long)]
+        template_prefix: Option<String>,
+        /// Suffixe du projet assisté (défaut : `_assist`).
+        #[arg(long)]
+        suffix: Option<String>,
+        /// Exécutable ffmpeg (défaut : configuration).
+        #[arg(long)]
+        ffmpeg: Option<PathBuf>,
+        /// Exécutable ffprobe (défaut : configuration).
+        #[arg(long)]
+        ffprobe: Option<PathBuf>,
+        /// Calcule les rapports sans publier le projet `_assist`.
+        #[arg(long)]
+        report_only: bool,
     },
 }
 
@@ -1317,6 +1360,7 @@ fn run() -> Result<()> {
                 logs_dir,
                 timeout_s,
                 dry_run,
+                no_post,
             } => {
                 let resolved = config.paths.resolve();
                 let logs_dir = logs_dir.unwrap_or(resolved.logs);
@@ -1328,6 +1372,13 @@ fn run() -> Result<()> {
                         .then(|| configured_panel_config.clone())
                 });
                 let cwd = std::env::current_dir().context("répertoire courant introuvable")?;
+                let mut post = PostOptions::from_config(
+                    &config.steps.step8.post,
+                    &config.steps.step8.docs_subfolder,
+                );
+                if no_post {
+                    post.enabled = false;
+                }
                 let options = Step8Options {
                     manifest,
                     folders,
@@ -1340,11 +1391,79 @@ fn run() -> Result<()> {
                     dry_run,
                     max_drivers_kept: config.steps.step8.max_drivers_kept,
                     timeout_s: timeout_s.unwrap_or(config.steps.step8.timeout_s),
+                    post,
                 };
                 let outcome = run_step8(&options).context("exécution de STEP8")?;
+                let post_failed = outcome
+                    .post
+                    .as_ref()
+                    .is_some_and(|summary| !summary.failures.is_empty());
                 println!("{}", serde_json::to_string_pretty(&outcome)?);
                 if !outcome.success {
                     std::process::exit(outcome.exit_code);
+                }
+                if post_failed {
+                    std::process::exit(1);
+                }
+            }
+        },
+        Command::Post(args) => match args.command {
+            PostCommand::Run {
+                folders,
+                projects,
+                docs,
+                template_prefix,
+                suffix,
+                ffmpeg,
+                ffprobe,
+                report_only,
+            } => {
+                if folders.is_empty() && projects.is_empty() {
+                    anyhow::bail!("passer au moins --folder ou --project");
+                }
+                if docs.is_some() && projects.len() > 1 {
+                    anyhow::bail!("--docs n'est autorisé qu'avec un seul --project");
+                }
+                let mut options = PostOptions::from_config(
+                    &config.steps.step8.post,
+                    &config.steps.step8.docs_subfolder,
+                );
+                if let Some(prefix) = template_prefix {
+                    options.template_prefix = prefix;
+                }
+                if let Some(suffix) = suffix {
+                    options.suffix = suffix;
+                }
+                if let Some(ffmpeg) = ffmpeg {
+                    options.ffmpeg = ffmpeg;
+                }
+                if let Some(ffprobe) = ffprobe {
+                    options.ffprobe = ffprobe;
+                }
+                options.report_only = report_only;
+                let mut results = Vec::new();
+                let mut failures = 0usize;
+                for folder in folders {
+                    let summary = run_post_dir(&options, &folder);
+                    failures += summary.failures.len();
+                    results.push(json!({
+                        "folder": folder.to_string_lossy(),
+                        "summary": summary
+                    }));
+                }
+                for project in projects {
+                    let outcome = run_post_project(&options, &project, docs.as_deref());
+                    if outcome.error.is_some() {
+                        failures += 1;
+                    }
+                    results.push(json!({
+                        "project": project.to_string_lossy(),
+                        "outcome": outcome
+                    }));
+                }
+                println!("{}", serde_json::to_string_pretty(&results)?);
+                if failures > 0 {
+                    std::process::exit(1);
                 }
             }
         },

@@ -82,6 +82,19 @@ comparaison porte donc sur la composition et les 82 segments, pas sur une
 Aucune écriture n'a été faite dans `/mnt/cache` ni dans les dossiers de
 production. Les seuls fichiers créés sont sous `/tmp/opencode`.
 
+## Post-traitement A5/A6
+
+Depuis le 2026-10-27, un STEP8 réussi enchaîne le post-traitement déterministe
+A5/A6. Le projet brut `<vidéo>_9x16.ecproj` reste **inchangé** et un second
+projet `<vidéo>_9x16_assist.ecproj` est toujours publié à côté (copie exacte
+si aucune décision ne s'applique). Les artefacts `post.json`, `review.json` et
+`audit.json` sont écrits sous `<docs>/post/<projet_assisté>/`.
+
+Le post-traitement est activé par `[steps.step8.post]` et désactivable avec
+`--no-post`. Il peut aussi être lancé seul avec `workflow-cli post run`.
+Détail des décisions A1/A2/A3/A4/A6, du template SDM et des validations :
+`docs/LOT-9-POST-STEP8.md`.
+
 ## Commandes
 
 ```sh
@@ -96,10 +109,13 @@ workflow-cli step8 run
 
 # Timeout interne explicite (0 désactive le timeout).
 workflow-cli step8 run --timeout-s 3600
+
+# Sans post-traitement A5/A6.
+workflow-cli step8 run --folder "/tmp/projet" --no-post
 ```
 
 Options : `--manifest`, `--folder` (répétable), `--cli`, `--panel-jsx`,
-`--config-json`, `--logs-dir`, `--timeout-s`, `--dry-run`.
+`--config-json`, `--logs-dir`, `--timeout-s`, `--dry-run`, `--no-post`.
 
 ## Annulation et timeout
 

@@ -2,6 +2,7 @@
 
 pub mod error;
 pub mod media;
+pub mod post;
 pub mod process;
 pub mod retention;
 pub mod step1;

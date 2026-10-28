@@ -945,6 +945,41 @@ impl Default for Step7Config {
     }
 }
 
+/// Post-traitement déterministe A5/A6 après STEP8.
+///
+/// Le projet brut n'est jamais modifié : un second `.ecproj` suffixé
+/// (`_assist` par défaut) est publié, même lorsqu'aucune décision n'est
+/// applicable. Les artefacts vont sous `<docs>/<artifacts_subfolder>/`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PostConfig {
+    pub enabled: bool,
+    pub suffix: String,
+    pub projects_subfolder: String,
+    pub artifacts_subfolder: String,
+    pub template_prefix: String,
+    pub ffmpeg: PathBuf,
+    pub ffprobe: PathBuf,
+    pub a1_margin: f64,
+    pub a2_margin: f64,
+}
+
+impl Default for PostConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            suffix: "_assist".into(),
+            projects_subfolder: "projets".into(),
+            artifacts_subfolder: "post".into(),
+            template_prefix: "M6 - SDM - ".into(),
+            ffmpeg: PathBuf::from("ffmpeg"),
+            ffprobe: PathBuf::from("ffprobe"),
+            a1_margin: 1.04,
+            a2_margin: 1.05,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Step8Config {
@@ -954,6 +989,7 @@ pub struct Step8Config {
     pub panel_config: PathBuf,
     pub docs_subfolder: String,
     pub max_drivers_kept: usize,
+    pub post: PostConfig,
 }
 
 impl Default for Step8Config {
@@ -965,6 +1001,7 @@ impl Default for Step8Config {
             panel_config: PathBuf::new(),
             docs_subfolder: "docs".into(),
             max_drivers_kept: 10,
+            post: PostConfig::default(),
         }
     }
 }

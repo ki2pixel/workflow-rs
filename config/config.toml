@@ -194,6 +194,18 @@ panel_config = "assets/effectcraft/mediasolution_ec.json"
 docs_subfolder = "docs"
 max_drivers_kept = 10
 
+[steps.step8.post]
+# Second `.ecproj` suffixé, le brut reste intact.
+enabled = true
+suffix = "_assist"
+projects_subfolder = "projets"
+artifacts_subfolder = "post"
+template_prefix = "M6 - SDM - "
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"
+a1_margin = 1.04
+a2_margin = 1.05
+
 [retention]
 # Projets sources : `steps.step7.cleanup_threshold_hours` (48 h) est utilisé.
 # Les sorties finalisées (`paths.finalized`, /mnt/cache) ne sont jamais

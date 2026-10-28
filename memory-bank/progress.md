@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 282 tests unitaires, sans matériel.
+- 315 tests unitaires, sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture
@@ -32,7 +32,151 @@
   D-025 à D-027 alignés sur le code. Audit `.agents/` : `codingstandards.md` et
   les 22 `SKILL.md` alignés (tests 280, `max_workers` retiré, verrou STEP1,
   gate EffectCraft, legacy en lecture seule).
-- **Aucune tâche active.**
+- Étude STEP9 agentique terminée (D-029) : consolidation déterministe (A0–A5 :
+  profilage, letterbox, overlays source, keyframes, transitions, rapport)
+  d'abord, agent QA read-only (B) ensuite, co-monteur (C) en laboratoire.
+  Logos, jingle et rendu restent humains. Aucun code de production modifié.
+- **Post-traitement A5/A6 intégré (D-032)** : après un STEP8 réussi, le brut
+  reste intact et `<stem>_assist.ecproj` est toujours publié, avec
+  `post.json`/`review.json`/`audit.json` sous `docs/post/`. A1 letterbox, A2
+  bannière, A3/A4 en revue, A6 template SDM. Commande `workflow-cli post`.
+  Validation 295 au pixel (0/255), parité de décisions avec le prototype sur
+  268/187/191/181, 270/276/286/287 sans changement d'échelle, A2 synthétique
+  11/11, 315 tests, fmt/clippy verts. Reste : exposer `review.json` dans
+  l'UI, recalibrer A3/A4 et traiter 179/287.
+
+## Post-traitement A5/A6 (2026-10-27)
+
+- Code : `crates/workflow-steps/src/post/` ; hook dans `step8.rs` ;
+  commande `workflow-cli post run`.
+- Invariants : brut inchangé, `_assist.ecproj` toujours publié (copie exacte
+  sans décision), artefacts additifs, A1/A2 sans déplacement d'Anchor Point,
+  A3/A4 en revue, A6 éligible court-circuite A1–A4, conflit A1/A2 → revue.
+- Validation : 295 assist identique à la référence et rendu 0/255 à
+  0/10/30/50 s ; décisions identiques au prototype sur 268, 187 DISNEYWORLD,
+  187 ECOLE, 191 et 181 ; 270/276/286/287 0 apply et assist identique au
+  brut ; A2 synthétique 11/11 ; idempotence 187 ECOLE.
+- Configuration : `[steps.step8.post]` ; `--no-post` pour désactiver ;
+  `post run --report-only` pour ne pas publier d'assist.
+- Documentation : `docs/LOT-9-POST-STEP8.md`, `docs/LOT-1-STEP8.md`,
+  `docs/CONTRAT-ENVIRONNEMENT.md`, étude §3.9, protocole §14.1.
+- Limites : pas d'exposition UI/CEP, A3/A4 en revue, bords non noirs et
+  recadrages sémantiques en revue, A6 multi-segment/keyframé en revue,
+  timeout serveur STEP8 incluant le post, 179/287 partiels.
+
+## Étude STEP9 agentique (2026-10-26)
+
+- Documents : `docs/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/SPIKE-STEP9-PROTOCOLE.md`.
+- Corpus : `298 Camille_GOOD.zip` et `300 Camille_GOOD.zip`, comparés aux
+  sorties STEP8 brutes.
+- Constats : 117 segments comparables, 0 ancre STEP6 modifiée, 23/120 calques
+  keyframés (72 clés), 92 segments à +27 % d'échelle sur 300, 1 fusion et
+  3 splits, 2 logos + 1 jingle sur 298.
+- Décision D-029 : A0–A5 maintenant, B en PoC, C en laboratoire ; pas d'agent
+  en écriture sur la production, pas de dépendance cloud bloquante ; logos,
+  jingle et rendu restent humains.
+- Prochaine étape : spike A sur copies isolées, sans toucher aux 8 étapes.
+
+### Phase 0 du spike (2026-10-26)
+
+- Baseline STEP8 reproductible : calques identiques sur 298/300, seuls les
+  chemins médias changent.
+- Labels : 118 segments bruts, 120 finaux, 0 ancre modifiée, 23 keyframés,
+  72 clés, 1 fusion, 3 splits, Null parent 118 → 0.
+- A0/A2 : bande de 108 px détectée sur 300 → scale 207,4 % (humain 207 %) ;
+  no-op sur 298 ; A1 no-op (aucun letterbox).
+- A3 : 39 % des clés humaines à ≤ 60 px d'un objet suivi ; règle de sélection
+  précision 0,62 (298), 0,29 (JOSEPH), 0,20 (KATIA). Re-cadrage statique de
+  300 non déterministe avec `_ae.json` seul.
+- Rapport : `/tmp/opencode/step9-spike/01-baseline/RAPPORT-PHASE0.md`.
+- Prochaine étape : A2 sur copie (rendu de contrôle), prototype A3 conservateur
+  sur 298, A4 splits/transitions.
+
+### Corpus élargi du spike (2026-10-27)
+
+- 19 paires / 32 vidéos exploitables : 179, 181, 187, 191, 208, 211, 221,
+  223, 227, 266, 268, 270, 276, 286, 287, 295, 298, 300, 303.
+- 1059 segments bruts, 520 clés humaines, 145 segments keyframés.
+- 278/520 clés (53,5 %) à ≤ 60 px d'un objet suivi ; 458/907 segments
+  statiques (50,5 %) à ≤ 50 px du brut, 363/907 (40 %) à > 100 px.
+- A3 invalidé en auto : précision 0,20, rappel 0,23 ; 35 faux positifs sur
+  les vidéos « sans piège ». Décision D-030 : candidats en `review` ou flag
+  projet.
+- A1 validé sur le letterbox noir (191 : 249,6 % vs 255 % avec marge 4 % ;
+  268 : 179,1/222,2 % par segment) ; bords non noirs de 268 en `review`.
+- A2 fragile : 207,4 % correct sur 187 DISNEYWORLD, faux positif à 260 % sur
+  187 ECOLE ; logos de coin (191) et logo de template (295, `sdm.png`) hors
+  A2 ; corrigé en v2 (D-031).
+- A6 SDM validé sur le GOOD 295 reçu le 2026-10-27 : brut et GOOD partagent
+  le même `_ae.json`/`_tracking.json` (SHA-256 identiques). Template fond
+  180 % flouté 50 + panneau 84,3497774862575 % à y=171,032 + panneau
+  56,294573830734535 % à y=1082,026 + logo `sdm.png`, reproduit par
+  `06-corpus/a6_template.py` à 0/255 (exact, 0 pixel > 2) à 0, 10, 30 et
+  50 s. Wrapper `03-scenario-a/a6_apply.py` : déclencheur configuré
+  `M6 - SDM - `, 295 → apply/audit pass, 187 → noop/audit pass, 295
+  keyframé → review sans projet ; rendu relinké 0/255. Reste à l'intégrer
+  au post-traitement de production.
+- Réserves : 179 sans `.ecproj` GOOD, 287 avec 1 référence sur 3, 2CV
+  exclue ; dérive de baseline identifiée comme STEP4/5 (tracking legacy
+  vs Rust), pas STEP6/8. Le STEP6 Rust sur le `_tracking.json` legacy
+  reproduit le `_GOOD/_ae.json` à l'identique (4355/4355 sur 187,
+  2979/2979 sur 181) ; delta d'ancre médian vs GOOD ramené de 62,75 à
+  8,4 px sur 187 et de 44,01 à 2,43 px sur 181 avec la recette legacy.
+  Le commit legacy `0e9765b` du 2026-10-16 19:01 (`STEP4_TPU_FAST=1`,
+  `object_min_missing=25`) est postérieur aux GOOD ; `--object-min-missing
+  1` remonte la couverture personne à 1722 frames vs 1623 legacy, mais ne
+  ramène pas les ancres (64,33 px) : le gate n'explique que la couverture.
+  Diagnostic : `/tmp/opencode/step9-spike/06-corpus/DIAGNOSTIC-DERIVE.md`.
+- Clamp du panel : correct pour une position centrée (`[C/(2s),
+  W-C/(2s)]`) ; les ancres hors plage des GOOD sont des déplacements
+  manuels de `Position` couverts par l'intervalle généralisé
+  `[p/s, W-(C-p)/s]`, sauf 181 segment 34 (vide de 36,7 px) à signaler en
+  `review`.
+- Rapports : `docs/ETUDE-STEP9-AGENTIQUE.md` §3.6/§3.8,
+  `docs/SPIKE-STEP9-PROTOCOLE.md` §4.6/§5.7/§8.1,
+  `/tmp/opencode/step9-spike/06-corpus/RAPPORT-CORPUS.md`,
+  `RAPPORT-A6.md` et `DIAGNOSTIC-DERIVE.md`.
+- Prochaine étape : A5 (`post.json`, `review.json`, `audit.json`), validation
+  A1 sur letterbox synthétique, puis A2 durci et intégration A6.
+
+### A5 v2 et A6 intégré (2026-10-27)
+
+- `a5_report.py` v2 : hash vidéo échantillonné (3 × 4 Mio), `timings_ms`,
+  A1 10e percentile + couverture mathématique + keyframes en `review`, A2
+  haut/bas + sombre + géométrie + logo/partiel/décor, `--template sdm`.
+- A1 : 268 15 applies à 231,1 % + Y −287,9 px ; 191 37 applies à 249,6 % +
+  Y −367,8 px enfant ; 181 Concierge 0 apply, 10 barres asymétriques en
+  `review`. Rendu 268 : 194/170 px de barres → 0/0 à 2,5/5/9/24,5/35/54 s.
+- A2 : 187 DISNEYWORLD/ECOLE 206,6 %, géométrie 1,3/2,6 et 0/0 px ; 191
+  logo review ; 268/181 noop. Validation synthétique 11/11 : 3 apply,
+  7 review, 1 noop.
+- A6 : `a5_report.py --template sdm` émet la décision et le bloc `template` ;
+  295 apply/audit pass, 295 keyframé review, 187 noop. `a6_apply.py --apply`
+  reste le seul writer du projet.
+- Coût A5 : 3,7–33,5 s par vidéo (0,07–0,24× la durée, sans rendu).
+- Rapport : `/tmp/opencode/step9-spike/06-corpus/a5v2/RAPPORT-A5-V2.md` ;
+  décision D-031.
+- Prochaine étape : brancher A5/A6 dans le post-traitement de production,
+  hors panel ; références 179/287 toujours manquantes.
+
+### Prototype A5 (2026-10-27)
+
+- `03-scenario-a/a5_report.py` : rapport déterministe A0–A4, écrit
+  `post.json`/`review.json`/`audit.json` sans modifier le `.ecproj`.
+- 4 cas : 268, 187 DISNEYWORLD, 187 ECOLE, 191 cancer.
+- A2 : 206,6 % vs 207 % sur 187 (0,4 %) ; décor de 187 ECOLE séparé ; logo
+  de 191 en `review`.
+- A1 : 231,1 % (268) dans la plage 221,3–239,7 % ; 249,6 % vs 255 % (191,
+  2,1 %). Validation visuelle : A2 propre ; A1 laisse 19,5 % de barre en haut
+  sur 191 (ancre décentrée), mais la compensation Position Y de -417,8 px
+  supprime les barres. A5 prescrit scale + compensation et signale le cadrage
+  vertical en `review`.
+- A3 : précision 0,29–0,60, rappel 0,20–0,43, jamais appliqué.
+- A4 : cut dur intra-segment désactivé par défaut (32 faux positifs sur 187).
+- Rapport : `/tmp/opencode/step9-spike/06-corpus/a5/RAPPORT-A5.md`.
+- Prochaine étape : contrôle de couverture A1 (Position Y), A2 durci,
+  intégration A6 opt-in avec le profil mesuré.
 
 ## Rollback Tauri (2026-10-26)
 

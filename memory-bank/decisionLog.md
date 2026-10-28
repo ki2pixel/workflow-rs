@@ -56,6 +56,253 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Sauvegarde** : branche `backup/tauri-abandon-20261026` sur `1613b17`.
 - **Référence** : `docs/DECISION-ABANDON-TAURI.md`.
 
+## 2026-10-26 — D-029 : pas de STEP9 agentique en production, consolidation déterministe d'abord
+
+- **Contexte** : étude d'opportunité demandée sur l'automatisation
+  post-STEP8 (recadrage 9:16, nettoyage éditorial, habillage, rendu) avec
+  EffectCraft 0.17. L'étude confronte le guide de recadrage, le code
+  STEP5/6/8, le panel `MediaSolution.jsx`, les capacités MCP d'EffectCraft et
+  les projets témoins `298 Camille_GOOD.zip` / `300 Camille_GOOD.zip`.
+- **Constats mesurés** (détail dans `docs/ETUDE-STEP9-AGENTIQUE.md`) :
+  1. sur 117 segments comparables, l'ancre horizontale STEP6 n'a jamais été
+     modifiée (delta max 0,00 px) ; les keyframes humaines déplacent la
+     Position, pas l'Anchor Point ;
+  2. 23 calques sur 120 seulement sont keyframés, avec 72 clés au total ;
+     20/23 calques sont dans la fourchette 2–6 du guide ;
+  3. sur 300, l'échelle passe de 180 % à 207 % sur 92 segments pour sortir une
+     bannière basse permanente ; deux zooms locaux à 254,7 % et 287,6 %
+     traitent un sous-titre et une archive 4:3 ;
+  4. 1 fusion et 3 splits de transitions sur 120 segments ;
+  5. 298 ajoute 2 logos et 1 jingle de 3 s, et allonge la composition de 3 s ;
+  6. les deux exports finaux mesurés sont en 1080×1920, 25 fps,
+     10,01–10,27 Mbit/s ;
+  7. le rendu EffectCraft d'un projet de 65,8 s prend 72,3 s sur la GTX 1650,
+     à 10,29 Mbit/s : le rendu n'est pas le goulot.
+- **Décision** :
+  1. **Ne pas implémenter de STEP9 agentique en production maintenant.**
+     Aucun agent n'écrit dans les `.ecproj` de production.
+  2. **Consolider d'abord le déterministe** dans un module post-STEP8 isolé
+     (spike) : A0 profilage (`video_profile.json`), A1 détection letterbox
+     (`cropdetect`), A2 détection des overlays/sous-titres source, A3
+     keyframes 2–6 issues du tracking, A4 splits/merges candidats, A5
+     rapport/QC. **Hors périmètre A, par décision** : relink automatique
+     (contrôle optionnel), placement des logos/jingle, extension de
+     composition et rendu H.264. Ces gestes restent humains (directives
+     client, export GPU externe, validation).
+  3. **Ajouter un artefact additif** (`_post.json` ou équivalent) plutôt que
+     modifier `_ae.json`, `_audio.json`, le CSV ou l'ordre des clés. Le panel
+     `MediaSolution.jsx` reste le chemin existant ; le post-traitement est
+     séparé et optionnel.
+  4. **Seul usage agentique autorisé à court terme** : un agent QA read-only
+     (scénario B), local-first, qui inspecte des frames clés et produit un
+     rapport `audit.json` sans modifier le projet. Cloud uniquement opt-in
+     par projet, avec DPA et politique de rétention ; aucune dépendance
+     réseau bloquante dans les 8 étapes.
+  5. **Scénario C (co-monteur en boucle fermée)** : laboratoire uniquement,
+     sur copies, avec approbation humaine, max 3 itérations par segment,
+     deltas bornés, `batch` atomique et `undo`. Aucune livraison automatique.
+- **Alternatives rejetées** :
+  - **Remplacer STEP6 par un VLM** : le corpus montre que l'ancre STEP6 est
+    déjà stable et pertinente ; le problème est temporel (keyframes), pas
+    l'ancre.
+  - **Agent co-monteur immédiat** : non-déterminisme, sur-correction,
+    latence, coût et absence de corpus d'évaluation.
+  - **Cloud-first** : rupture de la promesse offline et du confinement des
+    rushes ; risque juridique et dépendance réseau.
+  - **Mutation directe des `.ecproj` en JSON** : risque de casser les
+    timebases, les parentés et les contrats ; passer par MCP/`script`.
+  - **Ajouter un 9e step au serveur avant validation** : le spike doit
+    rester hors catalogue et hors serveur.
+- **Conséquences** :
+  - `docs/ETUDE-STEP9-AGENTIQUE.md` et `docs/SPIKE-STEP9-PROTOCOLE.md`
+    documentent l'analyse et le protocole ;
+  - aucun code de production n'est modifié par cette décision ;
+  - le spike doit mesurer A0–A5 (couverture cadrage/nettoyage ≥ 70 %, hash
+    stable, zéro faux positif sur les contrôles propres), B (précision ≥ 95 %,
+    rappel ≥ 90 %) et C (préférence ≥ 60 %) avant toute intégration ;
+  - si A échoue, ne pas passer à B ; si B échoue, ne pas passer à C.
+- **Références** : `docs/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/SPIKE-STEP9-PROTOCOLE.md`, `docs/LOT-1-STEP6.md`,
+  `docs/LOT-1-STEP8.md`, `memory-bank/activeContext.md`.
+
+## 2026-10-27 — D-030 : A3 en review, A1/A2 durcis, template SDM séparé
+
+- **Contexte** : le corpus STEP9 a été porté à 19 paires / 32 vidéos
+  exploitables (1059 segments bruts, 520 clés humaines), avec des paires
+  « sans piège », letterbox, overlays, cas complexe, mixte et template SDM.
+  Les mesures du 2026-10-27 invalident l'application automatique de A3 et
+  précisent les limites de A1/A2.
+- **Constats** :
+  1. A3 (amplitude du centroïde > 100 px, trous < 30 %, durée ≥ 1 s) a une
+     précision de 0,20 et un rappel de 0,23 sur 1059 segments ; sur les
+     vidéos « sans piège », elle ajoute 35 segments keyframés pour 1 vrai
+     positif. Le mouvement du centroïde ne prédit pas la décision humaine.
+  2. A1 est validé sur le letterbox noir : 191 (800 px actifs, barres
+     152/128) → 249,6 % avec marge 4 % vs 255 % humain (2,1 %), 255 % avec
+     une marge de 6,25 % ; 268 alterne 179,1/222,2 % par
+     segment. Les bords non noirs de 268 (8 segments scalés à 204–224 %)
+     ne sont pas vus par `cropdetect`.
+  3. A2 reste fragile : 207,4 % correct sur 187 DISNEYWORLD, mais faux
+     positif à 260 % sur 187 ECOLE (zone statique de décor) ; les logos de
+     coin (191) et incrustés (295) ne sont pas des bannières.
+  4. 40 % des segments statiques sont à plus de 100 px du cadrage brut, et
+     même 298/300 en comptent 49/96. Le re-cadrage est sémantique (sujet
+     choisi par le monteur, personne floutée qui parle, dos, groupe).
+  5. Le cas 295 (SDM) est un template de composition à trois panneaux, pas
+     un geste de cadrage.
+  6. Le scale A1 seul ne garantit pas la couverture : sur 191, 249,6 %
+     supprime la barre du bas mais laisse 19,5 % de barre en haut, car
+     l'ancre du sujet est décentrée. Une compensation de Position Y de
+     -417,8 px supprime les barres ; le cadrage vertical reste à valider.
+- **Décision** :
+  1. **A3 n'est plus auto-appliqué.** Il produit des candidats dans
+     `review.json` ou s'active par flag explicite par projet, après validation
+     humaine. La spécification des keyframes reste celle du protocole.
+  2. **A1 auto** pour le letterbox noir, avec le **maximum** de letterbox par
+     segment, un **contrôle de couverture** par frames et une compensation de
+     Position Y si l'ancre est décentrée ; les bords non noirs et les cas
+     ambigus vont en `review`.
+  3. **A2 auto limité à la bannière claire pleine largeur** (largeur > 50 %,
+     hauteur 24–200 px, persistance > 60 %). Validé sur 187
+     DISNEYWORLD/ECOLE (206,6 % vs 207 %) ; les logos de coin, les zones
+     sombres/animées et les bannières en haut restent en `review` tant que le
+     classifieur n'est pas durci.
+  4. **A4 auto** pour les gestes mécaniques (fusion < 0,5 s, cut dur manqué) ;
+     les splits sémantiques restent en `review`.
+  5. **A6 template SDM** est validé sur le GOOD 295 reçu le 2026-10-27 :
+     brut et GOOD partagent le même `_ae.json`/`_tracking.json` (SHA-256
+     identiques). Le template est un fond 180 % flouté 50, un panneau
+     84,3497774862575 % à y=171,032, un panneau 56,294573830734535 % à
+     y=1082,026 et le logo `sdm.png`. Le prototype `a6_template.py` reproduit
+     le rendu à **0/255** (exact, 0 pixel > 2) à 0, 10, 30 et 50 s. Le
+     déclencheur est une règle de nommage **configurée** (`M6 - SDM - ` par
+     défaut) ou un mapping projet, suivie d'un contrôle structurel
+     (mono-segment, sans keyframe, comp 1080×1920, source 1920×1080) ; sinon
+     `review`. Le wrapper `a6_apply.py` écrit `post.json`/`review.json`/
+     `audit.json` et le projet transformé ; l'intégration au rapport A5 et
+     les validations complémentaires sont en **D-031**.
+  6. Le delta de baseline vient de **STEP4/5 (tracking legacy vs Rust)**, pas
+     de STEP6/8. Le STEP6 Rust alimenté par le `_tracking.json` legacy
+     reproduit le `_GOOD/_ae.json` à l'identique (4355/4355 frames sur 187,
+     2979/2979 sur 181). La bascule est datée : le commit legacy `0e9765b` du
+     **2026-10-16 19:01** (`STEP4_TPU_FAST=1`, `object_min_missing=25`) est
+     postérieur aux GOOD. Le Rust reproduit le mode *fast* actuel. Un run
+     `--object-min-missing 1` remonte la couverture personne à 1722 frames
+     contre 1623 legacy, mais ne ramène pas les ancres (delta médian 64,33 px
+     contre 8,39 px avec le tracking legacy) : le gate explique la couverture,
+     pas la sélection d'objet. **Portée** : cette recette est un outil de
+     diagnostic historique, pas la méthode du corpus. La référence de
+     production est **STEP1–8 Rust** ; les GOOD 181/187 sont des références
+     historiques et ne doivent pas être mélangés aux bruts Rust. La parité
+     STEP4/5 legacy/Rust est un chantier externe, hors-scope STEP9 ; le
+     tracking Rust est la référence de production, et `MediaSolution.jsx`
+     arbitre le recentrage.
+  7. Le **clamp du panel** (300..1620 px) est correct pour une position
+     centrée : `anchor ∈ [C/(2s), W - C/(2s)]`. Les ancres hors plage des GOOD
+     sont des déplacements manuels de `Position` qui restent couverts par
+     l'intervalle généralisé `[p/s, W - (C-p)/s]` ; un seul cas (181 segment
+     34) laisse un vide de 36,7 px, à signaler en `review`. Ce n'est pas un
+     bug à corriger dans le panel.
+- **Conséquences** :
+  - G1 est révisé : couverture ≥ 70 % des **gestes mécaniques** seulement,
+    A3 en review, pas de revendication de remplacement du cadrage humain ;
+  - `docs/ETUDE-STEP9-AGENTIQUE.md` §3.6 et
+    `docs/SPIKE-STEP9-PROTOCOLE.md` §4.6/§8.1 sont mis à jour ;
+  - aucun code de production n'est modifié ; les prototypes restent sous
+    `/tmp/opencode/step9-spike/` ;
+  - prochaine étape : finaliser le contrôle de couverture A1 (seuil de
+    compensation), durcir A2 (bannière sombre/animée, logo de coin), puis
+    intégrer A6 comme module opt-in avec le profil mesuré ; 179 reste sans
+    GOOD, 287 n'a qu'une référence sur trois.
+- **Références** : `docs/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/SPIKE-STEP9-PROTOCOLE.md`, `06-corpus/RAPPORT-CORPUS.md` (spike),
+  `memory-bank/activeContext.md`.
+
+## 2026-10-27 — D-031 : A5 v2, hash échantillonné et A2 géométrique
+
+- **Contexte** : la v1 de A5 laissait trois trous : hash vidéo complet coûteux,
+  A1 sans contrôle de couverture systématique, A2 limité à la bande basse
+  claire. A6 était validé mais hors du rapport A5.
+- **Décision** :
+  1. `audit.json` hashe un **échantillon** déterministe de la vidéo (début,
+     milieu, fin, 3 × 4 Mio) plus la taille et les offsets ; le hash complet
+     n'est plus utilisé en production.
+  2. A1 prend le **10e percentile** des hauteurs actives du segment, vérifie
+     la couverture mathématique de tous les crops après scale et compensation
+     Y, et met en `review` tout segment keyframé ou letterbox intermittent
+     (≥ 10 % des crops).
+  3. A2 scanne toute la hauteur. Une bande haute plausible, un logo
+     (< 35 %), une bande partielle (35–50 %), un décor (> 200 px), une bande
+     sombre (paires de bords + médiane < 60) ou une bande dont les bords
+     bougent (centre/hauteur > 12 px) partent en `review`. Une bannière qui
+     change seulement de texte ou de luminosité reste applicable si sa
+     géométrie est stable.
+  4. A5 expose `--template sdm` : décision A6 et bloc `template` dans
+     `post.json`, sans écrire le projet. `a6_apply.py --apply` reste le seul
+     writer du `.ecproj` transformé dans le prototype ; D-032 le remplace en
+     production par le module Rust `post`.
+  5. `post.json` et `audit.json` portent `timings_ms` par étage.
+- **Validation** : 268 (15 A1, 231,1 %, Y −287,9 px), 191 (37 A1, 249,6 %,
+  Y −367,8 px enfant), 187 DISNEYWORLD/ECOLE (A2 206,6 %, géométrie 1,3/2,6
+  et 0/0 px), 181 Concierge (« sans piège ») 0 action auto, 295 A6 apply.
+  Validation synthétique A2 11/11 (3 apply, 7 review, 1 noop). A5 coûte
+  3,7–33,5 s par vidéo (0,07–0,24× la durée, sans rendu).
+- **Conséquences** : aucun code de production modifié ; A2 reste volontairement
+  conservateur sur les cas ambigus ; A6 reste un module post-STEP8 opt-in,
+  pas une fonction du panel ; 179/287 restent bloqués par les références
+  manquantes.
+- **Références** : `06-corpus/a5v2/RAPPORT-A5-V2.md`,
+  `docs/ETUDE-STEP9-AGENTIQUE.md` §3.7/§3.8,
+  `docs/SPIKE-STEP9-PROTOCOLE.md` §5.2/§5.3/§5.6/§5.7/§8.1,
+  `memory-bank/activeContext.md`.
+
+## 2026-10-27 — D-032 : post-traitement A5/A6 en production, projet `_assist` toujours publié
+
+- **Contexte** : les prototypes A5 v2 et A6 sont validés sur 268, 187, 191,
+  181, 295 et 11 cas A2 synthétiques. Le besoin de production est de rendre
+  ces gestes disponibles après chaque STEP8 sans jamais écraser le projet
+  brut ni les artefacts STEP4/5/6.
+- **Décision** :
+  1. Le post-traitement est porté dans `crates/workflow-steps/src/post/` et
+     appelé après un STEP8 réussi. Il est aussi exposé par
+     `workflow-cli post run`.
+  2. Le `.ecproj` brut reste **octet pour octet inchangé**. Un second projet
+     `<stem>_assist.ecproj` est **toujours** publié à côté ; sans décision
+     applicable, c'est une copie exacte du brut.
+  3. `post.json`, `review.json` et `audit.json` sont additifs sous
+     `<docs>/post/<projet_assisté>/`. Aucun `_ae.json`, `_audio.json`, CSV,
+     ordre de clés ou panneau n'est modifié.
+  4. A1/A2 ne déplacent jamais l'Anchor Point ; A3/A4 restent en `review`
+     (D-030). Un conflit A1/A2 part en `review`, aucune action n'est
+     appliquée.
+  5. A6 éligible applique le template SDM et court-circuite A1–A4. Un préfixe
+     SDM incohérent part en `review` sans bloquer A1–A4.
+  6. L'écriture A6 de production est le module Rust `post`, pas
+     `a6_apply.py`. Le prototype Python reste un outil de comparaison, hors
+     production.
+  7. La configuration est `[steps.step8.post]` ; `--no-post` désactive le
+     hook et `post run --report-only` calcule les rapports sans publier de
+     projet assisté.
+  8. Un échec de post-traitement fait sortir la CLI STEP8 en code non nul,
+     afin que la séquence serveur s'arrête au lieu de laisser croire que le
+     projet assisté existe.
+- **Validation** :
+  - 295 : assist identique au JSON de référence, rendu relinké **0/255** à
+    0, 10, 30 et 50 s ;
+  - 268, 187 DISNEYWORLD, 187 ECOLE, 191 et 181 : décisions A1/A2/A3/A4
+    **identiques au prototype** (code, action, cible, raison, détails) ;
+  - 270/276/286/287 : 0 `apply`, 7 projets, assist identique au brut, audit
+    `pass` ;
+  - A2 synthétique : 11/11 (3 `apply`, 7 `review`, 1 `noop`) ;
+  - 315 tests, `fmt` et `clippy -D warnings` verts ; idempotence vérifiée sur
+    187 ECOLE.
+- **Limites** : artefacts non exposés dans l'interface web ou le panneau CEP ;
+  A3/A4 en revue ; bords non noirs et recadrages sémantiques en revue ; A6
+  multi-segment/keyframé en revue ; le timeout serveur STEP8 couvre aussi le
+  post-traitement ; 179 sans GOOD et 287 avec une seule référence sur trois.
+- **Références** : `docs/LOT-9-POST-STEP8.md`, `docs/ETUDE-STEP9-AGENTIQUE.md`
+  §3.9, `docs/SPIKE-STEP9-PROTOCOLE.md` §14.1, `config/config.toml`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

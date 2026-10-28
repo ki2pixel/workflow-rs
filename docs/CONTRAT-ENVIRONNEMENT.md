@@ -394,6 +394,19 @@ EffectCraft : STEP8 appelle `effectcraft-cli` en headless, dans une session
 `run prefs.set … file.runScript` (aucun bridge TCP, aucune application lancée),
 avec `scripts/MediaSolution-EC/MediaSolution.jsx`, pour produire les `.ecproj`.
 
+Post-traitement A5/A6 : après un STEP8 réussi, le projet brut
+`<vidéo>_9x16.ecproj` reste **inchangé** et un second projet
+`<vidéo>_9x16_assist.ecproj` est publié à côté (copie exacte du brut si aucune
+décision ne s'applique). Trois artefacts additifs sont écrits sous
+`<docs>/post/<projet_assisté>/` : `post.json` (décisions, timings, specs,
+template), `review.json` (abstentions) et `audit.json` (contrôles, SHA-256 du
+brut et du projet assisté, hash échantillonné de la vidéo). A1/A2 ne déplacent
+jamais l'Anchor Point ; A3/A4 restent en revue ; A6 applique le template SDM
+si le préfixe configuré correspond et si la structure est mono-segment sans
+keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
+avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
+avec `workflow-cli post run`. Détail : `docs/LOT-9-POST-STEP8.md`.
+
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée

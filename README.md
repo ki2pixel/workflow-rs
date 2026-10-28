@@ -7,7 +7,9 @@ pont matériel Coral, le contrat d'environnement et le harnais de parité.
 Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
-`effectcraft-cli`) sont opérationnels. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
+`effectcraft-cli`) sont opérationnels. Le post-traitement A5/A6 est intégré
+après STEP8 : le projet brut reste intact et un second `_assist.ecproj` est
+toujours publié avec ses rapports. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
 Runtime CUDA, avec un CSV identique à la production sur les quatre cas du
 corpus. Le lot 3 porte STEP4 sur Coral Edge TPU : BlazeFace, FaceMesh,
 blendshapes, EfficientDet, suivi et détection de parole, avec un JSON identique
@@ -63,6 +65,12 @@ Linux et le panneau CEP continue d'appeler Python.
   `effectcraft-cli`, sans pont Python ni application. Le projet 250 a produit
   un `.ecproj` ouvrable (82 segments, 1080×1920, 25 fps, 133 s) et la
   progression `MS_BATCH_*` est relayée en direct.
+- Post-traitement A5/A6 intégré après STEP8 : A1 letterbox noir, A2 bannière
+  basse, A3/A4 en revue, A6 template SDM. Le brut `<vidéo>_9x16.ecproj` reste
+  inchangé ; `<vidéo>_9x16_assist.ecproj` et `post.json`/`review.json`/
+  `audit.json` sont toujours produits. Validation 295 au pixel (0/255) et
+  parité de décisions avec le prototype sur 268/187/191/181. Détail dans
+  `docs/LOT-9-POST-STEP8.md`.
 - Lot 2 terminé : STEP2 TransNetV2 en `ort` CUDA, FFmpeg `rawvideo` via
   `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
@@ -130,7 +138,8 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
 - `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
 - `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
-- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout et annulation.
+- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
+- `docs/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
 - `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
@@ -145,6 +154,8 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
 - `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
 - `docs/DECISION-ABANDON-TAURI.md` : décision D-028, motifs de l'abandon du client desktop Tauri et procédure de restauration.
+- `docs/ETUDE-STEP9-AGENTIQUE.md` : étude d'opportunité et de faisabilité du post-STEP8 (recadrage 9:16, nettoyage, habillage, rendu), confrontation des scénarios déterministe, QA agentique et co-monteur.
+- `docs/SPIKE-STEP9-PROTOCOLE.md` : protocole de spike isolé, corpus 298/300 puis 19 paires / 32 vidéos, métriques, critères d'acceptation et d'arrêt.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -227,6 +238,9 @@ cargo run -p workflow-cli -- step7 finalize --no-delete \
 
 cargo run -p workflow-cli -- step8 run --dry-run
 cargo run -p workflow-cli -- step8 run --folder /tmp/projet
+cargo run -p workflow-cli -- step8 run --folder /tmp/projet --no-post
+cargo run -p workflow-cli -- post run --folder /tmp/projet
+cargo run -p workflow-cli -- post run --project /tmp/projet/projets/video_9x16.ecproj --docs /tmp/projet/docs
 
 cargo run -p workflow-cli -- step1 run --source-dir ~/Téléchargements
 cargo run -p workflow-cli -- step1 normalize-only [--force]

@@ -15,6 +15,7 @@ pub mod step5;
 pub mod step6;
 pub mod step7;
 pub mod step8;
+pub mod template;
 #[cfg(all(test, unix))]
 mod test_support;
 mod value;

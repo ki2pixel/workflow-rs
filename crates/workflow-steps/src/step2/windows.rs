@@ -190,7 +190,7 @@ pub fn frame_timecode(frame: usize, fps: f64) -> String {
     format!("{hours:02}:{minutes:02}:{seconds:02}.{millis:03}")
 }
 
-pub fn write_scenes_csv(path: &Path, scenes: &[Scene], fps: f64) -> Result<()> {
+pub fn scenes_csv_text(scenes: &[Scene], fps: f64) -> String {
     let mut text = String::from("No,Timecode In,Timecode Out,Frame In,Frame Out\r\n");
     for (index, (start, end)) in scenes.iter().enumerate() {
         text.push_str(&format!(
@@ -202,6 +202,11 @@ pub fn write_scenes_csv(path: &Path, scenes: &[Scene], fps: f64) -> Result<()> {
             end + 1
         ));
     }
+    text
+}
+
+pub fn write_scenes_csv(path: &Path, scenes: &[Scene], fps: f64) -> Result<()> {
+    let text = scenes_csv_text(scenes, fps);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("création de {}", parent.display()))?;
     }

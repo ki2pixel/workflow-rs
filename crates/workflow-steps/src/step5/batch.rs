@@ -25,12 +25,15 @@ pub struct Step5BatchOptions {
     pub skip_preserved_mov: bool,
     pub preserved_mov_names: Vec<String>,
     pub ffprobe: PathBuf,
+    /// `Some(prefix)` ignore les vidéos du template direct.
+    pub template_prefix: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct Step5BatchReport {
     pub projects: usize,
     pub files: usize,
+    pub skipped_template: usize,
     pub failures: Vec<String>,
 }
 
@@ -67,6 +70,8 @@ pub fn run_step5_batch(options: &Step5BatchOptions) -> Result<Step5BatchReport, 
         }
 
         let videos = videos_in(&docs, options);
+        let (videos, skipped_template) = videos;
+        report.skipped_template += skipped_template;
         for (video_index, video) in videos.iter().enumerate() {
             let Some(stem) = video.file_stem().and_then(|value| value.to_str()) else {
                 continue;
@@ -152,41 +157,57 @@ fn matching_projects(work_dir: &Path, keyword: &str) -> Vec<PathBuf> {
     projects
 }
 
-fn videos_in(docs: &Path, options: &Step5BatchOptions) -> Vec<PathBuf> {
+fn videos_in(docs: &Path, options: &Step5BatchOptions) -> (Vec<PathBuf>, usize) {
     let Ok(entries) = fs::read_dir(docs) else {
-        return Vec::new();
+        return (Vec::new(), 0);
     };
-    let mut videos: Vec<PathBuf> = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .filter(|path| {
-            path.extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| {
-                    VIDEO_EXTENSIONS
-                        .iter()
-                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
-                })
-        })
-        .filter(|path| {
-            let preserved = crate::step2::is_preserved_media_with(
-                path,
-                options.skip_preserved_mov,
-                &options.preserved_mov_names,
-                &options.ffprobe,
-            );
-            if preserved {
-                eprintln!(
-                    "Média préservé ignoré (alpha/liste noire): {}",
-                    path.display()
-                );
+    let mut skipped_template = 0;
+    let mut videos = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if !path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                VIDEO_EXTENSIONS
+                    .iter()
+                    .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+            })
+        {
+            continue;
+        }
+        if let Some(prefix) = options.template_prefix.as_deref() {
+            if crate::template::matches_name(&path, prefix)
+                && matches!(
+                    crate::template::probe_direct(&options.ffprobe, &path, prefix),
+                    Ok(Some(_))
+                )
+            {
+                eprintln!("Template direct ignoré: {}", path.display());
+                skipped_template += 1;
+                continue;
             }
-            !preserved
-        })
-        .collect();
+        }
+        let preserved = crate::step2::is_preserved_media_with(
+            &path,
+            options.skip_preserved_mov,
+            &options.preserved_mov_names,
+            &options.ffprobe,
+        );
+        if preserved {
+            eprintln!(
+                "Média préservé ignoré (alpha/liste noire): {}",
+                path.display()
+            );
+            continue;
+        }
+        videos.push(path);
+    }
     videos.sort();
-    videos
+    (videos, skipped_template)
 }
 
 fn tracking_path(docs: &Path, stem: &str) -> Option<(PathBuf, PathBuf)> {
@@ -238,9 +259,42 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe: PathBuf::from("ffprobe"),
+            template_prefix: None,
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.projects, 1);
+        assert_eq!(report.files, 0);
+        assert!(report.success());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn batch_skips_direct_templates_without_tracking() {
+        let dir = tempfile::tempdir().unwrap();
+        let docs = dir.path().join("100 Camille").join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("M6 - SDM - clip.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
+"#,
+        );
+        let options = Step5BatchOptions {
+            work_dir: dir.path().to_path_buf(),
+            keyword: "Camille".into(),
+            docs_subfolder: "docs".into(),
+            tracking_analytics: false,
+            expression_summary: false,
+            expression_keys: vec![],
+            skip_preserved_mov: true,
+            preserved_mov_names: vec![],
+            ffprobe,
+            template_prefix: Some("M6 - SDM - ".into()),
+        };
+        let report = run_step5_batch(&options).unwrap();
+        assert_eq!(report.skipped_template, 1);
         assert_eq!(report.files, 0);
         assert!(report.success());
     }
@@ -262,6 +316,7 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec!["m6+.mov".into()],
             ffprobe: PathBuf::from("/nonexistent/ffprobe"),
+            template_prefix: None,
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.files, 0);
@@ -285,6 +340,7 @@ mod tests {
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe: PathBuf::from("ffprobe"),
+            template_prefix: None,
         };
         let report = run_step5_batch(&options).unwrap();
         assert_eq!(report.files, 1);

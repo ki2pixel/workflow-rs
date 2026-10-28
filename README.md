@@ -72,6 +72,11 @@ Linux et le panneau CEP continue d'appeler Python.
   `audit.json` sont toujours produits. Validation 295 au pixel (0/255) et
   parité de décisions avec le prototype sur 268/187/191/181. Détail dans
   `docs/lots/LOT-9-POST-STEP8.md`.
+- Bypass direct SDM : quand `steps.step8.post.direct = true`, les vidéos
+  `M6 - SDM - ` au profil 1920×1080 25 fps sautent STEP2–STEP6 ; STEP7
+  synthétise un `_scenes.csv` mono-segment et STEP8 génère le brut sans
+  panel. Validé sur 295 (pixel), 340 et un lot mixte ; les sorties non-SDM
+  restent identiques.
 - Lot 2 terminé : STEP2 TransNetV2 en `ort` CUDA, FFmpeg `rawvideo` via
   `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
@@ -245,7 +250,9 @@ cargo run -p workflow-cli -- step7 finalize --no-delete \
 cargo run -p workflow-cli -- step8 run --dry-run
 cargo run -p workflow-cli -- step8 run --folder /tmp/projet
 cargo run -p workflow-cli -- step8 run --folder /tmp/projet --no-post
-cargo run -p workflow-cli -- post run --folder /tmp/projet
+cargo run -p workflow-cli -- step7 finalize --direct --work-dir /tmp/projets
+cargo run -p workflow-cli -- step8 run --direct --folder /tmp/projet
+cargo run -p workflow-cli -- post run --folder /tmp/projet --direct
 cargo run -p workflow-cli -- post run --project /tmp/projet/projets/video_9x16.ecproj --docs /tmp/projet/docs
 
 cargo run -p workflow-cli -- step1 run --source-dir ~/Téléchargements

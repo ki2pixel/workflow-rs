@@ -438,6 +438,9 @@ enum Step7Command {
         /// Liste les projets sans archiver, copier ni supprimer.
         #[arg(long)]
         dry_run: bool,
+        /// Active le bypass direct des vidéos du template.
+        #[arg(long)]
+        direct: bool,
     },
 }
 
@@ -626,6 +629,9 @@ enum Step8Command {
         /// Désactive le post-traitement A5/A6 après EffectCraft.
         #[arg(long)]
         no_post: bool,
+        /// Active le bypass direct des vidéos du template.
+        #[arg(long)]
+        direct: bool,
     },
 }
 
@@ -663,6 +669,9 @@ enum PostCommand {
         /// Calcule les rapports sans publier le projet `_assist`.
         #[arg(long)]
         report_only: bool,
+        /// Active le bypass direct des vidéos du template.
+        #[arg(long)]
+        direct: bool,
     },
 }
 
@@ -1194,6 +1203,12 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
+                    template_prefix: config
+                        .steps
+                        .step8
+                        .post
+                        .direct
+                        .then(|| config.steps.step8.post.template_prefix.clone()),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -1251,6 +1266,12 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
+                    template_prefix: config
+                        .steps
+                        .step8
+                        .post
+                        .direct
+                        .then(|| config.steps.step8.post.template_prefix.clone()),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -1294,6 +1315,7 @@ fn run() -> Result<()> {
                 no_delete,
                 restore_archives,
                 dry_run,
+                direct,
             } => {
                 let resolved = config.paths.resolve();
                 let work_dir = work_dir.unwrap_or(resolved.projects);
@@ -1306,8 +1328,15 @@ fn run() -> Result<()> {
                     .map_err(|error| anyhow::anyhow!(error))?;
 
                 if dry_run {
-                    let projects = find_projects_to_finalize(&work_dir, mode, project.as_deref())
-                        .with_context(|| format!("analyse de {}", work_dir.display()))?;
+                    let projects = find_projects_to_finalize(
+                        &work_dir,
+                        mode,
+                        project.as_deref(),
+                        (direct || config.steps.step8.post.direct)
+                            .then_some(config.steps.step8.post.template_prefix.as_str()),
+                        &config.steps.step8.post.ffprobe,
+                    )
+                    .with_context(|| format!("analyse de {}", work_dir.display()))?;
                     let names: Vec<String> = projects
                         .iter()
                         .filter_map(|path| path.file_name())
@@ -1337,6 +1366,9 @@ fn run() -> Result<()> {
                     restore_archives: restore_archives || config.steps.step7.restore_archives,
                     delete_source: !no_delete && config.steps.step7.delete_source,
                     project_filter: project,
+                    template_prefix: (direct || config.steps.step8.post.direct)
+                        .then(|| config.steps.step8.post.template_prefix.clone()),
+                    ffprobe: config.steps.step8.post.ffprobe.clone(),
                 };
                 let report = finalize_work_dir(&options)
                     .with_context(|| format!("finalisation de {}", options.work_dir.display()))?;
@@ -1361,6 +1393,7 @@ fn run() -> Result<()> {
                 timeout_s,
                 dry_run,
                 no_post,
+                direct,
             } => {
                 let resolved = config.paths.resolve();
                 let logs_dir = logs_dir.unwrap_or(resolved.logs);
@@ -1378,6 +1411,9 @@ fn run() -> Result<()> {
                 );
                 if no_post {
                     post.enabled = false;
+                }
+                if direct {
+                    post.direct = true;
                 }
                 let options = Step8Options {
                     manifest,
@@ -1417,12 +1453,16 @@ fn run() -> Result<()> {
                 ffmpeg,
                 ffprobe,
                 report_only,
+                direct,
             } => {
                 if folders.is_empty() && projects.is_empty() {
                     anyhow::bail!("passer au moins --folder ou --project");
                 }
                 if docs.is_some() && projects.len() > 1 {
                     anyhow::bail!("--docs n'est autorisé qu'avec un seul --project");
+                }
+                if direct && !projects.is_empty() {
+                    anyhow::bail!("--direct ne s'applique qu'aux dossiers --folder");
                 }
                 let mut options = PostOptions::from_config(
                     &config.steps.step8.post,
@@ -1441,6 +1481,9 @@ fn run() -> Result<()> {
                     options.ffprobe = ffprobe;
                 }
                 options.report_only = report_only;
+                if direct {
+                    options.direct = true;
+                }
                 let mut results = Vec::new();
                 let mut failures = 0usize;
                 for folder in folders {

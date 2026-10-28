@@ -407,13 +407,16 @@ jamais l'Anchor Point ; A3/A4 restent en revue ; A6 applique le template SDM
 si le préfixe configuré correspond et si la structure est mono-segment sans
 keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
-avec `workflow-cli post run`. Détail : `docs/lots/LOT-9-POST-STEP8.md`.
+avec `workflow-cli post run`. Depuis D-034, `steps.step8.post.direct`
+court-circuite STEP2–STEP6 pour les vidéos SDM au profil 1920×1080 25 fps :
+STEP7 synthétise le CSV mono-segment et STEP8 construit le brut sans panel.
+Détail : `docs/lots/LOT-9-POST-STEP8.md`.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée
 
-Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 161 clés ; `config/env.map.toml` documente 148 correspondances.
+Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 162 clés ; `config/env.map.toml` documente 149 correspondances.
 
 Sections : `[server]`, `[paths]`, `[legacy]`, `[webhook]`, `[download]`, `[steps]`, `[steps.filter]`, `[steps.stepN]` (dont `[steps.step8.post]`), `[retention]` et `[hardware]`.
 

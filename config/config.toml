@@ -197,6 +197,10 @@ max_drivers_kept = 10
 [steps.step8.post]
 # Second `.ecproj` suffixé, le brut reste intact.
 enabled = true
+# Bypass direct des vidéos SDM : STEP2 à STEP6 les ignorent, STEP7 synthétise
+# le CSV mono-segment et STEP8 construit le brut sans MediaSolution.
+# Validé le 2026-10-28 sur 295 (pixel), 340 et un lot mixte.
+direct = true
 suffix = "_assist"
 projects_subfolder = "projets"
 artifacts_subfolder = "post"

@@ -339,6 +339,59 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/README.md`, `AGENTS.md`, `README.md`,
   `parity/DRIFT.md`.
 
+## 2026-10-28 — D-034 : bypass direct des vidéos SDM
+
+- **Contexte** : le template SDM (A6) ne consomme que le `.ecproj` brut, la
+  vidéo source et `sdm.png`. Les vidéos SDM traversaient pourtant STEP2
+  (cuts), STEP3 (audio), STEP4 (tracking) et STEP5/6 (réduction), puis le
+  panel `MediaSolution.jsx` reconstruisait un projet que A6 devait à nouveau
+  transformer. Sur 340, le projet du panel n'est pas compatible A6 ; le
+  bypass évite ces étapes et rend le résultat déterministe.
+- **Décision** :
+  1. `steps.step8.post.direct` (défaut `false`) active le bypass. Le prédicat
+     est conservateur : nom préfixé par `template_prefix`, `.mp4`, H.264,
+     1920×1080, SAR 1:1, 25 fps CFR, durée de flux et `nb_frames` valides.
+     Un nom SDM qui ne respecte pas le profil repart dans le pipeline normal.
+  2. STEP2 à STEP6 ignorent les vidéos valides (`SKIP_TEMPLATE`) **avant**
+     le chargement des modèles et le verrou matériel ; les rapports exposent
+     `skipped_template`.
+  3. STEP7 considère une vidéo SDM valide comme prête en `lenient` ; le mode
+     `strict` conserve sa sémantique (scènes + tracking réels). Il synthétise
+     le CSV mono-segment depuis `nb_frames` avec le
+     format STEP2 (CRLF, frames 1-based incluses, `Timecode Out` = début de
+     la dernière frame), l'écrit dans l'archive sous `<stem>_scenes.csv` et
+     dans la copie finale sous `<stem>.csv`, sans modifier le projet source
+     et sans écraser un CSV existant. `metadata.json` reçoit
+     `scenes_origin` (`template`, `step2` ou `null`).
+  4. STEP8 construit le brut `<stem>_9x16.ecproj` depuis l'asset embarqué
+     `assets/effectcraft/sdm_raw_template.json`, sans `MediaSolution.jsx`,
+     puis publie `_assist.ecproj` via A6. Le brut est aussi créé avec
+     `--no-post` ; un brut existant n'est jamais écrasé.
+  5. Un dossier qui ne contient que des SDM n'appelle pas le panel. Un
+     dossier mixte l'appelle avec les noms SDM injectés en minuscules dans
+     `videoSkipNames` ; les non-SDM suivent le pipeline normal et leurs
+     sorties restent inchangées.
+  6. `workflow-cli post run --direct` crée le brut pour un lancement manuel,
+     mais jamais en `--report-only`.
+  7. `direct` reste `false` dans le code par défaut ; `config/config.toml`
+     l'active après validation.
+- **Validation** :
+  - 295 : CSV STEP7 identique au CSV STEP2 de référence ; chaîne STEP7 →
+    STEP8 ; rendu à 0/10/30/50 s **identique au pixel** à la référence Rust
+    acceptée (`a6exact`/`prod`) ;
+  - 340 : CSV `1,00:00:00.000,00:00:21.200,1,531` ; brut et assist rendus,
+    logo et panneaux conformes ;
+  - lot mixte 303 + 340 : `.ecproj` et `_assist.ecproj` non-SDM identiques
+    octet pour octet à l'ancien pipeline (chemins normalisés), rendu
+    identique à 10/60 s ; SDM `apply` A6, audit `pass` ;
+  - `cargo test --workspace`, `fmt` et `clippy -D warnings` verts.
+- **Limites** : profil statique limité au MP4 H.264 1920×1080 25 fps ; les
+  autres formats ou cadences repartent dans le pipeline normal ; A6 continue
+  de valider la structure du brut.
+- **Références** : `docs/lots/LOT-9-POST-STEP8.md`,
+  `crates/workflow-steps/src/template.rs`,
+  `crates/workflow-steps/src/post/direct.rs`, `config/config.toml`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

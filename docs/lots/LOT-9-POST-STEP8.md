@@ -1,8 +1,10 @@
 # Lot 9 — post-traitement A5/A6 après STEP8
 
-> Statut : intégré à la production le 2026-10-27.
+> Statut : intégré à la production le 2026-10-27 ; bypass direct SDM ajouté
+> le 2026-10-28.
 > Décisions : **D-030** (A3 en review, A1/A2 durcis), **D-031** (A5 v2,
-> hash échantillonné, A6 mesuré), **D-032** (écriture du projet assisté).
+> hash échantillonné, A6 mesuré), **D-032** (écriture du projet assisté),
+> **D-034** (bypass direct des vidéos SDM).
 > Code : `crates/workflow-steps/src/post/`, hook dans
 > `crates/workflow-steps/src/step8.rs`, commande `workflow-cli post`.
 
@@ -128,11 +130,55 @@ et le rendu relinké donne **0/255** (0 pixel > 2) à 0, 10, 30 et 50 s par
 rapport au GOOD. Un projet keyframé ou multi-segment part en `review` et le
 projet assisté reste une copie du brut.
 
+## Bypass direct des vidéos SDM
+
+A6 ne consomme que le `.ecproj` brut, la vidéo source et `sdm.png`. Les
+vidéos SDM n'ont donc pas besoin de STEP2 (cuts), STEP3 (audio), STEP4
+(tracking), STEP5/6 (réduction) ni du panel `MediaSolution.jsx`. Quand
+`steps.step8.post.direct = true`, une vidéo SDM valide est court-circuitée.
+
+Prédicat volontairement conservateur : nom préfixé par `template_prefix`,
+`.mp4`, H.264, 1920×1080, SAR 1:1, 25 fps CFR, durée de flux et `nb_frames`
+valides. Un nom SDM qui ne respecte pas ce profil repart dans le pipeline
+normal.
+
+- **STEP2 à STEP6** : `SKIP_TEMPLATE` est appliqué avant le chargement des
+  modèles et le verrou matériel. Les rapports exposent `skipped_template`.
+- **STEP7** : une vidéo SDM valide suffit en mode `lenient` ; le mode
+  `strict` conserve sa sémantique (scènes + tracking réels). Le CSV
+  mono-segment est synthétisé depuis `nb_frames` avec le format STEP2
+  (en-tête `No,Timecode In,Timecode Out,Frame In,Frame Out`, CRLF, frames
+  1-based incluses, `Timecode Out` = début de la dernière frame). Il est
+  écrit dans l'archive sous `<stem>_scenes.csv` et dans la copie finale
+  sous `<stem>.csv`. Le projet source n'est pas modifié ; un CSV existant
+  n'est jamais écrasé. `metadata.json` reçoit `scenes_origin` (`template`,
+  `step2` ou `null`).
+- **STEP8** : le brut `<stem>_9x16.ecproj` est construit depuis l'asset
+  embarqué `assets/effectcraft/sdm_raw_template.json`, sans
+  `MediaSolution.jsx`, puis A6 publie `<stem>_9x16_assist.ecproj`. Le brut
+  est créé même avec `--no-post` et un brut existant n'est jamais écrasé.
+- **Dossiers** : un dossier qui ne contient que des SDM n'appelle pas le
+  panel. Un dossier mixte l'appelle avec les noms SDM injectés en minuscules
+  dans `videoSkipNames` ; le panel ignore les SDM et traite les non-SDM
+  normalement.
+- **Post seul** : `workflow-cli post run --direct` crée le brut pour un
+  lancement manuel, mais pas en `--report-only`.
+
+Validation :
+
+| Cas | Résultat |
+| --- | --- |
+| 295 | CSV STEP7 identique au CSV STEP2 (`1,00:00:00.000,00:00:52.640,1,1317`) ; chaîne STEP7 → STEP8 ; rendu 0/10/30/50 s identique au pixel à la référence Rust acceptée |
+| 340 | CSV `1,00:00:00.000,00:00:21.200,1,531` ; brut et assist rendus, logo et panneaux conformes |
+| Lot mixte 303 + 340 | non-SDM `.ecproj` et `_assist.ecproj` identiques octet pour octet à l'ancien pipeline (chemins normalisés) ; rendu identique à 10/60 s ; SDM `apply` A6, audit `pass` |
+
 ## Configuration
 
 ```toml
 [steps.step8.post]
 enabled = true
+# Bypass direct des vidéos SDM (D-034). Validé sur 295/340 et un lot mixte.
+direct = true
 suffix = "_assist"
 projects_subfolder = "projets"
 artifacts_subfolder = "post"
@@ -153,6 +199,11 @@ post-traitement est de 0,07–0,24× la durée de la vidéo (sans rendu).
 # Hook automatique après STEP8 (désactivable).
 workflow-cli step8 run --folder /tmp/projet
 workflow-cli step8 run --folder /tmp/projet --no-post
+
+# Bypass direct SDM (ou via [steps.step8.post].direct = true).
+workflow-cli step7 finalize --direct --work-dir /tmp/projets
+workflow-cli step8 run --direct --folder /tmp/projet
+workflow-cli post run --direct --folder /tmp/projet
 
 # Post-traitement seul, sur un dossier projet.
 workflow-cli post run --folder /tmp/projet
@@ -178,6 +229,9 @@ workflow-cli post run --folder /tmp/projet --report-only
 | 191 | 37 A1 à 249,6 %, 12 `review`, audit `pass` |
 | 181 Concierge | 0 `apply`, 20 `review`, assist octet pour octet identique |
 | 270 / 276 / 286 / 287 | 0 `apply`, 7 projets, assist identiques au brut, audit `pass` |
+| 295 direct | CSV STEP7 = STEP2, rendu 0/10/30/50 s identique au pixel à la référence Rust |
+| 340 direct | CSV 531 frames, brut + assist, rendu conforme |
+| Lot mixte 303 + 340 | non-SDM identique octet pour octet à l'ancien pipeline (chemins normalisés), rendu identique |
 | A2 synthétique | 11/11 conformes (3 `apply`, 7 `review`, 1 `noop`) |
 
 Les décisions A1/A2/A3/A4 de 268, 187 DISNEYWORLD, 187 ECOLE, 191 et 181 sont
@@ -198,6 +252,9 @@ GOOD sur trois, donc la comparaison y est partielle.
   CEP ; ils sont consultables sous `docs/post/`.
 - Le post-traitement ajoute du temps au STEP8 ; le timeout serveur doit en
   tenir compte sur les vidéos très longues.
+- Le bypass direct est limité au profil MP4 H.264 1920×1080 25 fps CFR ; les
+  autres formats ou cadences repartent dans le pipeline normal. Un brut
+  existant n'est jamais remplacé, même s'il n'est pas compatible A6.
 - 179 n'a pas de `.ecproj` GOOD et 287 n'a qu'une référence sur trois : la
   validation corpus reste partielle sur ces deux projets.
 - Les projets **multi-source** ne sont pas traités par A1/A2 : la vidéo
@@ -208,6 +265,7 @@ GOOD sur trois, donc la comparaison y est partielle.
 ```sh
 cargo test -p workflow-steps post:: --lib
 cargo test -p workflow-steps step8 --lib
+cargo test -p workflow-steps template --lib
 cargo test --workspace
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings

@@ -4,6 +4,7 @@
 //! headless. Aucun bridge, aucun lancement d'application : le préflight
 //! `prefs.set` est exécuté par le CLI, dans la même session que le driver.
 
+use crate::post::direct;
 use crate::post::{run_post_for_folders, PostOptions, PostRunSummary};
 use anyhow::{bail, Context, Result};
 use chrono::Local;
@@ -77,6 +78,10 @@ struct Step8Report {
     timed_out: bool,
     duration_s: f64,
     success: bool,
+    direct_projects: usize,
+    direct_created: usize,
+    panel_skipped: bool,
+    panel_folders: Vec<String>,
     post: Option<PostRunSummary>,
 }
 
@@ -116,6 +121,10 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
     let config_path = resolve_config_path(options, manifest.as_ref());
     let (config_json, docs_subfolder) =
         load_panel_config(config_path.as_deref(), &options.docs_subfolder);
+    // Le post-traitement et le bypass direct lisent le même `docs/` que le
+    // panel, y compris quand `mediasolution_ec.json` change le nom du dossier.
+    let mut post = options.post.clone();
+    post.docs_subfolder = docs_subfolder.clone();
     let folders = select_folders(manifest.as_ref(), &options.folders, &docs_subfolder);
     if folders.is_empty() {
         if candidate_count == 0 {
@@ -135,15 +144,21 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         );
     }
 
-    let panel_jsx = resolve_panel_jsx(&options.panel_jsx)
-        .context("Panel MediaSolution.jsx introuvable (dépôt et copie installée)")?;
-    let cli_path = resolve_cli(&options.cli).with_context(|| {
-        format!(
-            "Exécutable EffectCraft introuvable: {}",
-            options.cli.display()
-        )
-    })?;
-    let version = cli_version(&cli_path);
+    let direct_summary = if post.direct {
+        direct::ensure_for_folders(&folders, &post, options.dry_run)
+    } else {
+        direct::DirectSummary::default()
+    };
+    let panel_folders: Vec<String> = folders
+        .iter()
+        .filter(|folder| !direct_summary.pure_folders.contains(folder))
+        .cloned()
+        .collect();
+    let panel_skipped = direct_summary.templates > 0 && panel_folders.is_empty();
+    let mut config_json = config_json;
+    if !direct_summary.names.is_empty() {
+        config_json = inject_video_skip_names(config_json.as_deref(), &direct_summary.names);
+    }
 
     tracing::info!(
         "Manifeste: {}",
@@ -151,35 +166,78 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             .as_ref()
             .map_or_else(|| "aucun".into(), |path| path.display().to_string())
     );
-    tracing::info!(
-        "Mode d'exécution: headless (effectcraft-cli {})",
-        version.as_deref().unwrap_or("version inconnue")
-    );
     tracing::info!("{} dossier(s) à traiter:", folders.len());
     for folder in &folders {
         tracing::info!("  - {folder}");
     }
-    tracing::info!("Panel: {}", panel_jsx.display());
-    tracing::info!("CLI: {}", cli_path.display());
+    if direct_summary.templates > 0 {
+        tracing::info!(
+            "Template direct: {} vidéo(s), {} brut(s) créé(s), {} déjà présent(s)",
+            direct_summary.templates,
+            direct_summary.created,
+            direct_summary.existing
+        );
+    }
+    if panel_skipped {
+        tracing::info!("Panel MediaSolution ignoré: tous les dossiers sont des templates directs.");
+    } else if panel_folders.len() != folders.len() {
+        tracing::info!(
+            "Panel MediaSolution limité à {} dossier(s) non-template.",
+            panel_folders.len()
+        );
+    }
 
     let step8_dir = options.logs_dir.join("step8");
     let drivers_dir = step8_dir.join("drivers");
     fs::create_dir_all(&drivers_dir)
         .with_context(|| format!("création de {}", drivers_dir.display()))?;
     let stamp = Local::now().format("%Y%m%d_%H%M%S");
-    let driver_path = drivers_dir.join(format!("step8_driver_{stamp}.jsx"));
-    let progress_path = drivers_dir.join(format!("step8_progress_{stamp}.log"));
-    let panel = fs::read_to_string(&panel_jsx)
-        .with_context(|| format!("lecture du panel {}", panel_jsx.display()))?;
-    let driver = build_driver_js(&panel, &folders, config_json.as_deref(), &progress_path);
-    fs::write(&driver_path, driver)
-        .with_context(|| format!("écriture du driver {}", driver_path.display()))?;
-    tracing::info!("Driver généré: {}", driver_path.display());
+    let mut driver_path = PathBuf::new();
+    let mut progress_path = PathBuf::new();
+    let mut version = None;
+    let mut panel_jsx_display = options.panel_jsx.to_string_lossy().to_string();
+    let mut cli_display = options.cli.to_string_lossy().to_string();
+
+    if !panel_skipped {
+        let panel_jsx = resolve_panel_jsx(&options.panel_jsx)
+            .context("Panel MediaSolution.jsx introuvable (dépôt et copie installée)")?;
+        let cli_path = resolve_cli(&options.cli).with_context(|| {
+            format!(
+                "Exécutable EffectCraft introuvable: {}",
+                options.cli.display()
+            )
+        })?;
+        panel_jsx_display = panel_jsx.to_string_lossy().to_string();
+        cli_display = cli_path.to_string_lossy().to_string();
+        version = cli_version(&cli_path);
+        tracing::info!(
+            "Mode d'exécution: headless (effectcraft-cli {})",
+            version.as_deref().unwrap_or("version inconnue")
+        );
+        tracing::info!("Panel: {}", panel_jsx.display());
+        tracing::info!("CLI: {}", cli_path.display());
+
+        driver_path = drivers_dir.join(format!("step8_driver_{stamp}.jsx"));
+        progress_path = drivers_dir.join(format!("step8_progress_{stamp}.log"));
+        let panel = fs::read_to_string(&panel_jsx)
+            .with_context(|| format!("lecture du panel {}", panel_jsx.display()))?;
+        let driver = build_driver_js(
+            &panel,
+            &panel_folders,
+            config_json.as_deref(),
+            &progress_path,
+        );
+        fs::write(&driver_path, driver)
+            .with_context(|| format!("écriture du driver {}", driver_path.display()))?;
+        tracing::info!("Driver généré: {}", driver_path.display());
+    } else {
+        tracing::info!("CLI: {}", cli_display);
+    }
 
     if options.dry_run {
         tracing::info!("--dry-run: exécution EffectCraft ignorée.");
-        println!("MS_BATCH_TOTAL: {}", folders.len());
-        for (index, folder) in folders.iter().enumerate() {
+        println!("MS_BATCH_TOTAL: {}", panel_folders.len());
+        for (index, folder) in panel_folders.iter().enumerate() {
             let name = Path::new(folder)
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -187,8 +245,11 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             println!(
                 "MS_BATCH_PROGRESS: {}/{} - {name}",
                 index + 1,
-                folders.len()
+                panel_folders.len()
             );
+        }
+        if panel_skipped {
+            println!("DIRECT_TEMPLATE_TOTAL: {}", direct_summary.templates);
         }
         return Ok(Step8Outcome {
             success: true,
@@ -201,46 +262,82 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         });
     }
 
-    let timeout = (options.timeout_s > 0).then(|| Duration::from_secs(options.timeout_s));
-    let cli_outcome = run_cli(
-        &cli_path,
-        &driver_path,
-        &progress_path,
-        &options.cwd,
-        timeout,
-    )?;
-    let duration = started.elapsed().as_secs_f64();
-    let return_code = cli_outcome.return_code;
-    let result = cli_outcome.result;
-    let timed_out = cli_outcome.timed_out;
-    let success = !timed_out && evaluate_result(result.as_ref());
-    if timed_out {
-        tracing::error!(
-            "Batch interrompu après le timeout interne de {} s.",
-            options.timeout_s
-        );
-    } else if result.is_none() {
-        tracing::error!("Aucun résultat MS_BATCH_RESULT reçu du CLI (code {return_code}).");
-    } else if !success {
-        if let Some(error) = result.as_ref().and_then(|value| value.get("error")) {
-            tracing::error!("Batch en échec: {error}");
+    let duration;
+    let mut return_code;
+    let result;
+    let timed_out;
+    let mut success;
+    if panel_skipped {
+        duration = started.elapsed().as_secs_f64();
+        return_code = i32::from(direct_summary.failed > 0);
+        timed_out = false;
+        success = direct_summary.failed == 0;
+        if !success {
+            tracing::error!(
+                "Template direct: {} brut(s) non créé(s) dans les dossiers 100 % SDM.",
+                direct_summary.failed
+            );
         }
-        if let Some(errors) = result
-            .as_ref()
-            .and_then(|value| value.get("errors"))
-            .and_then(Value::as_array)
-        {
-            for error in errors {
-                tracing::error!("Échec projet: {error}");
+        result = Some(json!({
+            "ok": direct_summary.failed == 0,
+            "errors": [],
+            "panel_skipped": "all_direct_templates",
+            "direct_templates": direct_summary.templates,
+        }));
+    } else {
+        let timeout = (options.timeout_s > 0).then(|| Duration::from_secs(options.timeout_s));
+        let cli_outcome = run_cli(
+            &resolve_cli(&options.cli).context("effectcraft-cli introuvable")?,
+            &driver_path,
+            &progress_path,
+            &options.cwd,
+            timeout,
+        )?;
+        duration = started.elapsed().as_secs_f64();
+        return_code = cli_outcome.return_code;
+        result = cli_outcome.result;
+        timed_out = cli_outcome.timed_out;
+        success = !timed_out && evaluate_result(result.as_ref());
+        if timed_out {
+            tracing::error!(
+                "Batch interrompu après le timeout interne de {} s.",
+                options.timeout_s
+            );
+        } else if result.is_none() {
+            tracing::error!("Aucun résultat MS_BATCH_RESULT reçu du CLI (code {return_code}).");
+        } else if !success {
+            if let Some(error) = result.as_ref().and_then(|value| value.get("error")) {
+                tracing::error!("Batch en échec: {error}");
+            }
+            if let Some(errors) = result
+                .as_ref()
+                .and_then(|value| value.get("errors"))
+                .and_then(Value::as_array)
+            {
+                for error in errors {
+                    tracing::error!("Échec projet: {error}");
+                }
             }
         }
-    }
-    if success && return_code != 0 {
-        tracing::warn!("MS_BATCH_RESULT valide mais code de sortie CLI non nul ({return_code}).");
+        if direct_summary.failed > 0 {
+            tracing::error!(
+                "Template direct: {} brut(s) non créé(s) ; lot marqué en échec.",
+                direct_summary.failed
+            );
+            if success && return_code == 0 {
+                return_code = 1;
+            }
+            success = false;
+        }
+        if success && return_code != 0 {
+            tracing::warn!(
+                "MS_BATCH_RESULT valide mais code de sortie CLI non nul ({return_code})."
+            );
+        }
     }
 
-    let post_summary = if success && options.post.enabled {
-        let summary = run_post_for_folders(&folders, &options.post);
+    let post_summary = if success && post.enabled {
+        let summary = run_post_for_folders(&folders, &post);
         tracing::info!(
             "Post-traitement: {} projet(s), {} assist(s), {} apply, {} review, {} échec(s)",
             summary.projects,
@@ -272,9 +369,9 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
             .and_then(Value::as_str)
             .map(str::to_string),
         folders: folders.clone(),
-        panel_jsx: panel_jsx.to_string_lossy().to_string(),
-        cli: cli_path.to_string_lossy().to_string(),
-        mode: "headless",
+        panel_jsx: panel_jsx_display,
+        cli: cli_display,
+        mode: if panel_skipped { "direct" } else { "headless" },
         bridge_port: Value::Null,
         app_launched: false,
         cli_version: version.clone(),
@@ -289,6 +386,10 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
         timed_out,
         duration_s: round2(duration),
         success,
+        direct_projects: direct_summary.templates,
+        direct_created: direct_summary.created,
+        panel_skipped,
+        panel_folders: panel_folders.clone(),
         post: post_summary.clone(),
     };
     let report_path = write_report(&step8_dir, &report)?;
@@ -343,6 +444,44 @@ fn resolve_config_path(options: &Step8Options, manifest: Option<&Value>) -> Opti
         .map(PathBuf::from)?;
     let candidate = output_dir.join("mediasolution_ec.json");
     candidate.is_file().then_some(candidate)
+}
+
+fn inject_video_skip_names(config_json: Option<&str>, names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return config_json.map(str::to_string);
+    }
+    let mut value = config_json
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| json!({}));
+    let object = value.as_object_mut().expect("objet JSON");
+    let entry = object
+        .entry("videoSkipNames")
+        .or_insert_with(|| json!(["m6+.mp4"]));
+    if !entry.is_array() {
+        *entry = json!(["m6+.mp4"]);
+    }
+    let array = entry.as_array_mut().expect("tableau videoSkipNames");
+    // Le panel compare les noms de fichiers déjà passés en minuscules
+    // (`isVideoSkipped`), donc toutes les entrées doivent l'être.
+    for value in array.iter_mut() {
+        if let Some(text) = value.as_str() {
+            let lower = text.to_lowercase();
+            if lower != text {
+                *value = json!(lower);
+            }
+        }
+    }
+    for name in names {
+        let lower = name.to_lowercase();
+        if !array
+            .iter()
+            .any(|value| value.as_str() == Some(lower.as_str()))
+        {
+            array.push(json!(lower));
+        }
+    }
+    serde_json::to_string(&value).ok()
 }
 
 fn load_panel_config(path: Option<&Path>, fallback_docs: &str) -> (Option<String>, String) {
@@ -1236,5 +1375,176 @@ printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles
         assert_eq!(report["cli_version"], "0.13.0");
         assert_eq!(report["result"]["ok"], true);
         assert_eq!(report["folders"].as_array().unwrap().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_template_skips_panel_and_still_publishes_raw() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("340 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/M6 - SDM - Leslie et Léo.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
+"#,
+        );
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder.clone()],
+            cli: dir.path().join("effectcraft-cli-introuvable"),
+            panel_jsx: dir.path().join("MediaSolution-introuvable.jsx"),
+            panel_config: None,
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                ffprobe,
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert!(folder
+            .join("projets/M6 - SDM - Leslie et Léo_9x16.ecproj")
+            .is_file());
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["mode"], "direct");
+        assert_eq!(report["panel_skipped"], true);
+        assert_eq!(report["direct_projects"], 1);
+        assert_eq!(report["direct_created"], 1);
+        assert_eq!(report["panel_folders"].as_array().unwrap().len(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_write_failure_fails_step8() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("340 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/M6 - SDM - Leslie et Léo.mp4"), b"video").unwrap();
+        // Un fichier à la place du dossier `projets` force l'échec direct.
+        fs::write(folder.join("projets"), b"obstacle").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
+"#,
+        );
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder],
+            cli: dir.path().join("effectcraft-cli-introuvable"),
+            panel_jsx: dir.path().join("MediaSolution-introuvable.jsx"),
+            panel_config: None,
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                ffprobe,
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(!outcome.success);
+        assert_eq!(outcome.exit_code, 1);
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["success"], false);
+        assert_eq!(report["panel_skipped"], true);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mixed_folder_keeps_panel_and_skips_only_the_sdm() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("340 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        fs::write(folder.join("docs/M6 - SDM - Leslie et Léo.mp4"), b"video").unwrap();
+        fs::write(folder.join("docs/Autre - Sujet.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+case "$*" in
+  *"M6 - SDM"*) printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}' ;;
+  *) printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1280,"height":720,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"250","duration":"10.000000"}]}' ;;
+esac
+"#,
+        );
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        crate::test_support::write_executable(
+            &cli,
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.13.0'; exit 0; fi
+printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles":true}},{"command":"file.runScript","result":{"ok":true,"error":null,"result":"step8-ok","output":"MS_BATCH_RESULT: {\"ok\": true, \"errors\": []}"}}]'
+"#,
+        );
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder.clone()],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions {
+                direct: true,
+                enabled: false,
+                ffprobe,
+                ..PostOptions::default()
+            },
+        };
+        let outcome = run_step8(&options).unwrap();
+        assert!(outcome.success);
+        assert!(folder
+            .join("projets/M6 - SDM - Leslie et Léo_9x16.ecproj")
+            .is_file());
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["panel_skipped"], false);
+        assert_eq!(report["panel_folders"].as_array().unwrap().len(), 1);
+        let driver = fs::read_to_string(report["driver"].as_str().unwrap()).unwrap();
+        assert!(driver.contains("m6 - sdm - leslie et léo.mp4"));
+        assert!(!driver.contains("M6 - SDM - Leslie et Léo.mp4"));
+    }
+
+    #[test]
+    fn skip_names_are_injected_without_losing_panel_config() {
+        let config = r#"{"docsSubFolderName":"docs","videoSkipNames":["M6+.MP4"]}"#;
+        let injected =
+            inject_video_skip_names(Some(config), &["M6 - SDM - Leslie et Léo.mp4".to_string()])
+                .unwrap();
+        let value: Value = serde_json::from_str(&injected).unwrap();
+        assert_eq!(value["docsSubFolderName"], "docs");
+        assert_eq!(value["videoSkipNames"].as_array().unwrap().len(), 2);
+        assert_eq!(value["videoSkipNames"][0], "m6+.mp4");
+        assert_eq!(value["videoSkipNames"][1], "m6 - sdm - leslie et léo.mp4");
+        let injected = inject_video_skip_names(None, &["CLIP.mp4".to_string()]).unwrap();
+        let value: Value = serde_json::from_str(&injected).unwrap();
+        assert_eq!(value["videoSkipNames"][0], "m6+.mp4");
+        assert_eq!(value["videoSkipNames"][1], "clip.mp4");
     }
 }

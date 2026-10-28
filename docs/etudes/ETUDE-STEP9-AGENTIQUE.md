@@ -1190,7 +1190,7 @@ Valider sur copies isolées, sans toucher aux 8 étapes ni à `/mnt/cache` :
 
 - toute écriture hors `/tmp/opencode/step9-spike` ;
 - toute modification de `/mnt/cache` ou `runtime/` ;
-- toute régression des 315 tests ou des contrats ;
+- toute régression des 333 tests ou des contrats ;
 - tout projet A non déterministe ;
 - tout envoi cloud sans accord explicite ;
 - tout export sans revue humaine.

@@ -2,14 +2,32 @@
 
 ## Tâche en cours
 
-**Post-traitement A5/A6 intégré à la production.** STEP8 publie désormais
+**Post-traitement A5/A6 et bypass direct SDM en production.** STEP8 publie
 toujours un second `<stem>_assist.ecproj` à côté du brut intact, avec
 `post.json`/`review.json`/`audit.json` sous `docs/post/`. A1 letterbox, A2
-bannière, A3/A4 en revue, A6 template SDM. La commande `workflow-cli post`
-permet de le relancer seul. 315 tests, fmt et clippy verts ; validation 295
-au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
+bannière, A3/A4 en revue, A6 template SDM. Depuis D-034, `post.direct`
+court-circuite STEP2–STEP6 pour les vidéos `M6 - SDM - ` au profil
+1920×1080 25 fps ; STEP7 synthétise le CSV mono-segment et STEP8 construit
+le brut sans panel. Validation 295 au pixel, 340, lot mixte et non-SDM
+inchangés ; tests, fmt et clippy verts.
 
 ## Dernière session
+
+- [2026-10-28] **Bypass direct SDM (D-034)** :
+  - `template.rs` : sonde ffprobe, prédicat MP4 H.264 1920×1080 SAR 1:1
+    25 fps CFR, CSV mono-segment au format STEP2, brut depuis
+    `assets/effectcraft/sdm_raw_template.json` ;
+  - STEP2–STEP6 : `SKIP_TEMPLATE` avant modèles et verrou matériel ;
+  - STEP7 : SDM prête en `lenient` (strict inchangé), CSV synthétique dans l'archive
+    (`_scenes.csv`) et la copie finale (`.csv`), `scenes_origin` dans
+    `metadata.json`, source intacte ;
+  - STEP8 : brut direct + assist A6, panel évité pour un dossier 100 % SDM,
+    `videoSkipNames` en minuscules pour un dossier mixte ; brut créé même
+    avec `--no-post` ;
+  - validations : 295 STEP7→STEP8 rendu identique au pixel à 0/10/30/50 s ;
+    340 CSV 531 frames et rendu conforme ; lot mixte 303 + 340 non-SDM
+    identique octet pour octet (chemins normalisés) et rendu identique ;
+  - config `direct = true` après validation ; docs LOT-9, README et D-034.
 
 - [2026-10-28] **Synchronisation documentaire post-audit** :
   comptes de tests ramenés à 315 (283 `#[test]` + 32 `#[tokio::test]`) dans
@@ -250,7 +268,7 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 315 tests unitaires ; pas de CI.
+- 333 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

@@ -4,6 +4,7 @@
 //! copie du projet, normalisation des fichiers dans `docs/`, manifeste lu par
 //! STEP8, puis suppression optionnelle de la source.
 
+use crate::template;
 use anyhow::{bail, Context, Result};
 use chrono::{Local, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -67,6 +68,9 @@ pub struct Step7Options {
     pub restore_archives: bool,
     pub delete_source: bool,
     pub project_filter: Option<String>,
+    /// `Some(prefix)` active la lecture directe des vidéos du template.
+    pub template_prefix: Option<String>,
+    pub ffprobe: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -92,6 +96,14 @@ pub struct ArchiveSummary {
     pub details: Vec<Value>,
 }
 
+#[derive(Debug, Clone)]
+struct SyntheticScenes {
+    frames: u64,
+    bytes: Vec<u8>,
+}
+
+type SyntheticMap = HashMap<PathBuf, SyntheticScenes>;
+
 /// Finalise tous les projets prêts du répertoire de travail.
 pub fn finalize_work_dir(options: &Step7Options) -> Result<Step7Report> {
     let output_dir = select_output_dir(
@@ -103,6 +115,8 @@ pub fn finalize_work_dir(options: &Step7Options) -> Result<Step7Report> {
         &options.work_dir,
         options.mode,
         options.project_filter.as_deref(),
+        options.template_prefix.as_deref(),
+        &options.ffprobe,
     )?;
     let mut archive_cache = HashMap::new();
     let mut finalized = Vec::new();
@@ -152,6 +166,8 @@ pub fn find_projects_to_finalize(
     work_dir: &Path,
     mode: FinalizeMode,
     project_filter: Option<&str>,
+    template_prefix: Option<&str>,
+    ffprobe: &Path,
 ) -> Result<Vec<PathBuf>> {
     let mut projects = Vec::new();
     for entry in
@@ -173,14 +189,19 @@ pub fn find_projects_to_finalize(
                 continue;
             }
         }
-        if project_is_ready(&path, mode)? {
+        if project_is_ready(&path, mode, template_prefix, ffprobe)? {
             projects.push(path);
         }
     }
     Ok(projects)
 }
 
-fn project_is_ready(project_dir: &Path, mode: FinalizeMode) -> Result<bool> {
+fn project_is_ready(
+    project_dir: &Path,
+    mode: FinalizeMode,
+    template_prefix: Option<&str>,
+    ffprobe: &Path,
+) -> Result<bool> {
     let videos = find_mp4_videos(project_dir);
     if videos.is_empty() {
         return Ok(false);
@@ -190,6 +211,24 @@ fn project_is_ready(project_dir: &Path, mode: FinalizeMode) -> Result<bool> {
     }
 
     for video in videos {
+        // Le mode `strict` conserve sa sémantique : scènes + tracking réels.
+        // Seul `lenient` accepte une vidéo SDM valide comme projet prêt.
+        if mode == FinalizeMode::Lenient {
+            if let Some(prefix) = template_prefix {
+                if template::matches_name(&video, prefix) {
+                    match template::probe_direct(ffprobe, &video, prefix) {
+                        Ok(Some(_)) => return Ok(true),
+                        Ok(None) => {}
+                        Err(error) => {
+                            tracing::warn!(
+                                "STEP7: sonde template impossible pour {}: {error:#}",
+                                video.display()
+                            );
+                        }
+                    }
+                }
+            }
+        }
         let stem = video
             .file_stem()
             .and_then(|stem| stem.to_str())
@@ -216,11 +255,20 @@ fn finalize_project(
     options: &Step7Options,
     archive_cache: &mut HashMap<String, PathBuf>,
 ) -> Result<Option<PathBuf>> {
+    let synthetic = synthetic_scenes(project_dir, options);
+    if !synthetic.is_empty() {
+        tracing::info!(
+            "STEP7: {} CSV mono-segment template à archiver pour {}",
+            synthetic.len(),
+            project_name
+        );
+    }
     if let Err(error) = archive_project_analysis(
         project_dir,
         project_name,
         &options.archives_dir,
         archive_cache,
+        &synthetic,
     ) {
         tracing::warn!("Archivage des analyses ignoré pour {project_name}: {error:#}");
     }
@@ -244,6 +292,7 @@ fn finalize_project(
             tracing::warn!("Restauration des archives ignorée pour {project_name}: {error:#}");
         }
     }
+    write_output_synthetic_scenes(&output_project_dir, &synthetic);
 
     if project_dir.starts_with(&options.archives_dir) {
         tracing::error!(
@@ -431,11 +480,83 @@ fn move_file(source: &Path, target: &Path) -> Result<()> {
     }
 }
 
+fn synthetic_scenes(project_dir: &Path, options: &Step7Options) -> SyntheticMap {
+    let Some(prefix) = options.template_prefix.as_deref() else {
+        return HashMap::new();
+    };
+    let mut synthetic = HashMap::new();
+    for video in find_videos(project_dir) {
+        if !template::matches_name(&video, prefix) {
+            continue;
+        }
+        let Some(stem) = video.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        if find_named(project_dir, &format!("{stem}{SCENES_SUFFIX}")).is_some()
+            || find_named(project_dir, &format!("{stem}.csv")).is_some()
+        {
+            continue;
+        }
+        match template::probe_direct(&options.ffprobe, &video, prefix) {
+            Ok(Some(probe)) => match template::single_scene_csv_bytes(probe.frames) {
+                Ok(bytes) => {
+                    synthetic.insert(
+                        video,
+                        SyntheticScenes {
+                            frames: probe.frames,
+                            bytes,
+                        },
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        "STEP7: CSV mono-segment impossible pour {}: {error:#}",
+                        video.display()
+                    );
+                }
+            },
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(
+                    "STEP7: sonde template impossible pour {}: {error:#}",
+                    video.display()
+                );
+            }
+        }
+    }
+    synthetic
+}
+
+fn write_output_synthetic_scenes(output_project_dir: &Path, synthetic: &SyntheticMap) {
+    if synthetic.is_empty() {
+        return;
+    }
+    let docs = output_project_dir.join("docs");
+    for (video, scenes) in synthetic {
+        let Some(stem) = video.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        if docs.join(format!("{stem}{SCENES_SUFFIX}")).is_file()
+            || docs.join(format!("{stem}.csv")).is_file()
+        {
+            continue;
+        }
+        let target = docs.join(format!("{stem}.csv"));
+        if let Err(error) = template::write_single_scene_csv(&target, scenes.frames) {
+            tracing::warn!(
+                "STEP7: écriture du CSV template impossible dans {}: {error:#}",
+                target.display()
+            );
+        }
+    }
+}
+
 fn archive_project_analysis(
     project_dir: &Path,
     project_name: &str,
     archives_dir: &Path,
     cache: &mut HashMap<String, PathBuf>,
+    synthetic: &SyntheticMap,
 ) -> Result<ArchiveSummary> {
     if !project_dir.is_dir() {
         bail!("dossier projet introuvable: {}", project_dir.display());
@@ -465,6 +586,12 @@ fn archive_project_analysis(
         let audio = find_named(project_dir, &format!("{stem}{AUDIO_SUFFIX}"));
         let tracking = find_named(project_dir, &format!("{stem}{TRACKING_SUFFIX}"))
             .or_else(|| find_named(project_dir, &format!("{stem}.json")));
+        let synthetic_scenes = synthetic.get(video);
+        let mut scenes_origin = if scenes.is_some() {
+            json!("step2")
+        } else {
+            Value::Null
+        };
 
         let Some(video_hash) = compute_video_hash(video) else {
             details.push(json!({
@@ -477,7 +604,26 @@ fn archive_project_analysis(
         let video_archive = project_archive.join(&video_hash);
         fs::create_dir_all(&video_archive)?;
 
-        let scenes_copied = copy_artifact(scenes.as_deref(), &video_archive, stem, SCENES_SUFFIX);
+        let scenes_copied = if let Some(source) = scenes.as_deref() {
+            copy_artifact(Some(source), &video_archive, stem, SCENES_SUFFIX)
+        } else if let Some(synthetic) = synthetic_scenes {
+            let target = video_archive.join(format!("{stem}{SCENES_SUFFIX}"));
+            match fs::write(&target, &synthetic.bytes) {
+                Ok(()) => {
+                    scenes_origin = json!("template");
+                    Some(target.to_string_lossy().to_string())
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        "STEP7: écriture du CSV template impossible dans {}: {error}",
+                        target.display()
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
         let audio_copied = copy_artifact(audio.as_deref(), &video_archive, stem, AUDIO_SUFFIX);
         let tracking_copied =
             copy_artifact(tracking.as_deref(), &video_archive, stem, TRACKING_SUFFIX);
@@ -491,6 +637,7 @@ fn archive_project_analysis(
             "video_stem": stem,
             "video_hash": video_hash,
             "created_at": Utc::now().to_rfc3339_opts(SecondsFormat::Micros, false),
+            "scenes_origin": scenes_origin.clone(),
             "copied": {
                 "scenes": scenes_copied,
                 "audio": audio_copied,
@@ -504,8 +651,9 @@ fn archive_project_analysis(
 
         details.push(json!({
             "video": video.strip_prefix(project_dir).unwrap_or(video).to_string_lossy(),
+            "scenes_origin": scenes_origin,
             "copied": {
-                "scenes": scenes.is_some(),
+                "scenes": scenes_copied.is_some(),
                 "audio": audio.is_some(),
                 "tracking": tracking.is_some(),
                 "archived": true,
@@ -735,12 +883,33 @@ mod tests {
         write(&mov_only.join("clip_tracking.json"), b"{}");
         fs::create_dir_all(dir.path().join("_temp_skip")).unwrap();
 
-        let lenient = find_projects_to_finalize(dir.path(), FinalizeMode::Lenient, None).unwrap();
+        let lenient = find_projects_to_finalize(
+            dir.path(),
+            FinalizeMode::Lenient,
+            None,
+            None,
+            Path::new("ffprobe"),
+        )
+        .unwrap();
         assert_eq!(lenient.len(), 2);
-        let strict = find_projects_to_finalize(dir.path(), FinalizeMode::Strict, None).unwrap();
+        let strict = find_projects_to_finalize(
+            dir.path(),
+            FinalizeMode::Strict,
+            None,
+            None,
+            Path::new("ffprobe"),
+        )
+        .unwrap();
         assert_eq!(strict.len(), 1);
         assert_eq!(strict[0].file_name().unwrap(), "ready");
-        let videos = find_projects_to_finalize(dir.path(), FinalizeMode::Videos, None).unwrap();
+        let videos = find_projects_to_finalize(
+            dir.path(),
+            FinalizeMode::Videos,
+            None,
+            None,
+            Path::new("ffprobe"),
+        )
+        .unwrap();
         assert_eq!(videos.len(), 2);
     }
 
@@ -781,7 +950,9 @@ mod tests {
         let project = project(dir.path(), "projet");
         let archives = dir.path().join("archives");
         let mut cache = HashMap::new();
-        let summary = archive_project_analysis(&project, "projet", &archives, &mut cache).unwrap();
+        let summary =
+            archive_project_analysis(&project, "projet", &archives, &mut cache, &HashMap::new())
+                .unwrap();
         assert_eq!(summary.processed, 1);
         assert_eq!(summary.copied, 1);
         let archive_project = matching_archive_dirs(&archives, "projet").remove(0);
@@ -816,7 +987,8 @@ mod tests {
         let project = project(dir.path(), "projet");
         let archives = dir.path().join("archives");
         let mut cache = HashMap::new();
-        archive_project_analysis(&project, "projet", &archives, &mut cache).unwrap();
+        archive_project_analysis(&project, "projet", &archives, &mut cache, &HashMap::new())
+            .unwrap();
 
         let output = dir.path().join("out");
         fs::create_dir_all(output.join("docs")).unwrap();
@@ -846,6 +1018,8 @@ mod tests {
             restore_archives: false,
             delete_source: false,
             project_filter: None,
+            template_prefix: None,
+            ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
         assert!(report.projects.is_empty());
@@ -871,6 +1045,8 @@ mod tests {
             restore_archives: false,
             delete_source: false,
             project_filter: None,
+            template_prefix: None,
+            ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
         assert_eq!(report.projects.len(), 1);
@@ -897,9 +1073,86 @@ mod tests {
             restore_archives: false,
             delete_source: true,
             project_filter: None,
+            template_prefix: None,
+            ffprobe: PathBuf::from("ffprobe"),
         };
         let report = finalize_work_dir(&options).unwrap();
         assert_eq!(report.projects.len(), 1);
         assert!(!project.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn archives_synthetic_scene_csv_for_direct_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let work = dir.path().join("work");
+        let project = work.join("340 Camille");
+        let docs = project.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        std::fs::write(docs.join("M6 - SDM - Leslie et Léo.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
+"#,
+        );
+        let strict = find_projects_to_finalize(
+            &work,
+            FinalizeMode::Strict,
+            None,
+            Some("M6 - SDM - "),
+            &ffprobe,
+        )
+        .unwrap();
+        assert!(strict.is_empty(), "strict garde scènes + tracking réels");
+        let lenient = find_projects_to_finalize(
+            &work,
+            FinalizeMode::Lenient,
+            None,
+            Some("M6 - SDM - "),
+            &ffprobe,
+        )
+        .unwrap();
+        assert_eq!(lenient.len(), 1);
+        let archives = dir.path().join("archives");
+        let output = dir.path().join("out");
+        let options = Step7Options {
+            work_dir: work,
+            output_dir: output.clone(),
+            archives_dir: archives.clone(),
+            logs_dir: dir.path().join("logs"),
+            fallback_output_dir: dir.path().join("fallback"),
+            mode: FinalizeMode::Lenient,
+            restore_archives: false,
+            delete_source: false,
+            project_filter: None,
+            template_prefix: Some("M6 - SDM - ".into()),
+            ffprobe,
+        };
+        let report = finalize_work_dir(&options).unwrap();
+        assert_eq!(report.projects.len(), 1);
+        let archive_project = matching_archive_dirs(&archives, "340 Camille").remove(0);
+        let video = project.join("docs/M6 - SDM - Leslie et Léo.mp4");
+        let hash = compute_video_hash(&video).unwrap();
+        let csv = archive_project
+            .join(&hash)
+            .join("M6 - SDM - Leslie et Léo_scenes.csv");
+        assert_eq!(
+            fs::read_to_string(&csv).unwrap(),
+            "No,Timecode In,Timecode Out,Frame In,Frame Out\r\n\
+             1,00:00:00.000,00:00:21.200,1,531\r\n"
+        );
+        let metadata: Value = serde_json::from_slice(
+            &fs::read(archive_project.join(&hash).join("metadata.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(metadata["scenes_origin"], "template");
+        assert!(metadata["copied"]["scenes"].is_string());
+        assert!(metadata["copied"]["audio"].is_null());
+        assert!(output
+            .join("340 Camille/docs/M6 - SDM - Leslie et Léo.csv")
+            .is_file());
+        assert!(!docs.join("M6 - SDM - Leslie et Léo.csv").exists());
     }
 }

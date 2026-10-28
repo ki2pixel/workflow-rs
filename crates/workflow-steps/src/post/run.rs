@@ -12,7 +12,7 @@ use crate::post::ecproj::{
 use crate::post::model::{
     now_iso, verdict, Action, AuditCheck, Decision, PostProjectOutcome, PostRunSummary, PostSummary,
 };
-use crate::post::{a1, a2, a3, a4, a6, detect};
+use crate::post::{a1, a2, a3, a4, a6, detect, direct};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
@@ -28,6 +28,8 @@ const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
 #[derive(Debug, Clone)]
 pub struct PostOptions {
     pub enabled: bool,
+    /// Active le bypass direct des vidéos du template.
+    pub direct: bool,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
     pub suffix: String,
@@ -45,6 +47,7 @@ impl Default for PostOptions {
     fn default() -> Self {
         Self {
             enabled: true,
+            direct: false,
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
             suffix: "_assist".into(),
@@ -63,6 +66,7 @@ impl PostOptions {
     pub fn from_config(config: &workflow_core::config::PostConfig, docs_subfolder: &str) -> Self {
         Self {
             enabled: config.enabled,
+            direct: config.direct,
             ffmpeg: config.ffmpeg.clone(),
             ffprobe: config.ffprobe.clone(),
             suffix: config.suffix.clone(),
@@ -93,6 +97,30 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
     let mut summary = PostRunSummary::default();
     if !options.enabled {
         return summary;
+    }
+    if options.direct && !options.report_only {
+        let direct = direct::ensure_folder(
+            folder,
+            &options.docs_subfolder,
+            &options.projects_subfolder,
+            &options.ffprobe,
+            &options.template_prefix,
+            false,
+        );
+        if direct.templates > 0 {
+            tracing::info!(
+                "Template direct {}: {} vidéo(s), {} brut(s) créé(s), {} déjà présent(s)",
+                folder.display(),
+                direct.templates,
+                direct.created,
+                direct.existing
+            );
+        }
+        if direct.failed > 0 {
+            summary
+                .failures
+                .push(format!("template direct: {}", folder.display()));
+        }
     }
     let projects_dir = folder.join(&options.projects_subfolder);
     if !projects_dir.is_dir() {

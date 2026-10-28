@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 315 tests unitaires, sans matériel.
+- 333 tests unitaires, sans matériel.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`, puis sur `1531 Camille`
   via le frontend Rust (8/8 étapes `completed`).
 - Widget système Rust : CPU/RAM/disque et GPU `nvidia-smi` ; auto-ouverture

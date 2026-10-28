@@ -83,7 +83,7 @@ Le contrat est complété par [`../parity/DRIFT.md`](../parity/DRIFT.md) pour le
 | STEP6 | [`lots/LOT-1-STEP6.md`](lots/LOT-1-STEP6.md) | Lot 1 | Référence |
 | STEP7 | [`lots/LOT-1-STEP7.md`](lots/LOT-1-STEP7.md) | Lot 1 | Référence |
 | STEP8 | [`lots/LOT-1-STEP8.md`](lots/LOT-1-STEP8.md) | Lot 1 | Référence |
-| A5/A6 (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
+| A5/A6 et bypass direct SDM (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
 
 La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 `LOT-4-STEP3` sont volontairement dans cet ordre historique.

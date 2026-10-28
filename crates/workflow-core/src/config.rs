@@ -954,6 +954,9 @@ impl Default for Step7Config {
 #[serde(default, deny_unknown_fields)]
 pub struct PostConfig {
     pub enabled: bool,
+    /// Bypass direct des vidéos du template (STEP2 à STEP6 sautés ; STEP7
+    /// synthétise le CSV mono-segment et STEP8 construit le brut).
+    pub direct: bool,
     pub suffix: String,
     pub projects_subfolder: String,
     pub artifacts_subfolder: String,
@@ -968,6 +971,7 @@ impl Default for PostConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            direct: false,
             suffix: "_assist".into(),
             projects_subfolder: "projets".into(),
             artifacts_subfolder: "post".into(),

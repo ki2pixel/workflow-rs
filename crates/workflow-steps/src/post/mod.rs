@@ -10,6 +10,7 @@ pub mod a3;
 pub mod a4;
 pub mod a6;
 pub mod detect;
+pub mod direct;
 pub mod ecproj;
 pub mod model;
 pub mod run;

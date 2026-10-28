@@ -28,8 +28,9 @@ documentation map `docs/README.md`, and
 - `crates/workflow-schema`: JSON schemas and Python-compatible decimal rounding
   (`round.rs`).
 - `crates/workflow-steps`: STEP1–STEP8 implementations (modules `step1` …
-  `step8`) plus `post/` (A5/A6 post-traitement after STEP8: `_assist.ecproj`,
-  `post.json`, `review.json`, `audit.json`).
+  `step8`) plus `template` (bypass direct SDM) and `post/` (A5/A6
+  post-traitement after STEP8: `_assist.ecproj`, `post.json`, `review.json`,
+  `audit.json`).
 - `crates/workflow-cli`: operational entrypoint for all eight steps; the
   server and scripts invoke it. There is no Python fallback.
 - `crates/workflow-server`: axum server on `:5004`. It serializes runs and
@@ -49,7 +50,7 @@ documentation map `docs/README.md`, and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 315 unit tests, no hardware
+cargo test --workspace                                    # 333 unit tests, no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -97,6 +98,11 @@ cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
   `workflow-cli post run --report-only` to compute reports without publishing
   an assisted project. Do not run either against `runtime/` or `/mnt/cache`
   for experiments.
+- With `steps.step8.post.direct = true`, `M6 - SDM - ` videos matching the
+  1920×1080 25 fps H.264 profile skip STEP2–STEP6; STEP7 synthesizes the
+  mono-segment `_scenes.csv` and STEP8 builds the raw without the panel. Do
+  not enable it on a machine without `ffprobe` or with a different SDM
+  profile: the fallback is the normal pipeline, not a hard failure.
 - Before a switch: stop both servers (sync refuses if either `:5003` or
   `:5004` is listening), run `./scripts/sync-backends.sh` (dry-run), then
   `--apply`. `scripts/start-rust.sh` does this automatically when the Rust

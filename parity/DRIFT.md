@@ -196,7 +196,7 @@ bout en headless avec `effectcraft-cli`, et le panneau JSX/CEP continue
 d'appeler le pont Python. Aucune étape Rust ne dépend de ce binaire.
 
 Conséquence pratique : ne pas rejouer cette validation lors des lots suivants.
-Le document `docs/LOT-1-BRIDGE.md` et le protocole `docs/STEP2-WINDOWS.md`
+Le document `docs/lots/LOT-1-BRIDGE.md` et le protocole `docs/lots/STEP2-WINDOWS.md`
 restent comme référence historique ; ils ne sont pas des prérequis de bascule.
 
 ### D-023 — Synchronisation au changement
@@ -228,7 +228,7 @@ La synchronisation prend le verrou `/tmp/workflow-sync.lock`, refuse les ports
 5003/5004 actifs et les processus d'étape, et sauvegarde les bases
 (`VACUUM INTO`) et les listes avant écriture. Le lanceur Rust l'exécute
 automatiquement ; le raccourci Python reste inchangé. Détail dans
-`docs/SYNC-BACKENDS.md`.
+`docs/exploitation/SYNC-BACKENDS.md`.
 
 ### D-024 — STEP4 régénéré vs archive 153
 
@@ -246,7 +246,7 @@ affectés : leurs références et leurs bruts (1720) sont cohérents.
 ### D-025 — `/sound-design` hors racine : 404 au lieu de 403
 
 `ServeDir` renvoie `404` pour une traversée ou un fichier absent sous
-`/sound-design`, alors que `docs/CONTRAT-ENVIRONNEMENT.md` mentionne
+`/sound-design`, alors que `docs/architecture/CONTRAT-ENVIRONNEMENT.md` mentionne
 `403 {"error":"Access denied"}`. Aucun contenu hors racine n'est servi : la
 différence est un code HTTP, pas une faille. Le frontend courant ne distingue
 pas ces deux codes. Un middleware dédié n'a pas été ajouté pour éviter de

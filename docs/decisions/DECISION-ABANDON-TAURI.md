@@ -132,6 +132,6 @@ pour retrouver l'état d'exploitation précédent.
 - `memory-bank/decisionLog.md` — décision D-028.
 - `memory-bank/activeContext.md`, `memory-bank/progress.md`.
 - `README.md` — interface et lanceurs.
-- `docs/SWITCH-PUBLIC.md` — bascule et rollback Python.
-- `docs/LOT-5-ORCHESTRATOR.md` — serveur et contrat HTTP.
+- `docs/exploitation/SWITCH-PUBLIC.md` — bascule et rollback Python.
+- `docs/lots/LOT-5-ORCHESTRATOR.md` — serveur et contrat HTTP.
 - `parity/DRIFT.md` — écarts legacy.

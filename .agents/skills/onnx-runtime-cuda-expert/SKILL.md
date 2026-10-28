@@ -109,8 +109,8 @@ Options : `--device cpu|cuda`, `--model`, `--onnxruntime`, `--cuda-lib-dir`,
 
 ## Références
 
-- `docs/LOT-2-STEP2.md`
-- `docs/STEP2-WINDOWS.md`
+- `docs/lots/LOT-2-STEP2.md`
+- `docs/lots/STEP2-WINDOWS.md`
 - `crates/workflow-steps/src/step2/`
 - `parity/DRIFT.md`
 - `.agents/skills/rust-concurrency-orchestrator/SKILL.md`

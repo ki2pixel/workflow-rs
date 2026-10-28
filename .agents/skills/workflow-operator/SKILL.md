@@ -7,7 +7,7 @@ description: Exploiter le pipeline Rust workflow-rs (8 étapes, CLI, serveur 500
 
 Cette skill décrit l'exploitation du pipeline Rust. Elle s'appuie sur
 `AGENTS.md`, `.agents/rules/codingstandards.md` et
-`docs/CONTRAT-ENVIRONNEMENT.md`.
+`docs/architecture/CONTRAT-ENVIRONNEMENT.md`.
 
 ## 1. Architecture et responsabilités
 
@@ -137,7 +137,7 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`.
 - Parité : `scripts/shadow-step56.py`, `scripts/validate-lot5.py`,
   `scripts/validate-step1.py`, `tools/parity/parity.py`.
-- Docs : `README.md`, `docs/LOT-*.md`, `docs/CONTRAT-ENVIRONNEMENT.md`,
+- Docs : `README.md`, `docs/lots/LOT-*.md`, `docs/architecture/CONTRAT-ENVIRONNEMENT.md`,
   `parity/DRIFT.md`, `memory-bank/`.
 
 ## 8. Ressource

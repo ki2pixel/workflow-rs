@@ -2,7 +2,7 @@
 
 > **Statut** : protocole d'expérimentation. A5/A6 sont industrialisés depuis le
 > 2026-10-27 ; les scénarios B/C restent des spikes.
-> **Étude associée** : `docs/ETUDE-STEP9-AGENTIQUE.md`.
+> **Étude associée** : `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`.
 > **Décisions** : D-029 à D-032 (`memory-bank/decisionLog.md`).
 > **Date** : 2026-10-26, mise à jour le 2026-10-27.
 
@@ -1064,8 +1064,8 @@ Arrêter immédiatement si :
 
 ## 11. Livrables de fin de spike
 
-1. `docs/ETUDE-STEP9-AGENTIQUE.md` — étude (ce document associé).
-2. `docs/SPIKE-STEP9-PROTOCOLE.md` — protocole.
+1. `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` — étude (ce document associé).
+2. `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` — protocole.
 3. `rapport-A.md`, `rapport-B.md`, `rapport-C.md` — résultats.
 4. `labels-*.json`, `audit.json`, `post.json` — données reproductibles.
 5. `memory-bank/decisionLog.md` — D-029 et mise à jour éventuelle.
@@ -1114,7 +1114,7 @@ Le périmètre A5/A6 n'est plus un spike : il est porté dans
 toujours publié, et les artefacts `post.json`/`review.json`/`audit.json` sont
 additifs. A3/A4 restent en revue, A1/A2 ne déplacent pas l'Anchor Point, A6
 applique le template SDM mesuré. Le détail, les validations et les limites
-sont dans `docs/LOT-9-POST-STEP8.md` et la décision **D-032**.
+sont dans `docs/lots/LOT-9-POST-STEP8.md` et la décision **D-032**.
 
 Les scénarios B (QA agentique) et C (co-monteur) restent hors production :
 ce protocole conserve leur cadre d'expérimentation.

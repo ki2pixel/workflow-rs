@@ -98,9 +98,9 @@ jq '.total_frames, (.frames_analysis|length)' \
 
 ## Références
 
-- `docs/LOT-1-STEP5.md`
-- `docs/LOT-1-STEP6.md`
-- `docs/LOT-1-BRIDGE.md`
+- `docs/lots/LOT-1-STEP5.md`
+- `docs/lots/LOT-1-STEP6.md`
+- `docs/lots/LOT-1-BRIDGE.md`
 - `parity/DRIFT.md` (D-001, D-002, D-003, D-004, D-007)
 - `.agents/skills/after-effects-bridge/SKILL.md`
 - `crates/workflow-steps/src/step5/`

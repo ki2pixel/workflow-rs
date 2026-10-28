@@ -190,7 +190,7 @@ Détail dans `../parity/DRIFT.md`.
 | Dernier lien webhook (Dropbox) | même archive via `source_url`, 33 s, ZIP valide |
 | Moniteur réel bout en bout | base isolée sans les deux URL de `276` : 1 téléchargement planifié, R2 réussi, 183 450 047 octets, ZIP valide, historique réécrit à 911 URL, 0 échec |
 | Repli R2 → Dropbox bout en bout | webhook local avec `r2_url` en 404 et `source_url` réel : repli Dropbox, 175 Mo, message `(R2 absent - repli Dropbox utilisé)`, aucun échec persistant |
-| Chaîne complète STEP1 → STEP8 | `1720 Camille.zip` : 8/8 étapes, 4 `.ecproj`, aucune écriture `/mnt/cache` (voir `VALIDATION-STEP1-8.md`) |
+| Chaîne complète STEP1 → STEP8 | `1720 Camille.zip` : 8/8 étapes, 4 `.ecproj`, aucune écriture `/mnt/cache` (voir `docs/validation/VALIDATION-STEP1-8.md`) |
 
 ### 7.1 Chaîne complète STEP1 → STEP8
 
@@ -198,7 +198,7 @@ Le test `1720 Camille` couvre l'enchaînement complet, y compris STEP1 :
 1 archive extraite, 4 vidéos déjà conformes, 35/45/61/59 scènes,
 27/27/46/26 segments audio, 5 158/4 673/5 022/5 272 trames de tracking,
 4 `_ae.json`, 1 projet finalisé et 4 `.ecproj`. Détail, isolation et contrôles
-d'intégrité dans `VALIDATION-STEP1-8.md`.
+d'intégrité dans `docs/validation/VALIDATION-STEP1-8.md`.
 
 ### 7.2 Simuler un nouveau lien sans attendre le webhook
 
@@ -259,7 +259,7 @@ curl -H "X-Worker-Token: $WORKFLOW_SERVER_WORKER_TOKEN" \
 Le serveur Python reste sur 5003 pour le rollback, mais il ne doit pas être
 démarré tant que le moniteur Rust est actif : `start_workflow.sh` lance
 toujours son propre moniteur CSV. La bascule contrôlée passe par
-`scripts/sync-backends.sh --apply` (voir `SYNC-BACKENDS.md`) :
+`scripts/sync-backends.sh --apply` (voir `docs/exploitation/SYNC-BACKENDS.md`) :
 
 - Python → Rust : arrêter Python, synchroniser, démarrer Rust ;
 - Rust → Python : arrêter Rust, synchroniser, démarrer Python.
@@ -285,7 +285,7 @@ Le moniteur Rust est actif sur cette machine depuis le 2026-10-23 21:13 :
   dans le dossier du backend cible.
 
 La procédure de bascule publique par reverse proxy est décrite dans
-`SWITCH-PUBLIC.md`.
+`docs/exploitation/SWITCH-PUBLIC.md`.
 
 Diagnostic ponctuel avec le même moteur, sans écrire l'historique :
 

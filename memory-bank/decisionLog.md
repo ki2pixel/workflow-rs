@@ -54,7 +54,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   281 tests) et `713b6bc` (polling web masqué et Cache-Control, 282 tests).
   `687eaf9`/`1613b17` (réorg docs) restent dans la branche de sauvegarde.
 - **Sauvegarde** : branche `backup/tauri-abandon-20261026` sur `1613b17`.
-- **Référence** : `docs/DECISION-ABANDON-TAURI.md`.
+- **Référence** : `docs/decisions/DECISION-ABANDON-TAURI.md`.
 
 ## 2026-10-26 — D-029 : pas de STEP9 agentique en production, consolidation déterministe d'abord
 
@@ -63,7 +63,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   EffectCraft 0.17. L'étude confronte le guide de recadrage, le code
   STEP5/6/8, le panel `MediaSolution.jsx`, les capacités MCP d'EffectCraft et
   les projets témoins `298 Camille_GOOD.zip` / `300 Camille_GOOD.zip`.
-- **Constats mesurés** (détail dans `docs/ETUDE-STEP9-AGENTIQUE.md`) :
+- **Constats mesurés** (détail dans `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`) :
   1. sur 117 segments comparables, l'ancre horizontale STEP6 n'a jamais été
      modifiée (delta max 0,00 px) ; les keyframes humaines déplacent la
      Position, pas l'Anchor Point ;
@@ -114,16 +114,16 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   - **Ajouter un 9e step au serveur avant validation** : le spike doit
     rester hors catalogue et hors serveur.
 - **Conséquences** :
-  - `docs/ETUDE-STEP9-AGENTIQUE.md` et `docs/SPIKE-STEP9-PROTOCOLE.md`
+  - `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` et `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`
     documentent l'analyse et le protocole ;
   - aucun code de production n'est modifié par cette décision ;
   - le spike doit mesurer A0–A5 (couverture cadrage/nettoyage ≥ 70 %, hash
     stable, zéro faux positif sur les contrôles propres), B (précision ≥ 95 %,
     rappel ≥ 90 %) et C (préférence ≥ 60 %) avant toute intégration ;
   - si A échoue, ne pas passer à B ; si B échoue, ne pas passer à C.
-- **Références** : `docs/ETUDE-STEP9-AGENTIQUE.md`,
-  `docs/SPIKE-STEP9-PROTOCOLE.md`, `docs/LOT-1-STEP6.md`,
-  `docs/LOT-1-STEP8.md`, `memory-bank/activeContext.md`.
+- **Références** : `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`, `docs/lots/LOT-1-STEP6.md`,
+  `docs/lots/LOT-1-STEP8.md`, `memory-bank/activeContext.md`.
 
 ## 2026-10-27 — D-030 : A3 en review, A1/A2 durcis, template SDM séparé
 
@@ -206,16 +206,16 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Conséquences** :
   - G1 est révisé : couverture ≥ 70 % des **gestes mécaniques** seulement,
     A3 en review, pas de revendication de remplacement du cadrage humain ;
-  - `docs/ETUDE-STEP9-AGENTIQUE.md` §3.6 et
-    `docs/SPIKE-STEP9-PROTOCOLE.md` §4.6/§8.1 sont mis à jour ;
+  - `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` §3.6 et
+    `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §4.6/§8.1 sont mis à jour ;
   - aucun code de production n'est modifié ; les prototypes restent sous
     `/tmp/opencode/step9-spike/` ;
   - prochaine étape : finaliser le contrôle de couverture A1 (seuil de
     compensation), durcir A2 (bannière sombre/animée, logo de coin), puis
     intégrer A6 comme module opt-in avec le profil mesuré ; 179 reste sans
     GOOD, 287 n'a qu'une référence sur trois.
-- **Références** : `docs/ETUDE-STEP9-AGENTIQUE.md`,
-  `docs/SPIKE-STEP9-PROTOCOLE.md`, `06-corpus/RAPPORT-CORPUS.md` (spike),
+- **Références** : `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`, `06-corpus/RAPPORT-CORPUS.md` (spike),
   `memory-bank/activeContext.md`.
 
 ## 2026-10-27 — D-031 : A5 v2, hash échantillonné et A2 géométrique
@@ -252,8 +252,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   pas une fonction du panel ; 179/287 restent bloqués par les références
   manquantes.
 - **Références** : `06-corpus/a5v2/RAPPORT-A5-V2.md`,
-  `docs/ETUDE-STEP9-AGENTIQUE.md` §3.7/§3.8,
-  `docs/SPIKE-STEP9-PROTOCOLE.md` §5.2/§5.3/§5.6/§5.7/§8.1,
+  `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` §3.7/§3.8,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §5.2/§5.3/§5.6/§5.7/§8.1,
   `memory-bank/activeContext.md`.
 
 ## 2026-10-27 — D-032 : post-traitement A5/A6 en production, projet `_assist` toujours publié
@@ -300,8 +300,44 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   A3/A4 en revue ; bords non noirs et recadrages sémantiques en revue ; A6
   multi-segment/keyframé en revue ; le timeout serveur STEP8 couvre aussi le
   post-traitement ; 179 sans GOOD et 287 avec une seule référence sur trois.
-- **Références** : `docs/LOT-9-POST-STEP8.md`, `docs/ETUDE-STEP9-AGENTIQUE.md`
-  §3.9, `docs/SPIKE-STEP9-PROTOCOLE.md` §14.1, `config/config.toml`.
+- **Références** : `docs/lots/LOT-9-POST-STEP8.md`, `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`
+  §3.9, `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §14.1, `config/config.toml`.
+
+## 2026-10-28 — D-033 : documentation réorganisée en six domaines
+
+- **Contexte** : `docs/` regroupait 23 documents à plat (lots STEP1–STEP8,
+  A5/A6, contrat, décision, études STEP9, exploitation, validation) et un
+  dossier `audits/`, sans index ni règle de navigation. Les renvois croisés
+  étaient dispersés dans 30 fichiers du dépôt. La réorganisation antérieure
+  (`687eaf9`/`1613b17`, branche `backup/tauri-abandon-20261026`) n'a jamais
+  été fusionnée et utilisait une autre taxonomie.
+- **Décision** :
+  1. Six domaines : `architecture/` (contrat), `lots/` (bilans par lot et
+     `STEP2-WINDOWS.md`), `exploitation/` (sync, bascule, rétention),
+     `decisions/` (ADR), `etudes/` (étude et spike STEP9), `validation/`
+     (validation de bout en bout et `audits/`).
+  2. `docs/README.md` devient l'index unique : taxonomie, statuts, parcours
+     par profil, table par étape et correspondance ancien → nouveau.
+  3. Les renvois entre documents sont repo-relatifs en backticks
+     (`docs/lots/LOT-1-STEP8.md`) ; les liens Markdown relatifs sont réservés
+     à l'index. Les chemins applicatifs `<projet>/docs/` et `docs/post/`
+     restent inchangés.
+  4. Les audits suivent désormais `docs/validation/audits/AAAA-MM-JJ-<sujet>.md`.
+  5. Aucun fichier n'est renommé : seuls les déplacements changent les chemins,
+     ce qui préserve `git log --follow` et `git blame`.
+- **Conséquences** : les fiches de lot quittent la racine pour `docs/lots/`,
+  le contrat passe sous `docs/architecture/`, et
+  `.agents/workflows/docs-updater.md` compte les documents via
+  `find docs -name '*.md'`. `AGENTS.md`, `README.md`, les règles, skills et la
+  memory-bank pointent vers l'index.
+- **Validation** : 24 fichiers déplacés par `git mv` en deux commits (move pur
+  détecté à 100 %, puis réécriture) ; 211 renvois réécrits dans 30 fichiers ;
+  zéro ancien chemin hors table de correspondance ; toutes les cibles citées
+  existent ; liens de l'index résolus ; 315 tests, `fmt` et `clippy
+  -D warnings` verts ; aucun fichier sous `crates/`, `scripts/`, `assets/` ou
+  `config/` modifié.
+- **Références** : `docs/README.md`, `AGENTS.md`, `README.md`,
+  `parity/DRIFT.md`.
 
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
@@ -347,7 +383,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
     processus pour une métrique machine.
   - Supprimer le toggle : l'opérateur doit pouvoir réactiver l'auto-ouverture.
 - **Conséquences** : `/api/system_monitor` peut être routé vers le backend
-  actif (voir `docs/SWITCH-PUBLIC.md`) ; la divergence de valeur par défaut
+  actif (voir `docs/exploitation/SWITCH-PUBLIC.md`) ; la divergence de valeur par défaut
   est consignée dans `systemPatterns.md`.
 - **Validation** : endpoint réel sur GTX 1650 (30 %, 0,41/4,0 Go, 44 °C),
   tests serveur GPU, page rendue avec la case décochée.
@@ -384,8 +420,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   sans exécution matérielle ni modification des données de production.
 - **Décision** :
   1. Consigner le rapport dans
-     `docs/audits/2026-10-24-audit-backend-rust.md` ; les audits futurs suivent
-     la même convention `docs/audits/AAAA-MM-JJ-<sujet>.md`.
+     `docs/validation/audits/2026-10-24-audit-backend-rust.md` ; les audits futurs suivent
+     la même convention `docs/validation/audits/AAAA-MM-JJ-<sujet>.md`.
   2. Classer les constats en P0 (bloquant), P1 (majeur) et P2 (qualité), avec
      preuve `fichier:ligne` et test de non-régression attendu.
   3. Traiter en priorité la course `stop` → `reserve` / `finish` (A1), qui
@@ -574,11 +610,11 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 ## Références
 
 - `parity/DRIFT.md` (détails et preuves)
-- `docs/LOT-*.md`
-- `docs/SYNC-BACKENDS.md`
-- `docs/SWITCH-PUBLIC.md`
-- `docs/RETENTION.md`
-- `docs/VALIDATION-STEP1-8.md`
+- `docs/lots/LOT-*.md`
+- `docs/exploitation/SYNC-BACKENDS.md`
+- `docs/exploitation/SWITCH-PUBLIC.md`
+- `docs/exploitation/RETENTION.md`
+- `docs/validation/VALIDATION-STEP1-8.md`
 
 ## Remédiation de l'audit backend du 2026-10-24
 

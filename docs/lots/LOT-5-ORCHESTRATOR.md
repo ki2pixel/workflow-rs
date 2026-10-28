@@ -2,7 +2,7 @@
 
 > Mise à jour lot 6 : STEP1 est désormais porté en Rust. Les mentions
 > d'indisponibilité de STEP1 ci-dessous décrivent l'état livré au lot 5 et sont
-> levées par `docs/LOT-6-STEP1.md`.
+> levées par `docs/lots/LOT-6-STEP1.md`.
 
 ## Objectif
 
@@ -70,7 +70,7 @@ la fois. C'est une contrainte d'exploitation documentée, pas un fallback.
 
 ## Contrat HTTP
 
-Les routes et formes de réponse sont celles de `docs/CONTRAT-ENVIRONNEMENT.md`.
+Les routes et formes de réponse sont celles de `docs/architecture/CONTRAT-ENVIRONNEMENT.md`.
 
 | Route | Auth | Comportement Rust |
 | --- | --- | --- |
@@ -178,7 +178,7 @@ cargo build --release -p workflow-server -p workflow-cli
 basculement du trafic public (reverse proxy, DNS ou port) reste une opération
 externe. En cas d'échec Rust, il suffit de continuer à router vers 5003.
 La validation réelle de cette coexistence (Rust sur 5004, Python sur 5003,
-rollback après arrêt) est décrite dans `docs/LOT-7-INTEGRATION.md`.
+rollback après arrêt) est décrite dans `docs/lots/LOT-7-INTEGRATION.md`.
 
 `check` exige que le binaire `workflow-cli` et le gabarit existent, que la base
 et le verrou soient isolés, et que le jeton soit configuré. Il signale aussi la
@@ -209,7 +209,7 @@ et STEP4.
   lorsqu'un `_tracking.json` partiel existe déjà. Le pipeline Rust neuf n'en a
   pas besoin ; les projets Python déjà réduits restent identiques (shadow).
 - Les routes cache/statistiques/audio et `/test-sound` restent dans Python.
-  Les routes CSV sont réelles depuis le lot 8 (voir `LOT-8-INGESTION.md`).
+  Les routes CSV sont réelles depuis le lot 8 (voir `docs/lots/LOT-8-INGESTION.md`).
 - Le moniteur webhook et le téléchargement R2/Dropbox sont portés, mais
   désactivés par défaut. La migration explicite de l'historique Python est
   obligatoire avant activation (`D-018`, `D-021`).

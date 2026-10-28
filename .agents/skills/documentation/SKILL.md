@@ -148,8 +148,8 @@ lire la documentation.
 ## Documentation du dépôt
 
 - `README.md` : état, commandes, prérequis.
-- `docs/LOT-*.md` : périmètre, parité, performance, limites.
-- `docs/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas.
+- `docs/lots/LOT-*.md` : périmètre, parité, performance, limites.
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas.
 - `parity/DRIFT.md` : écarts et décisions.
 - `memory-bank/` : état courant, décisions, progrès.
 - `.agents/` : règles, skills, workflows pour les agents.

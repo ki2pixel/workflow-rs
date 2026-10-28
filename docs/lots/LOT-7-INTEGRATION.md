@@ -92,5 +92,5 @@ externe : le script ne touche jamais au port 5003.
 - La compilation Windows du pont, le basculement du JSX After Effects et la
   validation STEP8 sur la machine Windows sont abandonnés (D-022) : la cible
   est Linux et le panneau CEP continue d'appeler Python.
-- La bascule publique est décrite dans `SWITCH-PUBLIC.md` ; le routage reste
+- La bascule publique est décrite dans `docs/exploitation/SWITCH-PUBLIC.md` ; le routage reste
   une décision d'exploitation.

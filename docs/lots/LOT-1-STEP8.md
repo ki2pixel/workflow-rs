@@ -93,7 +93,7 @@ si aucune décision ne s'applique). Les artefacts `post.json`, `review.json` et
 Le post-traitement est activé par `[steps.step8.post]` et désactivable avec
 `--no-post`. Il peut aussi être lancé seul avec `workflow-cli post run`.
 Détail des décisions A1/A2/A3/A4/A6, du template SDM et des validations :
-`docs/LOT-9-POST-STEP8.md`.
+`docs/lots/LOT-9-POST-STEP8.md`.
 
 ## Commandes
 

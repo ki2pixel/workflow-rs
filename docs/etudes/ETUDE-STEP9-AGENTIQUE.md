@@ -7,7 +7,7 @@
 > en production le 2026-10-27 (**D-032**).
 > Décisions associées : **D-029**, **D-030**, **D-031**, **D-032**
 > (`memory-bank/decisionLog.md`).
-> Protocole de spike : `docs/SPIKE-STEP9-PROTOCOLE.md`.
+> Protocole de spike : `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`.
 
 ## Résumé exécutif
 
@@ -280,7 +280,7 @@ de composition restent **hors périmètre A** (directives client).
 
 ### 3.4 Résultats Phase 0 du spike (2026-10-26)
 
-La Phase 0 du protocole `docs/SPIKE-STEP9-PROTOCOLE.md` a été exécutée
+La Phase 0 du protocole `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` a été exécutée
 sur des copies isolées sous `/tmp/opencode/step9-spike/` (rapport détaillé :
 `01-baseline/RAPPORT-PHASE0.md`). Résultats mesurés :
 
@@ -585,7 +585,7 @@ au JSON de référence et le rendu relinké reste à **0/255** à 0, 10, 30 et
 conformes au prototype. Les projets 270/276/286/287 ne changent aucune échelle
 et leur assist est identique au brut.
 
-Détail d'exploitation, configuration et limites : `docs/LOT-9-POST-STEP8.md`.
+Détail d'exploitation, configuration et limites : `docs/lots/LOT-9-POST-STEP8.md`.
 Décision : **D-032**.
 
 ---
@@ -1146,7 +1146,7 @@ B ensuite, C en laboratoire.
 
 ## 8. Protocole de spike (résumé)
 
-Le détail est dans `docs/SPIKE-STEP9-PROTOCOLE.md`.
+Le détail est dans `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`.
 
 ### 8.1 Objectif
 
@@ -1328,13 +1328,13 @@ Avec 300–1 500 tokens par image selon le modèle et la résolution.
 - `AGENTS.md` — règles du dépôt, isolation, contrats.
 - `.agents/rules/codingstandards.md` — standards Rust et JSON.
 - `.agents/rules/memorybankprotocol.md` — protocole memory-bank.
-- `docs/LOT-1-STEP6.md` — contrat `_ae.json`, parité, performance.
-- `docs/LOT-1-STEP8.md` — gate scripting, driver, timeout.
-- `docs/LOT-7-INTEGRATION.md` — séquence réelle STEP2 → STEP8.
-- `docs/VALIDATION-STEP1-8.md` — validation complète, isolation.
+- `docs/lots/LOT-1-STEP6.md` — contrat `_ae.json`, parité, performance.
+- `docs/lots/LOT-1-STEP8.md` — gate scripting, driver, timeout.
+- `docs/lots/LOT-7-INTEGRATION.md` — séquence réelle STEP2 → STEP8.
+- `docs/validation/VALIDATION-STEP1-8.md` — validation complète, isolation.
 - `memory-bank/decisionLog.md` — D-029 à D-032.
-- `docs/SPIKE-STEP9-PROTOCOLE.md` — protocole détaillé.
-- `docs/LOT-9-POST-STEP8.md` — post-traitement A5/A6 en production.
+- `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` — protocole détaillé.
+- `docs/lots/LOT-9-POST-STEP8.md` — post-traitement A5/A6 en production.
 
 ### 9.6 Glossaire
 

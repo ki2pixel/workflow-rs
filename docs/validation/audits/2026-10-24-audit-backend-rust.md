@@ -7,7 +7,7 @@
   abstraction matérielle `workflow-tpu`, étapes STEP1 à STEP8.
 - **Méthode** : audit statique du code, exécution de la suite de tests et des
   lints, lecture croisée de `AGENTS.md`, `.agents/rules/`, `memory-bank/`,
-  `docs/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md`.
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md`.
 - **Hors périmètre** : aucune étape matérielle lancée, aucun serveur démarré,
   aucune écriture dans `runtime/`, `/mnt/cache` ou le dépôt Python legacy,
   aucune mesure de parité réelle (les tests ne chargent ni modèle, ni GPU, ni
@@ -571,7 +571,7 @@ pointer les trois étapes dessus.
 ### C1 — P2 — Message `/stop` non conforme
 
 **Constat.** `state.rs:310` renvoie « L'étape n'est pas en cours. » alors que
-le contrat (`docs/CONTRAT-ENVIRONNEMENT.md:189`) spécifie
+le contrat (`docs/architecture/CONTRAT-ENVIRONNEMENT.md:189`) spécifie
 `Step 'STEP3' is not running`, et précise ligne 195 que le frontend dépend de
 `"not running"`. Le frontend actuel utilise `/cancel`, donc l'impact est
 latent, mais la dérive est réelle.
@@ -582,7 +582,7 @@ dans `parity/DRIFT.md`.
 ### C2 — P2 — Statut du moniteur CSV non conforme
 
 **Constat.** `service.rs:155-176` publie `checking`, `active` ou `error`,
-alors que le contrat (`docs/CONTRAT-ENVIRONNEMENT.md:138`) attend
+alors que le contrat (`docs/architecture/CONTRAT-ENVIRONNEMENT.md:138`) attend
 `running|stopped`. Un consommateur qui teste `status === "running"` ne verra
 jamais le moniteur actif.
 
@@ -591,7 +591,7 @@ jamais le moniteur actif.
 
 ### C3 — P2 — Traversée `/sound-design` : 404 au lieu de 403
 
-**Constat.** Le contrat (`docs/CONTRAT-ENVIRONNEMENT.md:192`) attend
+**Constat.** Le contrat (`docs/architecture/CONTRAT-ENVIRONNEMENT.md:192`) attend
 `403 {"error":"Access denied"}`. `ServeDir` (`http.rs:80`) renvoie 404. La
 sécurité est bonne (pas de fuite), seul le code diffère.
 
@@ -808,7 +808,7 @@ ss -ltnp | grep -E ':500[34]' || true
 - `crates/workflow-tpu/src/{session,ffi}.rs`
 - `crates/workflow-cli/src/main.rs`
 - `config/config.toml`, `scripts/switch-rust.sh`, `parity/DRIFT.md`,
-  `docs/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/`.
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, `memory-bank/`.
 
 ## 11. Audit croisé avec le rapport Gemini Web
 

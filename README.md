@@ -46,7 +46,7 @@ Linux et le panneau CEP continue d'appeler Python.
   (244, 245, 249, 250). STEP4 brut pour 244/245 ; idempotence sur 249/250.
 - Performance release : 0,096 s (5,9×) sur 244, 0,101 s sur 245, 0,072 s sur
   249, 0,039 s sur 250, RSS 16 Mio. Détail et décision ouverte dans
-  `docs/LOT-1-STEP5.md`.
+  `docs/lots/LOT-1-STEP5.md`.
 - Lot 1.3 terminé : STEP6 `_ae.json` avec index tracking/audio, enrichissement
   `is_speaking`/`tier`, parse CSV et recommandations de segments. Identique à la
   production sur les quatre projets ; 0,108 s et 44 Mio sur 244.
@@ -54,7 +54,7 @@ Linux et le panneau CEP continue d'appeler Python.
   identiques sur 19 vidéos (148, 151, 152, 244, 245, 249, 250, 253, 254, 257),
   sans écriture dans `/mnt/cache`. Le passage `--prefer-raw` reproduit aussi les
   19 `_tracking.json` depuis les STEP4 bruts. Détail dans
-  `docs/LOT-1-SHADOW.md`.
+  `docs/lots/LOT-1-SHADOW.md`.
 - Lot 1.4 terminé : `workflow-bridge` pour les cuts CSV et `analyze_manifest`.
   Parité sur 273 calques, les quatre entrées `_ae.json` et les overrides de
   configuration ; cuts 21× plus rapide que Python.
@@ -70,56 +70,56 @@ Linux et le panneau CEP continue d'appeler Python.
   inchangé ; `<vidéo>_9x16_assist.ecproj` et `post.json`/`review.json`/
   `audit.json` sont toujours produits. Validation 295 au pixel (0/255) et
   parité de décisions avec le prototype sur 268/187/191/181. Détail dans
-  `docs/LOT-9-POST-STEP8.md`.
+  `docs/lots/LOT-9-POST-STEP8.md`.
 - Lot 2 terminé : STEP2 TransNetV2 en `ort` CUDA, FFmpeg `rawvideo` via
   `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline
   sur les quatre cas ; VRAM pic sous la baseline. Détail dans
-  `docs/LOT-2-STEP2.md`.
+  `docs/lots/LOT-2-STEP2.md`.
 - Lot 3 terminé : STEP4 Coral Edge TPU avec modèles co-compilés BlazeFace et
   FaceMesh, crop affine 192×192, 52 blendshapes filtrées One-Euro, EfficientDet
   avec hystérésis, suivi `obj_N`, détection de parole et JSON en streaming
   atomique. Parité complète à `1e-6` sur `face_pan`, `real_244` et `real_245` ;
   blendshapes à `5,96e-7`, objets IoU 1,0, RSS 199,5 Mio sur `real_244`.
-  Détail dans `docs/LOT-3-STEP4.md`.
+  Détail dans `docs/lots/LOT-3-STEP4.md`.
 - Lot 4 terminé : STEP3 YAMNet Split Coral, frontend log-mel NPY, VAD médian
   avec hangover, ECAPA-TDNN ONNX CPU, AHC average et writer JSON atomique.
   JSON brut identique sur `vox_2spk`, `real_244` et `real_245` ; projection
   STEP5 audio identique sur les deux projets. Le chemin CPU YAMNet reste un
   mode de test explicite. Détail, performance et limites dans
-  `docs/LOT-4-STEP3.md`.
+  `docs/lots/LOT-4-STEP3.md`.
 - Lot 5 terminé : `workflow-server` (axum) expose le contrat de polling sur
   le port 5004, avec base et racine Rust, verrou `/tmp/workflow-rs-hw.lock`,
   séquence sérialisée, arrêt SIGTERM, timeout et logs. STEP5/STEP6 disposent
   d'un mode batch ; 12/12 artefacts identiques aux copies de production 244,
-  245, 249 et 250. Détail dans `docs/LOT-5-ORCHESTRATOR.md`.
+  245, 249 et 250. Détail dans `docs/lots/LOT-5-ORCHESTRATOR.md`.
 - Lot 6 terminé : STEP1 Rust extrait les archives ZIP/RAR/TAR avec
   assainissement des chemins, réinitialisation mensuelle et suppression après
   succès, puis normalise les vidéos (ffprobe, GPU avec repli CPU, `yadif`) en
   préservant les `.mov` alpha ou listés. Validation réelle sur une archive
-  synthétique et via le serveur 5004. Détail dans `docs/LOT-6-STEP1.md`.
+  synthétique et via le serveur 5004. Détail dans `docs/lots/LOT-6-STEP1.md`.
 - Lot 7 terminé : séquence STEP2 → STEP8 sur une copie de 244, STEP5/6
   rejoués sur les artefacts Rust avec `_ae.json`, `_audio.json` et
   `_tracking.json` identiques sémantiquement à la production, puis bascule
   contrôlée 5003/5004 avec rollback vérifié. Détail dans
-  `docs/LOT-7-INTEGRATION.md`.
+  `docs/lots/LOT-7-INTEGRATION.md`.
 - Lot 8 terminé : ingestion webhook, normalisation d'URL, historique SQLite,
   échecs/cooldown, téléchargement `.part` + `Range`, validation ZIP et routes
   `/api/csv_*`. Import réel de 911 URL identiques à la base Python, audit de
   normalisation à 0 changement, webhook réel à 462 enregistrements. Le dernier
   lien du webhook (`276 Camille.zip`, 175 Mo) a été téléchargé via R2 puis via
   Dropbox, et le moniteur a été validé bout en bout sur une base isolée, y
-  compris le repli R2 → Dropbox. Détail dans `docs/LOT-8-INGESTION.md`.
+  compris le repli R2 → Dropbox. Détail dans `docs/lots/LOT-8-INGESTION.md`.
 - Synchronisation Python ↔ Rust : `workflow-cli sync` fusionne l'historique,
   la liste STEP1 et les analyses STEP7 avant chaque bascule. Première fusion
   réelle le 2026-10-23 : 911 URL, 96 archives traitées et 640 hash STEP7
-  (1,8 Go) de chaque côté. Détail dans `docs/SYNC-BACKENDS.md`.
+  (1,8 Go) de chaque côté. Détail dans `docs/exploitation/SYNC-BACKENDS.md`.
 - Validation isolée de bout en bout le 2026-10-23 : téléchargement HTTP →
   STEP1 → STEP7 → sync, puis corpus 153, 154, 155, 156, 158, 159 et 1720
   préparés ; shadow STEP5/6 162/162 sur 20 projets.
 - Chaîne complète validée : STEP1 → STEP8 sur `1720 Camille.zip` (8/8 étapes,
   4 `.ecproj`, aucune écriture dans `/mnt/cache`). Détail dans
-  `docs/VALIDATION-STEP1-8.md`.
+  `docs/validation/VALIDATION-STEP1-8.md`.
 - Validation Windows/After Effects abandonnée (D-022) : le pont Python et le
   panneau CEP restent en place, sans dépendance Rust.
 - Modèles de production copiés dans `assets/models/` avec manifeste SHA-256 ;
@@ -129,33 +129,34 @@ Linux et le panneau CEP continue d'appeler Python.
 
 ## Documents
 
-- `docs/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers, intégrations.
+- `docs/README.md` : index de la documentation, taxonomie et guide d'orientation.
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers, intégrations.
 - `config/config.toml` : configuration typée ; secrets par variables d'environnement.
 - `config/env.map.toml` : correspondance entre l'ancien `.env` et le futur `config.toml`.
 - `assets/models/manifest.toml` : rôles, tailles et SHA-256 des modèles copiés.
-- `docs/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
-- `docs/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
-- `docs/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
-- `docs/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
-- `docs/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
-- `docs/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
-- `docs/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
-- `docs/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
-- `docs/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
-- `docs/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
-- `docs/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
-- `docs/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
-- `docs/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
-- `docs/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
-- `docs/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
-- `docs/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
-- `docs/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
-- `docs/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
-- `docs/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
-- `docs/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
-- `docs/DECISION-ABANDON-TAURI.md` : décision D-028, motifs de l'abandon du client desktop Tauri et procédure de restauration.
-- `docs/ETUDE-STEP9-AGENTIQUE.md` : étude d'opportunité et de faisabilité du post-STEP8 (recadrage 9:16, nettoyage, habillage, rendu), confrontation des scénarios déterministe, QA agentique et co-monteur.
-- `docs/SPIKE-STEP9-PROTOCOLE.md` : protocole de spike isolé, corpus 298/300 puis 19 paires / 32 vidéos, métriques, critères d'acceptation et d'arrêt.
+- `docs/lots/LOT-1-STEP5.md` : parité, performance et limites du port STEP5.
+- `docs/lots/LOT-1-STEP6.md` : parité, performance et limites du port STEP6.
+- `docs/lots/LOT-1-SHADOW.md` : validation shadow STEP5/STEP6 et limite des projets disponibles.
+- `docs/lots/LOT-1-BRIDGE.md` : parité et limites du pont After Effects.
+- `docs/lots/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
+- `docs/lots/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
+- `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
+- `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
+- `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
+- `docs/lots/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
+- `docs/lots/LOT-5-ORCHESTRATOR.md` : serveur axum, contrat HTTP, isolation, séquence, bascule contrôlée et limites.
+- `docs/lots/LOT-6-STEP1.md` : extraction ZIP/RAR/TAR, assainissement, normalisation vidéo et limites STEP1.
+- `docs/lots/LOT-7-INTEGRATION.md` : séquence réelle STEP2 → STEP8, parité STEP5/6 et bascule contrôlée 5003/5004.
+- `docs/lots/LOT-8-INGESTION.md` : moniteur webhook, historique, téléchargement reprenable et migration.
+- `docs/exploitation/SYNC-BACKENDS.md` : synchronisation au changement entre Python et Rust, commandes, sauvegardes et limites.
+- `docs/validation/VALIDATION-STEP1-8.md` : séquence complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité.
+- `docs/exploitation/SWITCH-PUBLIC.md` : bascule publique par reverse proxy Nginx, canari, rollback et routes Python-only.
+- `docs/lots/STEP2-WINDOWS.md` : protocole optionnel de validation STEP2 CUDA sous Windows (cible Linux en production).
+- `docs/exploitation/RETENTION.md` : rétention des données Rust et cohabitation avec le workflow Python legacy.
+- `docs/validation/audits/2026-10-24-audit-backend-rust.md` : audit backend (architecture, concurrence, sécurité, contrats), constats P0/P1/P2, audit croisé Gemini Web et plan de remédiation.
+- `docs/decisions/DECISION-ABANDON-TAURI.md` : décision D-028, motifs de l'abandon du client desktop Tauri et procédure de restauration.
+- `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` : étude d'opportunité et de faisabilité du post-STEP8 (recadrage 9:16, nettoyage, habillage, rendu), confrontation des scénarios déterministe, QA agentique et co-monteur.
+- `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` : protocole de spike isolé, corpus 298/300 puis 19 paires / 32 vidéos, métriques, critères d'acceptation et d'arrêt.
 - `parity/README.md` : corpus, commandes et sécurité du harnais.
 - `parity/BASELINE.md` : mesures de référence.
 - `parity/DRIFT.md` : écarts de comportement à ne pas reproduire.
@@ -199,7 +200,7 @@ En pratique, avec `webhook.enabled = true`, un seul backend tourne à la fois :
   tester un projet, le copier dans cette racine, jamais l'inverse.
 
 La procédure complète, les options et les sauvegardes sont décrites dans
-`docs/SYNC-BACKENDS.md`.
+`docs/exploitation/SYNC-BACKENDS.md`.
 
 ## CLI
 

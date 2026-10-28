@@ -1,6 +1,6 @@
 ---
 name: workflow-docs-updater-plus
-description: Synchroniser la documentation Rust (README, docs/LOT-*, contrat, parité, memory-bank) après un changement de code ou d'exploitation.
+description: Synchroniser la documentation Rust (README, docs/lots/LOT-*, contrat, parité, memory-bank) après un changement de code ou d'exploitation.
 ---
 
 # Workflow Docs Updater Plus
@@ -10,14 +10,17 @@ description: Synchroniser la documentation Rust (README, docs/LOT-*, contrat, pa
 - Après un changement de comportement, de configuration, de contrat JSON/CSV,
   de route HTTP, de verrou ou de procédure d'exploitation.
 - Après une validation de parité ou une bascule de backend.
-- Pour aligner `README.md`, `docs/LOT-*.md`, `docs/CONTRAT-ENVIRONNEMENT.md`,
-  `parity/DRIFT.md`, `AGENTS.md` et `memory-bank/`.
+- Pour aligner `README.md`, `docs/lots/LOT-*.md`,
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, `parity/DRIFT.md`, `AGENTS.md`
+  et `memory-bank/`.
 - Pour ajouter une décision durable dans `memory-bank/decisionLog.md`.
+- Pour localiser un document, commencer par `docs/README.md` (index,
+  taxonomie et table de correspondance).
 
 ## Sources de vérité
 
 1. **Le code** (`crates/`, `scripts/`, `config/`) : comportement réel.
-2. **Les mesures** (`parity/`, `docs/VALIDATION-*.md`) : ce qui a été vérifié.
+2. **Les mesures** (`parity/`, `docs/validation/VALIDATION-*.md`) : ce qui a été vérifié.
 3. **Les docs existantes** : ce qui est promis.
 4. **La memory-bank** : l'état et les décisions récentes.
 
@@ -30,7 +33,7 @@ arbitrage si le contrat est ambigu.
 
 - Lire `/home/kidpixel/workflow-rs/memory-bank/activeContext.md` et
   `/home/kidpixel/workflow-rs/memory-bank/progress.md`.
-- Lire les `docs/LOT-*.md` concernés.
+- Lire les `docs/lots/LOT-*.md` concernés.
 - Inspecter le code réel : `rg`, `cargo metadata`, `cargo tree`, `wc -l`.
 - Vérifier les commandes et chemins cités.
 
@@ -38,12 +41,12 @@ arbitrage si le contrat est ambigu.
 
 | Changement | Docs à mettre à jour |
 | --- | --- |
-| Config TOML | `README.md`, `docs/CONTRAT-ENVIRONNEMENT.md`, `config/env.map.toml` |
-| STEP1/2/3/4 | `docs/LOT-*.md`, `docs/VALIDATION-STEP1-8.md`, `parity/DRIFT.md` |
-| Serveur/API | `docs/CONTRAT-ENVIRONNEMENT.md`, `docs/LOT-5-ORCHESTRATOR.md` |
-| Ingestion | `docs/LOT-8-INGESTION.md`, `docs/SYNC-BACKENDS.md` |
-| Bascule | `docs/SWITCH-PUBLIC.md`, `docs/SYNC-BACKENDS.md` |
-| Rétention | `docs/RETENTION.md` |
+| Config TOML | `README.md`, `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, `config/env.map.toml` |
+| STEP1/2/3/4 | `docs/lots/LOT-*.md`, `docs/validation/VALIDATION-STEP1-8.md`, `parity/DRIFT.md` |
+| Serveur/API | `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, `docs/lots/LOT-5-ORCHESTRATOR.md` |
+| Ingestion | `docs/lots/LOT-8-INGESTION.md`, `docs/exploitation/SYNC-BACKENDS.md` |
+| Bascule | `docs/exploitation/SWITCH-PUBLIC.md`, `docs/exploitation/SYNC-BACKENDS.md` |
+| Rétention | `docs/exploitation/RETENTION.md` |
 | Parité | `parity/DRIFT.md`, `parity/BASELINE.md`, `parity/README.md` |
 | Agents | `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `memory-bank/` |
 
@@ -98,7 +101,8 @@ Après :
 - `.agents/skills/documentation/SKILL.md`
 - `README.md`
 - `AGENTS.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
+- `docs/README.md`
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md`
 - `parity/DRIFT.md`
 - `memory-bank/`
 - `resources/docs_sync_checklist.md`

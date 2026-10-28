@@ -60,8 +60,8 @@
   brut ; A2 synthétique 11/11 ; idempotence 187 ECOLE.
 - Configuration : `[steps.step8.post]` ; `--no-post` pour désactiver ;
   `post run --report-only` pour ne pas publier d'assist.
-- Documentation : `docs/LOT-9-POST-STEP8.md`, `docs/LOT-1-STEP8.md`,
-  `docs/CONTRAT-ENVIRONNEMENT.md`, étude §3.9, protocole §14.1.
+- Documentation : `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-1-STEP8.md`,
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, étude §3.9, protocole §14.1.
 - Limites : pas d'exposition UI/CEP, A3/A4 en revue, bords non noirs et
   recadrages sémantiques en revue, A6 multi-segment/keyframé en revue,
   timeout serveur STEP8 incluant le post, 179/287 partiels.
@@ -83,8 +83,8 @@
 
 ## Étude STEP9 agentique (2026-10-26)
 
-- Documents : `docs/ETUDE-STEP9-AGENTIQUE.md`,
-  `docs/SPIKE-STEP9-PROTOCOLE.md`.
+- Documents : `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`.
 - Corpus : `298 Camille_GOOD.zip` et `300 Camille_GOOD.zip`, comparés aux
   sorties STEP8 brutes.
 - Constats : 117 segments comparables, 0 ancre STEP6 modifiée, 23/120 calques
@@ -150,8 +150,8 @@
   manuels de `Position` couverts par l'intervalle généralisé
   `[p/s, W-(C-p)/s]`, sauf 181 segment 34 (vide de 36,7 px) à signaler en
   `review`.
-- Rapports : `docs/ETUDE-STEP9-AGENTIQUE.md` §3.6/§3.8,
-  `docs/SPIKE-STEP9-PROTOCOLE.md` §4.6/§5.7/§8.1,
+- Rapports : `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` §3.6/§3.8,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §4.6/§5.7/§8.1,
   `/tmp/opencode/step9-spike/06-corpus/RAPPORT-CORPUS.md`,
   `RAPPORT-A6.md` et `DIAGNOSTIC-DERIVE.md`.
 - Prochaine étape : A5 (`post.json`, `review.json`, `audit.json`), validation
@@ -265,18 +265,34 @@
   ZIP valide.
 - Sync : 96 archives, 640 hash STEP7, 1,8 Go.
 
+## Réorganisation documentaire (2026-10-28)
+
+- `docs/` passe de 23 documents à plat à six domaines : `architecture/`,
+  `lots/`, `exploitation/`, `decisions/`, `etudes/`, `validation/`.
+- 24 fichiers déplacés par `git mv` en deux commits : move pur détecté à
+  100 %, puis réécriture des renvois.
+- `docs/README.md` devient l'index : taxonomie, statuts, parcours par profil,
+  table par étape et correspondance ancien → nouveau.
+- 211 renvois réécrits dans 30 fichiers (README, AGENTS, règles, skills,
+  workflow, memory-bank, parity) et 18 renvois internes normalisés en chemins
+  repo-relatifs.
+- Convention audits : `docs/validation/audits/AAAA-MM-JJ-<sujet>.md` (D-033).
+- Les chemins applicatifs `<projet>/docs/` et `docs/post/` sont inchangés ;
+  `cargo fmt`, `clippy -D warnings` et les 315 tests restent verts.
+
 ## Prochaines actions
 
 1. **D-024** : diagnostiquer l'écart STEP4 Python sur `153 Camille`
    (4 977 objets contre 11 853). Ne pas utiliser `--prefer-raw` sur ce projet
    tant que la configuration d'origine n'est pas retrouvée.
 2. **Reverse proxy** : aucun nginx/caddy/cloudflared n'est installé. La bascule
-   publique reste à faire ; voir `docs/SWITCH-PUBLIC.md`.
+   publique reste à faire ; voir `docs/exploitation/SWITCH-PUBLIC.md`.
 3. **Surveillance production** : vérifier le moniteur webhook Rust après
    quelques jours d'activité, les téléchargements et la cohérence de
    l'historique.
-4. **Documentation** : maintenir `README.md`, `docs/LOT-*.md`,
-   `docs/CONTRAT-ENVIRONNEMENT.md` et `parity/DRIFT.md` à jour.
+4. **Documentation** : maintenir `README.md`, `docs/README.md`,
+   `docs/lots/LOT-*.md`, `docs/architecture/CONTRAT-ENVIRONNEMENT.md` et
+   `parity/DRIFT.md` à jour.
 5. **Memory-bank** : mettre à jour `activeContext.md` et ce fichier à chaque
    session significative.
 6. **Interface** : ne pas réintroduire de client desktop Tauri/GTK/WebKit ;

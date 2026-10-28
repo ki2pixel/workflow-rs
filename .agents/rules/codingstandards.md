@@ -204,5 +204,5 @@ alwaysApply: true
 - Utiliser des canaux non bornés ou un parallélisme non contrôlé sur le TPU.
 - Laisser un `unwrap()` sur une entrée utilisateur, un chemin ou un fichier.
 
-> Maintenir ce fichier concis. Les détails de lot vivent dans `docs/LOT-*.md`,
+> Maintenir ce fichier concis. Les détails de lot vivent dans `docs/lots/LOT-*.md`,
 > les écarts dans `parity/DRIFT.md`, l'état courant dans `memory-bank/`.

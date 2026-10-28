@@ -132,8 +132,8 @@ comportement legacy sont dans `parity/DRIFT.md`.
 
 - Docs en français, code/commandes en anglais.
 - `README.md` : état et commandes.
-- `docs/LOT-*.md` : périmètre, parité, performance, limites.
-- `docs/CONTRAT-ENVIRONNEMENT.md` : contrat HTTP/artefacts.
+- `docs/lots/LOT-*.md` : périmètre, parité, performance, limites.
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md` : contrat HTTP/artefacts.
 - `parity/DRIFT.md` : écarts et décisions D-xxx.
 - `memory-bank/` : état courant, décisions, progrès.
 - `AGENTS.md` : résumé opérationnel pour les agents.
@@ -178,4 +178,4 @@ comportement legacy sont dans `parity/DRIFT.md`.
   STEP8 côté CLI.
 - Configuration : `[steps.step8.post]` ; `--no-post` désactive le hook ;
   `workflow-cli post run --report-only` calcule les rapports sans publier.
-- Détail : `docs/LOT-9-POST-STEP8.md`.
+- Détail : `docs/lots/LOT-9-POST-STEP8.md`.

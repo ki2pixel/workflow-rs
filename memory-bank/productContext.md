@@ -110,8 +110,8 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 - `README.md`
 - `AGENTS.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
-- `docs/LOT-*.md`
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md`
+- `docs/lots/LOT-*.md`
 - `parity/DRIFT.md`
 - `memory-bank/systemPatterns.md`
 - `memory-bank/decisionLog.md`

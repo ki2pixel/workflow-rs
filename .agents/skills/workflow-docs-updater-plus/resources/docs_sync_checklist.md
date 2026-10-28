@@ -4,12 +4,13 @@
 
 - [ ] `README.md` : état des lots, commandes, prérequis, liens.
 - [ ] `AGENTS.md` : layout, commandes, safety rails, conventions.
-- [ ] `docs/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers.
-- [ ] `docs/LOT-*.md` : périmètre, parité, performance, limites.
-- [ ] `docs/SYNC-BACKENDS.md` : fusion Python ↔ Rust.
-- [ ] `docs/SWITCH-PUBLIC.md` : bascule et rollback.
-- [ ] `docs/RETENTION.md` : rétention.
-- [ ] `docs/VALIDATION-STEP1-8.md` : validation de bout en bout.
+- [ ] `docs/README.md` : index, taxonomie et table de correspondance.
+- [ ] `docs/architecture/CONTRAT-ENVIRONNEMENT.md` : routes, états, schémas, fichiers.
+- [ ] `docs/lots/LOT-*.md` : périmètre, parité, performance, limites.
+- [ ] `docs/exploitation/SYNC-BACKENDS.md` : fusion Python ↔ Rust.
+- [ ] `docs/exploitation/SWITCH-PUBLIC.md` : bascule et rollback.
+- [ ] `docs/exploitation/RETENTION.md` : rétention.
+- [ ] `docs/validation/VALIDATION-STEP1-8.md` : validation de bout en bout.
 - [ ] `parity/DRIFT.md` : écarts et décisions D-xxx.
 - [ ] `parity/BASELINE.md` : mesures de référence.
 - [ ] `.agents/` : règles, skills, workflows.

@@ -11,6 +11,12 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 ## Dernière session
 
+- [2026-10-28] **Documentation réorganisée en six domaines (D-033)** :
+  `docs/` passe de 23 fichiers à plat à `architecture/`, `lots/`,
+  `exploitation/`, `decisions/`, `etudes/` et `validation/`, avec un index
+  `docs/README.md`. 24 fichiers déplacés par `git mv`, 211 renvois réécrits
+  dans 30 fichiers. Les chemins applicatifs `<projet>/docs/` et `docs/post/`
+  restent inchangés.
 - [2026-10-28 02:16] **Fermeture du terminal = arrêt du serveur** :
   `start-rust.sh` pose son trap avant le préflight et arrête le serveur avant
   toute écriture sur le pty. Sous `setsid`, `workflow-server` survivait à la
@@ -36,9 +42,9 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
     0/10/30/50 s ; décisions A1/A2/A3/A4 identiques au prototype sur 268,
     187 DISNEYWORLD, 187 ECOLE, 191 et 181 ; 270/276/286/287 0 apply et
     assist identique au brut ; A2 synthétique 11/11 ; idempotence 187 ECOLE ;
-  - docs : `docs/LOT-9-POST-STEP8.md`, `docs/LOT-1-STEP8.md`,
-    `docs/CONTRAT-ENVIRONNEMENT.md`, `docs/ETUDE-STEP9-AGENTIQUE.md` §3.9,
-    `docs/SPIKE-STEP9-PROTOCOLE.md` §14.1, `README.md`, `AGENTS.md` ;
+  - docs : `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-1-STEP8.md`,
+    `docs/architecture/CONTRAT-ENVIRONNEMENT.md`, `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` §3.9,
+    `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §14.1, `README.md`, `AGENTS.md` ;
   - prochaines étapes : exposer `review.json` en lecture seule dans l'UI,
     recalibrer A3/A4, traiter les références manquantes 179/287.
 - [2026-10-27] **Spike STEP9 — A5 v2 et A6 intégré** :
@@ -117,8 +123,8 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
     déplacements manuels de `Position` couverts par l'intervalle généralisé
     `[p/s, W-(C-p)/s]`, sauf 181 segment 34 (vide de 36,7 px) à signaler en
     `review` ;
-  - décision D-030 ; rapports `docs/ETUDE-STEP9-AGENTIQUE.md` §3.6/§3.8,
-    `docs/SPIKE-STEP9-PROTOCOLE.md` §4.6/§5.7/§8.1,
+  - décision D-030 ; rapports `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` §3.6/§3.8,
+    `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` §4.6/§5.7/§8.1,
     `/tmp/opencode/step9-spike/06-corpus/RAPPORT-CORPUS.md` et
     `RAPPORT-A6.md` ;
   - prochaine étape : A5, validation A1 synthétique, A2 durci, intégration A6.
@@ -135,8 +141,8 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
   - rapport : `/tmp/opencode/step9-spike/01-baseline/RAPPORT-PHASE0.md` ;
     aucun code de production modifié, aucune écriture dans `/mnt/cache`.
 - [2026-10-26] **Étude STEP9 agentique et décision D-029** :
-  - étude `docs/ETUDE-STEP9-AGENTIQUE.md` et protocole
-    `docs/SPIKE-STEP9-PROTOCOLE.md` ;
+  - étude `docs/etudes/ETUDE-STEP9-AGENTIQUE.md` et protocole
+    `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` ;
   - analyse des projets témoins `298 Camille_GOOD.zip` et
     `300 Camille_GOOD.zip` : 117 segments comparables, 0 ancre modifiée,
     23/120 calques keyframés, 72 clés, 92 segments à +27 % d'échelle,
@@ -259,10 +265,10 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 ## Prochaines actions
 
 - Poursuivre le spike A sur copies isolées, selon
-  `docs/SPIKE-STEP9-PROTOCOLE.md` : finaliser le seuil de compensation A1,
+  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` : finaliser le seuil de compensation A1,
   durcir A2, intégrer A6 comme module opt-in avec le profil mesuré de 295.
 - Diagnostiquer D-024 sans modifier les données de production.
-- Lire `docs/SWITCH-PUBLIC.md` avant toute bascule publique.
+- Lire `docs/exploitation/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.
 - Maintenir `memory-bank/progress.md` et `decisionLog.md` à jour.
 
@@ -282,10 +288,11 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 - `AGENTS.md`
 - `README.md`
-- `docs/CONTRAT-ENVIRONNEMENT.md`
-- `docs/LOT-*.md`
-- `docs/ETUDE-STEP9-AGENTIQUE.md`
-- `docs/SPIKE-STEP9-PROTOCOLE.md`
+- `docs/README.md`
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md`
+- `docs/lots/LOT-*.md`
+- `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`
+- `docs/etudes/SPIKE-STEP9-PROTOCOLE.md`
 - `parity/DRIFT.md`
 - `memory-bank/progress.md`
 - `memory-bank/decisionLog.md`

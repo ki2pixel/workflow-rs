@@ -149,7 +149,7 @@ La synchronisation au changement a été validée sur l'état réel le 2026-10-2
 | Sauvegarde | `runtime/backups/sync/20261023_215036/sync-report.json` |
 
 La copie STEP7 n'a pas modifié les archives Python. Le détail des fusions et
-des options est dans `SYNC-BACKENDS.md`.
+des options est dans `docs/exploitation/SYNC-BACKENDS.md`.
 
 Un aller-retour complet a ensuite été validé le 2026-10-23 à 22:18 : arrêt de
 Rust, `sync-backends.sh --apply`, démarrage de Python sur 5003 avec
@@ -160,6 +160,6 @@ repris sur 5004. Aucun téléchargement n'a été créé pendant ce test.
 
 Un test isolé de bout en bout (téléchargement HTTP → STEP1 → STEP7 → sync
 retour) a également été exécuté dans `/tmp/opencode/e2e-900` ; le détail est
-dans `SYNC-BACKENDS.md`, section 10. Les corpus 153, 154, 155, 156, 158, 159
+dans `docs/exploitation/SYNC-BACKENDS.md`, section 10. Les corpus 153, 154, 155, 156, 158, 159
 et 1720 ont été préparés ; le shadow STEP5/6 donne 162/162 sur 20 projets
-(voir `LOT-1-SHADOW.md`).
+(voir `docs/lots/LOT-1-SHADOW.md`).

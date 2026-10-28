@@ -25,7 +25,7 @@ Trois boucles d'arrière-plan tournent dans le processus :
 
 La nouvelle application utilise le port 5004 et une racine de travail distincte. Elle ne partage ni la base SQLite, ni les répertoires, ni le verrou matériel.
 
-Le lot 5 implémente ce contrat pour les STEP2 à STEP8 et le lot 6 pour STEP1 : `POST /run/STEP1` extrait les archives puis normalise les projets, sans appel Python. Le lot 8 porte le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et les statuts CSV. Les routes cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy. Voir `LOT-5-ORCHESTRATOR.md`, `LOT-6-STEP1.md` et `LOT-8-INGESTION.md` pour le détail et les écarts volontaires.
+Le lot 5 implémente ce contrat pour les STEP2 à STEP8 et le lot 6 pour STEP1 : `POST /run/STEP1` extrait les archives puis normalise les projets, sans appel Python. Le lot 8 porte le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et les statuts CSV. Les routes cache, statistiques, diagnostics et `/api/audio/*` restent dans le serveur Python legacy. Voir `docs/lots/LOT-5-ORCHESTRATOR.md`, `docs/lots/LOT-6-STEP1.md` et `docs/lots/LOT-8-INGESTION.md` pour le détail et les écarts volontaires.
 
 ## 2. API HTTP
 
@@ -254,7 +254,7 @@ workflow-cli history stats
 
 Pour les bascules répétées, `workflow-cli sync` remplace l'import ponctuel :
 il fusionne les deux bases et la liste STEP1, puis copie les archives non
-traitées et les analyses STEP7. Voir `SYNC-BACKENDS.md`.
+traitées et les analyses STEP7. Voir `docs/exploitation/SYNC-BACKENDS.md`.
 
 `history audit` vérifie que chaque URL stockée est déjà normalisée. Le moniteur est désactivé par défaut (`webhook.enabled = false`) et refuse une base vide (`webhook.require_history = true`) pour éviter de re-télécharger tout le webhook.
 
@@ -351,7 +351,7 @@ Variables injectées dans chaque sous-processus : `PYTHONIOENCODING=UTF-8`, `PYT
 > le modèle quantifié et reste un mode de test explicite. ECAPA-TDNN tourne sur
 > CPU via ONNX Runtime. Le traitement des vidéos est séquentiel ; le module est
 > branché à l'orchestrateur depuis le lot 5. Détail et mesures dans
-> `docs/LOT-4-STEP3.md`.
+> `docs/lots/LOT-4-STEP3.md`.
 >
 > Sur la machine de référence, `config/config.toml` pointe
 > `[steps.step3].edgetpu` et `[steps.step4].edgetpu` vers
@@ -405,7 +405,7 @@ jamais l'Anchor Point ; A3/A4 restent en revue ; A6 applique le template SDM
 si le préfixe configuré correspond et si la structure est mono-segment sans
 keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
-avec `workflow-cli post run`. Détail : `docs/LOT-9-POST-STEP8.md`.
+avec `workflow-cli post run`. Détail : `docs/lots/LOT-9-POST-STEP8.md`.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 

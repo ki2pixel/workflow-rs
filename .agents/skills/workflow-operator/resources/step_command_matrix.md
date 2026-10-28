@@ -13,7 +13,8 @@
 | STEP5 | Réduction JSON | `workflow-cli step5 project --work-dir runtime/projets_extraits --keyword Camille` | `runtime/logs/step5/` | JSON STEP3/STEP4 | Réécrit les JSON réduits |
 | STEP6 | Pré-traitement AE | `workflow-cli step6 project --work-dir runtime/projets_extraits --keyword Camille` | `runtime/logs/step6/` | `_tracking.json`, `_audio.json`, `<stem>.csv` | Réécrit les `_ae.json` |
 | STEP7 | Finalisation + archivage | `workflow-cli step7 finalize --dry-run` puis sans `--dry-run` | `runtime/logs/step7/`, manifeste `finalized_projects_*.json` | `paths.finalized`, `paths.archives` accessibles | Supprime la source après publication ; `--no-delete` pour conserver |
-| STEP8 | Projets EffectCraft | `workflow-cli step8 run --dry-run` puis `step8 run` | `runtime/logs/step8/`, `step8_run_*.json` | `effectcraft-cli`, manifeste STEP7, `assets/effectcraft/mediasolution_ec.json` | Réécrit les `.ecproj` ; `--dry-run` pour inspecter |
+| STEP8 | Projets EffectCraft | `workflow-cli step8 run --dry-run` puis `step8 run` | `runtime/logs/step8/`, `step8_run_*.json` | `effectcraft-cli`, manifeste STEP7, `assets/effectcraft/mediasolution_ec.json` | Réécrit les `.ecproj` ; `--dry-run` pour inspecter ; `--no-post` désactive A5/A6 |
+| A5/A6 | Post-traitement déterministe | `workflow-cli post run --folder <dossier_projet>` | `docs/post/<projet_assisté>/` ; stdout du CLI | STEP8 réussi, `ffmpeg`/`ffprobe`, `[steps.step8.post]` | Publie `<video>_9x16_assist.ecproj` ; le brut reste intact ; `--report-only` pour ne rien publier |
 
 ## Rappels
 

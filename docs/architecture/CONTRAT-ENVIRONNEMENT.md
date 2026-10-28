@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.4 |
-| Date | 2026-10-24 |
+| Version | 1.5 |
+| Date | 2026-10-28 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -294,7 +294,7 @@ Nomenclature des artefacts :
 | STEP5 | `<stem>_tracking.json`, et réécriture sur place de `<stem>_audio.json` |
 | STEP6 | `<stem>_ae.json` |
 | STEP7 | `<projet>__finalized_<timestamp>/docs/`, manifeste dans `logs/step7/finalized_projects_<ts>.json` |
-| STEP8 | `<video>_9x16.ecproj` |
+| STEP8 | `<video>_9x16.ecproj` (brut) et `<video>_9x16_assist.ecproj` (post A5/A6), plus `<docs>/post/<projet_assisté>/` |
 
 Points d'attention :
 
@@ -392,7 +392,9 @@ Téléchargement : R2 en priorité, Dropbox en repli. Le nom de fichier vient de
 
 EffectCraft : STEP8 appelle `effectcraft-cli` en headless, dans une session
 `run prefs.set … file.runScript` (aucun bridge TCP, aucune application lancée),
-avec `scripts/MediaSolution-EC/MediaSolution.jsx`, pour produire les `.ecproj`.
+avec le panel `assets/effectcraft/MediaSolution.jsx` (copie du panel de
+production) et sa configuration `assets/effectcraft/mediasolution_ec.json`,
+pour produire les `.ecproj`.
 
 Post-traitement A5/A6 : après un STEP8 réussi, le projet brut
 `<vidéo>_9x16.ecproj` reste **inchangé** et un second projet
@@ -411,9 +413,9 @@ After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 a
 
 ## 8. Configuration unifiée
 
-Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` d'environ 45 clés, validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu.
+Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 161 clés ; `config/env.map.toml` documente 148 correspondances.
 
-Sections prévues : `[server]`, `[paths]`, `[webhook]`, `[download]`, `[steps.stepN]`, `[hardware]`.
+Sections : `[server]`, `[paths]`, `[legacy]`, `[webhook]`, `[download]`, `[steps]`, `[steps.filter]`, `[steps.stepN]` (dont `[steps.step8.post]`), `[retention]` et `[hardware]`.
 
 Correspondance complète dans `config/env.map.toml`. Les règles de validation sont les suivantes :
 

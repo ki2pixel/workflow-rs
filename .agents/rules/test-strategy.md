@@ -82,7 +82,7 @@ cargo test -p workflow-ingest --lib
 cargo test -p workflow-sync --lib
 ```
 
-- La suite compte environ 282 tests (250 `#[test]` + 32 `#[tokio::test]`).
+- La suite compte 315 tests (283 `#[test]` + 32 `#[tokio::test]`).
 - Pas de CI : exécuter la suite manuellement avant de terminer.
 - La couverture n'est pas instrumentée par défaut. Si `cargo-llvm-cov` est
   disponible, documenter la commande et le résultat ; sinon, l'indiquer.

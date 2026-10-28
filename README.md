@@ -2,7 +2,8 @@
 
 Réécriture Rust du pipeline `workflow_mediapipe`. Rust est le backend de
 production depuis le 2026-10-23 ; le dépôt Python reste la référence de parité
-et le rollback, sans être arrêté ni modifié par la bascule. Le lot 0 a validé le
+et le rollback : il est arrêté en production et n'est réécrit que par un
+`sync --apply` explicite. Le lot 0 a validé le
 pont matériel Coral, le contrat d'environnement et le harnais de parité.
 Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et

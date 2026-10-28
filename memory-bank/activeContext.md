@@ -11,6 +11,14 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 ## Dernière session
 
+- [2026-10-28] **Synchronisation documentaire post-audit** :
+  comptes de tests ramenés à 315 (283 `#[test]` + 32 `#[tokio::test]`) dans
+  la memory-bank et `.agents/` ; `parity/DRIFT.md` D-015 corrigé
+  (`/api/system_monitor` est réel, `/api/performance/frontend` reste un stub) ;
+  contrat en version 1.5 (nomenclature `_assist.ecproj`, panneau
+  `assets/effectcraft/MediaSolution.jsx`, 161 clés TOML et sections réelles) ;
+  skill `workflow-operator` complétée pour le hook A5/A6. Aucun code ni
+  artefact de production modifié.
 - [2026-10-28] **Documentation réorganisée en six domaines (D-033)** :
   `docs/` passe de 23 fichiers à plat à `architecture/`, `lots/`,
   `exploitation/`, `decisions/`, `etudes/` et `validation/`, avec un index
@@ -242,7 +250,7 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 282 tests unitaires ; pas de CI.
+- 315 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
@@ -264,9 +272,11 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 ## Prochaines actions
 
-- Poursuivre le spike A sur copies isolées, selon
-  `docs/etudes/SPIKE-STEP9-PROTOCOLE.md` : finaliser le seuil de compensation A1,
-  durcir A2, intégrer A6 comme module opt-in avec le profil mesuré de 295.
+- Post-traitement A5/A6 : exposer `review.json` en lecture seule dans l'UI,
+  recalibrer A3/A4, traiter les références manquantes 179/287 (voir
+  `docs/lots/LOT-9-POST-STEP8.md`).
+- Poursuivre les scénarios B/C décrits dans
+  `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`, sans toucher à la production.
 - Diagnostiquer D-024 sans modifier les données de production.
 - Lire `docs/exploitation/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.

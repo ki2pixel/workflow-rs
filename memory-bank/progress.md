@@ -47,6 +47,27 @@
   11/11, 315 tests, fmt/clippy verts. Reste : exposer `review.json` dans
   l'UI, recalibrer A3/A4 et traiter 179/287.
 
+## Synchronisation documentaire (2026-10-28)
+
+- Audit du workflow `docs-updater` : 315 tests (283 `#[test]` + 32
+  `#[tokio::test]`), `clippy -D warnings` et `cargo fmt --check` verts, arbre
+  git propre, aucun TODO/FIXME/HACK dans `crates/`.
+- Comptes de tests corrigés de 282 à 315 dans `memory-bank/systemPatterns.md`,
+  `memory-bank/productContext.md`, `.agents/rules/test-strategy.md`,
+  `.agents/skills/tests-suite-guardian/`, `.agents/skills/workflow-operator/`
+  et `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`.
+- `parity/DRIFT.md` D-015 : `/api/system_monitor` sert des métriques réelles
+  CPU/RAM/disque/GPU ; seul `/api/performance/frontend` reste un stub.
+- `docs/architecture/CONTRAT-ENVIRONNEMENT.md` passe en version 1.5 :
+  nomenclature STEP8 avec `_assist.ecproj` et `docs/post/`, panneau
+  `assets/effectcraft/MediaSolution.jsx`, 161 clés TOML et sections réelles
+  (`[legacy]`, `[steps.filter]`, `[steps.step8.post]`, `[retention]`).
+- `docs/lots/LOT-1-STEP8.md` pointe la copie versionnée du panneau ;
+  `docs/lots/LOT-8-INGESTION.md` date ses comptes de tests de clôture.
+- `.agents/skills/workflow-operator/` documente le hook A5/A6 obligatoire
+  après STEP8 (`--no-post`, `post run`, `--report-only`) et les artefacts
+  `_assist`.
+
 ## Post-traitement A5/A6 (2026-10-27)
 
 - Code : `crates/workflow-steps/src/post/` ; hook dans `step8.rs` ;

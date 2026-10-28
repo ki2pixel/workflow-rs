@@ -2,10 +2,11 @@
 
 ## Périmètre livré
 
-STEP8 génère les projets `<video>_9x16.ecproj` en pilotant
-`scripts/MediaSolution-EC/MediaSolution.jsx` avec `effectcraft-cli`, en
-headless. Le pont Python, le lancement de l'application et le mode `--bridge`
-sont hors-scope.
+STEP8 génère les projets `<video>_9x16.ecproj` en pilotant le panel
+`assets/effectcraft/MediaSolution.jsx` (copie du panel de production
+`workflow_mediapipe/scripts/MediaSolution-EC/MediaSolution.jsx`) avec
+`effectcraft-cli`, en headless. Le pont Python, le lancement de l'application et
+le mode `--bridge` sont hors-scope.
 
 Le wrapper :
 

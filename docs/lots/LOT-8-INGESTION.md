@@ -180,8 +180,8 @@ Détail dans `../parity/DRIFT.md`.
 | Plan avec 911 URL importées | `webhook probe --plan` : 0 téléchargement planifié |
 | Plan avec base vide | 429 téléchargements planifiés : le verrou `require_history` est indispensable |
 | Serveur dry-run sur webhook réel | moniteur `active`, 0 nouvelle archive, aucun fichier téléchargé |
-| Tests `workflow-ingest` | 42 tests : URL, webhook, historique, cooldown, reprise, ZIP, repli, échecs |
-| Tests workspace | 207 tests, `clippy -D warnings`, `fmt --check` |
+| Tests `workflow-ingest` | 42 tests à la clôture du lot : URL, webhook, historique, cooldown, reprise, ZIP, repli, échecs |
+| Tests workspace | 207 tests à la clôture du lot, `clippy -D warnings`, `fmt --check` |
 | Téléchargement Dropbox réel | `m6_.png` (22 047 octets) téléchargé depuis un lien `scl/fi` réel |
 | Reprise réelle `Range` | `.part` de 5 000 octets, réponse HTTP 206, `resumed_from=5000`, md5 identique |
 | ZIP réel de production | `155 Camille.zip` (783 691 649 octets) via HTTP local, 1,5 s, md5 identique, validation ZIP réussie |

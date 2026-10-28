@@ -20,6 +20,8 @@
 - Journal serveur enrichi (configuration, requêtes, webhook, étapes,
   séquences), ANSI désactivé à l'écriture fichier et terminal limité à la
   session courante au démarrage.
+- Lanceur Rust : la fermeture de la fenêtre de terminal arrête désormais le
+  serveur `:5004` (SIGHUP intercepté, `cleanup` robuste au pty détruit).
 - Shadow STEP5/6 `162/162` sur 20 projets.
 - Sync réelle : 911 URL, 96 archives, 640 hash STEP7 (1,8 Go).
 - Audit documentaire du 2026-10-24 : commandes de parité corrigées et état de

@@ -11,6 +11,13 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 ## Dernière session
 
+- [2026-10-28 02:16] **Fermeture du terminal = arrêt du serveur** :
+  `start-rust.sh` pose son trap avant le préflight et arrête le serveur avant
+  toute écriture sur le pty. Sous `setsid`, `workflow-server` survivait à la
+  fermeture de la fenêtre : le `echo` de `cleanup` échouait (EIO) et `set -e`
+  interrompait le trap avant `switch-rust.sh stop`. Validé en pty réel :
+  fermeture (SIGHUP) et Ctrl+C envoient SIGTERM et nettoient le PID ; GNOME
+  Terminal conserve son dialogue `confirm-close`.
 - [2026-10-28 01:32] **Premier batch production A5/A6 (`223 Camille`)** :
   2 vidéos, STEP2–8 7/7 `completed`, post 2 assist, 0 apply, 13 review,
   84 noop, audit `pass` ; brut/assist identiques et artefacts STEP4/5/6

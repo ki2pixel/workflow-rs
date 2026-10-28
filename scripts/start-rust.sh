@@ -50,6 +50,27 @@ if [[ ! -x "$ROOT/target/release/workflow-server" ]]; then
     exit 1
 fi
 
+# Le serveur est lancé sous `setsid` par switch-rust.sh : il ne reçoit donc
+# pas le SIGHUP de la fermeture du terminal et continuerait d'écouter sur 5004.
+# Le trap est posé avant la vérification pour couvrir aussi une fermeture
+# pendant le démarrage.
+TAIL_PID=""
+STOPPED=0
+cleanup() {
+    STOPPED=1
+    # Le pty est déjà détruit quand la fenêtre se ferme : écrire sur
+    # stdout/stderr renvoie EIO et, avec `set -e`, interromprait le nettoyage
+    # avant l'arrêt du serveur. D'où le `|| true` ; l'arrêt passe ensuite par
+    # switch-rust.sh, seule source de vérité pour le PID et les sous-processus.
+    echo "Arrêt du serveur Rust..." || true
+    if [[ -n "${TAIL_PID:-}" ]]; then
+        kill "$TAIL_PID" 2>/dev/null || true
+    fi
+    "$ROOT/scripts/switch-rust.sh" stop >/dev/null 2>&1 || true
+    exit 130
+}
+trap cleanup INT TERM HUP
+
 echo "Vérification de la configuration Rust..."
 if ! "$ROOT/scripts/switch-rust.sh" check; then
     echo "La vérification a échoué ; le serveur n'est pas démarré." >&2
@@ -119,16 +140,6 @@ fi
 # démarrage pour n'afficher que la session courante.
 tail -n +"$LOG_START_LINE" -f --pid="$SERVER_PID" "$LOG_FILE" &
 TAIL_PID=$!
-
-STOPPED=0
-cleanup() {
-    STOPPED=1
-    kill "$TAIL_PID" 2>/dev/null || true
-    echo
-    echo "Arrêt du serveur Rust..."
-    "$ROOT/scripts/switch-rust.sh" stop || true
-}
-trap cleanup INT TERM HUP
 
 wait "$TAIL_PID" || true
 if [[ "$STOPPED" == "0" ]]; then

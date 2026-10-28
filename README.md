@@ -167,7 +167,11 @@ lance `workflow_mediapipe/start_workflow.sh` sur 5003.
 
 Le raccourci Rust `~/Bureau/Rust_Workflow.desktop` appelle
 `scripts/start-rust.sh` : vérification, démarrage sur 5004, ouverture de
-Firefox et suivi des logs. Ctrl+C ou fermeture du terminal arrête le serveur.
+Firefox et suivi des logs. Ctrl+C ou fermeture du terminal arrête le serveur ;
+GNOME Terminal demande confirmation avant de fermer la fenêtre
+(`org.gnome.Terminal.Legacy.Settings confirm-close`). Le serveur tournant sous
+`setsid`, c'est le lanceur qui l'arrête sur SIGINT/SIGTERM/SIGHUP
+(`scripts/switch-rust.sh stop`).
 Les secrets sont générés au premier lancement dans `config/launcher.env`
 (non versionné, `chmod 600`).
 

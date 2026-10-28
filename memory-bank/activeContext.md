@@ -11,6 +11,10 @@ au pixel (0/255) et parité de décisions avec le prototype sur 268/187/191/181.
 
 ## Dernière session
 
+- [2026-10-28 01:32] **Premier batch production A5/A6 (`223 Camille`)** :
+  2 vidéos, STEP2–8 7/7 `completed`, post 2 assist, 0 apply, 13 review,
+  84 noop, audit `pass` ; brut/assist identiques et artefacts STEP4/5/6
+  intacts. Revues A1/A2/A3/A4 attendues ; A6 non déclenché.
 - [2026-10-27] **Post-traitement A5/A6 en production (D-032)** :
   - module Rust `crates/workflow-steps/src/post/` : parseur `.ecproj`,
     détecteurs ffprobe/cropdetect/bandes, A1, A2, A3, A4, A6, audit ;

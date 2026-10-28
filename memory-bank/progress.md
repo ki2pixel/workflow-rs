@@ -64,6 +64,21 @@
   recadrages sémantiques en revue, A6 multi-segment/keyframé en revue,
   timeout serveur STEP8 incluant le post, 179/287 partiels.
 
+## Validation production A5/A6 (2026-10-28)
+
+- Batch STEP2–8 sur `223 Camille` (2 vidéos) : 7/7 étapes `completed`,
+  STEP8 2/2 projets, post 2 assist, 0 apply, 13 review, 84 noop, 0 échec,
+  audit `pass` sur les deux projets.
+- Brut et assist **octet pour octet identiques** (aucune action auto) ;
+  `_ae.json`, `_audio.json` et CSV non modifiés (mtimes antérieurs au post).
+- Revues : A1 barres asymétriques haut 6 / bas 82 (2 segments Audi, 1
+  Peugeot), A2 bande animée (Audi) / logo étroit (Peugeot), A3 7 candidats
+  (désactivé), A4 segment court 0,32 s (Peugeot). A6 non déclenché.
+- Clamps panneau Peugeot segments 16/19/21 (300/1620 px) : couverture exacte,
+  `source_coverage` pass, pas de revue A5.
+- Le STEP8 isolé de 00:28 avait échoué sur l'ancien manifeste
+  `/mnt/cache/309 Camille` (dossier introuvable), avant le batch ; sans lien.
+
 ## Étude STEP9 agentique (2026-10-26)
 
 - Documents : `docs/ETUDE-STEP9-AGENTIQUE.md`,

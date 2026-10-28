@@ -148,6 +148,10 @@ comportement legacy sont dans `parity/DRIFT.md`.
   Contrairement au legacy, la copie Rust désactive l'auto-ouverture par
   défaut (`ui.autoOpenLogOverlay = false`) ; le toggle Settings reste
   fonctionnel et une valeur persistée par l'opérateur reste prioritaire.
+- Écart assumé : la barre `.workflow-controls` de la topbar est centrée
+  (`justify-content: center`, `controls.css`) au lieu d'être calée à gauche
+  comme dans le legacy. `.sequence-controls` centre aussi ses lignes en cas de
+  wrap ; le media query 768 px conserve la disposition mobile en colonne.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
 - Pas de client desktop natif (D-028) : ne pas ajouter de dépendance
   GTK/WebKit/zbus/Tauri ; `assets/web` est l'unique interface.

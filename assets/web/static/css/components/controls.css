@@ -64,7 +64,9 @@
 }
 
 .unified-controls--topbar .workflow-controls {
-    justify-content: flex-start;
+    /* Écart assumé Rust : centrer la barre de contrôle dans la topbar
+       (le legacy la cale à gauche avec flex-start). */
+    justify-content: center;
 }
 
 .unified-controls--topbar .utility-widgets {
@@ -72,7 +74,13 @@
 }
 
 /* Sequence controls group */
-.sequence-controls { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sequence-controls {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
 
 .control-group {
     display: inline-flex;

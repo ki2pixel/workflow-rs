@@ -11,6 +11,7 @@ use workflow_ingest::monitor::{plan_downloads, PlanContext};
 use workflow_ingest::url::normalize_url;
 use workflow_ingest::webhook::WebhookClient;
 use workflow_steps::post::{run_post_dir, run_post_project, PostOptions};
+use workflow_steps::qa::{run_qa, QaOptions, QaStatus};
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step1::{run_normalize_only, run_step1, Step1Options};
 use workflow_steps::step2::{run_step2, Step2Options};
@@ -71,6 +72,8 @@ enum Command {
     Step8(Step8Args),
     /// Post-traitement A5/A6 d'un projet ou d'un dossier (second `.ecproj`).
     Post(PostArgs),
+    /// Contrôle qualité read-only après export humain (`qa.json`).
+    Qa(QaArgs),
     /// Planifie ou applique la rétention des données de travail.
     Retention(RetentionArgs),
     /// Synchronise l'état Python legacy et l'état Rust, hors serveur.
@@ -640,7 +643,6 @@ struct PostArgs {
     #[command(subcommand)]
     command: PostCommand,
 }
-
 #[derive(Debug, Subcommand)]
 enum PostCommand {
     /// Calcule A5/A6 et publie un `.ecproj` `_assist` par projet brut.
@@ -672,6 +674,47 @@ enum PostCommand {
         /// Active le bypass direct des vidéos du template.
         #[arg(long)]
         direct: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct QaArgs {
+    #[command(subcommand)]
+    command: QaCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum QaCommand {
+    /// Contrôle Stage 0 d'un export final et écrit `qa.json` sous `--out`.
+    Run {
+        /// Export final `.mp4` (obligatoire).
+        #[arg(long)]
+        video: PathBuf,
+        /// Projet `.ecproj` brut, optionnel. Sans projet, les contrôles
+        /// structurels sont marqués `not_applicable`.
+        #[arg(long)]
+        project: Option<PathBuf>,
+        /// Dossier docs, réservé aux contrôles futurs (non utilisé en v1).
+        #[arg(long)]
+        docs: Option<PathBuf>,
+        /// Répertoire de sortie explicite : `qa.json` y est écrit.
+        #[arg(long)]
+        out: PathBuf,
+        /// Exécutable ffmpeg (défaut : configuration STEP8/post).
+        #[arg(long)]
+        ffmpeg: Option<PathBuf>,
+        /// Exécutable ffprobe (défaut : configuration STEP8/post).
+        #[arg(long)]
+        ffprobe: Option<PathBuf>,
+        /// Identifiant vidéo (défaut : nom de fichier sans extension).
+        #[arg(long)]
+        video_id: Option<String>,
+        /// Identifiant dossier (ex. `300`).
+        #[arg(long)]
+        folder_id: Option<String>,
+        /// Split (`dev`, `holdout`, `reserve`).
+        #[arg(long)]
+        split: Option<String>,
     },
 }
 
@@ -1507,6 +1550,39 @@ fn run() -> Result<()> {
                 }
                 println!("{}", serde_json::to_string_pretty(&results)?);
                 if failures > 0 {
+                    std::process::exit(1);
+                }
+            }
+        },
+        Command::Qa(args) => match args.command {
+            QaCommand::Run {
+                video,
+                project,
+                docs: _,
+                out,
+                ffmpeg,
+                ffprobe,
+                video_id,
+                folder_id,
+                split,
+            } => {
+                let options = QaOptions {
+                    ffmpeg: ffmpeg.unwrap_or_else(|| config.steps.step8.post.ffmpeg.clone()),
+                    ffprobe: ffprobe.unwrap_or_else(|| config.steps.step8.post.ffprobe.clone()),
+                    template_prefix: config.steps.step8.post.template_prefix.clone(),
+                    out_dir: out,
+                    video_id,
+                    folder_id,
+                    split,
+                };
+                let outcome =
+                    run_qa(&video, project.as_deref(), &options).context("exécution de QA")?;
+                let payload = json!({
+                    "qa_path": outcome.qa_path.to_string_lossy(),
+                    "report": outcome.report,
+                });
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+                if outcome.report.overall_status == QaStatus::Fail {
                     std::process::exit(1);
                 }
             }

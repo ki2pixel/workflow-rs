@@ -10,11 +10,12 @@ audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
 `effectcraft-cli`) sont opérationnels. Le post-traitement A5/A6 est intégré
 après STEP8 : le projet brut reste intact et un second `_assist.ecproj` est
-toujours publié avec ses rapports. Le lot 2 ajoute STEP2 TransNetV2 en ONNX
-Runtime CUDA, avec un CSV identique à la production sur les quatre cas du
-corpus. Le lot 3 porte STEP4 sur Coral Edge TPU : BlazeFace, FaceMesh,
-blendshapes, EfficientDet, suivi et détection de parole, avec un JSON identique
-à la production sur `face_pan`, `real_244` et `real_245`. Le lot 4 porte STEP3
+toujours publié avec ses rapports.
+Le lot 2 ajoute STEP2 TransNetV2 en ONNX Runtime CUDA, avec un CSV identique à
+la production sur les quatre cas du corpus. Le lot 3 porte STEP4 sur Coral
+Edge TPU : BlazeFace, FaceMesh, blendshapes, EfficientDet, suivi et détection
+de parole, avec un JSON identique à la production sur `face_pan`, `real_244`
+et `real_245`. Le lot 4 porte STEP3
 sur Coral Edge TPU : VAD YAMNet Split, embeddings ECAPA-TDNN et AHC, avec un
 `_audio.json` identique à la production sur `vox`, `real_244` et `real_245`.
 Le lot 5 ajoute le serveur d'orchestration Rust sur le port 5004, avec état
@@ -26,7 +27,10 @@ Python n'est lancée en repli. Le lot 8 porte l'ingestion : moniteur webhook,
 normalisation d'URL, historique SQLite, cooldown des échecs, téléchargement
 R2/Dropbox reprenable et statuts CSV. Le moniteur est désactivé par défaut ;
 il est actif sur l'instance de production depuis le 2026-10-23, après import
-de l'historique. La chaîne STEP1 → STEP8 est
+de l'historique. Le lot 10 ajoute le contrôle QA read-only
+`workflow-cli qa run` après export humain : Stage 0 déterministe et `qa.json`
+séparé de l'`audit.json` ; OCR sous-titres et visage coupé restent à porter.
+La chaîne STEP1 → STEP8 est
 validée sur une archive réelle (`1720 Camille.zip`). La validation Windows du
 pont et du JSX After Effects est abandonnée (D-022) : la production cible
 Linux et le panneau CEP continue d'appeler Python.
@@ -148,6 +152,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/lots/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
 - `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
+- `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, `qa.json`, seuils et limites v1.
 - `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/lots/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.
@@ -255,6 +260,11 @@ cargo run -p workflow-cli -- step7 finalize --direct --work-dir /tmp/projets
 cargo run -p workflow-cli -- step8 run --direct --folder /tmp/projet
 cargo run -p workflow-cli -- post run --folder /tmp/projet --direct
 cargo run -p workflow-cli -- post run --project /tmp/projet/projets/video_9x16.ecproj --docs /tmp/projet/docs
+
+cargo run -p workflow-cli -- qa run \
+  --video /tmp/projet/video_9x16.mp4 \
+  --project /tmp/projet/projets/video_9x16.ecproj \
+  --out /tmp/qa/video
 
 cargo run -p workflow-cli -- step1 run --source-dir ~/Téléchargements
 cargo run -p workflow-cli -- step1 normalize-only [--force]

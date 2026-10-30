@@ -429,6 +429,32 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/template.rs`,
   `crates/workflow-steps/src/post/direct.rs`, `config/config.toml`.
 
+## 2026-10-30 — D-036 : contrôle QA read-only scénario B, Stage 0 Rust
+
+- **Contexte** : l'étude `docs/etudes/Architecture_QA_Vidéo_Locale.md` retient
+  une cascade locale après export humain, distincte du post-traitement A5/A6.
+  Le PoC Python a validé Stage 0, OCR et visage sur 35 exports, mais aucun code
+  Rust n'existait.
+- **Décision** :
+  1. `workflow-cli qa run` intervient après l'export H.264 humain ; il ne
+     modifie ni le `.ecproj`, ni le MP4, ni `docs/`.
+  2. Le rapport `qa.json` est distinct de l'`audit.json` A5/A6 et n'est écrit
+     que sous un `--out` explicite, par fichier temporaire puis `rename`.
+  3. Stage 0 déterministe : specs ffprobe, durée MP4/composition, timeline,
+     template A6 (`sdm.png`), noir/gel. Seuils hauts : noir ≥ 3 s, gel ≥ 5 s,
+     segment < 0,08 s, couverture > 5 s ; les fondus, photos fixes et
+     flash-cuts du corpus GOOD ne sont pas des défauts.
+  4. `auto_approve_eligible` reste **false** ; OCR sous-titres, visage coupé et
+     logos sont des checks `not_applicable` jusqu'à leur portage Rust.
+  5. Pas de serveur, pas de fallback Python, pas d'écriture dans le corpus,
+     `runtime/` ou `/mnt/cache`.
+- **Validation** : 35 exports, 35 `pass`, 0 finding, 0 écart de statut, de
+  findings ou de statut de check avec le Stage 0 Python ; médiane 12,3 s et
+  max 21,8 s par export en release séquentiel ; 21 tests `qa`, suite 362
+  tests, `fmt` et `clippy -D warnings` verts.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/`, `crates/workflow-cli/src/main.rs`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

@@ -4,7 +4,7 @@
 | --- | --- |
 | Type | Index |
 | Statut | Actif |
-| Date | 2026-10-28 |
+| Date | 2026-10-30 |
 | Portée | Navigation, taxonomie et règles de maintenance de `docs/` |
 | Voir aussi | `../README.md`, `../AGENTS.md`, `../parity/DRIFT.md`, `../memory-bank/activeContext.md` |
 
@@ -98,6 +98,7 @@ La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 | [`lots/LOT-7-INTEGRATION.md`](lots/LOT-7-INTEGRATION.md) | Séquence réelle STEP2 → STEP8 et rollback contrôlé. | Référence |
 | [`lots/LOT-8-INGESTION.md`](lots/LOT-8-INGESTION.md) | Webhook, normalisation d'URL, historique SQLite, cooldown et téléchargement R2/Dropbox. | Référence |
 | [`lots/STEP2-WINDOWS.md`](lots/STEP2-WINDOWS.md) | Protocole de validation STEP2 CUDA sous Windows, différé et non exécuté (D-022). | Historique |
+| [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) | Contrôle QA read-only après export humain : Stage 0 déterministe, `qa.json` séparé, OCR/visage à porter. | Référence |
 
 ## 5. Exploitation
 
@@ -182,6 +183,7 @@ chemins de la colonne « Avant » ne sont plus valides.
 | `docs/LOT-7-INTEGRATION.md` | [`lots/LOT-7-INTEGRATION.md`](lots/LOT-7-INTEGRATION.md) |
 | `docs/LOT-8-INGESTION.md` | [`lots/LOT-8-INGESTION.md`](lots/LOT-8-INGESTION.md) |
 | `docs/LOT-9-POST-STEP8.md` | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) |
+| `docs/LOT-10-QA.md` | [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) |
 | `docs/STEP2-WINDOWS.md` | [`lots/STEP2-WINDOWS.md`](lots/STEP2-WINDOWS.md) |
 | `docs/VALIDATION-STEP1-8.md` | [`validation/VALIDATION-STEP1-8.md`](validation/VALIDATION-STEP1-8.md) |
 | `docs/audits/2026-10-24-audit-backend-rust.md` | [`validation/audits/2026-10-24-audit-backend-rust.md`](validation/audits/2026-10-24-audit-backend-rust.md) |

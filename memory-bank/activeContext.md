@@ -2,18 +2,29 @@
 
 ## Tâche en cours
 
-**Post-traitement A5/A6 et bypass direct SDM/archive-only en production.**
-STEP8 publie toujours un second `<stem>_assist.ecproj` à côté du brut intact,
-avec `post.json`/`review.json`/`audit.json` sous `docs/post/`. A1 letterbox,
-A2 bannière, A3/A4 en revue, A6 template SDM. Depuis D-034, `post.direct`
-court-circuite STEP2–STEP6 pour les vidéos `M6 - SDM - ` au profil
-1920×1080 25 fps ; STEP7 synthétise le CSV mono-segment et STEP8 construit
-le brut sans panel. Depuis D-035, `archive_only_prefixes` applique le même
-bypass à `W9 - LPHDF` mais sans aucun `.ecproj` : seul le CSV est archivé et
-copié, STEP8 ignore la vidéo par son nom. Validation 295 au pixel, 340, 341,
-lots mixtes et non-bypass inchangés ; tests, fmt et clippy verts.
+**Contrôle QA read-only après export humain (scénario B).**
+Le module `crates/workflow-steps/src/qa/` et `workflow-cli qa run` sont intégrés
+pour le Stage 0 : specs, durée MP4/composition, timeline, template A6,
+noir/gel et agrégation. `qa.json` est distinct de l'`audit.json` A5/A6 et
+s'écrit uniquement sous `--out`. Validation sur les 35 exports : 35 `pass`,
+0 écart avec le PoC Python, médiane 12,3 s. OCR sous-titres, visage coupé et
+logos restent `not_applicable` ; `auto_approve_eligible = false`. Le
+post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
+D-034, D-035).
 
 ## Dernière session
+
+- [2026-10-30] **Contrôle QA read-only — Stage 0 Rust (D-036)** :
+  - module `qa/` (`model`, `stage0`, `aggregate`, `report`) et commande
+    `workflow-cli qa run` ; `qa.json` séparé, écriture atomique sous `--out` ;
+  - Stage 0 : ffprobe, specs, durée MP4/composition, timeline, template A6,
+    `blackdetect`/`freezedetect`, seuils hauts (noir 3 s, gel 5 s, segment
+    0,08 s, couverture 5 s) ;
+  - 35 exports : 35 `pass`, 0 finding, 0 écart vs PoC Python ; médiane 12,3 s,
+    max 21,8 s en release séquentiel ;
+  - 21 tests `qa`, suite 362 tests, `fmt` et `clippy -D warnings` verts ;
+  - OCR/visage/logos `not_applicable`, `auto_approve_eligible = false` ;
+  - docs : `docs/lots/LOT-10-QA.md`, note d'architecture, README, index docs.
 
 - [2026-10-29] **Bypass archive-only LPHDF (D-035)** :
   - `archive_only_prefixes = ["W9 - LPHDF"]` sous `[steps.step8.post]` ;
@@ -283,7 +294,7 @@ lots mixtes et non-bypass inchangés ; tests, fmt et clippy verts.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 341 tests unitaires ; pas de CI.
+- 362 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

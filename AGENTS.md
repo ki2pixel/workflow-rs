@@ -50,7 +50,7 @@ documentation map `docs/README.md`, and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 341 unit tests, no hardware
+cargo test --workspace                                    # 362 unit tests, no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings

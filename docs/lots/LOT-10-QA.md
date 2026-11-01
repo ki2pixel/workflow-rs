@@ -1,8 +1,8 @@
 # Lot 10 — contrôle qualité read-only après export humain
 
 > Statut : module Rust v1 démarré le 2026-10-30. Stage 0 déterministe,
-> Stage 1 OCR PP-OCRv6 et visage YuNet, agrégation intégrés ; les logos
-> restent à porter.
+> Stage 1 OCR PP-OCRv6 (sous-titres et logos) et visage YuNet, agrégation
+> intégrés. Le contrôle logos s'appuie sur le masque des overlays `.ecproj`.
 > Décision : scénario B de `docs/etudes/Architecture_QA_Vidéo_Locale.md`.
 > Code : `crates/workflow-steps/src/qa/`, commande `workflow-cli qa run`.
 
@@ -24,8 +24,8 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
 - Aucune écriture dans le corpus, `runtime/` ou `/mnt/cache`.
 - Pas de fallback Python : le module Rust est autonome pour Stage 0, l'OCR et
   le visage.
-- `auto_approve_eligible` reste **false** en v1. Les logos ne sont pas
-  mesurés et aucune validation humaine n'a encore eu lieu.
+- `auto_approve_eligible` reste **false** en v1. Le contrôle logos produit
+  des candidats `review` et aucune validation humaine n'a encore eu lieu.
 - Un modèle ou un projet absent produit `not_applicable`, pas un échec
   global.
 - Les écritures JSON utilisent temporaire voisin + `rename`
@@ -45,25 +45,28 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
    texte, la reconnaissance CTC donne texte et score, puis des filtres
    géométriques écartent logos, cartons et textes de scène. Un sous-titre
    n'est retenu qu'après trois échantillons consécutifs à hauteur stable.
-3. **Stage 1 — visage** : YuNet ONNX Runtime CPU sur les mêmes instants. Le
+3. **Stage 1 — logos** : OCR de la bande haute (32 % supérieurs) sur douze
+   frames uniformes, puis persistance ≥ 50 %. Les zones alpha des PNG
+   d'overlay déclarés dans le `.ecproj` sont masquées par intervalle ; un
+   texte persistant hors masque devient un candidat `logo_residual`.
+4. **Stage 1 — visage** : YuNet ONNX Runtime CPU sur les mêmes instants. Le
    détecteur tourne sur la frame et sur une version étendue de 15 % de chaque
    côté ; les deux jeux de boîtes sont fusionnés. Seuls les visages dont un
    landmark (yeux, nez, bouche) approche un bord gauche/droit sont retenus,
    après trois échantillons consécutifs. Un gros plan de profil qui coupe la
    nuque ou le menton sans couper les landmarks reste valide.
-4. **Stage 2 — agrégation** : un `fail` de check ou un défaut objectif
+5. **Stage 2 — agrégation** : un `fail` de check ou un défaut objectif
    (`spec_mismatch`, `template_logo_missing`) bloque ; tout autre finding ou
    check `review` demande une revue ; `info` et `not_applicable` ne dégradent
    pas le statut.
-5. **Preuves** : hash SHA-256 de l'export, puis une frame WebP par finding
+6. **Preuves** : hash SHA-256 de l'export, puis une frame WebP par finding
    sous `<out>/evidence/`, à mi-intervalle ou 250 ms après le début.
-6. **Rapport** : `qa.json` avec specs, hash, méta projet, checks, findings,
-   preuves Stage 0, preuves OCR et visage, statut global et métriques.
+7. **Rapport** : `qa.json` avec specs, hash, méta projet, checks, findings,
+   preuves Stage 0, preuves OCR, logos et visage, statut global et métriques.
 
-Les deux contrôles Stage 1 partagent le même échantillonnage et s'exécutent
-dans deux threads : l'OCR et le visage sont CPU-bound et indépendants. Le
-temps total est donc proche de `Stage 0 + max(OCR, visage)` plutôt que de la
-somme.
+Les sous-titres et les logos partagent le même thread et les mêmes sessions
+ONNX ; le visage tourne dans un second thread. Le temps total est donc proche
+de `Stage 0 + max(OCR + logos, visage)` plutôt que de la somme.
 
 ## Seuils Stage 0
 
@@ -115,6 +118,32 @@ nécessaire. Le classifieur d'orientation 180° de RapidOCR n'est pas utilisé :
 les sous-titres sont horizontaux et la détection DB ne produit pas de
 quadrilatères retournés sur ce corpus.
 
+## Stage 1 logos
+
+| Paramètre | Valeur |
+| --- | --- |
+| Modèles | PP-OCRv6 det/rec, mêmes que les sous-titres |
+| Licence | Apache-2.0 (RapidOCR / PaddleOCR) |
+| Bande lue | 0–32 % de la hauteur |
+| Échantillons | 12 frames uniformes sur la durée |
+| Score | ≥ 0,50 |
+| Texte | ≥ 2 caractères |
+| Boîte | hauteur 18–180 px, largeur ≥ 30 px, aspect ≥ 1,2 |
+| Persistance | ≥ 50 % des échantillons, clé alphanumérique minuscule |
+| Seuil alpha du masque | > 8 pour la boîte, ≥ 200 pour compter un pixel opaque |
+| Recouvrement | détection écartée si ≥ 50 % de sa surface est dans un overlay actif |
+| Sévérité | `low` à 50–79 %, `medium` à partir de 80 % |
+
+Le masque lit les calques image du `.ecproj` (`png`, `jpg`, `jpeg`, `webp`),
+résout l'asset dans `docs/` à côté de `projets/` et applique les
+transformations statiques (ancre, position, échelle). Le projet est
+canonicalisé : un lien symbolique ne casse pas la résolution. Un calque
+animé, pivoté, sans PNG ou sans canal alpha est listé dans `overlays_skipped`
+(une image opaque masquerait la frame entière) ; si aucun overlay
+n'est exploitable, le contrôle passe `not_applicable` au lieu de produire des
+faux positifs. Sans `.ecproj`, il est aussi `not_applicable` : un OCR de bande
+haute seul confond logo de chaîne et habillage éditorial.
+
 ## Stage 1 visage
 
 | Paramètre | Valeur |
@@ -154,9 +183,9 @@ workflow-cli qa run \
 
 `--project` est optionnel : sans lui, `project_readable` est
 `not_applicable` et l'échantillonnage retombe sur des fenêtres de 5 s.
-`--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont
-`not_applicable`. `--no-ocr` et `--no-face` désactivent explicitement un
-contrôle. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
+`--models` est optionnel : sans lui, `subtitle_ocr`, `logo_residual` et
+`face_cut` sont `not_applicable`. `--no-ocr`, `--no-logo` et `--no-face`
+désactivent explicitement un contrôle. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
 frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration
 `steps.step8.post`. `--intra-threads` borne les threads intra-op ONNX par
@@ -205,8 +234,9 @@ Champs principaux : `schema_version`, `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
-`stage1_ocr_evidence`, `stage1_face_evidence` (si le contrôle tourne),
-`overall_status`, `auto_approve_eligible`, `auto_approve_reason`,
+`stage1_ocr_evidence`, `stage1_logo_evidence`, `stage1_face_evidence` (si le
+contrôle tourne), `overall_status`, `auto_approve_eligible`,
+`auto_approve_reason`,
 `models_provenance`, `execution_metrics.timings_ms`.
 
 `export_sha256` est le SHA-256 du MP4 contrôlé. `cache_key` est l'empreinte
@@ -223,6 +253,12 @@ n'invalide pas le rapport.
 `stage1_ocr_ms` ; `models_provenance.ocr_det` porte le SHA-256 de la
 détection et `models_provenance.ocr_rec` celui de la reconnaissance.
 
+`stage1_logo_evidence` contient les deux modèles, 12 échantillons,
+`samples_with_text`, `detections_total`, `masked_total`, `findings_total`,
+`frame_errors`, `persistence_min`, `top_end`, `overlays_total`, la liste
+`overlays` (nom, intervalle, bbox dans la composition, pixels opaques) et
+`overlays_skipped`. `timings_ms` ajoute `stage1_logo_ms`.
+
 `stage1_face_evidence` contient le modèle, le nombre d'échantillons, les
 compteurs `samples_with_face`, `samples_with_cut`, `frame_errors`, et les
 paramètres (`per_segment`, score, NMS, padding). `timings_ms` ajoute
@@ -233,8 +269,10 @@ Les findings Stage 0 utilisent `timecode_start_sec` / `timecode_end_sec`,
 utilisent `detected_by_stage = stage1_ppocr_bottom` et résument dans `notes`
 les textes lus, les segments, les scores moyen/max et le centre vertical. Les
 findings visage ajoutent `bbox_xywh` et
-`detected_by_stage = stage1_yunet_face`. Le schéma sera figé quand les logos
-seront portés.
+`detected_by_stage = stage1_yunet_face`. Les findings logo ajoutent
+`bbox_xywh` et `detected_by_stage = stage1_ppocr_top` ; `notes` contient le
+texte, la persistance et le score moyen. Le schéma sera figé après la galerie
+labellisée.
 
 ## Validation
 
@@ -268,10 +306,31 @@ seront portés.
 - Temps OCR médian 21,7 s et max 43,5 s par export ; QA complet médian
   35,4 s et max 63,6 s. La cible de 60 s est tenue en médiane et dépassée de
   3,6 s sur le pire export (`300_UJUD - KATIA`, 41,6 s d'OCR).
-- 66 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
+- 75 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
   template, agrégation, écriture atomique, letterbox, décodage YuNet, NMS,
   padding, décodage CTC, composantes, filtres OCR, slugs, scan de lot,
-  sélection de l'instant de preuve et empreinte de cache).
+  sélection de l'instant de preuve, empreinte de cache, masque alpha,
+  transformations d'overlay, résolution des liens symboliques et agrégation
+  des logos).
+
+### Stage 1 logos
+
+- 35 exports, `--no-face --no-evidence --workers 4` : 30 `pass`, 3
+  `not_applicable` (sans `.ecproj`) et 2 `review` sur 270.
+- 386 détections filtrées, 259 masquées par un overlay déclaré (67 %).
+- 32 exports évalués : **2 faux positifs connus** (270 « MASUPER »/« LIGUEZ »,
+  habillage source non déclaré), soit 6,25 %, sous la cible G3 de 10 %.
+  Aucun finding sur 295 (SDM), 191/211/276/287 (LFAUIT), 223 (turbo), 227
+  (e=M6), 266 (EQC), 268 (Lorie), 286 (20H10), 298 (les 100/M6+).
+- Synthétique : un logo « CHAIN LOGO » persistant 12/12 produit 1 finding
+  `logo_residual` ; le même clip avec un overlay PNG déclaré au même endroit
+  est entièrement masqué (12 détections, 0 finding) ; un texte présent sur
+  moins de la moitié des échantillons ne produit aucun finding.
+- Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
+  rendus depuis les rushes. 270 reste un candidat à confirmer par un humain.
+- QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
+  logos et 14,2 s de visage.
+- 417 tests workspace (385 `#[test]` + 32 `#[tokio::test]`).
 
 ### Stage 1 visage
 
@@ -295,8 +354,11 @@ seront portés.
 
 ## Limites v1
 
-- Logos non mesurés ; le baseline OCR du PoC était insuffisant (15/35 flags,
-  dont 13 habillages éditoriaux).
+- Logos : 2 faux positifs connus sur 270 (habillage source non déclaré) et
+  aucun positif réel labellisé. Le détecteur produit des candidats `review`,
+  jamais une auto-approbation.
+- Le masque ne couvre que les PNG déclarés ; un habillage incrusté dans la
+  source reste indistinguable d'un logo résiduel sans galerie labellisée.
 - Détection OCR axis-aligned, sans classifieur d'orientation 180° : les
   sous-titres tournés ou verticaux ne sont pas couverts.
 - Côté court de détection fixé à 480 px : réglé pour les exports 9:16
@@ -317,8 +379,8 @@ seront portés.
 
 ## Prochaines étapes
 
-1. Construire le masque des overlays projet et la galerie labellisée avant
-   DINOv2 pour les logos.
+1. Constituer la galerie labellisée (logos et habillages) et comparer raw vs
+   GOOD pour mesurer le rappel réel ; DINOv2 seulement ensuite.
 2. Réserver le VLM local aux frames ambiguës (phase 4).
 3. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
 4. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.

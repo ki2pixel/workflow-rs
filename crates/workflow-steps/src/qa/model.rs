@@ -260,6 +260,38 @@ pub struct Stage1OcrEvidence {
     pub bottom_start: f64,
 }
 
+/// Overlay déclaré dans le `.ecproj`, réduit à sa zone alpha visible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlayRegion {
+    pub name: String,
+    pub layer_id: i64,
+    pub start_s: f64,
+    pub end_s: f64,
+    /// Boîte dans les coordonnées de la composition.
+    pub bbox_xywh: [f64; 4],
+    /// Pixels dont l'alpha est ≥ 200, pour distinguer un vrai logo d'un PNG
+    /// presque entièrement transparent.
+    pub opaque_pixels: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stage1LogoEvidence {
+    pub det_model: String,
+    pub rec_model: String,
+    pub samples_total: usize,
+    pub samples_with_text: usize,
+    pub detections_total: usize,
+    /// Détections écartées parce qu'elles tombent dans un overlay déclaré.
+    pub masked_total: usize,
+    pub findings_total: usize,
+    pub frame_errors: usize,
+    pub persistence_min: f64,
+    pub top_end: f64,
+    pub overlays_total: usize,
+    pub overlays: Vec<OverlayRegion>,
+    pub overlays_skipped: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub name: String,
@@ -296,6 +328,8 @@ pub struct Timings {
     pub project_ms: u64,
     #[serde(default)]
     pub stage1_ocr_ms: u64,
+    #[serde(default)]
+    pub stage1_logo_ms: u64,
     #[serde(default)]
     pub stage1_face_ms: u64,
     #[serde(default)]
@@ -334,6 +368,8 @@ pub struct QaReport {
     pub stage0_evidence: Stage0Evidence,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage1_ocr_evidence: Option<Stage1OcrEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage1_logo_evidence: Option<Stage1LogoEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage1_face_evidence: Option<Stage1FaceEvidence>,
     pub overall_status: QaStatus,
@@ -418,6 +454,7 @@ mod tests {
                 thresholds: Stage0Thresholds::default(),
             },
             stage1_ocr_evidence: None,
+            stage1_logo_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

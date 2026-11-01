@@ -566,6 +566,55 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-01 — D-041 : masque des overlays `.ecproj` et contrôle logos
+
+- **Contexte** : le baseline OCR de la bande haute produisait 15/35 flags sur
+  les exports GOOD, dont 13 habillages éditoriaux. La note d'architecture
+  conditionnait la détection de logos au masque des overlays intentionnels
+  dérivé du `.ecproj`. Sans lui, un OCR de bande haute ne distingue pas un
+  logo résiduel d'un titre d'émission ou d'un sticker de template.
+- **Décision** :
+  1. `qa/overlay.rs` lit les calques image du `.ecproj` (`png`, `jpg`,
+     `jpeg`, `webp`), décode le PNG (`png` 0.18) et réduit l'overlay à la
+     boîte des pixels dont l'alpha dépasse 8. Les pixels alpha ≥ 200 sont
+     comptés comme opaques.
+  2. Les transformations statiques (ancre, position, échelle) et l'intervalle
+     `in_point`/`out_point` sont appliqués. Un calque animé, pivoté ou sans
+     PNG est listé dans `overlays_skipped` ; si aucun overlay n'est
+     exploitable, le contrôle passe `not_applicable` au lieu de produire des
+     faux positifs.
+  3. L'asset est résolu par le chemin déclaré, puis `docs/` à côté de
+     `projets/` ; le projet est canonicalisé pour que les liens symboliques
+     du corpus de validation ne cassent pas la résolution. Un PNG sans canal
+     alpha est refusé (masquer la frame entière désactiverait le contrôle).
+  4. `qa/logo.rs` lit la bande haute 0–32 % sur 12 frames uniformes, applique
+     les seuils du baseline (score ≥ 0,50, hauteur 18–180 px, largeur ≥ 30 px,
+     aspect ≥ 1,2), écarte toute détection couverte à ≥ 50 % par un overlay
+     actif, puis agrège les textes persistants sur ≥ 50 % des échantillons.
+  5. Le contrôle exige un `.ecproj` ; il partage les sessions ONNX de l'OCR
+     des sous-titres et tourne dans le même thread. `--no-logo` le désactive ;
+     `--no-ocr` le désactive aussi.
+  6. `qa.json` ajoute `stage1_logo_evidence` (`masked_total`, `overlays`,
+     `overlays_skipped`), `timings_ms.stage1_logo_ms`, et `cache_version=2`
+     invalide les rapports antérieurs.
+- **Validation** : lot 35 exports à 4 workers, `--no-face --no-evidence` :
+  30 `pass`, 3 `not_applicable` (sans projet), 2 `review` sur 270 ; 386
+  détections, 259 masquées (67 %). Les 13 flags du baseline sur les exports
+  avec projet sont tous couverts (191/211/276/287 LFAUIT, 223 turbo, 227 e=m6,
+  266 EQC, 268 Lorie, 286 20H10, 298 les 100). Il reste 2 faux positifs
+  connus (270 « MASUPER »/« LIGUEZ », habillage source non déclaré), soit
+  6,25 % des 32 exports évalués, sous la cible G3 de 10 %. Synthétique :
+  « CHAIN LOGO » persistant 12/12 → 1 finding ; même clip avec overlay PNG
+  déclaré → 12 détections masquées, 0 finding ; texte transitoire → 0 finding.
+  QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s). 75 tests
+  `qa`, suite 417 tests, `fmt` et `clippy -D warnings` verts.
+- **Limites** : le rappel réel n'est pas mesurable sur les GOOD (pas de
+  positifs labellisés) ; 270 reste un candidat à confirmer ; le masque ne
+  couvre que les PNG déclarés, pas les habillages incrustés dans la source.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/overlay.rs`,
+  `crates/workflow-steps/src/qa/logo.rs`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

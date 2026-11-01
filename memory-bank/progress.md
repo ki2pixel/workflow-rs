@@ -12,18 +12,19 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 407 tests unitaires, sans matériel.
-- **Contrôle QA read-only Stage 0 + OCR + visage (D-036, D-037, D-038)** :
+- 417 tests unitaires, sans matériel.
+- **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-041)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
   PP-OCRv6 ONNX CPU : 1 124 échantillons, 12 détections isolées, 0 finding
-  sur 35 GOOD, 12/12 sous-titres synthétiques. YuNet : 745 échantillons avec
-  visage, 0 finding sur 35 GOOD, 2/2 recadrages synthétiques. QA complet
-  médian 35,4 s, max 63,6 s ; mode lot `--folder` à 4 workers (Stage 0 :
-  4,01 s/export), cache par empreinte (0,23 s sur hit) et `export_sha256`
-  avec une frame WebP par finding. Logos `not_applicable` et
-  `auto_approve_eligible = false`.
-  Détail : `docs/lots/LOT-10-QA.md`.
+  sur 35 GOOD, 12/12 sous-titres synthétiques. Logos : masque alpha des
+  overlays `.ecproj`, 30/32 exports évalués `pass`, 2 faux positifs connus
+  (270), 259/386 détections masquées. YuNet : 745 échantillons avec visage,
+  0 finding sur 35 GOOD, 2/2 recadrages synthétiques. QA complet 298 en
+  32,1 s ; mode lot `--folder` à 4 workers (Stage 0 : 4,01 s/export), cache
+  par empreinte (0,23 s sur hit) et `export_sha256` avec une frame WebP par
+  finding. `auto_approve_eligible = false`. Détail :
+  `docs/lots/LOT-10-QA.md`.
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
   sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
   aucun `.ecproj` (validé sur 295, 340, 341 et lots mixtes).

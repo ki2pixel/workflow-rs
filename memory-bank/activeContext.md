@@ -5,22 +5,39 @@
 **Contrôle QA read-only après export humain (scénario B).**
 Le module `crates/workflow-steps/src/qa/` et `workflow-cli qa run` sont intégrés
 pour le Stage 0 (specs, durée MP4/composition, timeline, template A6,
-noir/gel), le Stage 1 OCR PP-OCRv6 et le Stage 1 visage YuNet, tous en ONNX
-Runtime CPU. `qa.json` est distinct de l'`audit.json` A5/A6 et s'écrit
-uniquement sous `--out` ; il porte le hash SHA-256 de l'export et, par
-finding, une frame de preuve WebP. Validation Stage 0 sur les 35 exports :
-35 `pass`, 0 écart avec le PoC Python, médiane 12,3 s. Validation OCR : 1 124
-échantillons, 12 détections isolées, 0 finding sur 35 GOOD, 12/12 sous-titres
-synthétiques. Validation visage : 745 échantillons avec visage, 0 finding,
-2/2 recadrages synthétiques. Les deux contrôles tournent en parallèle ; QA
-complet médian 35,4 s, max 63,6 s. Le mode lot `--folder` répartit les
-exports sur 4 workers (Stage 0 : 4,01 s/export) et réutilise les `qa.json`
-dont l'empreinte correspond. Les logos restent
-`not_applicable` ;
-`auto_approve_eligible = false`. Le post-traitement A5/A6 et les bypass
-SDM/LPHDF restent en production (D-032, D-034, D-035).
+noir/gel), le Stage 1 OCR PP-OCRv6 (sous-titres et logos) et le Stage 1 visage
+YuNet, tous en ONNX Runtime CPU. `qa.json` est distinct de l'`audit.json`
+A5/A6 et s'écrit uniquement sous `--out` ; il porte le hash SHA-256 de
+l'export et, par finding, une frame de preuve WebP. Validation Stage 0 sur
+les 35 exports : 35 `pass`, 0 écart avec le PoC Python, médiane 12,3 s.
+Validation OCR : 1 124 échantillons, 12 détections isolées, 0 finding sur
+35 GOOD, 12/12 sous-titres synthétiques. Validation logos : masque alpha des
+overlays `.ecproj`, 30/32 exports évalués `pass`, 2 faux positifs connus
+(270), 259/386 détections masquées. Validation visage : 745 échantillons avec
+visage, 0 finding, 2/2 recadrages synthétiques. Les sous-titres et les logos
+partagent le thread OCR ; QA complet 298 en 32,1 s. Le mode lot `--folder`
+répartit les exports sur 4 workers (Stage 0 : 4,01 s/export) et réutilise les
+`qa.json` dont l'empreinte correspond. `auto_approve_eligible = false`. Le
+post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
+D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-01] **Stage 1 logos et masque overlays (D-041)** :
+  - `qa/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
+    transformations statiques, résolution `docs/`, canonicalisation des
+    liens symboliques ;
+  - `qa/logo.rs` : OCR bande haute 0–32 %, 12 frames, persistance ≥ 50 %,
+    masque si ≥ 50 % de la détection est couverte, findings `logo_residual` ;
+  - `--no-logo`, `overlays_skipped`, `stage1_logo_evidence` et
+    `stage1_logo_ms` ; le cache passe en `cache_version=2` ;
+  - lot 35 exports : 30 `pass`, 3 `not_applicable` (sans projet), 2 `review`
+    (270), 259/386 détections masquées, 6,25 % de faux positifs connus ;
+  - synthétiques : logo persistant détecté, contrôle masqué propre, texte
+    transitoire non flagué ;
+  - QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s) ;
+  - 76 tests `qa`, suite 417 tests, `fmt` et `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS, D-041.
 
 - [2026-11-01] **Stage 1 OCR, lot, preuves et cache (D-038 à D-040)** :
   - `qa/ocr.rs` : détection DB et reconnaissance CTC sur la bande basse

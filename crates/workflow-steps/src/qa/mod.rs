@@ -5,8 +5,10 @@
 //! `qa.json` sous `--out`.
 //!
 //! État v1 : Stage 0 déterministe (specs, durée, timeline, template A6,
-//! noir/gel), Stage 1 OCR sous-titres (PP-OCRv6) et visage (YuNet), agrégation.
-//! Les logos restent `not_applicable` ; `auto_approve_eligible` reste faux.
+//! noir/gel), Stage 1 OCR sous-titres et logos (PP-OCRv6) et visage (YuNet),
+//! agrégation. Le contrôle logos exige un `.ecproj` pour masquer les overlays
+//! déclarés ; sans projet il reste `not_applicable`. `auto_approve_eligible`
+//! reste faux.
 
 pub mod aggregate;
 pub mod batch;
@@ -15,8 +17,10 @@ pub mod evidence;
 pub mod face;
 pub mod frame;
 pub mod inference;
+pub mod logo;
 pub mod model;
 pub mod ocr;
+pub mod overlay;
 pub mod report;
 pub mod sample;
 pub mod stage0;
@@ -24,10 +28,11 @@ pub mod stage0;
 pub use batch::{discover_exports, run_folder, BatchOutcome, BatchSummary};
 pub use face::{FaceOptions, FACE_MODEL_FILENAME};
 pub use model::{
-    DefectType, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,
-    Stage1FaceEvidence, Stage1OcrEvidence,
+    DefectType, OverlayRegion, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,
+    Stage1FaceEvidence, Stage1LogoEvidence, Stage1OcrEvidence,
 };
 pub use ocr::{OcrOptions, OCR_DET_FILENAME, OCR_REC_FILENAME};
+pub use overlay::{read_mask, OverlayMask};
 pub use report::{read_report, report_path, write_report};
 pub use sample::SegmentSpan;
 pub use stage0::{run_stage0, Stage0Options, Stage0Result};
@@ -53,6 +58,8 @@ pub struct QaOptions {
     pub intra_threads: Option<usize>,
     /// Active le contrôle OCR sous-titres.
     pub ocr_enabled: bool,
+    /// Active le contrôle logos de la bande haute.
+    pub logo_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
     /// Écrit une frame WebP par finding sous `<out>/evidence/`.
@@ -75,6 +82,7 @@ impl Default for QaOptions {
             onnxruntime: None,
             intra_threads: None,
             ocr_enabled: true,
+            logo_enabled: true,
             face_enabled: true,
             evidence_enabled: true,
             per_segment: 1,
@@ -89,14 +97,6 @@ impl Default for QaOptions {
 pub struct QaOutcome {
     pub report: QaReport,
     pub qa_path: PathBuf,
-}
-
-/// Vérifications de Stage 1 non encore portées en Rust.
-pub fn stage1_pending_checks() -> Vec<QaCheck> {
-    vec![QaCheck::not_applicable(
-        "logo_residual",
-        "Détection de logos différée après construction du masque projet",
-    )]
 }
 
 pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<QaOutcome> {
@@ -132,9 +132,11 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     let mut checks = stage0.checks;
     let mut findings = stage0.findings;
     let mut ocr_evidence = None;
+    let mut logo_evidence = None;
     let mut ocr_model = None;
     let mut ocr_rec_model = None;
     let mut ocr_ms = 0;
+    let mut logo_ms = 0;
     let mut face_evidence = None;
     let mut face_model = None;
     let mut face_ms = 0;
@@ -185,6 +187,61 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         None
     };
 
+    // Le masque des overlays déclarés est indispensable : sans projet, un OCR
+    // de bande haute confond logo de chaîne et habillage éditorial.
+    let mut logo_mask = None;
+    if !options.logo_enabled {
+        checks.push(QaCheck::not_applicable(
+            "logo_residual",
+            "contrôle logos désactivé (--no-logo)",
+        ));
+    } else if ocr_options.is_none() {
+        checks.push(QaCheck::not_applicable(
+            "logo_residual",
+            "contrôle OCR désactivé ou modèles OCR absents",
+        ));
+    } else if let Some(project_path) = project {
+        match overlay::read_mask(project_path) {
+            Ok(mask) if mask.regions.is_empty() && !mask.skipped.is_empty() => {
+                tracing::warn!(
+                    skipped = mask.skipped.len(),
+                    "aucun overlay exploitable, contrôle logos désactivé"
+                );
+                checks.push(QaCheck::not_applicable(
+                    "logo_residual",
+                    format!(
+                        "overlays déclarés non exploitables: {}",
+                        mask.skipped.join(" ; ")
+                    ),
+                ));
+            }
+            Ok(mask) => {
+                tracing::info!(
+                    overlays = mask.regions.len(),
+                    skipped = mask.skipped.len(),
+                    "masque d'overlays chargé"
+                );
+                logo_mask = Some(mask);
+            }
+            Err(error) => {
+                tracing::warn!(
+                    project = %project_path.display(),
+                    error = %error,
+                    "masque d'overlays illisible"
+                );
+                checks.push(QaCheck::not_applicable(
+                    "logo_residual",
+                    format!("masque d'overlays illisible: {error:#}"),
+                ));
+            }
+        }
+    } else {
+        checks.push(QaCheck::not_applicable(
+            "logo_residual",
+            "projet .ecproj requis pour le masque d'overlays",
+        ));
+    }
+
     let face_options = if !options.face_enabled {
         checks.push(QaCheck::not_applicable(
             "face_cut",
@@ -220,9 +277,10 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     // parallèle divise la latence du QA complet sur les exports longs.
     let (ocr_result, face_result) = match (&ocr_options, &face_options) {
         (Some(ocr_opts), Some(face_opts)) => {
+            let logo_ref = logo_mask.as_ref();
             let (ocr_joined, face_joined) = std::thread::scope(|scope| {
                 let ocr_handle =
-                    scope.spawn(|| ocr::run_ocr(video, &stage0.specs, &spans, ocr_opts));
+                    scope.spawn(|| ocr::run_ocr(video, &stage0.specs, &spans, ocr_opts, logo_ref));
                 let face_handle =
                     scope.spawn(|| face::run_face(video, &stage0.specs, &spans, face_opts));
                 (ocr_handle.join(), face_handle.join())
@@ -233,7 +291,13 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             )
         }
         (Some(ocr_opts), None) => (
-            Some(ocr::run_ocr(video, &stage0.specs, &spans, ocr_opts)?),
+            Some(ocr::run_ocr(
+                video,
+                &stage0.specs,
+                &spans,
+                ocr_opts,
+                logo_mask.as_ref(),
+            )?),
             None,
         ),
         (None, Some(face_opts)) => (
@@ -247,9 +311,11 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         checks.extend(result.checks);
         findings.extend(result.findings);
         ocr_evidence = Some(result.evidence);
+        logo_evidence = result.logo_evidence;
         ocr_model = Some(result.det_model);
         ocr_rec_model = Some(result.rec_model);
         ocr_ms = result.timing_ms;
+        logo_ms = result.logo_timing_ms;
     }
     if let Some(result) = face_result {
         checks.extend(result.checks);
@@ -258,8 +324,6 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         face_model = Some(result.model);
         face_ms = result.timing_ms;
     }
-    checks.extend(stage1_pending_checks());
-
     let evidence_ms = if options.evidence_enabled && !findings.is_empty() {
         let stats = evidence::write_evidence_frames(
             video,
@@ -283,6 +347,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     let overall_status = aggregate::overall_status(&checks, &findings);
     let mut timings = stage0.timings;
     timings.stage1_ocr_ms = ocr_ms;
+    timings.stage1_logo_ms = logo_ms;
     timings.stage1_face_ms = face_ms;
     timings.evidence_ms = evidence_ms;
     timings.total_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
@@ -312,6 +377,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         findings,
         stage0_evidence: stage0.evidence,
         stage1_ocr_evidence: ocr_evidence,
+        stage1_logo_evidence: logo_evidence,
         stage1_face_evidence: face_evidence,
         overall_status,
         auto_approve_eligible: false,
@@ -345,16 +411,6 @@ fn video_id_from_path(video: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::qa::model::QaStatus;
-
-    #[test]
-    fn pending_stage1_checks_are_not_applicable() {
-        let checks = stage1_pending_checks();
-        assert_eq!(checks.len(), 1);
-        assert!(checks
-            .iter()
-            .all(|check| check.status == QaStatus::NotApplicable));
-    }
 
     #[test]
     fn video_id_falls_back_to_stem() {

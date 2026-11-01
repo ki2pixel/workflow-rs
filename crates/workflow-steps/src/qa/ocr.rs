@@ -16,9 +16,12 @@
 use crate::post::detect;
 use crate::qa::frame::{grab_frame, resize_bilinear, BgrFrame};
 use crate::qa::inference::cpu_session;
+use crate::qa::logo;
 use crate::qa::model::{
-    DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1OcrEvidence,
+    DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence,
+    Stage1OcrEvidence,
 };
+use crate::qa::overlay::OverlayMask;
 use crate::qa::sample::{sample_times, SegmentSpan};
 use anyhow::{bail, ensure, Context, Result};
 use ort::session::Session;
@@ -88,9 +91,13 @@ pub struct OcrResult {
     pub checks: Vec<QaCheck>,
     pub findings: Vec<QaFinding>,
     pub evidence: Stage1OcrEvidence,
+    pub logo_evidence: Option<Stage1LogoEvidence>,
     pub det_model: ModelInfo,
     pub rec_model: ModelInfo,
+    /// Temps du contrôle sous-titres, hors passe logos.
     pub timing_ms: u64,
+    /// Temps de la passe logos, quand elle est active.
+    pub logo_timing_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -109,8 +116,8 @@ struct OcrSample {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct DetBox {
-    bbox: [i64; 4],
+pub(crate) struct DetBox {
+    pub(crate) bbox: [i64; 4],
 }
 
 pub fn run_ocr(
@@ -118,6 +125,7 @@ pub fn run_ocr(
     specs: &QaSpecs,
     segments: &[SegmentSpan],
     options: &OcrOptions,
+    logo_mask: Option<&OverlayMask>,
 ) -> Result<OcrResult> {
     if !matches!(options.per_segment, 1 | 3) {
         bail!(
@@ -248,27 +256,49 @@ pub fn run_ocr(
         });
     }
 
-    let findings = aggregate(&samples);
+    let subtitle_timing_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+    let subtitle_findings = aggregate(&samples);
     let evidence = Stage1OcrEvidence {
         det_model: det_model.name.clone(),
         rec_model: rec_model.name.clone(),
         samples_total: samples.len(),
         samples_with_text,
         detections_total,
-        findings_total: findings.len(),
+        findings_total: subtitle_findings.len(),
         frame_errors,
         per_segment: options.per_segment,
         min_score: MIN_SCORE,
         bottom_start: BOTTOM_START,
     };
-    let check = ocr_check(&evidence);
+    let mut checks = vec![ocr_check(&evidence)];
+    let mut findings = subtitle_findings;
+    let mut logo_evidence = None;
+    let mut logo_timing_ms = 0;
+    if let Some(mask) = logo_mask {
+        let result = logo::run_logo(
+            video,
+            specs,
+            mask,
+            options,
+            &det_model.name,
+            &rec_model.name,
+            &mut det,
+            &mut rec,
+        )?;
+        checks.push(result.check);
+        findings.extend(result.findings);
+        logo_evidence = Some(result.evidence);
+        logo_timing_ms = result.timing_ms;
+    }
     Ok(OcrResult {
-        checks: vec![check],
+        checks,
         findings,
         evidence,
+        logo_evidence,
         det_model,
         rec_model,
-        timing_ms: started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        timing_ms: subtitle_timing_ms,
+        logo_timing_ms,
     })
 }
 
@@ -458,13 +488,13 @@ fn ocr_check(evidence: &Stage1OcrEvidence) -> QaCheck {
     }
 }
 
-struct DetEngine {
+pub(crate) struct DetEngine {
     session: Session,
     output_name: String,
 }
 
 impl DetEngine {
-    fn load(
+    pub(crate) fn load(
         model: &Path,
         onnxruntime: Option<&Path>,
         intra_threads: Option<usize>,
@@ -488,7 +518,7 @@ impl DetEngine {
         })
     }
 
-    fn detect(&mut self, image: &BgrFrame) -> Result<Vec<DetBox>> {
+    pub(crate) fn detect(&mut self, image: &BgrFrame) -> Result<Vec<DetBox>> {
         let (det_width, det_height) = det_input_size(image.width, image.height);
         let resized = resize_bilinear(image, det_width, det_height);
         let input = normalized_chw(&resized);
@@ -685,14 +715,14 @@ fn box_score(prob: &[f32], width: usize, component: &Component) -> f32 {
     }
 }
 
-struct RecEngine {
+pub(crate) struct RecEngine {
     session: Session,
     output_name: String,
     characters: Vec<String>,
 }
 
 impl RecEngine {
-    fn load(
+    pub(crate) fn load(
         model: &Path,
         onnxruntime: Option<&Path>,
         intra_threads: Option<usize>,
@@ -735,7 +765,11 @@ impl RecEngine {
         })
     }
 
-    fn recognize(&mut self, image: &BgrFrame, boxes: &[DetBox]) -> Result<Vec<(String, f64)>> {
+    pub(crate) fn recognize(
+        &mut self,
+        image: &BgrFrame,
+        boxes: &[DetBox],
+    ) -> Result<Vec<(String, f64)>> {
         let mut results = Vec::with_capacity(boxes.len());
         for chunk in boxes.chunks(REC_BATCH) {
             let ratios = chunk

@@ -33,7 +33,8 @@ pub fn fingerprint_from_export(
     };
     let thresholds = Stage0Thresholds::default();
     let canonical = format!(
-        "schema={QA_SCHEMA_VERSION}\n\
+        "cache_version=2\n\
+         schema={QA_SCHEMA_VERSION}\n\
          export={export_sha256}\n\
          project={project_hash}\n\
          model.det={}\n\
@@ -41,6 +42,7 @@ pub fn fingerprint_from_export(
          model.face={}\n\
          per_segment={}\n\
          ocr={}\n\
+         logo={}\n\
          face={}\n\
          evidence={}\n\
          template_prefix={}\n\
@@ -54,6 +56,7 @@ pub fn fingerprint_from_export(
         model_hash(options, face::FACE_MODEL_FILENAME)?,
         options.per_segment,
         u8::from(options.ocr_enabled),
+        u8::from(options.logo_enabled),
         u8::from(options.face_enabled),
         u8::from(options.evidence_enabled),
         options.template_prefix,
@@ -134,6 +137,10 @@ mod tests {
 
         let mut changed = options();
         changed.face_enabled = false;
+        assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
+
+        let mut changed = options();
+        changed.logo_enabled = false;
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
     }
 

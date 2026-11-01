@@ -728,6 +728,9 @@ enum QaCommand {
         /// Désactive le contrôle visage YuNet.
         #[arg(long)]
         no_face: bool,
+        /// Désactive le contrôle logos de la bande haute.
+        #[arg(long)]
+        no_logo: bool,
         /// N'écrit pas les frames de preuve WebP.
         #[arg(long)]
         no_evidence: bool,
@@ -1604,6 +1607,7 @@ fn run() -> Result<()> {
                 onnxruntime,
                 intra_threads,
                 no_ocr,
+                no_logo,
                 no_face,
                 no_evidence,
                 per_segment,
@@ -1626,6 +1630,7 @@ fn run() -> Result<()> {
                     onnxruntime,
                     intra_threads,
                     ocr_enabled: !no_ocr,
+                    logo_enabled: !no_logo,
                     face_enabled: !no_face,
                     evidence_enabled: !no_evidence,
                     per_segment,

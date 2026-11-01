@@ -79,6 +79,7 @@ mod tests {
                 thresholds: Stage0Thresholds::default(),
             },
             stage1_ocr_evidence: None,
+            stage1_logo_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

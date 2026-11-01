@@ -330,13 +330,20 @@ labellisée.
   `logo_residual` ; le même clip avec un overlay PNG déclaré au même endroit
   est entièrement masqué (12 détections, 0 finding) ; un texte présent sur
   moins de la moitié des échantillons ne produit aucun finding.
-- Galerie synthétique (76 clips de 6 s, base `187_control`, fonds variés) :
-  60/60 positifs détectés (textes de 24 à 96 px, 4 styles, 8 positions ; IC
-  95 % de Wilson 94,0–100 %), 0/16 faux positifs (8 masqués, 4 transitoires,
-  4 négatifs), 8/8 masquages effectifs. La génération et l'évaluation sont
+- Galerie synthétique (76 clips de 6 s sur 22 fonds réels des clips
+  synthétiques, bande haute sans texte) : 60/60 positifs détectés (textes de
+  24 à 96 px, 4 styles, 8 positions ; IC 95 % de Wilson 94,0–100 %), 0/16
+  faux positifs (8 masqués, 4 transitoires, 4 négatifs), 8/8 masquages
+  effectifs. La génération et l'évaluation sont
   `gen_logo_gallery.py` et `eval_logo_gallery.py` dans
-  `/media/kidpixel/WORK/qa-poc/scripts/`. Limite : fond unique et texte net,
-  ce n'est pas un rappel sur logos réels.
+  `/media/kidpixel/WORK/qa-poc/scripts/`. Limite : texte `drawtext` net et
+  overlay synthétique.
+- Galerie d'assets réels (36 clips, 13 PNG alpha du corpus, 22 fonds) :
+  **22/26 positifs** (84,6 %, IC 95 % 66,5–93,9 %), **0/10 faux positifs**,
+  6/6 masqués. Les échecs sont des logos stylisés ou carrés : M6+ lu
+  « 161+ »/« 11+ »/« 1+ », Gulli à l'échelle 0,75, Les 100 à l'échelle 1,0.
+  L'OCR texte ne tient pas la cible G3 de 90 % sur ces assets ; DINOv2 ou un
+  classifieur de logos reste nécessaire.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
   rendus depuis les rushes. 270 est confirmé comme branding source.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de

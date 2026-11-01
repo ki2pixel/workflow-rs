@@ -566,6 +566,35 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-043 : galerie de logos réels et limite de l'OCR texte
+
+- **Contexte** : la galerie texte 60/60 ne teste que des chaînes `drawtext`
+  larges. Les assets PNG du corpus (M6+, Gulli, Les 100, LFAUIT, turbo…)
+  incluent des logos stylisés, carrés ou courts, plus proches de la production.
+- **Décision** :
+  1. `gen_logo_asset_gallery.py` compose 13 PNG alpha valides sur 22 fonds
+     propres : 26 positifs (13 assets × 2 transformations), 6 masqués et
+     4 négatifs. Les PNG sont validés avant usage ; `211 LFAUIT.png`, fichier
+     texte de 15 octets, est ignoré. Chaque ffmpeg est borné à 120 s.
+  2. Les transformations sont contraintes pour garder le logo dans la frame
+     et dans la bande haute (M6+ à droite).
+  3. `eval_logo_gallery.py` accepte `--gallery` et `--reports` et normalise
+     les slugs (accents, apostrophes) pour retrouver les 36 cas.
+  4. Un log `debug` par détection logo expose texte, score et bbox ; il a
+     permis d'identifier M6+ lu « 161+ », « 11+ » puis « 1+ ».
+- **Validation** : 36 clips, `--no-face --no-evidence --workers 4`, 85 s de
+  QA. Rappel 22/26 (84,6 %, IC 95 % de Wilson 66,5–93,9 %), faux positifs
+  0/10, 6/6 masquages effectifs. Les logos à texte large passent ; M6+,
+  Gulli à 0,75 et Les 100 à 1,0 échouent (texte instable, logo carré ou
+  stylisé).
+- **Conséquence** : la cible G3 de rappel ≥ 90 % n'est pas tenue sur les
+  assets réels. La galerie texte 60/60 reste valable pour le sous-ensemble
+  texte, mais DINOv2 ou un classifieur de logos reste nécessaire avant de
+  considérer G3 acquise. `auto_approve_eligible` reste faux.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `/media/kidpixel/WORK/qa-poc/reports/POC-RESULTS.md`,
+  `scripts/gen_logo_asset_gallery.py`, `scripts/eval_logo_gallery.py`.
+
 ## 2026-11-01 — D-042 : galerie synthétique de logos et préremplissage Rust
 
 - **Contexte** : les 35 exports GOOD ne fournissent aucun positif réel
@@ -573,12 +602,13 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   dev pré-remplis depuis le baseline texte contenaient 13 faux positifs
   d'habillage éditorial, que le masque `.ecproj` écarte désormais.
 - **Décision** :
-  1. `scripts/gen_logo_gallery.py` génère 76 clips de 6 s sur le fond
-     `187_control` (offsets variés sur 1–9 s) : 60 positifs persistants (textes de 24 à
-     96 px, quatre styles, huit positions), 8 cas masqués par un PNG déclaré,
-     4 textes transitoires (2 s sur 6) et 4 négatifs sans texte. Chaque clip
-     reçoit un `.ecproj` minimal ; les cas masqués déclarent un PNG plein
-     cadre dont la zone alpha couvre le texte.
+  1. `scripts/gen_logo_gallery.py` génère 76 clips de 6 s sur 22 fonds réels
+     des clips synthétiques (bande haute sans texte, offsets variés sur 1–9 s) :
+     60 positifs persistants (textes de 24 à 96 px, quatre styles, huit
+     positions), 8 cas masqués par un PNG déclaré, 4 textes transitoires (2 s
+     sur 6) et 4 négatifs sans texte. Chaque clip reçoit un `.ecproj` minimal ;
+     les cas masqués déclarent un PNG plein cadre dont la zone alpha couvre le
+     texte.
   2. `scripts/eval_logo_gallery.py` compare les findings `logo_residual` aux
      attendus et écrit `metrics.json`.
   3. `scripts/prefill_labels.py` préfère `reports/rust-logo/<dossier>-<slug>`
@@ -588,12 +618,12 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   4. 270 reste un candidat `review` : le logo « MASUPER »/« LIGUEZ » est déjà
      dans le rush `MSL1.mov`, donc c'est le branding de l'émission. Aucune
      suppression automatique n'est ajoutée.
-- **Validation** : galerie 76 clips, `--no-face --no-evidence --workers 4`,
-  163,7 s de mur. Rappel 60/60 (IC 95 % de Wilson 94,0–100 %), faux positifs
-  0/16 (IC 95 % 0–19,4 %), 8/8 masquages effectifs. Le lot 35 exports reste à
+- **Validation** : galerie 76 clips sur 22 fonds, `--no-face --no-evidence
+  --workers 4`, 177,2 s de mur. Rappel 60/60 (IC 95 % de Wilson 94,0–100 %),
+  faux positifs 0/16 (IC 95 % 0–19,4 %), 8/8 masquages effectifs. Le lot 35 exports reste à
   30/32 `pass` et 2 exports `review` (270).
-- **Limites** : fond unique, texte `drawtext` net et overlay synthétique ; ce
-  résultat ne remplace pas une galerie de logos réels. Le rappel réel et les
+- **Limites** : texte `drawtext` net et overlay synthétique, même si les 22
+  fonds sont réels ; ce résultat ne remplace pas une galerie de logos réels. Le rappel réel et les
   courbes P/R restent à produire.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `/media/kidpixel/WORK/qa-poc/reports/POC-RESULTS.md`,

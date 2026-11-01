@@ -14,18 +14,19 @@ Validation OCR : 1 124 échantillons, 12 détections isolées, 0 finding sur
 35 GOOD, 12/12 sous-titres synthétiques. Validation logos : masque alpha des
 overlays `.ecproj`, 30/32 exports évalués `pass`, 2 exports `review` (270,
 branding source, 4 findings), 259/386 détections masquées ; galerie
-synthétique 60/60 positifs (IC 95 % 94,0–100 %) et 0/16 faux positifs.
-Validation visage : 745
-échantillons avec visage, 0 finding, 2/2 recadrages synthétiques. Les
-sous-titres et les logos partagent le thread OCR ; QA complet 298 en 32,1 s. Le mode lot `--folder`
-répartit les exports sur 4 workers (Stage 0 : 4,01 s/export) et réutilise les
+synthétique 60/60 sur 22 fonds (IC 95 % 94,0–100 %) et 0/16 faux positifs ;
+assets réels 22/26 (84,6 %, IC 66,5–93,9 %), 0/10 faux positifs, 6/6 masqués.
+Validation visage : 745 échantillons avec visage, 0 finding, 2/2 recadrages
+synthétiques. Les sous-titres et les logos partagent le thread OCR ; QA
+complet 298 en 32,1 s. Le mode lot `--folder` répartit les exports sur
+4 workers (Stage 0 : 4,01 s/export) et réutilise les
 `qa.json` dont l'empreinte correspond. `auto_approve_eligible = false`. Le
 post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
 
-- [2026-11-01] **Stage 1 logos, masque overlays et galerie (D-041, D-042)** :
+- [2026-11-01/02] **Stage 1 logos, masque overlays et galeries (D-041 à D-043)** :
   - `qa/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
     transformations statiques, résolution `docs/`, canonicalisation des
     liens symboliques ;
@@ -38,12 +39,16 @@ D-034, D-035).
     positifs connus ; logo confirmé dans les rushes ;
   - synthétiques : logo persistant détecté, contrôle masqué propre, texte
     transitoire non flagué ;
-  - galerie 76 clips : 60/60 positifs (24–96 px, IC 95 % 94,0–100 %),
-    0/16 faux positifs (8 masqués, 4 transitoires, 4 négatifs), 163,7 s ;
+  - galerie texte 76 clips sur 22 fonds : 60/60 positifs (24–96 px, IC 95 %
+    94,0–100 %), 0/16 faux positifs (8 masqués, 4 transitoires, 4 négatifs),
+    177,2 s ;
+  - galerie assets réels 36 clips (13 PNG, 22 fonds) : 22/26 positifs
+    (84,6 %, IC 66,5–93,9 %), 0/10 faux positifs, 6/6 masqués ; échecs
+    M6+/Gulli/Les 100, DINOv2 nécessaire pour G3 ;
   - labels dev régénérés depuis `reports/rust-logo` (plus de baseline) ;
   - QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s) ;
   - 76 tests `qa`, suite 417 tests, `fmt` et `clippy -D warnings` verts ;
-  - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS, D-041/D-042.
+  - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS, D-041 à D-043.
 
 - [2026-11-01] **Stage 1 OCR, lot, preuves et cache (D-038 à D-040)** :
   - `qa/ocr.rs` : détection DB et reconnaissance CTC sur la bande basse

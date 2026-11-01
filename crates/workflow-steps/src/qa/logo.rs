@@ -117,6 +117,13 @@ pub(crate) fn run_logo(
                 continue;
             };
             detections_total += 1;
+            tracing::debug!(
+                time,
+                text = %detection.text,
+                score = detection.score,
+                bbox = ?detection.bbox,
+                "détection logo bande haute"
+            );
             let bbox = [
                 detection.bbox[0] as f64,
                 detection.bbox[1] as f64,

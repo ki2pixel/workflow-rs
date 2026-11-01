@@ -157,7 +157,7 @@ workflow-cli qa run \
 `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont
 `not_applicable`. `--no-ocr` et `--no-face` désactivent explicitement un
 contrôle. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
-frames WebP. `--docs` est accepté pour le contrat futur mais non utilisé en
+frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration
 `steps.step8.post`. `--intra-threads` borne les threads intra-op ONNX par
 session.
@@ -176,6 +176,14 @@ défaut pour ne pas sursouscrire les cœurs (deux sessions ONNX par worker).
 Un export en erreur n'interrompt pas le lot : il est marqué `error` dans le
 résumé, et le CLI sort en code 1 si le lot contient un `fail` ou une erreur.
 
+Par défaut, `<out>/<slug>/qa.json` est réutilisé si son `cache_key` correspond
+toujours à l'export, au projet, aux modèles et aux options qui changent le
+résultat (`per_segment`, OCR, visage, preuves, seuils Stage 0). Le hit est
+quasi instantané (0,23 s pour 2 exports mesurés) et marqué `cached: true` dans
+le résumé ; `--no-cache` force le recalcul. Un contenu modifié, un modèle
+différent ou une option changée invalide l'empreinte. Le cache vit sous
+`--out` : aucun état global, aucun TTL.
+
 ```sh
 workflow-cli qa run \
   --folder "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple/187 Camille_GOOD" \
@@ -188,8 +196,8 @@ workflow-cli qa run \
 `summary.json` contient `schema`, `generated_at`, `folder`, `workers`,
 `intra_threads`, `videos`, `counts` (`pass`, `info`, `review`, `fail`,
 `not_applicable`, `error`), `findings_total` et `items` (identifiants,
-chemins, statut, nombre de findings, latence, `export_sha256`, `qa_path` ou
-`error`).
+chemins, statut, nombre de findings, latence, `cached`, `export_sha256`,
+`qa_path` ou `error`).
 
 ## Schéma `qa.json`
 
@@ -201,7 +209,9 @@ Champs principaux : `schema_version`, `generated_at`, `video_id`,
 `overall_status`, `auto_approve_eligible`, `auto_approve_reason`,
 `models_provenance`, `execution_metrics.timings_ms`.
 
-`export_sha256` est le SHA-256 du MP4 contrôlé. Chaque finding peut porter
+`export_sha256` est le SHA-256 du MP4 contrôlé. `cache_key` est l'empreinte
+des entrées qui ont produit le rapport ; vide dans les rapports antérieurs au
+cache. Chaque finding peut porter
 `evidence_frame`, chemin relatif au répertoire `--out` (par exemple
 `evidence/001_face_cut_7.50.webp`). `timings_ms.evidence_ms` mesure
 l'extraction des preuves ; un échec ffmpeg laisse le finding sans preuve et
@@ -258,10 +268,10 @@ seront portés.
 - Temps OCR médian 21,7 s et max 43,5 s par export ; QA complet médian
   35,4 s et max 63,6 s. La cible de 60 s est tenue en médiane et dépassée de
   3,6 s sur le pire export (`300_UJUD - KATIA`, 41,6 s d'OCR).
-- 62 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
+- 66 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
   template, agrégation, écriture atomique, letterbox, décodage YuNet, NMS,
-  padding, décodage CTC, composantes, filtres OCR, slugs, scan de lot et
-  sélection de l'instant de preuve).
+  padding, décodage CTC, composantes, filtres OCR, slugs, scan de lot,
+  sélection de l'instant de preuve et empreinte de cache).
 
 ### Stage 1 visage
 
@@ -295,10 +305,11 @@ seront portés.
   fournis via `--models`.
 - Preuves limitées à une frame par finding ; pas de vignette de contexte ni
   de galerie.
-- Pas de cache ni de serveur ; le mode lot relance tous les exports.
+- Cache local par empreinte, sans TTL ni purge automatique ; un rapport
+  périmé est simplement recalculé. Pas de serveur.
 - Chaque échantillon est extrait par un processus ffmpeg ; les deux contrôles
-  Stage 1 tournent en parallèle dans chaque worker. Le cache par hash reste à
-  porter pour éviter de recalculer un export inchangé.
+  Stage 1 tournent en parallèle dans chaque worker. Le cache évite de
+  recalculer un export inchangé, mais un premier passage reste complet.
 - Un lot ne supprime pas les `qa.json` des exports absents du dossier ; le
   `summary.json` fait foi pour le lot courant.
 - Pas de `--docs` exploité : le contrôle A6 se fait par `sdm.png` dans le
@@ -308,7 +319,6 @@ seront portés.
 
 1. Construire le masque des overlays projet et la galerie labellisée avant
    DINOv2 pour les logos.
-2. Ajouter le cache par hash (export, modèles, options) pour ne recalculer
-   que les exports modifiés.
-3. Réserver le VLM local aux frames ambiguës (phase 4).
-4. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
+2. Réserver le VLM local aux frames ambiguës (phase 4).
+3. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
+4. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.

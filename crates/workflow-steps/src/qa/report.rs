@@ -49,6 +49,7 @@ mod tests {
             split: Some("dev".into()),
             video: "/tmp/test_9x16.mp4".into(),
             export_sha256: "0".repeat(64),
+            cache_key: "0".repeat(64),
             project: None,
             specs: QaSpecs {
                 width: 1080,

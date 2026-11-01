@@ -749,6 +749,9 @@ enum QaCommand {
         /// Limite le nombre d'exports traités en mode `--folder`.
         #[arg(long, requires = "folder")]
         limit: Option<usize>,
+        /// Désactive la réutilisation des `qa.json` en mode `--folder`.
+        #[arg(long, requires = "folder")]
+        no_cache: bool,
     },
 }
 
@@ -1609,6 +1612,7 @@ fn run() -> Result<()> {
                 split,
                 workers,
                 limit,
+                no_cache,
             } => {
                 if !matches!(per_segment, 1 | 3) {
                     anyhow::bail!("--per-segment doit valoir 1 ou 3");
@@ -1630,7 +1634,7 @@ fn run() -> Result<()> {
                     split,
                 };
                 if let Some(folder) = folder {
-                    let outcome = run_folder(&folder, &options, workers, limit)
+                    let outcome = run_folder(&folder, &options, workers, limit, !no_cache)
                         .context("exécution du QA par lot")?;
                     let payload = json!({
                         "summary_path": outcome.summary_path.to_string_lossy(),

@@ -321,6 +321,10 @@ pub struct QaReport {
     /// SHA-256 de l'export contrôlé, pour le cache et la traçabilité.
     #[serde(default)]
     pub export_sha256: String,
+    /// Empreinte des entrées (export, projet, modèles, options) qui ont
+    /// produit ce rapport. Vide dans les rapports antérieurs au cache.
+    #[serde(default)]
+    pub cache_key: String,
     pub project: Option<String>,
     pub specs: QaSpecs,
     pub project_meta: Option<QaProjectMeta>,
@@ -392,6 +396,7 @@ mod tests {
             split: None,
             video: "/tmp/test.mp4".into(),
             export_sha256: "0".repeat(64),
+            cache_key: "0".repeat(64),
             project: None,
             specs: QaSpecs {
                 width: 1080,

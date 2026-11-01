@@ -513,7 +513,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   synthétiques détectés, contrôle `187_control` propre. QA complet médian
   35,4 s, max 63,6 s (OCR médian 21,7 s, max 43,5 s). Mode lot `--folder` :
   Stage 0 sur 35 exports à 4 workers en 4,0 s/export, QA complet ×2,19 sur
-  5 exports. 62 tests `qa`, suite 403 tests, `fmt` et `clippy -D warnings`
+  5 exports. 66 tests `qa`, suite 407 tests, `fmt` et `clippy -D warnings`
   verts.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/ocr.rs`.
@@ -541,6 +541,30 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   4 workers : 4,01 s/export, max 25,6 s.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/evidence.rs`.
+
+## 2026-11-01 — D-040 : cache local du QA par empreinte d'entrées
+
+- **Contexte** : un lot de 35 exports coûte ~20 min en QA complet. La plupart
+  des exports ne changent pas entre deux passages, mais le mode lot les
+  recalculait tous. Le hash de l'export existe déjà depuis D-039.
+- **Décision** :
+  1. `cache_key` est le SHA-256 d'une chaîne canonique : version de schéma,
+     hash de l'export, hash du projet, hashes des modèles det/rec/face,
+     `per_segment`, activation OCR/visage/preuves, préfixe de template et
+     seuils Stage 0.
+  2. En mode `--folder`, un `<out>/<slug>/qa.json` existant est réutilisé si
+     son `cache_key` est identique ; l'item du résumé porte `cached: true` et
+     `total_ms: 0`. Un rapport sans `cache_key` est recalculé.
+  3. Le cache vit sous `--out`, sans état global ni TTL ; `--no-cache` force
+     le recalcul. Le mode mono-export ne consulte pas le cache.
+  4. Un échec de lecture ou d'empreinte retombe sur un recalcul, jamais sur
+     une erreur de lot.
+- **Validation** : 2 exports `--no-ocr --no-face` en 20,3 s et 21,6 s au
+  premier passage, 0,23 s au second (2 hits) ; `--no-evidence` invalide
+  l'empreinte et recalcule. 66 tests `qa`, suite 407 tests, `fmt` et
+  `clippy -D warnings` verts.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/cache.rs`.
 
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 

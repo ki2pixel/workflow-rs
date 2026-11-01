@@ -14,14 +14,15 @@ finding, une frame de preuve WebP. Validation Stage 0 sur les 35 exports :
 synthétiques. Validation visage : 745 échantillons avec visage, 0 finding,
 2/2 recadrages synthétiques. Les deux contrôles tournent en parallèle ; QA
 complet médian 35,4 s, max 63,6 s. Le mode lot `--folder` répartit les
-exports sur 4 workers (Stage 0 : 4,01 s/export). Les logos restent
+exports sur 4 workers (Stage 0 : 4,01 s/export) et réutilise les `qa.json`
+dont l'empreinte correspond. Les logos restent
 `not_applicable` ;
 `auto_approve_eligible = false`. Le post-traitement A5/A6 et les bypass
 SDM/LPHDF restent en production (D-032, D-034, D-035).
 
 ## Dernière session
 
-- [2026-11-01] **Stage 1 OCR, lot et preuves (D-038, D-039)** :
+- [2026-11-01] **Stage 1 OCR, lot, preuves et cache (D-038 à D-040)** :
   - `qa/ocr.rs` : détection DB et reconnaissance CTC sur la bande basse
     75–98,5 %, CPU via `ort`, liste de caractères lue dans les métadonnées ;
   - détection côté court 480 px, boîtes axis-aligned, unclip 1,6, filtres
@@ -37,9 +38,11 @@ SDM/LPHDF restent en production (D-032, D-034, D-035).
     bornés ; Stage 0 35 exports en 4 workers = 4,01 s/export ;
   - `export_sha256`, `--no-evidence` et une frame WebP par finding
     (`<out>/evidence/`) ; échec ffmpeg non bloquant ;
-  - 62 tests `qa`, suite 403 tests, `fmt` et `clippy -D warnings` verts ;
-  - docs : `LOT-10-QA.md`, note d'architecture, README, POC-RESULTS, D-038
-    et D-039.
+  - cache local `cache_key` : 2 exports en 0,23 s sur hit, `--no-cache` pour
+    forcer le recalcul ;
+  - 66 tests `qa`, suite 407 tests, `fmt` et `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, README, POC-RESULTS, D-038,
+    D-039 et D-040.
 
 - [2026-10-30] **Stage 1 visage YuNet (D-037)** :
   - `qa/face.rs` : YuNet ONNX CPU, letterbox 640×640, frame originale +

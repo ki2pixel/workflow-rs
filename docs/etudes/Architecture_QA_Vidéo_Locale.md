@@ -234,6 +234,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 | --- | --- | --- | --- |
 | Stage 0 | 35 GOOD, seuils noir 3 s / gel 5 s | 35 `pass`, 0 finding, 4,0 s/vidéo en batch, max 25,6 s | **G1 franchie** |
 | Stage 0 Rust lot | 35 exports, `--folder --workers 4` | 4,01 s/export (hash inclus), max 25,6 s, 35 `pass` | **G1 franchie** |
+| Cache Rust | 2 exports, même dossier | 0,23 s sur hit, invalidation par contenu/modèles/options | **gain de débit** |
 | OCR sous-titres | 1 124 échantillons, bande basse 75–98 % | 0 finding sur 35 GOOD, 16 textes de scène filtrés | **G2 partielle** |
 | OCR Rust | 1 124 échantillons, PP-OCRv6 det/rec ONNX CPU | 0 finding sur 35 GOOD, 12 détections isolées, 12/12 synthétiques | **G2 partielle** |
 | OCR synthétique | 12 positifs + 1 contrôle | 12/12 détectés, 0/1 faux positif | à étendre |
@@ -250,7 +251,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 - Les exports GOOD sont propres par construction. 298 conserve les logos « 100 »/« 13+ », 179 conserve « M6+ MAX » et l'habillage « LES APPRENTIS AVENTURIERS », 295 conserve le sticker SDM. Ces éléments sont des habillages éditoriaux, pas nécessairement des défauts : les positifs `real_pre` doivent être rendus depuis le projet brut, pas pris dans le GOOD.
 - Un OCR de la bande haute ne suffit pas pour les logos : il confond logo de chaîne et habillage d'émission. DINOv2 seul aurait le même angle mort. La détection de logos exige un masque des overlays intentionnels dérivé du `.ecproj`/`_ae.json`, une galerie labellisée et une comparaison raw vs GOOD.
 - Le critère visage sur les landmarks est indispensable : un gros plan de profil coupe la nuque et le menton sans couper les yeux ou la bouche (187 ECOLE). Un critère sur la bbox seule aurait produit des faux positifs.
-- La latence Python est dominée par l'OCR et YuNet. Le portage Rust exécute les deux contrôles Stage 1 en parallèle et répartit les exports d'un dossier sur plusieurs workers ; le coût restant vient de l'extraction ffmpeg par échantillon et de la détection DB. Le cache par hash reste à porter. La cible < 5 s/vidéo de G1 concerne le Stage 0 ; le QA complet reste dominé par l'OCR (~23 s/vidéo).
+- La latence Python est dominée par l'OCR et YuNet. Le portage Rust exécute les deux contrôles Stage 1 en parallèle et répartit les exports d'un dossier sur plusieurs workers ; le coût restant vient de l'extraction ffmpeg par échantillon et de la détection DB ; le cache par empreinte évite de recalculer un export inchangé. La cible < 5 s/vidéo de G1 concerne le Stage 0 ; le QA complet reste dominé par l'OCR (~22 s/vidéo).
 
 **Décision PoC** : Stage 0 + OCR sous-titres + visage coupé passent en phase de validation ; logos différés après construction du masque projet ; VLM hors v1 ; `auto_approve_eligible = false` tant que les logos et la validation humaine ne sont pas en place.
 
@@ -527,10 +528,11 @@ Stage 2 — agrégation
 | `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
 | `qa/aggregate.rs` | Hystérésis, calibration, sévérité | règles |
 | `qa/evidence.rs` | Frames WebP par finding | `ffmpeg` |
+| `qa/cache.rs` | Empreinte export/projet/modèles/options | sha2 |
 | `qa/report.rs` | `qa.json` (hash et chemins de preuves) | serde |
 | `qa/mod.rs` | API publique, options | — |
 
-État au 2026-11-01 : `model.rs`, `stage0.rs`, `ocr.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `ocr` et `face` le Stage 1 ; les deux contrôles partagent l'échantillonnage et tournent en parallèle. `batch` scanne un dossier, répartit les exports sur plusieurs workers et écrit `summary.json`. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP. `logo.rs` reste à porter ; le `qa.json` v1 le marque `not_applicable`.
+État au 2026-11-01 : `model.rs`, `stage0.rs`, `ocr.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `ocr` et `face` le Stage 1 ; les deux contrôles partagent l'échantillonnage et tournent en parallèle. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP. `logo.rs` reste à porter ; le `qa.json` v1 le marque `not_applicable`.
 
 ### 8.4 Commande CLI
 
@@ -547,7 +549,7 @@ workflow-cli qa run \
   --split dev
 ```
 
-`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont `not_applicable`. `--no-ocr`, `--no-face` et `--no-evidence` désactivent un contrôle ou les preuves, et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
+`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont `not_applicable`. `--no-ocr`, `--no-face` et `--no-evidence` désactivent un contrôle ou les preuves, `--no-cache` force le recalcul d'un lot, et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
 
 `--folder` remplace `--video` pour traiter un dossier complet : chaque export écrit `<out>/<slug>/qa.json`, le lot écrit `<out>/summary.json`, et `--workers` (défaut 4) fixe le parallélisme. Le projet `projets/<stem>.ecproj` est associé automatiquement quand il existe.
 
@@ -614,7 +616,7 @@ La feuille de route est dimensionnée pour 1 à 2 ingénieurs et le corpus de 36
 | Phase & horizon | Travaux | Livrables | Porte |
 | --- | --- | --- | --- |
 | **0. Manifeste et labels** *(2–3 j)* | Inventaire des 36 exports principaux + 1 réserve, split 12/24, schéma `qa_label.json`, générateur synthétique — **fait** : manifeste, split, schéma, 37 gabarits ; labels dev à pré-remplir puis relire | `qa_manifest.json`, `split.json`, labels dev | **G0** : corpus, split et labels prêts |
-| **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder` | **G1** : 0 FP sur 35 GOOD ; < 5 s/vidéo en batch de 4 (PoC), 12,3 s en Rust séquentiel — mode lot `--folder` intégré |
+| **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder`, cache | **G1** : 0 FP sur 35 GOOD ; 4,01 s/export en lot de 4, 12,3 s en séquentiel — mode lot et cache intégrés |
 | **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques, hash et preuves WebP — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
 | **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, galerie DINOv2, persistance, synthèse appariée — **PoC** : baseline OCR 15/35 flags dont 13 habillages légitimes, non viable sans masque | Galerie + courbes P/R | **G3** : logo ≥ 90 % galerie, FP ≤ 10 % |
 | **4. VLM optionnel** *(3–5 j)* | SmolVLM2/Qwen2.5-VL sur 5–10 frames ambiguës | Rapport latence/VRAM/rappel | **G4** : +5 pts, < 5 min, sinon abandon |

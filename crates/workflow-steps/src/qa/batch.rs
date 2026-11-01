@@ -10,7 +10,7 @@
 //! threads intra-op ONNX est réduit par worker pour éviter la sursouscription.
 
 use crate::post::model::now_iso;
-use crate::qa::{run_qa, QaOptions};
+use crate::qa::{cache, report, run_qa, QaOptions};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
@@ -44,6 +44,8 @@ pub struct BatchItem {
     pub status: String,
     pub findings: usize,
     pub total_ms: u64,
+    /// Rapport réutilisé sans réexécution (mêmes entrées).
+    pub cached: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub export_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,6 +91,7 @@ pub fn run_folder(
     base: &QaOptions,
     workers: usize,
     limit: Option<usize>,
+    cache_enabled: bool,
 ) -> Result<BatchOutcome> {
     if !folder.is_dir() {
         anyhow::bail!("dossier introuvable: {}", folder.display());
@@ -122,6 +125,7 @@ pub fn run_folder(
         videos = exports.len(),
         workers,
         intra_threads,
+        cache = cache_enabled,
         "QA par lot démarré"
     );
 
@@ -136,7 +140,7 @@ pub fn run_folder(
                 let Some(export) = exports.get(index) else {
                     break;
                 };
-                let item = run_export(export, &base, index);
+                let item = run_export(export, &base, index, cache_enabled);
                 if let Ok(mut guard) = results.lock() {
                     guard.push((index, item));
                 }
@@ -197,7 +201,17 @@ pub fn run_folder(
     })
 }
 
-fn run_export(export: &BatchExport, base: &QaOptions, index: usize) -> BatchItem {
+fn run_export(
+    export: &BatchExport,
+    base: &QaOptions,
+    index: usize,
+    cache_enabled: bool,
+) -> BatchItem {
+    if cache_enabled {
+        if let Some(item) = cached_item(export, base, index) {
+            return item;
+        }
+    }
     let mut options = base.clone();
     options.out_dir = base.out_dir.join(&export.slug);
     options.video_id = Some(export.video_id.clone());
@@ -235,6 +249,7 @@ fn run_export(export: &BatchExport, base: &QaOptions, index: usize) -> BatchItem
                 status,
                 findings: report.findings.len(),
                 total_ms: elapsed,
+                cached: false,
                 export_sha256: Some(report.export_sha256),
                 qa_path: Some(outcome.qa_path.to_string_lossy().to_string()),
                 error: None,
@@ -260,12 +275,88 @@ fn run_export(export: &BatchExport, base: &QaOptions, index: usize) -> BatchItem
                 status: "error".into(),
                 findings: 0,
                 total_ms: elapsed,
+                cached: false,
                 export_sha256: None,
                 qa_path: None,
                 error: Some(message),
             }
         }
     }
+}
+
+/// Réutilise `<out>/<slug>/qa.json` si son empreinte correspond toujours aux
+/// entrées. Un rapport absent, illisible ou d'une version antérieure est
+/// simplement recalculé.
+fn cached_item(export: &BatchExport, base: &QaOptions, index: usize) -> Option<BatchItem> {
+    let qa_path = base.out_dir.join(&export.slug).join(report::QA_FILENAME);
+    if !qa_path.is_file() {
+        return None;
+    }
+    let report = match report::read_report(&qa_path) {
+        Ok(report) => report,
+        Err(error) => {
+            tracing::warn!(
+                index,
+                path = %qa_path.display(),
+                error = %error,
+                "rapport en cache illisible, recalcul"
+            );
+            return None;
+        }
+    };
+    if report.cache_key.is_empty() {
+        return None;
+    }
+    let key = match cache::fingerprint(&export.video, export.project.as_deref(), base) {
+        Ok(key) => key,
+        Err(error) => {
+            tracing::warn!(
+                index,
+                video_id = %export.video_id,
+                error = %error,
+                "empreinte de cache indisponible, recalcul"
+            );
+            return None;
+        }
+    };
+    if report.cache_key != key {
+        return None;
+    }
+    // Un rapport dont une preuve WebP a été supprimée doit être recalculé :
+    // les chemins `evidence_frame` seraient sinon dangling.
+    let output_dir = base.out_dir.join(&export.slug);
+    let evidence_present = report.findings.iter().all(|finding| {
+        finding
+            .evidence_frame
+            .as_ref()
+            .is_none_or(|relative| output_dir.join(relative).is_file())
+    });
+    if !evidence_present {
+        return None;
+    }
+    tracing::info!(
+        index,
+        video_id = %export.video_id,
+        status = report.overall_status.as_str(),
+        "QA export réutilisé depuis le cache"
+    );
+    Some(BatchItem {
+        video_id: export.video_id.clone(),
+        folder_id: export.folder_id.clone(),
+        slug: export.slug.clone(),
+        video: export.video.to_string_lossy().to_string(),
+        project: export
+            .project
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string()),
+        status: report.overall_status.as_str().to_string(),
+        findings: report.findings.len(),
+        total_ms: 0,
+        cached: true,
+        export_sha256: Some(report.export_sha256),
+        qa_path: Some(qa_path.to_string_lossy().to_string()),
+        error: None,
+    })
 }
 
 /// Liste les `.mp4` de la racine du dossier, triés par nom, et associe le

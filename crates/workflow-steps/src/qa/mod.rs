@@ -10,6 +10,7 @@
 
 pub mod aggregate;
 pub mod batch;
+pub mod cache;
 pub mod evidence;
 pub mod face;
 pub mod frame;
@@ -125,6 +126,8 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     .with_context(|| format!("Stage 0 sur {}", video.display()))?;
     let export_sha256 = crate::post::detect::sha256_file(video)
         .with_context(|| format!("hachage SHA-256 de {}", video.display()))?;
+    let cache_key = cache::fingerprint_from_export(&export_sha256, project, options)
+        .with_context(|| format!("empreinte de cache QA de {}", video.display()))?;
 
     let mut checks = stage0.checks;
     let mut findings = stage0.findings;
@@ -300,6 +303,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         split: options.split.clone(),
         video: video.to_string_lossy().into_owned(),
         export_sha256,
+        cache_key,
         project: project.map(|path| path.to_string_lossy().into_owned()),
         specs: stage0.specs,
         project_meta: stage0.project_meta,

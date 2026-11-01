@@ -67,6 +67,22 @@ impl DefectType {
     pub fn is_blocking(self) -> bool {
         matches!(self, Self::SpecMismatch | Self::TemplateLogoMissing)
     }
+
+    /// Nom stable utilisé dans les chemins de preuve et les résumés.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SpecMismatch => "spec_mismatch",
+            Self::BlackFrame => "black_frame",
+            Self::Freeze => "freeze",
+            Self::TemplateLogoMissing => "template_logo_missing",
+            Self::CutContinuity => "cut_continuity",
+            Self::SubtitleBurnedIn => "subtitle_burned_in",
+            Self::LogoResidual => "logo_residual",
+            Self::FaceCut => "face_cut",
+            Self::FramingReview => "framing_review",
+            Self::ReactionShotReview => "reaction_shot_review",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +133,9 @@ pub struct QaFinding {
     pub bbox_xywh: Option<[f64; 4]>,
     pub detected_by_stage: String,
     pub notes: String,
+    /// Frame de preuve relative au répertoire `--out`, si elle a été écrite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_frame: Option<String>,
 }
 
 impl QaFinding {
@@ -138,6 +157,7 @@ impl QaFinding {
             bbox_xywh: None,
             detected_by_stage: detected_by_stage.into(),
             notes: notes.into(),
+            evidence_frame: None,
         }
     }
 
@@ -278,6 +298,8 @@ pub struct Timings {
     pub stage1_ocr_ms: u64,
     #[serde(default)]
     pub stage1_face_ms: u64,
+    #[serde(default)]
+    pub evidence_ms: u64,
     pub total_ms: u64,
 }
 
@@ -296,6 +318,9 @@ pub struct QaReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub split: Option<String>,
     pub video: String,
+    /// SHA-256 de l'export contrôlé, pour le cache et la traçabilité.
+    #[serde(default)]
+    pub export_sha256: String,
     pub project: Option<String>,
     pub specs: QaSpecs,
     pub project_meta: Option<QaProjectMeta>,
@@ -366,6 +391,7 @@ mod tests {
             folder_id: None,
             split: None,
             video: "/tmp/test.mp4".into(),
+            export_sha256: "0".repeat(64),
             project: None,
             specs: QaSpecs {
                 width: 1080,

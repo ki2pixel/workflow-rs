@@ -10,6 +10,7 @@
 
 pub mod aggregate;
 pub mod batch;
+pub mod evidence;
 pub mod face;
 pub mod frame;
 pub mod inference;
@@ -53,6 +54,8 @@ pub struct QaOptions {
     pub ocr_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
+    /// Écrit une frame WebP par finding sous `<out>/evidence/`.
+    pub evidence_enabled: bool,
     /// 1 ou 3 échantillons par segment.
     pub per_segment: usize,
     pub video_id: Option<String>,
@@ -72,6 +75,7 @@ impl Default for QaOptions {
             intra_threads: None,
             ocr_enabled: true,
             face_enabled: true,
+            evidence_enabled: true,
             per_segment: 1,
             video_id: None,
             folder_id: None,
@@ -119,6 +123,8 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         },
     )
     .with_context(|| format!("Stage 0 sur {}", video.display()))?;
+    let export_sha256 = crate::post::detect::sha256_file(video)
+        .with_context(|| format!("hachage SHA-256 de {}", video.display()))?;
 
     let mut checks = stage0.checks;
     let mut findings = stage0.findings;
@@ -251,10 +257,31 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     }
     checks.extend(stage1_pending_checks());
 
+    let evidence_ms = if options.evidence_enabled && !findings.is_empty() {
+        let stats = evidence::write_evidence_frames(
+            video,
+            &mut findings,
+            &options.out_dir,
+            &options.ffmpeg,
+            stage0.specs.duration_s,
+        );
+        if stats.errors > 0 {
+            tracing::warn!(
+                frames = stats.frames,
+                errors = stats.errors,
+                "certaines preuves WebP sont absentes"
+            );
+        }
+        stats.timing_ms
+    } else {
+        0
+    };
+
     let overall_status = aggregate::overall_status(&checks, &findings);
     let mut timings = stage0.timings;
     timings.stage1_ocr_ms = ocr_ms;
     timings.stage1_face_ms = face_ms;
+    timings.evidence_ms = evidence_ms;
     timings.total_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
     let mut provenance = ModelsProvenance::stage0_only();
     provenance.ocr_det = ocr_model;
@@ -272,6 +299,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         folder_id: options.folder_id.clone(),
         split: options.split.clone(),
         video: video.to_string_lossy().into_owned(),
+        export_sha256,
         project: project.map(|path| path.to_string_lossy().into_owned()),
         specs: stage0.specs,
         project_meta: stage0.project_meta,

@@ -45,6 +45,8 @@ pub struct BatchItem {
     pub findings: usize,
     pub total_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub export_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub qa_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -233,6 +235,7 @@ fn run_export(export: &BatchExport, base: &QaOptions, index: usize) -> BatchItem
                 status,
                 findings: report.findings.len(),
                 total_ms: elapsed,
+                export_sha256: Some(report.export_sha256),
                 qa_path: Some(outcome.qa_path.to_string_lossy().to_string()),
                 error: None,
             }
@@ -257,6 +260,7 @@ fn run_export(export: &BatchExport, base: &QaOptions, index: usize) -> BatchItem
                 status: "error".into(),
                 findings: 0,
                 total_ms: elapsed,
+                export_sha256: None,
                 qa_path: None,
                 error: Some(message),
             }

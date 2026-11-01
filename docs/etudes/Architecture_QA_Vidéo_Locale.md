@@ -233,7 +233,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 | Étage | Mesure | Résultat | Porte |
 | --- | --- | --- | --- |
 | Stage 0 | 35 GOOD, seuils noir 3 s / gel 5 s | 35 `pass`, 0 finding, 4,0 s/vidéo en batch, max 25,6 s | **G1 franchie** |
-| Stage 0 Rust lot | 35 exports, `--folder --workers 4` | 3,99 s/export, max 25,3 s, 35 `pass` | **G1 franchie** |
+| Stage 0 Rust lot | 35 exports, `--folder --workers 4` | 4,01 s/export (hash inclus), max 25,6 s, 35 `pass` | **G1 franchie** |
 | OCR sous-titres | 1 124 échantillons, bande basse 75–98 % | 0 finding sur 35 GOOD, 16 textes de scène filtrés | **G2 partielle** |
 | OCR Rust | 1 124 échantillons, PP-OCRv6 det/rec ONNX CPU | 0 finding sur 35 GOOD, 12 détections isolées, 12/12 synthétiques | **G2 partielle** |
 | OCR synthétique | 12 positifs + 1 contrôle | 12/12 détectés, 0/1 faux positif | à étendre |
@@ -303,6 +303,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
   "folder_id": "300",
   "split": "dev",
   "video": "/media/.../UJUD - JOSEPH_9x16.mp4",
+  "export_sha256": "575a5b706756e0e5…",
   "project": "/media/.../projets/UJUD - JOSEPH_9x16.ecproj",
   "specs": {
     "width": 1080,
@@ -411,13 +412,14 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
       "project_ms": 10,
       "stage1_ocr_ms": 27954,
       "stage1_face_ms": 23095,
+      "evidence_ms": 0,
       "total_ms": 42662
     }
   }
 }
 ```
 
-L'exemple ci-dessus décrit le contrat v1 réellement émis pour Stage 0 + OCR + visage. Les champs prévus pour les logos et le VLM (preuves WebP, `vlm_verification`, galerie DINOv2) seront ajoutés lors de leur portage ; ils ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
+L'exemple ci-dessus décrit le contrat v1 réellement émis pour Stage 0 + OCR + visage. `export_sha256` identifie l'export contrôlé ; chaque finding peut porter `evidence_frame`, un chemin relatif à `--out` vers une frame WebP (par exemple `evidence/001_face_cut_7.50.webp`). Les champs prévus pour les logos et le VLM (`vlm_verification`, galerie DINOv2) seront ajoutés lors de leur portage ; ils ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
 
 ## **7. Modèle de coût total et comparaison build/buy**
 
@@ -524,10 +526,11 @@ Stage 2 — agrégation
 | `qa/logo.rs` | Galerie DINOv2, persistance des coins, masque projet — **phase 3** | `ort`, DINOv2 |
 | `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
 | `qa/aggregate.rs` | Hystérésis, calibration, sévérité | règles |
-| `qa/report.rs` | `qa.json`, preuves WebP, hash | serde, image |
+| `qa/evidence.rs` | Frames WebP par finding | `ffmpeg` |
+| `qa/report.rs` | `qa.json` (hash et chemins de preuves) | serde |
 | `qa/mod.rs` | API publique, options | — |
 
-État au 2026-10-31 : `model.rs`, `stage0.rs`, `ocr.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `ocr` et `face` le Stage 1 ; les deux contrôles partagent l'échantillonnage et tournent en parallèle. `batch` scanne un dossier, répartit les exports sur plusieurs workers et écrit `summary.json`. `report` n'écrit que `qa.json`, sans preuve WebP ni hash d'export. `logo.rs` reste à porter ; le `qa.json` v1 le marque `not_applicable`.
+État au 2026-11-01 : `model.rs`, `stage0.rs`, `ocr.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `ocr` et `face` le Stage 1 ; les deux contrôles partagent l'échantillonnage et tournent en parallèle. `batch` scanne un dossier, répartit les exports sur plusieurs workers et écrit `summary.json`. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP. `logo.rs` reste à porter ; le `qa.json` v1 le marque `not_applicable`.
 
 ### 8.4 Commande CLI
 
@@ -544,7 +547,7 @@ workflow-cli qa run \
   --split dev
 ```
 
-`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont `not_applicable`. `--no-ocr` et `--no-face` désactivent un contrôle et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
+`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont `not_applicable`. `--no-ocr`, `--no-face` et `--no-evidence` désactivent un contrôle ou les preuves, et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
 
 `--folder` remplace `--video` pour traiter un dossier complet : chaque export écrit `<out>/<slug>/qa.json`, le lot écrit `<out>/summary.json`, et `--workers` (défaut 4) fixe le parallélisme. Le projet `projets/<stem>.ecproj` est associé automatiquement quand il existe.
 
@@ -612,7 +615,7 @@ La feuille de route est dimensionnée pour 1 à 2 ingénieurs et le corpus de 36
 | --- | --- | --- | --- |
 | **0. Manifeste et labels** *(2–3 j)* | Inventaire des 36 exports principaux + 1 réserve, split 12/24, schéma `qa_label.json`, générateur synthétique — **fait** : manifeste, split, schéma, 37 gabarits ; labels dev à pré-remplir puis relire | `qa_manifest.json`, `split.json`, labels dev | **G0** : corpus, split et labels prêts |
 | **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder` | **G1** : 0 FP sur 35 GOOD ; < 5 s/vidéo en batch de 4 (PoC), 12,3 s en Rust séquentiel — mode lot `--folder` intégré |
-| **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
+| **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques, hash et preuves WebP — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
 | **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, galerie DINOv2, persistance, synthèse appariée — **PoC** : baseline OCR 15/35 flags dont 13 habillages légitimes, non viable sans masque | Galerie + courbes P/R | **G3** : logo ≥ 90 % galerie, FP ≤ 10 % |
 | **4. VLM optionnel** *(3–5 j)* | SmolVLM2/Qwen2.5-VL sur 5–10 frames ambiguës | Rapport latence/VRAM/rappel | **G4** : +5 pts, < 5 min, sinon abandon |
 | **5. Intégration** *(3–5 j)* | Module `qa/`, CLI, tests, docs | `LOT-10-QA.md`, `qa.json` figé | **G5** : fmt, clippy, tests, zéro régression |

@@ -55,8 +55,10 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
    (`spec_mismatch`, `template_logo_missing`) bloque ; tout autre finding ou
    check `review` demande une revue ; `info` et `not_applicable` ne dégradent
    pas le statut.
-5. **Rapport** : `qa.json` avec specs, méta projet, checks, findings, preuves
-   Stage 0, preuves OCR et visage, statut global et métriques.
+5. **Preuves** : hash SHA-256 de l'export, puis une frame WebP par finding
+   sous `<out>/evidence/`, à mi-intervalle ou 250 ms après le début.
+6. **Rapport** : `qa.json` avec specs, hash, méta projet, checks, findings,
+   preuves Stage 0, preuves OCR et visage, statut global et métriques.
 
 Les deux contrôles Stage 1 partagent le même échantillonnage et s'exécutent
 dans deux threads : l'OCR et le visage sont CPU-bound et indépendants. Le
@@ -154,10 +156,11 @@ workflow-cli qa run \
 `not_applicable` et l'échantillonnage retombe sur des fenêtres de 5 s.
 `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont
 `not_applicable`. `--no-ocr` et `--no-face` désactivent explicitement un
-contrôle. `--per-segment` accepte 1 ou 3. `--docs` est accepté pour le
-contrat futur mais non utilisé en v1. `--ffmpeg` et `--ffprobe` surchargent
-la configuration `steps.step8.post`. `--intra-threads` borne les threads
-intra-op ONNX par session.
+contrôle. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
+frames WebP. `--docs` est accepté pour le contrat futur mais non utilisé en
+v1. `--ffmpeg` et `--ffprobe` surchargent la configuration
+`steps.step8.post`. `--intra-threads` borne les threads intra-op ONNX par
+session.
 
 Le binaire sort en code 1 si `overall_status = fail`, 0 sinon.
 
@@ -185,16 +188,24 @@ workflow-cli qa run \
 `summary.json` contient `schema`, `generated_at`, `folder`, `workers`,
 `intra_threads`, `videos`, `counts` (`pass`, `info`, `review`, `fail`,
 `not_applicable`, `error`), `findings_total` et `items` (identifiants,
-chemins, statut, nombre de findings, latence, `qa_path` ou `error`).
+chemins, statut, nombre de findings, latence, `export_sha256`, `qa_path` ou
+`error`).
 
 ## Schéma `qa.json`
 
 Champs principaux : `schema_version`, `generated_at`, `video_id`,
-`folder_id`, `split`, `video`, `project`, `specs`, `project_meta`,
+`folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
+`project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
 `stage1_ocr_evidence`, `stage1_face_evidence` (si le contrôle tourne),
 `overall_status`, `auto_approve_eligible`, `auto_approve_reason`,
 `models_provenance`, `execution_metrics.timings_ms`.
+
+`export_sha256` est le SHA-256 du MP4 contrôlé. Chaque finding peut porter
+`evidence_frame`, chemin relatif au répertoire `--out` (par exemple
+`evidence/001_face_cut_7.50.webp`). `timings_ms.evidence_ms` mesure
+l'extraction des preuves ; un échec ffmpeg laisse le finding sans preuve et
+n'invalide pas le rapport.
 
 `stage1_ocr_evidence` contient les deux modèles, le nombre d'échantillons,
 `samples_with_text`, `detections_total`, `findings_total`, `frame_errors`,
@@ -247,9 +258,10 @@ seront portés.
 - Temps OCR médian 21,7 s et max 43,5 s par export ; QA complet médian
   35,4 s et max 63,6 s. La cible de 60 s est tenue en médiane et dépassée de
   3,6 s sur le pire export (`300_UJUD - KATIA`, 41,6 s d'OCR).
-- 58 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
+- 62 tests unitaires `qa` (modèles, parsing noir/gel, specs, segments,
   template, agrégation, écriture atomique, letterbox, décodage YuNet, NMS,
-  padding, décodage CTC, composantes, filtres OCR, slugs et scan de lot).
+  padding, décodage CTC, composantes, filtres OCR, slugs, scan de lot et
+  sélection de l'instant de preuve).
 
 ### Stage 1 visage
 
@@ -262,8 +274,8 @@ seront portés.
 
 ### Mode lot
 
-- 35 exports, `--no-ocr --no-face --workers 4` : 139,8 s de mur, soit
-  **4,0 s/export**, max 25,3 s par export → cible G1 tenue.
+- 35 exports, `--no-ocr --no-face --workers 4` : 140,5 s de mur, soit
+  **4,01 s/export** (hash inclus), max 25,6 s par export → cible G1 tenue.
 - 5 exports complets : `--workers 1` 156,4 s (31,3 s/export) contre
   `--workers 5` 71,5 s (14,3 s/export), soit **×2,19**. Les latences
   individuelles du résumé sont gonflées par la contention ; c'est le débit
@@ -281,8 +293,8 @@ seront portés.
   1080×1920 du corpus. Un format très différent doit être revalidé.
 - Les modèles YuNet et PP-OCRv6 ne sont pas versionnés : ils doivent être
   fournis via `--models`.
-- Pas de frames de preuve WebP pour l'instant ; seules les métadonnées,
-  boîtes et intervalles sont écrits.
+- Preuves limitées à une frame par finding ; pas de vignette de contexte ni
+  de galerie.
 - Pas de cache ni de serveur ; le mode lot relance tous les exports.
 - Chaque échantillon est extrait par un processus ffmpeg ; les deux contrôles
   Stage 1 tournent en parallèle dans chaque worker. Le cache par hash reste à
@@ -296,8 +308,7 @@ seront portés.
 
 1. Construire le masque des overlays projet et la galerie labellisée avant
    DINOv2 pour les logos.
-2. Ajouter les preuves WebP, le hash de l'export et le cache par hash.
-3. Ajouter le cache par hash (export, modèles, options) pour ne recalculer
+2. Ajouter le cache par hash (export, modèles, options) pour ne recalculer
    que les exports modifiés.
-4. Réserver le VLM local aux frames ambiguës (phase 4).
-5. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
+3. Réserver le VLM local aux frames ambiguës (phase 4).
+4. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.

@@ -728,6 +728,9 @@ enum QaCommand {
         /// Désactive le contrôle visage YuNet.
         #[arg(long)]
         no_face: bool,
+        /// N'écrit pas les frames de preuve WebP.
+        #[arg(long)]
+        no_evidence: bool,
         /// Échantillons par segment : 1 (milieu) ou 3 (10/50/90 %).
         #[arg(long, default_value_t = 1)]
         per_segment: usize,
@@ -1599,6 +1602,7 @@ fn run() -> Result<()> {
                 intra_threads,
                 no_ocr,
                 no_face,
+                no_evidence,
                 per_segment,
                 video_id,
                 folder_id,
@@ -1619,6 +1623,7 @@ fn run() -> Result<()> {
                     intra_threads,
                     ocr_enabled: !no_ocr,
                     face_enabled: !no_face,
+                    evidence_enabled: !no_evidence,
                     per_segment,
                     video_id,
                     folder_id,

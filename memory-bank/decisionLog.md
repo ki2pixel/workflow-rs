@@ -513,10 +513,34 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   synthétiques détectés, contrôle `187_control` propre. QA complet médian
   35,4 s, max 63,6 s (OCR médian 21,7 s, max 43,5 s). Mode lot `--folder` :
   Stage 0 sur 35 exports à 4 workers en 4,0 s/export, QA complet ×2,19 sur
-  5 exports. 58 tests `qa`, suite 399 tests, `fmt` et `clippy -D warnings`
+  5 exports. 62 tests `qa`, suite 403 tests, `fmt` et `clippy -D warnings`
   verts.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/ocr.rs`.
+
+## 2026-11-01 — D-039 : hash d'export et preuves WebP dans `qa.json`
+
+- **Contexte** : le rapport QA doit être relu par un humain et, à terme,
+  servir de clé de cache. Sans hash, impossible de savoir quel MP4 a produit
+  un `qa.json` ; sans image, un finding de sous-titre ou de visage coupé
+  demande de rouvrir la vidéo.
+- **Décision** :
+  1. `export_sha256` est calculé sur le MP4 contrôlé et écrit après `video`.
+  2. Chaque finding porte `evidence_frame`, chemin relatif à `--out`, vers
+     une frame WebP extraite à mi-intervalle (ou 250 ms après le début).
+  3. L'extraction utilise `ffmpeg -c:v libwebp` : aucune dépendance d'image
+     Rust, fichiers d'environ 50 Ko, écriture temporaire puis `rename`.
+  4. Un échec ffmpeg laisse le finding sans preuve, compte l'erreur et
+     n'invalide pas le rapport ; `--no-evidence` désactive l'extraction.
+  5. `timings_ms.evidence_ms` mesure le coût ; le hash est inclus dans le
+     temps total.
+- **Validation** : `181_sub_center` produit
+  `evidence/000_subtitle_burned_in_7.50.webp` (51 Ko) et un hash identique à
+  `sha256sum` ; `face_still_left_cut` produit deux preuves, le contrôle
+  `face_still_center` n'en produit qu'une (gel). Stage 0 sur 35 exports à
+  4 workers : 4,01 s/export, max 25,6 s.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/evidence.rs`.
 
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 

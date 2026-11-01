@@ -316,18 +316,28 @@ labellisée.
 ### Stage 1 logos
 
 - 35 exports, `--no-face --no-evidence --workers 4` : 30 `pass`, 3
-  `not_applicable` (sans `.ecproj`) et 2 `review` sur 270.
+  `not_applicable` (sans `.ecproj`) et 2 exports en `review` (270, 4
+  findings).
 - 386 détections filtrées, 259 masquées par un overlay déclaré (67 %).
 - 32 exports évalués : **2 faux positifs connus** (270 « MASUPER »/« LIGUEZ »,
   habillage source non déclaré), soit 6,25 %, sous la cible G3 de 10 %.
-  Aucun finding sur 295 (SDM), 191/211/276/287 (LFAUIT), 223 (turbo), 227
-  (e=M6), 266 (EQC), 268 (Lorie), 286 (20H10), 298 (les 100/M6+).
+  Le logo est présent dès les rushes (`MSL1.mov`), donc il s'agit du branding
+  de l'émission et non d'un overlay oublié ; les 4 findings restent des
+  candidats `review`, sans suppression automatique. Aucun finding sur 295
+  (SDM), 191/211/276/287 (LFAUIT), 223 (turbo), 227 (e=M6), 266 (EQC), 268
+  (Lorie), 286 (20H10), 298 (les 100/M6+).
 - Synthétique : un logo « CHAIN LOGO » persistant 12/12 produit 1 finding
   `logo_residual` ; le même clip avec un overlay PNG déclaré au même endroit
   est entièrement masqué (12 détections, 0 finding) ; un texte présent sur
   moins de la moitié des échantillons ne produit aucun finding.
+- Galerie synthétique (40 clips de 6 s, base `187_control`) : 24/24 positifs
+  détectés (textes de 24 à 96 px, 4 styles, 8 positions), 0/16 faux positifs
+  (8 masqués, 4 transitoires, 4 négatifs), 8/8 masquages effectifs. La
+  génération et l'évaluation sont `scripts/gen_logo_gallery.py` et
+  `scripts/eval_logo_gallery.py` dans le PoC. Limite : fond unique et texte
+  net, ce n'est pas un rappel sur logos réels.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
-  rendus depuis les rushes. 270 reste un candidat à confirmer par un humain.
+  rendus depuis les rushes. 270 est confirmé comme branding source.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
   logos et 14,2 s de visage.
 - 417 tests workspace (385 `#[test]` + 32 `#[tokio::test]`).
@@ -354,8 +364,8 @@ labellisée.
 
 ## Limites v1
 
-- Logos : 2 faux positifs connus sur 270 (habillage source non déclaré) et
-  aucun positif réel labellisé. Le détecteur produit des candidats `review`,
+- Logos : 2 exports en `review` sur 270 (branding source non déclaré ou
+  oublié) et aucun positif réel labellisé. Le détecteur produit des candidats `review`,
   jamais une auto-approbation.
 - Le masque ne couvre que les PNG déclarés ; un habillage incrusté dans la
   source reste indistinguable d'un logo résiduel sans galerie labellisée.

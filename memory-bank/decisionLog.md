@@ -566,6 +566,38 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-01 — D-042 : galerie synthétique de logos et préremplissage Rust
+
+- **Contexte** : les 35 exports GOOD ne fournissent aucun positif réel
+  labellisé, donc le rappel G3 n'est pas mesurable sur le corpus. Les labels
+  dev pré-remplis depuis le baseline texte contenaient 13 faux positifs
+  d'habillage éditorial, que le masque `.ecproj` écarte désormais.
+- **Décision** :
+  1. `scripts/gen_logo_gallery.py` génère 40 clips de 6 s sur le fond
+     `187_control` : 24 positifs persistants (textes de 24 à 96 px, quatre
+     styles, huit positions), 8 cas masqués par un PNG déclaré, 4 textes
+     transitoires (2 s sur 6) et 4 négatifs sans texte. Chaque clip reçoit un
+     `.ecproj` minimal ; les cas masqués déclarent un PNG plein cadre dont la
+     zone alpha couvre le texte.
+  2. `scripts/eval_logo_gallery.py` compare les findings `logo_residual` aux
+     attendus et écrit `metrics.json`.
+  3. `scripts/prefill_labels.py` préfère `reports/rust-logo/<dossier>-<slug>`
+     au baseline texte ; sans rapport Rust exploitable, il n'injecte plus les
+     anciens candidats. Les 12 labels dev deviennent vides, cohérents avec
+     les 12 exports dev qui passent tous.
+  4. 270 reste un candidat `review` : le logo « MASUPER »/« LIGUEZ » est déjà
+     dans le rush `MSL1.mov`, donc c'est le branding de l'émission. Aucune
+     suppression automatique n'est ajoutée.
+- **Validation** : galerie 40 clips, `--no-face --no-evidence --workers 4`,
+  84,6 s de mur. Rappel 24/24, faux positifs 0/16, 8/8 masquages effectifs.
+  Le lot 35 exports reste à 30/32 `pass` et 2 exports `review` (270).
+- **Limites** : fond unique, texte `drawtext` net et overlay synthétique ; ce
+  résultat ne remplace pas une galerie de logos réels. Le rappel réel et les
+  courbes P/R restent à produire.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `/media/kidpixel/WORK/qa-poc/reports/POC-RESULTS.md`,
+  `scripts/gen_logo_gallery.py`, `scripts/eval_logo_gallery.py`.
+
 ## 2026-11-01 — D-041 : masque des overlays `.ecproj` et contrôle logos
 
 - **Contexte** : le baseline OCR de la bande haute produisait 15/35 flags sur
@@ -598,19 +630,20 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      `overlays_skipped`), `timings_ms.stage1_logo_ms`, et `cache_version=2`
      invalide les rapports antérieurs.
 - **Validation** : lot 35 exports à 4 workers, `--no-face --no-evidence` :
-  30 `pass`, 3 `not_applicable` (sans projet), 2 `review` sur 270 ; 386
-  détections, 259 masquées (67 %). Les 13 flags du baseline sur les exports
+  30 `pass`, 3 `not_applicable` (sans projet), 2 exports en `review`
+  (270, 4 findings) ; 386 détections, 259 masquées (67 %). Les 13 flags du baseline sur les exports
   avec projet sont tous couverts (191/211/276/287 LFAUIT, 223 turbo, 227 e=m6,
   266 EQC, 268 Lorie, 286 20H10, 298 les 100). Il reste 2 faux positifs
-  connus (270 « MASUPER »/« LIGUEZ », habillage source non déclaré), soit
+  connus (270 « MASUPER »/« LIGUEZ », branding présent dès les rushes), soit
   6,25 % des 32 exports évalués, sous la cible G3 de 10 %. Synthétique :
   « CHAIN LOGO » persistant 12/12 → 1 finding ; même clip avec overlay PNG
   déclaré → 12 détections masquées, 0 finding ; texte transitoire → 0 finding.
-  QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s). 75 tests
+  QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s). 76 tests
   `qa`, suite 417 tests, `fmt` et `clippy -D warnings` verts.
 - **Limites** : le rappel réel n'est pas mesurable sur les GOOD (pas de
-  positifs labellisés) ; 270 reste un candidat à confirmer ; le masque ne
-  couvre que les PNG déclarés, pas les habillages incrustés dans la source.
+  positifs labellisés) ; 270 est confirmé comme branding source (présent dans
+  `MSL1.mov`) mais reste un candidat `review` ; le masque ne couvre que les
+  PNG déclarés, pas les habillages incrustés dans la source.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/overlay.rs`,
   `crates/workflow-steps/src/qa/logo.rs`.

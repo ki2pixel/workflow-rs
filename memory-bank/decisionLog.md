@@ -455,6 +455,32 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/`, `crates/workflow-cli/src/main.rs`.
 
+## 2026-10-30 — D-037 : Stage 1 visage YuNet en ONNX Runtime CPU
+
+- **Contexte** : le PoC Python a validé YuNet + landmarks sur 1 124
+  échantillons et 2 recadrages synthétiques. Le Stage 0 Rust existe, mais le
+  contrôle visage restait `not_applicable`. `step4::face` dépend du TPU et du
+  pipeline TFLite ; le QA doit rester CPU et indépendant du verrou matériel.
+- **Décision** :
+  1. YuNet `face_detection_yunet_2023mar.onnx` (MIT, 0,23 Mo) via `ort`, CPU,
+     letterbox 640×640, BGR 0–255, deux passes : frame originale et version
+     étendue de 15 % avec bord répliqué.
+  2. Une détection padded qui recoupe une détection originale n'est conservée
+     que si elle révèle un landmark hors cadre ; sinon elle est dédupliquée.
+  3. Le critère reste la position des cinq landmarks (yeux, nez, bouche) à
+     moins de 3 % d'un bord gauche/droit, jamais la bbox seule. Taille minimale
+     8 %, score ≥ 0,60, NMS 0,30, trois échantillons consécutifs.
+  4. Les modèles sont externes (`--models`), le runtime est explicite
+     (`--onnxruntime`) ; sans modèle, `face_cut` est `not_applicable`.
+  5. `auto_approve_eligible` reste faux ; OCR et logos restent à porter.
+- **Validation** : 35 GOOD, 1 124 échantillons, 745 avec visage, 25 visages
+  coupés isolés, 0 épisode de 3 échantillons, 0 finding et 0 faux positif ;
+  `left_cut` et `right_cut` synthétiques détectés, `center` et
+  `profile_shift` non flagués. QA complet médian 28,3 s, max 50,3 s. 34 tests
+  `qa`, suite 375 tests, `fmt` et `clippy -D warnings` verts.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/face.rs`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

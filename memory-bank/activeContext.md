@@ -4,15 +4,29 @@
 
 **Contrôle QA read-only après export humain (scénario B).**
 Le module `crates/workflow-steps/src/qa/` et `workflow-cli qa run` sont intégrés
-pour le Stage 0 : specs, durée MP4/composition, timeline, template A6,
-noir/gel et agrégation. `qa.json` est distinct de l'`audit.json` A5/A6 et
-s'écrit uniquement sous `--out`. Validation sur les 35 exports : 35 `pass`,
-0 écart avec le PoC Python, médiane 12,3 s. OCR sous-titres, visage coupé et
-logos restent `not_applicable` ; `auto_approve_eligible = false`. Le
-post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
-D-034, D-035).
+pour le Stage 0 (specs, durée MP4/composition, timeline, template A6,
+noir/gel) et le Stage 1 visage YuNet ONNX CPU. `qa.json` est distinct de
+l'`audit.json` A5/A6 et s'écrit uniquement sous `--out`. Validation Stage 0
+sur les 35 exports : 35 `pass`, 0 écart avec le PoC Python, médiane 12,3 s.
+Validation visage : 1 124 échantillons, 0 finding sur 35 GOOD, 2/2 recadrages
+synthétiques détectés, 0/2 faux positifs ; QA complet médian 28,3 s, max
+50,3 s. OCR sous-titres et logos restent `not_applicable` ;
+`auto_approve_eligible = false`. Le post-traitement A5/A6 et les bypass
+SDM/LPHDF restent en production (D-032, D-034, D-035).
 
 ## Dernière session
+
+- [2026-10-30] **Stage 1 visage YuNet (D-037)** :
+  - `qa/face.rs` : YuNet ONNX CPU, letterbox 640×640, frame originale +
+    padding 15 %, fusion conditionnelle des détections padded ;
+  - critère landmarks à 3 % des bords, taille minimale 8 %, score 0,60,
+    NMS 0,30, agrégation sur 3 échantillons consécutifs ;
+  - `qa run --models --onnxruntime --per-segment`, `--no-face` pour désactiver ;
+  - 35 GOOD : 1 124 échantillons, 745 avec visage, 25 coupés isolés, 0 finding,
+    0 faux positif ; synthétiques 2/2 détectés, 0/2 faux positifs ;
+  - QA complet médian 28,3 s, max 50,3 s ; 34 tests `qa`, suite 375 tests,
+    `fmt` et `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, README et D-037.
 
 - [2026-10-30] **Contrôle QA read-only — Stage 0 Rust (D-036)** :
   - module `qa/` (`model`, `stage0`, `aggregate`, `report`) et commande

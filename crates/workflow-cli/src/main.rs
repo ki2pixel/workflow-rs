@@ -685,7 +685,7 @@ struct QaArgs {
 
 #[derive(Debug, Subcommand)]
 enum QaCommand {
-    /// Contrôle Stage 0 d'un export final et écrit `qa.json` sous `--out`.
+    /// Contrôle QA d'un export final et écrit `qa.json` sous `--out`.
     Run {
         /// Export final `.mp4` (obligatoire).
         #[arg(long)]
@@ -706,6 +706,18 @@ enum QaCommand {
         /// Exécutable ffprobe (défaut : configuration STEP8/post).
         #[arg(long)]
         ffprobe: Option<PathBuf>,
+        /// Répertoire des modèles QA (`face_detection_yunet_2023mar.onnx`).
+        #[arg(long)]
+        models: Option<PathBuf>,
+        /// Bibliothèque ONNX Runtime explicite.
+        #[arg(long)]
+        onnxruntime: Option<PathBuf>,
+        /// Désactive le contrôle visage YuNet.
+        #[arg(long)]
+        no_face: bool,
+        /// Échantillons par segment : 1 (milieu) ou 3 (10/50/90 %).
+        #[arg(long, default_value_t = 1)]
+        per_segment: usize,
         /// Identifiant vidéo (défaut : nom de fichier sans extension).
         #[arg(long)]
         video_id: Option<String>,
@@ -1562,15 +1574,26 @@ fn run() -> Result<()> {
                 out,
                 ffmpeg,
                 ffprobe,
+                models,
+                onnxruntime,
+                no_face,
+                per_segment,
                 video_id,
                 folder_id,
                 split,
             } => {
+                if !matches!(per_segment, 1 | 3) {
+                    anyhow::bail!("--per-segment doit valoir 1 ou 3");
+                }
                 let options = QaOptions {
                     ffmpeg: ffmpeg.unwrap_or_else(|| config.steps.step8.post.ffmpeg.clone()),
                     ffprobe: ffprobe.unwrap_or_else(|| config.steps.step8.post.ffprobe.clone()),
                     template_prefix: config.steps.step8.post.template_prefix.clone(),
                     out_dir: out,
+                    models_dir: models,
+                    onnxruntime,
+                    face_enabled: !no_face,
+                    per_segment,
                     video_id,
                     folder_id,
                     split,

@@ -43,6 +43,9 @@ pub struct Stage0Result {
     pub specs: QaSpecs,
     pub project_meta: Option<QaProjectMeta>,
     pub project_structure: Option<ProjectStructure>,
+    /// Segments lus dans le `.ecproj` ; vide sans projet ou si le projet est
+    /// illisible. Stage 1 s'en sert pour échantillonner les frames.
+    pub segments: Vec<ecproj::Segment>,
     pub checks: Vec<QaCheck>,
     pub findings: Vec<QaFinding>,
     pub evidence: Stage0Evidence,
@@ -79,6 +82,7 @@ pub fn run_stage0(
 
     let mut project_meta = None;
     let mut project_structure = None;
+    let mut segments = Vec::new();
     let project_started = Instant::now();
     if let Some(project) = project {
         let project_check = check_project(
@@ -92,6 +96,7 @@ pub fn run_stage0(
         findings.extend(project_check.findings);
         project_meta = project_check.meta;
         project_structure = project_check.structure;
+        segments = project_check.segments;
     } else {
         checks.push(QaCheck::not_applicable(
             "project_readable",
@@ -105,6 +110,7 @@ pub fn run_stage0(
         specs,
         project_meta,
         project_structure,
+        segments,
         checks,
         findings,
         evidence: Stage0Evidence {
@@ -449,6 +455,7 @@ struct ProjectCheck {
     findings: Vec<QaFinding>,
     meta: Option<QaProjectMeta>,
     structure: Option<ProjectStructure>,
+    segments: Vec<ecproj::Segment>,
 }
 
 fn check_project(
@@ -477,6 +484,7 @@ fn check_project(
                 )],
                 meta: None,
                 structure: None,
+                segments: Vec::new(),
             });
         }
     };
@@ -499,6 +507,7 @@ fn check_project(
                 )],
                 meta: None,
                 structure: None,
+                segments: Vec::new(),
             });
         }
     };
@@ -599,6 +608,7 @@ fn check_project(
         findings,
         meta: Some(project_meta),
         structure: Some(structure),
+        segments,
     })
 }
 

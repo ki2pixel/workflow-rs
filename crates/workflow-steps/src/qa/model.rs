@@ -214,6 +214,19 @@ pub struct Stage0Evidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stage1FaceEvidence {
+    pub model: String,
+    pub samples_total: usize,
+    pub samples_with_face: usize,
+    pub samples_with_cut: usize,
+    pub frame_errors: usize,
+    pub per_segment: usize,
+    pub score_threshold: f64,
+    pub nms_threshold: f64,
+    pub pad_ratio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub name: String,
     pub sha256: String,
@@ -244,6 +257,8 @@ pub struct Timings {
     pub ffprobe_ms: u64,
     pub black_freeze_ms: u64,
     pub project_ms: u64,
+    #[serde(default)]
+    pub stage1_face_ms: u64,
     pub total_ms: u64,
 }
 
@@ -269,6 +284,8 @@ pub struct QaReport {
     pub checks: Vec<QaCheck>,
     pub findings: Vec<QaFinding>,
     pub stage0_evidence: Stage0Evidence,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage1_face_evidence: Option<Stage1FaceEvidence>,
     pub overall_status: QaStatus,
     pub auto_approve_eligible: bool,
     pub auto_approve_reason: String,
@@ -348,6 +365,7 @@ mod tests {
                 freeze_intervals: Vec::new(),
                 thresholds: Stage0Thresholds::default(),
             },
+            stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,
             auto_approve_reason: "v1".into(),

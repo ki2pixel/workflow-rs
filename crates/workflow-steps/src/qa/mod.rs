@@ -5,16 +5,20 @@
 //! `qa.json` sous `--out`.
 //!
 //! État v1 : Stage 0 déterministe (specs, durée, timeline, template A6,
-//! noir/gel) et agrégation. L'OCR sous-titres et le visage coupé sont validés
-//! dans le PoC Python mais pas encore portés en Rust : ils apparaissent en
-//! `not_applicable` et `auto_approve_eligible` reste faux.
+//! noir/gel), Stage 1 visage (YuNet ONNX CPU) et agrégation. L'OCR sous-titres
+//! et les logos restent `not_applicable` ; `auto_approve_eligible` reste faux.
 
 pub mod aggregate;
+pub mod face;
 pub mod model;
 pub mod report;
 pub mod stage0;
 
-pub use model::{DefectType, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds};
+pub use face::{FaceOptions, SegmentSpan, FACE_MODEL_FILENAME};
+pub use model::{
+    DefectType, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,
+    Stage1FaceEvidence,
+};
 pub use report::{read_report, report_path, write_report};
 pub use stage0::{run_stage0, Stage0Options, Stage0Result};
 
@@ -31,6 +35,14 @@ pub struct QaOptions {
     pub template_prefix: String,
     /// Répertoire de sortie explicite : jamais le dossier du MP4 par défaut.
     pub out_dir: PathBuf,
+    /// Répertoire des modèles QA (YuNet, OCR).
+    pub models_dir: Option<PathBuf>,
+    /// Bibliothèque ONNX Runtime explicite.
+    pub onnxruntime: Option<PathBuf>,
+    /// Active le contrôle visage YuNet.
+    pub face_enabled: bool,
+    /// 1 ou 3 échantillons par segment.
+    pub per_segment: usize,
     pub video_id: Option<String>,
     pub folder_id: Option<String>,
     pub split: Option<String>,
@@ -43,6 +55,10 @@ impl Default for QaOptions {
             ffprobe: PathBuf::from("ffprobe"),
             template_prefix: crate::post::a6::DEFAULT_PREFIX.into(),
             out_dir: PathBuf::new(),
+            models_dir: None,
+            onnxruntime: None,
+            face_enabled: true,
+            per_segment: 1,
             video_id: None,
             folder_id: None,
             split: None,
@@ -61,11 +77,7 @@ pub fn stage1_pending_checks() -> Vec<QaCheck> {
     vec![
         QaCheck::not_applicable(
             "subtitle_ocr",
-            "Stage 1 non porté en Rust ; PoC Python validé (0 faux positif sur 35 GOOD)",
-        ),
-        QaCheck::not_applicable(
-            "face_cut",
-            "Stage 1 non porté en Rust ; PoC Python validé (0 faux positif sur 35 GOOD)",
+            "OCR non porté en Rust ; PoC Python validé (0 faux positif sur 35 GOOD)",
         ),
         QaCheck::not_applicable(
             "logo_residual",
@@ -101,12 +113,65 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     .with_context(|| format!("Stage 0 sur {}", video.display()))?;
 
     let mut checks = stage0.checks;
-    let findings = stage0.findings;
+    let mut findings = stage0.findings;
+    let mut face_evidence = None;
+    let mut face_model = None;
+    let mut face_ms = 0;
+
+    if !options.face_enabled {
+        checks.push(QaCheck::not_applicable(
+            "face_cut",
+            "contrôle visage désactivé (--no-face)",
+        ));
+    } else if let Some(models_dir) = &options.models_dir {
+        let model = models_dir.join(FACE_MODEL_FILENAME);
+        if !model.is_file() {
+            checks.push(QaCheck::not_applicable(
+                "face_cut",
+                format!("modèle YuNet introuvable: {}", model.display()),
+            ));
+        } else {
+            let spans = stage0
+                .segments
+                .iter()
+                .map(|segment| SegmentSpan {
+                    name: segment.name.clone(),
+                    start: segment.start,
+                    end: segment.end,
+                })
+                .collect::<Vec<_>>();
+            let result = face::run_face(
+                video,
+                &stage0.specs,
+                &spans,
+                &FaceOptions {
+                    model,
+                    onnxruntime: options.onnxruntime.clone(),
+                    ffmpeg: options.ffmpeg.clone(),
+                    per_segment: options.per_segment,
+                },
+            )
+            .with_context(|| format!("Stage 1 visage sur {}", video.display()))?;
+            checks.extend(result.checks);
+            findings.extend(result.findings);
+            face_evidence = Some(result.evidence);
+            face_model = Some(result.model);
+            face_ms = result.timing_ms;
+        }
+    } else {
+        checks.push(QaCheck::not_applicable(
+            "face_cut",
+            "modèle YuNet non fourni (--models)",
+        ));
+    }
     checks.extend(stage1_pending_checks());
 
     let overall_status = aggregate::overall_status(&checks, &findings);
     let mut timings = stage0.timings;
+    timings.stage1_face_ms = face_ms;
     timings.total_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+    let mut provenance = ModelsProvenance::stage0_only();
+    provenance.face = face_model;
 
     let video_id = options
         .video_id
@@ -126,10 +191,11 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         checks,
         findings,
         stage0_evidence: stage0.evidence,
+        stage1_face_evidence: face_evidence,
         overall_status,
         auto_approve_eligible: false,
         auto_approve_reason: aggregate::auto_approve_reason().into(),
-        models_provenance: ModelsProvenance::stage0_only(),
+        models_provenance: provenance,
         execution_metrics: ExecutionMetrics {
             timings_ms: timings,
         },
@@ -154,7 +220,7 @@ mod tests {
     #[test]
     fn pending_stage1_checks_are_not_applicable() {
         let checks = stage1_pending_checks();
-        assert_eq!(checks.len(), 3);
+        assert_eq!(checks.len(), 2);
         assert!(checks
             .iter()
             .all(|check| check.status == QaStatus::NotApplicable));

@@ -20,8 +20,9 @@
   sur 35 GOOD, 12/12 sous-titres synthétiques. Logos : masque alpha des
   overlays `.ecproj`, 30/32 exports évalués `pass`, 2 exports `review` (270,
   branding source, 4 findings), 259/386 détections masquées, galerie
-  synthétique 24/24 et 0/16 FP. YuNet : 745 échantillons avec visage, 0
-  finding sur 35 GOOD, 2/2 recadrages synthétiques. QA complet 298 en
+  synthétique 60/60 (IC 95 % 94,0–100 %) et 0/16 FP. YuNet : 745
+  échantillons avec visage, 0 finding sur 35 GOOD, 2/2 recadrages
+  synthétiques. QA complet 298 en
   32,1 s ; mode lot `--folder` à 4 workers (Stage 0 : 4,01 s/export), cache
   par empreinte (0,23 s sur hit) et `export_sha256` avec une frame WebP par
   finding. `auto_approve_eligible = false`. Détail :

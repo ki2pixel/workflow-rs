@@ -14,7 +14,8 @@ Validation OCR : 1 124 échantillons, 12 détections isolées, 0 finding sur
 35 GOOD, 12/12 sous-titres synthétiques. Validation logos : masque alpha des
 overlays `.ecproj`, 30/32 exports évalués `pass`, 2 exports `review` (270,
 branding source, 4 findings), 259/386 détections masquées ; galerie
-synthétique 24/24 positifs et 0/16 faux positifs. Validation visage : 745
+synthétique 60/60 positifs (IC 95 % 94,0–100 %) et 0/16 faux positifs.
+Validation visage : 745
 échantillons avec visage, 0 finding, 2/2 recadrages synthétiques. Les
 sous-titres et les logos partagent le thread OCR ; QA complet 298 en 32,1 s. Le mode lot `--folder`
 répartit les exports sur 4 workers (Stage 0 : 4,01 s/export) et réutilise les
@@ -37,8 +38,8 @@ D-034, D-035).
     positifs connus ; logo confirmé dans les rushes ;
   - synthétiques : logo persistant détecté, contrôle masqué propre, texte
     transitoire non flagué ;
-  - galerie 40 clips : 24/24 positifs (24–96 px), 0/16 faux positifs
-    (8 masqués, 4 transitoires, 4 négatifs), 84,6 s à 4 workers ;
+  - galerie 76 clips : 60/60 positifs (24–96 px, IC 95 % 94,0–100 %),
+    0/16 faux positifs (8 masqués, 4 transitoires, 4 négatifs), 163,7 s ;
   - labels dev régénérés depuis `reports/rust-logo` (plus de baseline) ;
   - QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s) ;
   - 76 tests `qa`, suite 417 tests, `fmt` et `clippy -D warnings` verts ;

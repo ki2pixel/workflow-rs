@@ -573,12 +573,12 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   dev pré-remplis depuis le baseline texte contenaient 13 faux positifs
   d'habillage éditorial, que le masque `.ecproj` écarte désormais.
 - **Décision** :
-  1. `scripts/gen_logo_gallery.py` génère 40 clips de 6 s sur le fond
-     `187_control` : 24 positifs persistants (textes de 24 à 96 px, quatre
-     styles, huit positions), 8 cas masqués par un PNG déclaré, 4 textes
-     transitoires (2 s sur 6) et 4 négatifs sans texte. Chaque clip reçoit un
-     `.ecproj` minimal ; les cas masqués déclarent un PNG plein cadre dont la
-     zone alpha couvre le texte.
+  1. `scripts/gen_logo_gallery.py` génère 76 clips de 6 s sur le fond
+     `187_control` (offsets variés sur 1–9 s) : 60 positifs persistants (textes de 24 à
+     96 px, quatre styles, huit positions), 8 cas masqués par un PNG déclaré,
+     4 textes transitoires (2 s sur 6) et 4 négatifs sans texte. Chaque clip
+     reçoit un `.ecproj` minimal ; les cas masqués déclarent un PNG plein
+     cadre dont la zone alpha couvre le texte.
   2. `scripts/eval_logo_gallery.py` compare les findings `logo_residual` aux
      attendus et écrit `metrics.json`.
   3. `scripts/prefill_labels.py` préfère `reports/rust-logo/<dossier>-<slug>`
@@ -588,9 +588,10 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   4. 270 reste un candidat `review` : le logo « MASUPER »/« LIGUEZ » est déjà
      dans le rush `MSL1.mov`, donc c'est le branding de l'émission. Aucune
      suppression automatique n'est ajoutée.
-- **Validation** : galerie 40 clips, `--no-face --no-evidence --workers 4`,
-  84,6 s de mur. Rappel 24/24, faux positifs 0/16, 8/8 masquages effectifs.
-  Le lot 35 exports reste à 30/32 `pass` et 2 exports `review` (270).
+- **Validation** : galerie 76 clips, `--no-face --no-evidence --workers 4`,
+  163,7 s de mur. Rappel 60/60 (IC 95 % de Wilson 94,0–100 %), faux positifs
+  0/16 (IC 95 % 0–19,4 %), 8/8 masquages effectifs. Le lot 35 exports reste à
+  30/32 `pass` et 2 exports `review` (270).
 - **Limites** : fond unique, texte `drawtext` net et overlay synthétique ; ce
   résultat ne remplace pas une galerie de logos réels. Le rappel réel et les
   courbes P/R restent à produire.

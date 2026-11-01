@@ -330,12 +330,13 @@ labellisée.
   `logo_residual` ; le même clip avec un overlay PNG déclaré au même endroit
   est entièrement masqué (12 détections, 0 finding) ; un texte présent sur
   moins de la moitié des échantillons ne produit aucun finding.
-- Galerie synthétique (40 clips de 6 s, base `187_control`) : 24/24 positifs
-  détectés (textes de 24 à 96 px, 4 styles, 8 positions), 0/16 faux positifs
-  (8 masqués, 4 transitoires, 4 négatifs), 8/8 masquages effectifs. La
-  génération et l'évaluation sont `scripts/gen_logo_gallery.py` et
-  `scripts/eval_logo_gallery.py` dans le PoC. Limite : fond unique et texte
-  net, ce n'est pas un rappel sur logos réels.
+- Galerie synthétique (76 clips de 6 s, base `187_control`, fonds variés) :
+  60/60 positifs détectés (textes de 24 à 96 px, 4 styles, 8 positions ; IC
+  95 % de Wilson 94,0–100 %), 0/16 faux positifs (8 masqués, 4 transitoires,
+  4 négatifs), 8/8 masquages effectifs. La génération et l'évaluation sont
+  `gen_logo_gallery.py` et `eval_logo_gallery.py` dans
+  `/media/kidpixel/WORK/qa-poc/scripts/`. Limite : fond unique et texte net,
+  ce n'est pas un rappel sur logos réels.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
   rendus depuis les rushes. 270 est confirmé comme branding source.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de

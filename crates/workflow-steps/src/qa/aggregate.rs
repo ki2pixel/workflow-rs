@@ -22,7 +22,7 @@ pub fn overall_status(checks: &[QaCheck], findings: &[QaFinding]) -> QaStatus {
 }
 
 pub fn auto_approve_reason() -> &'static str {
-    "v1 : OCR sous-titres et logos non mesurés, validation humaine requise"
+    "v1 : logos non mesurés, validation humaine requise"
 }
 
 #[cfg(test)]

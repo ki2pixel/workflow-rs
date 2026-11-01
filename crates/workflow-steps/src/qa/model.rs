@@ -227,6 +227,20 @@ pub struct Stage1FaceEvidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stage1OcrEvidence {
+    pub det_model: String,
+    pub rec_model: String,
+    pub samples_total: usize,
+    pub samples_with_text: usize,
+    pub detections_total: usize,
+    pub findings_total: usize,
+    pub frame_errors: usize,
+    pub per_segment: usize,
+    pub min_score: f64,
+    pub bottom_start: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub name: String,
     pub sha256: String,
@@ -236,7 +250,9 @@ pub struct ModelInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelsProvenance {
     pub stage0: String,
-    pub ocr: Option<ModelInfo>,
+    pub ocr_det: Option<ModelInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ocr_rec: Option<ModelInfo>,
     pub face: Option<ModelInfo>,
     pub embedding: Option<ModelInfo>,
 }
@@ -245,7 +261,8 @@ impl ModelsProvenance {
     pub fn stage0_only() -> Self {
         Self {
             stage0: "deterministic".into(),
-            ocr: None,
+            ocr_det: None,
+            ocr_rec: None,
             face: None,
             embedding: None,
         }
@@ -257,6 +274,8 @@ pub struct Timings {
     pub ffprobe_ms: u64,
     pub black_freeze_ms: u64,
     pub project_ms: u64,
+    #[serde(default)]
+    pub stage1_ocr_ms: u64,
     #[serde(default)]
     pub stage1_face_ms: u64,
     pub total_ms: u64,
@@ -284,6 +303,8 @@ pub struct QaReport {
     pub checks: Vec<QaCheck>,
     pub findings: Vec<QaFinding>,
     pub stage0_evidence: Stage0Evidence,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage1_ocr_evidence: Option<Stage1OcrEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage1_face_evidence: Option<Stage1FaceEvidence>,
     pub overall_status: QaStatus,
@@ -365,6 +386,7 @@ mod tests {
                 freeze_intervals: Vec::new(),
                 thresholds: Stage0Thresholds::default(),
             },
+            stage1_ocr_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

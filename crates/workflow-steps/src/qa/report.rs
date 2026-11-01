@@ -76,6 +76,7 @@ mod tests {
                 freeze_intervals: Vec::new(),
                 thresholds: Stage0Thresholds::default(),
             },
+            stage1_ocr_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

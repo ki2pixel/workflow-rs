@@ -5,16 +5,37 @@
 **Contrôle QA read-only après export humain (scénario B).**
 Le module `crates/workflow-steps/src/qa/` et `workflow-cli qa run` sont intégrés
 pour le Stage 0 (specs, durée MP4/composition, timeline, template A6,
-noir/gel) et le Stage 1 visage YuNet ONNX CPU. `qa.json` est distinct de
-l'`audit.json` A5/A6 et s'écrit uniquement sous `--out`. Validation Stage 0
-sur les 35 exports : 35 `pass`, 0 écart avec le PoC Python, médiane 12,3 s.
-Validation visage : 1 124 échantillons, 0 finding sur 35 GOOD, 2/2 recadrages
-synthétiques détectés, 0/2 faux positifs ; QA complet médian 28,3 s, max
-50,3 s. OCR sous-titres et logos restent `not_applicable` ;
+noir/gel), le Stage 1 OCR PP-OCRv6 et le Stage 1 visage YuNet, tous en ONNX
+Runtime CPU. `qa.json` est distinct de l'`audit.json` A5/A6 et s'écrit
+uniquement sous `--out`. Validation Stage 0 sur les 35 exports : 35 `pass`,
+0 écart avec le PoC Python, médiane 12,3 s. Validation OCR : 1 124
+échantillons, 12 détections isolées, 0 finding sur 35 GOOD, 12/12 sous-titres
+synthétiques. Validation visage : 745 échantillons avec visage, 0 finding,
+2/2 recadrages synthétiques. Les deux contrôles tournent en parallèle ; QA
+complet médian 35,4 s, max 63,6 s. Le mode lot `--folder` répartit les
+exports sur 4 workers (Stage 0 : 4,0 s/export). Les logos restent
+`not_applicable` ;
 `auto_approve_eligible = false`. Le post-traitement A5/A6 et les bypass
 SDM/LPHDF restent en production (D-032, D-034, D-035).
 
 ## Dernière session
+
+- [2026-10-31] **Stage 1 OCR PP-OCRv6 (D-038)** :
+  - `qa/ocr.rs` : détection DB et reconnaissance CTC sur la bande basse
+    75–98,5 %, CPU via `ort`, liste de caractères lue dans les métadonnées ;
+  - détection côté court 480 px, boîtes axis-aligned, unclip 1,6, filtres
+    géométriques du PoC et agrégation sur 3 échantillons consécutifs ;
+  - `qa run --no-ocr`, `--models` fournit det/rec ; sans modèle,
+    `subtitle_ocr` est `not_applicable` ;
+  - Stage 1 OCR et visage en parallèle, échantillonnage partagé
+    (`qa/sample.rs`, `qa/frame.rs`, `qa/inference.rs`) ;
+  - 35 GOOD : 12 détections isolées, 0 finding, 0 faux positif ; 12/12
+    synthétiques, contrôle `187_control` propre ; QA complet médian 35,4 s,
+    max 63,6 s ;
+  - mode lot `--folder` : scan, workers, `summary.json`, threads ONNX
+    bornés ; Stage 0 35 exports en 4 workers = 4,0 s/export ;
+  - 58 tests `qa`, suite 399 tests, `fmt` et `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, README, POC-RESULTS, D-038.
 
 - [2026-10-30] **Stage 1 visage YuNet (D-037)** :
   - `qa/face.rs` : YuNet ONNX CPU, letterbox 640×640, frame originale +

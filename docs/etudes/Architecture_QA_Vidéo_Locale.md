@@ -233,14 +233,16 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 | Étage | Mesure | Résultat | Porte |
 | --- | --- | --- | --- |
 | Stage 0 | 35 GOOD, seuils noir 3 s / gel 5 s | 35 `pass`, 0 finding, 4,0 s/vidéo en batch, max 25,6 s | **G1 franchie** |
-| OCR sous-titres | 1 124 échantillons, bande basse 75–98 % | 0 finding sur 35 GOOD, 9 textes de scène filtrés | **G2 partielle** |
+| Stage 0 Rust lot | 35 exports, `--folder --workers 4` | 3,99 s/export, max 25,3 s, 35 `pass` | **G1 franchie** |
+| OCR sous-titres | 1 124 échantillons, bande basse 75–98 % | 0 finding sur 35 GOOD, 16 textes de scène filtrés | **G2 partielle** |
+| OCR Rust | 1 124 échantillons, PP-OCRv6 det/rec ONNX CPU | 0 finding sur 35 GOOD, 12 détections isolées, 12/12 synthétiques | **G2 partielle** |
 | OCR synthétique | 12 positifs + 1 contrôle | 12/12 détectés, 0/1 faux positif | à étendre |
 | Visage coupé | 1 124 échantillons, YuNet + landmarks | 0 finding sur 35 GOOD, 728 échantillons avec visage | **G2 partielle** |
 | Visage Rust | 1 124 échantillons, YuNet ONNX CPU | 0 finding sur 35 GOOD, 25 coupés isolés, 2/2 synthétiques, 0/2 FP | **G2 partielle** |
 | Visage synthétique | 2 recadrages + 2 contrôles | 2/2 détectés, 0/2 faux positifs | à étendre |
 | Logo textuel | 12 frames/vidéo, texte persistant ≥ 50 % | 15/35 flags, dont 13 habillages d'émission légitimes | **G3 non testée** (baseline texte insuffisant) |
 | Latence mono-vidéo | 191, 3 min 23 | Stage 0 24,8 s + OCR 56,1 s + visage 77,4 s ≈ 158 s | sous 5 min, marge faible |
-| Latence Rust | 35 exports | QA complet médiane 28,3 s, max 50,3 s | < 60 s, atteint |
+| Latence Rust | 35 exports | QA complet médiane 35,4 s, max 63,6 s (OCR médian 21,7 s) | < 60 s en médiane, 63,6 s au pire |
 
 **Enseignements** :
 
@@ -248,11 +250,11 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 - Les exports GOOD sont propres par construction. 298 conserve les logos « 100 »/« 13+ », 179 conserve « M6+ MAX » et l'habillage « LES APPRENTIS AVENTURIERS », 295 conserve le sticker SDM. Ces éléments sont des habillages éditoriaux, pas nécessairement des défauts : les positifs `real_pre` doivent être rendus depuis le projet brut, pas pris dans le GOOD.
 - Un OCR de la bande haute ne suffit pas pour les logos : il confond logo de chaîne et habillage d'émission. DINOv2 seul aurait le même angle mort. La détection de logos exige un masque des overlays intentionnels dérivé du `.ecproj`/`_ae.json`, une galerie labellisée et une comparaison raw vs GOOD.
 - Le critère visage sur les landmarks est indispensable : un gros plan de profil coupe la nuque et le menton sans couper les yeux ou la bouche (187 ECOLE). Un critère sur la bbox seule aurait produit des faux positifs.
-- La latence Python est dominée par l'OCR et YuNet. Le portage Rust doit borner les threads ONNX par worker et batcher les crops pour viser < 60 s/vidéo.
+- La latence Python est dominée par l'OCR et YuNet. Le portage Rust exécute les deux contrôles Stage 1 en parallèle et répartit les exports d'un dossier sur plusieurs workers ; le coût restant vient de l'extraction ffmpeg par échantillon et de la détection DB. Le cache par hash reste à porter. La cible < 5 s/vidéo de G1 concerne le Stage 0 ; le QA complet reste dominé par l'OCR (~23 s/vidéo).
 
 **Décision PoC** : Stage 0 + OCR sous-titres + visage coupé passent en phase de validation ; logos différés après construction du masque projet ; VLM hors v1 ; `auto_approve_eligible = false` tant que les logos et la validation humaine ne sont pas en place.
 
-**Portage Rust Stage 0 et visage (2026-10-30)** : le module `crates/workflow-steps/src/qa/` et la commande `workflow-cli qa run` sont intégrés. Le Stage 0 reproduit le Python sur les 35 exports : 35 `pass`, 0 écart de statut, de findings ou de statut de check ; médiane 12,3 s, max 21,8 s. Le Stage 1 visage YuNet ONNX CPU ajoute 1 124 échantillons, 745 avec visage, 25 visages coupés isolés, 0 épisode de 3 échantillons consécutifs et donc 0 finding sur les 35 GOOD ; les 2 recadrages synthétiques sont détectés et les 2 contrôles passent. Le QA complet (Stage 0 + visage) tient en médiane 28,3 s et max 50,3 s. L'OCR sous-titres et les logos restent `not_applicable` ; `auto_approve_eligible` reste faux. Détail : `docs/lots/LOT-10-QA.md`.
+**Portage Rust Stage 0, OCR et visage (2026-10-31)** : le module `crates/workflow-steps/src/qa/` et la commande `workflow-cli qa run` sont intégrés. Le Stage 0 reproduit le Python sur les 35 exports : 35 `pass`, 0 écart de statut, de findings ou de statut de check ; médiane 12,3 s, max 21,8 s. Le Stage 1 OCR PP-OCRv6 (det/rec ONNX CPU, bande basse) ajoute 1 124 échantillons, 12 détections isolées, 0 épisode de 3 échantillons et donc 0 finding sur les 35 GOOD ; les 12 sous-titres synthétiques sont détectés et le contrôle négatif reste propre. Le Stage 1 visage YuNet ajoute 745 échantillons avec visage, 25 visages coupés isolés, 0 finding et 2/2 recadrages synthétiques détectés. Les deux contrôles tournent en parallèle ; les logos restent `not_applicable` et `auto_approve_eligible` reste faux. Détail : `docs/lots/LOT-10-QA.md`.
 
 ### **6.4 Schémas d'artefacts**
 
@@ -341,7 +343,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
     {"id": "short_segments", "status": "pass", "detail": "aucun segment < 0.5 s"},
     {"id": "timeline_coverage", "status": "pass", "detail": "dernier segment à 147.72s, comp 147.72s (Δ 0.00s)"},
     {"id": "template_a6", "status": "not_applicable", "detail": "projet hors template SDM"},
-    {"id": "subtitle_ocr", "status": "not_applicable", "detail": "OCR non porté en Rust ; PoC validé"},
+    {"id": "subtitle_ocr", "status": "pass", "detail": "36 échantillon(s), 0 avec texte, 0 détection(s), 0 erreur(s)"},
     {"id": "face_cut", "status": "pass", "detail": "36 échantillon(s), 21 avec visage, 0 coupé(s), 0 erreur(s)"},
     {"id": "logo_residual", "status": "not_applicable", "detail": "Détection de logos différée"}
   ],
@@ -357,6 +359,18 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
       "short_segment_finding_s": 0.08
     }
   },
+  "stage1_ocr_evidence": {
+    "det_model": "PP-OCRv6_det_small.onnx",
+    "rec_model": "PP-OCRv6_rec_small.onnx",
+    "samples_total": 36,
+    "samples_with_text": 0,
+    "detections_total": 0,
+    "findings_total": 0,
+    "frame_errors": 0,
+    "per_segment": 1,
+    "min_score": 0.55,
+    "bottom_start": 0.75
+  },
   "stage1_face_evidence": {
     "model": "face_detection_yunet_2023mar.onnx",
     "samples_total": 36,
@@ -370,10 +384,19 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
   },
   "overall_status": "pass",
   "auto_approve_eligible": false,
-  "auto_approve_reason": "v1 : OCR sous-titres et logos non mesurés, validation humaine requise",
+  "auto_approve_reason": "v1 : logos non mesurés, validation humaine requise",
   "models_provenance": {
     "stage0": "deterministic",
-    "ocr": null,
+    "ocr_det": {
+      "name": "PP-OCRv6_det_small.onnx",
+      "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+      "license": "Apache-2.0"
+    },
+    "ocr_rec": {
+      "name": "PP-OCRv6_rec_small.onnx",
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+      "license": "Apache-2.0"
+    },
     "face": {
       "name": "face_detection_yunet_2023mar.onnx",
       "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
@@ -383,17 +406,18 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
   },
   "execution_metrics": {
     "timings_ms": {
-      "ffprobe_ms": 48,
-      "black_freeze_ms": 14495,
-      "project_ms": 57,
-      "stage1_face_ms": 14581,
-      "total_ms": 28302
+      "ffprobe_ms": 208,
+      "black_freeze_ms": 14467,
+      "project_ms": 10,
+      "stage1_ocr_ms": 27954,
+      "stage1_face_ms": 23095,
+      "total_ms": 42662
     }
   }
 }
 ```
 
-L'exemple ci-dessus décrit le contrat v1 réellement émis pour Stage 0 + visage. Les champs prévus pour l'OCR, les logos et le VLM (preuves WebP, `vlm_verification`, galerie DINOv2) seront ajoutés lors de leur portage ; ils ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
+L'exemple ci-dessus décrit le contrat v1 réellement émis pour Stage 0 + OCR + visage. Les champs prévus pour les logos et le VLM (preuves WebP, `vlm_verification`, galerie DINOv2) seront ajoutés lors de leur portage ; ils ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
 
 ## **7. Modèle de coût total et comparaison build/buy**
 
@@ -495,14 +519,15 @@ Stage 2 — agrégation
 | --- | --- | --- |
 | `qa/model.rs` | Schémas `qa.json`, `Finding`, `Check`, `Status` | serde |
 | `qa/stage0.rs` | Specs, noir/figé, durée, template A6, cuts | `post::detect`, `post::a6` |
-| `qa/ocr.rs` | OCR du tiers bas, filtrage géométrique | `ort`, RapidOCR |
+| `qa/ocr.rs` | OCR PP-OCRv6 du tiers bas, filtrage géométrique | `ort` |
 | `qa/face.rs` | Visages YuNet, landmarks, padding, agrégation | `ort` |
 | `qa/logo.rs` | Galerie DINOv2, persistance des coins, masque projet — **phase 3** | `ort`, DINOv2 |
+| `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
 | `qa/aggregate.rs` | Hystérésis, calibration, sévérité | règles |
 | `qa/report.rs` | `qa.json`, preuves WebP, hash | serde, image |
 | `qa/mod.rs` | API publique, options | — |
 
-État au 2026-10-30 : `model.rs`, `stage0.rs`, `face.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `face` le Stage 1 visage ; `report` n'écrit que `qa.json`, sans preuve WebP ni hash d'export. `ocr.rs` et `logo.rs` restent à porter ; le `qa.json` v1 les marque `not_applicable`.
+État au 2026-10-31 : `model.rs`, `stage0.rs`, `ocr.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0, `ocr` et `face` le Stage 1 ; les deux contrôles partagent l'échantillonnage et tournent en parallèle. `batch` scanne un dossier, répartit les exports sur plusieurs workers et écrit `summary.json`. `report` n'écrit que `qa.json`, sans preuve WebP ni hash d'export. `logo.rs` reste à porter ; le `qa.json` v1 le marque `not_applicable`.
 
 ### 8.4 Commande CLI
 
@@ -519,7 +544,9 @@ workflow-cli qa run \
   --split dev
 ```
 
-`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `face_cut` est `not_applicable`. `--no-face` désactive le visage et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
+`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr` et `face_cut` sont `not_applicable`. `--no-ocr` et `--no-face` désactivent un contrôle et `--per-segment` accepte 1 ou 3. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
+
+`--folder` remplace `--video` pour traiter un dossier complet : chaque export écrit `<out>/<slug>/qa.json`, le lot écrit `<out>/summary.json`, et `--workers` (défaut 4) fixe le parallélisme. Le projet `projets/<stem>.ecproj` est associé automatiquement quand il existe.
 
 ### 8.5 `qa.json`
 
@@ -584,8 +611,8 @@ La feuille de route est dimensionnée pour 1 à 2 ingénieurs et le corpus de 36
 | Phase & horizon | Travaux | Livrables | Porte |
 | --- | --- | --- | --- |
 | **0. Manifeste et labels** *(2–3 j)* | Inventaire des 36 exports principaux + 1 réserve, split 12/24, schéma `qa_label.json`, générateur synthétique — **fait** : manifeste, split, schéma, 37 gabarits ; labels dev à pré-remplir puis relire | `qa_manifest.json`, `split.json`, labels dev | **G0** : corpus, split et labels prêts |
-| **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json` | **G1** : 0 FP sur 35 GOOD ; < 5 s/vidéo en batch de 4 (PoC), 12,3 s en Rust séquentiel — batch 4 à porter |
-| **2. OCR + visage** *(5–8 j)* | RapidOCR tiers bas, YuNet + landmarks, filtres géométriques — **visage fait en PoC et en Rust** : 0 FP sur 35, 2/2 visages synthétiques ; **OCR reste à porter** : 12/12 synthétiques en PoC, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
+| **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder` | **G1** : 0 FP sur 35 GOOD ; < 5 s/vidéo en batch de 4 (PoC), 12,3 s en Rust séquentiel — mode lot `--folder` intégré |
+| **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
 | **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, galerie DINOv2, persistance, synthèse appariée — **PoC** : baseline OCR 15/35 flags dont 13 habillages légitimes, non viable sans masque | Galerie + courbes P/R | **G3** : logo ≥ 90 % galerie, FP ≤ 10 % |
 | **4. VLM optionnel** *(3–5 j)* | SmolVLM2/Qwen2.5-VL sur 5–10 frames ambiguës | Rapport latence/VRAM/rappel | **G4** : +5 pts, < 5 min, sinon abandon |
 | **5. Intégration** *(3–5 j)* | Module `qa/`, CLI, tests, docs | `LOT-10-QA.md`, `qa.json` figé | **G5** : fmt, clippy, tests, zéro régression |

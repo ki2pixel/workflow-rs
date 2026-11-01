@@ -11,7 +11,7 @@ use workflow_ingest::monitor::{plan_downloads, PlanContext};
 use workflow_ingest::url::normalize_url;
 use workflow_ingest::webhook::WebhookClient;
 use workflow_steps::post::{run_post_dir, run_post_project, PostOptions};
-use workflow_steps::qa::{run_qa, QaOptions, QaStatus};
+use workflow_steps::qa::{run_folder, run_qa, QaOptions, QaStatus};
 use workflow_steps::retention::{apply_retention, plan_retention, RetentionOptions};
 use workflow_steps::step1::{run_normalize_only, run_step1, Step1Options};
 use workflow_steps::step2::{run_step2, Step2Options};
@@ -685,19 +685,25 @@ struct QaArgs {
 
 #[derive(Debug, Subcommand)]
 enum QaCommand {
-    /// Contrôle QA d'un export final et écrit `qa.json` sous `--out`.
+    /// Contrôle QA d'un export final (ou d'un dossier avec `--folder`) et
+    /// écrit `qa.json` sous `--out`.
     Run {
-        /// Export final `.mp4` (obligatoire).
-        #[arg(long)]
-        video: PathBuf,
+        /// Export final `.mp4` (obligatoire sans `--folder`).
+        #[arg(long, required_unless_present = "folder", conflicts_with = "folder")]
+        video: Option<PathBuf>,
+        /// Dossier d'exports `.mp4` à contrôler en lot. Chaque export reçoit
+        /// `<out>/<slug>/qa.json` et le lot écrit `<out>/summary.json`.
+        #[arg(long, conflicts_with = "video")]
+        folder: Option<PathBuf>,
         /// Projet `.ecproj` brut, optionnel. Sans projet, les contrôles
         /// structurels sont marqués `not_applicable`.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "folder")]
         project: Option<PathBuf>,
         /// Dossier docs, réservé aux contrôles futurs (non utilisé en v1).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "folder")]
         docs: Option<PathBuf>,
-        /// Répertoire de sortie explicite : `qa.json` y est écrit.
+        /// Répertoire de sortie explicite : `qa.json` y est écrit, ou la
+        /// racine du lot avec `--folder`.
         #[arg(long)]
         out: PathBuf,
         /// Exécutable ffmpeg (défaut : configuration STEP8/post).
@@ -712,6 +718,13 @@ enum QaCommand {
         /// Bibliothèque ONNX Runtime explicite.
         #[arg(long)]
         onnxruntime: Option<PathBuf>,
+        /// Threads intra-op ONNX par session (défaut : runtime, ou calculé
+        /// par worker en mode `--folder`).
+        #[arg(long)]
+        intra_threads: Option<usize>,
+        /// Désactive le contrôle OCR des sous-titres.
+        #[arg(long)]
+        no_ocr: bool,
         /// Désactive le contrôle visage YuNet.
         #[arg(long)]
         no_face: bool,
@@ -719,14 +732,20 @@ enum QaCommand {
         #[arg(long, default_value_t = 1)]
         per_segment: usize,
         /// Identifiant vidéo (défaut : nom de fichier sans extension).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "folder")]
         video_id: Option<String>,
         /// Identifiant dossier (ex. `300`).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "folder")]
         folder_id: Option<String>,
         /// Split (`dev`, `holdout`, `reserve`).
         #[arg(long)]
         split: Option<String>,
+        /// Nombre de workers du mode `--folder`.
+        #[arg(long, default_value_t = 4, requires = "folder")]
+        workers: usize,
+        /// Limite le nombre d'exports traités en mode `--folder`.
+        #[arg(long, requires = "folder")]
+        limit: Option<usize>,
     },
 }
 
@@ -1569,6 +1588,7 @@ fn run() -> Result<()> {
         Command::Qa(args) => match args.command {
             QaCommand::Run {
                 video,
+                folder,
                 project,
                 docs: _,
                 out,
@@ -1576,11 +1596,15 @@ fn run() -> Result<()> {
                 ffprobe,
                 models,
                 onnxruntime,
+                intra_threads,
+                no_ocr,
                 no_face,
                 per_segment,
                 video_id,
                 folder_id,
                 split,
+                workers,
+                limit,
             } => {
                 if !matches!(per_segment, 1 | 3) {
                     anyhow::bail!("--per-segment doit valoir 1 ou 3");
@@ -1592,21 +1616,37 @@ fn run() -> Result<()> {
                     out_dir: out,
                     models_dir: models,
                     onnxruntime,
+                    intra_threads,
+                    ocr_enabled: !no_ocr,
                     face_enabled: !no_face,
                     per_segment,
                     video_id,
                     folder_id,
                     split,
                 };
-                let outcome =
-                    run_qa(&video, project.as_deref(), &options).context("exécution de QA")?;
-                let payload = json!({
-                    "qa_path": outcome.qa_path.to_string_lossy(),
-                    "report": outcome.report,
-                });
-                println!("{}", serde_json::to_string_pretty(&payload)?);
-                if outcome.report.overall_status == QaStatus::Fail {
-                    std::process::exit(1);
+                if let Some(folder) = folder {
+                    let outcome = run_folder(&folder, &options, workers, limit)
+                        .context("exécution du QA par lot")?;
+                    let payload = json!({
+                        "summary_path": outcome.summary_path.to_string_lossy(),
+                        "summary": outcome.summary,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&payload)?);
+                    if outcome.summary.has_failures() {
+                        std::process::exit(1);
+                    }
+                } else {
+                    let video = video.context("--video ou --folder requis")?;
+                    let outcome =
+                        run_qa(&video, project.as_deref(), &options).context("exécution de QA")?;
+                    let payload = json!({
+                        "qa_path": outcome.qa_path.to_string_lossy(),
+                        "report": outcome.report,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&payload)?);
+                    if outcome.report.overall_status == QaStatus::Fail {
+                        std::process::exit(1);
+                    }
                 }
             }
         },

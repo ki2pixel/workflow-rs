@@ -98,7 +98,7 @@ La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 | [`lots/LOT-7-INTEGRATION.md`](lots/LOT-7-INTEGRATION.md) | Séquence réelle STEP2 → STEP8 et rollback contrôlé. | Référence |
 | [`lots/LOT-8-INGESTION.md`](lots/LOT-8-INGESTION.md) | Webhook, normalisation d'URL, historique SQLite, cooldown et téléchargement R2/Dropbox. | Référence |
 | [`lots/STEP2-WINDOWS.md`](lots/STEP2-WINDOWS.md) | Protocole de validation STEP2 CUDA sous Windows, différé et non exécuté (D-022). | Historique |
-| [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) | Contrôle QA read-only après export humain : Stage 0, visage YuNet, `qa.json` séparé, OCR/logos à porter. | Référence |
+| [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) | Contrôle QA read-only après export humain : Stage 0, OCR PP-OCRv6, visage YuNet, `qa.json` séparé, logos à porter. | Référence |
 
 ## 5. Exploitation
 

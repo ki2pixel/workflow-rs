@@ -28,9 +28,9 @@ normalisation d'URL, historique SQLite, cooldown des échecs, téléchargement
 R2/Dropbox reprenable et statuts CSV. Le moniteur est désactivé par défaut ;
 il est actif sur l'instance de production depuis le 2026-10-23, après import
 de l'historique. Le lot 10 ajoute le contrôle QA read-only
-`workflow-cli qa run` après export humain : Stage 0 déterministe, Stage 1
-visage YuNet et `qa.json` séparé de l'`audit.json` ; l'OCR sous-titres reste à
-porter.
+`workflow-cli qa run` après export humain : Stage 0 déterministe, Stage 1 OCR
+sous-titres (PP-OCRv6) et visage YuNet, `qa.json` séparé de l'`audit.json` ;
+les logos restent à porter.
 La chaîne STEP1 → STEP8 est
 validée sur une archive réelle (`1720 Camille.zip`). La validation Windows du
 pont et du JSX After Effects est abandonnée (D-022) : la production cible
@@ -153,7 +153,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/lots/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
 - `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
-- `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, visage YuNet, `qa.json`, seuils et limites v1.
+- `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, OCR PP-OCRv6, visage YuNet, `qa.json`, seuils et limites v1.
 - `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/lots/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.

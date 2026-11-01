@@ -10,18 +10,17 @@
 //! `qa.json` à `report::write_report`.
 
 use crate::post::detect;
+use crate::qa::frame::{grab_frame, resize_bilinear, BgrFrame};
+use crate::qa::inference::cpu_session;
 use crate::qa::model::{
     DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1FaceEvidence,
 };
+use crate::qa::sample::{sample_times, SegmentSpan};
 use anyhow::{bail, ensure, Context, Result};
-use ort::execution_providers::CPUExecutionProvider;
-use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
 use ort::value::Tensor;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::OnceLock;
 use std::time::Instant;
 use workflow_schema::round::round_to;
 
@@ -42,6 +41,8 @@ const DEFAULT_NMS_THRESHOLD: f32 = 0.3;
 pub struct FaceOptions {
     pub model: PathBuf,
     pub onnxruntime: Option<PathBuf>,
+    /// Threads intra-op ONNX (None : défaut du runtime).
+    pub intra_threads: Option<usize>,
     pub ffmpeg: PathBuf,
     /// 1 ou 3 échantillons par segment, comme le PoC.
     pub per_segment: usize,
@@ -52,6 +53,7 @@ impl Default for FaceOptions {
         Self {
             model: PathBuf::new(),
             onnxruntime: None,
+            intra_threads: None,
             ffmpeg: PathBuf::from("ffmpeg"),
             per_segment: 1,
         }
@@ -65,13 +67,6 @@ pub struct FaceResult {
     pub evidence: Stage1FaceEvidence,
     pub model: ModelInfo,
     pub timing_ms: u64,
-}
-
-#[derive(Debug, Clone)]
-pub struct SegmentSpan {
-    pub name: String,
-    pub start: f64,
-    pub end: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,48 +108,6 @@ struct FaceSample {
     cut: Vec<CutFace>,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct SampleTime {
-    segment: String,
-    time: f64,
-}
-
-/// Image BGR 8 bits, canaux entrelacés. Le nom `Bgr` est volontaire : YuNet a
-/// été entraîné et validé avec l'ordre de canaux d'OpenCV.
-#[derive(Debug, Clone)]
-struct BgrFrame {
-    width: usize,
-    height: usize,
-    data: Vec<u8>,
-}
-
-impl BgrFrame {
-    fn new(width: usize, height: usize, data: Vec<u8>) -> Result<Self> {
-        ensure!(
-            data.len() == width * height * 3,
-            "frame {}x{}: {} octets au lieu de {}",
-            width,
-            height,
-            data.len(),
-            width * height * 3
-        );
-        Ok(Self {
-            width,
-            height,
-            data,
-        })
-    }
-
-    fn pixel(&self, x: usize, y: usize) -> [u8; 3] {
-        let offset = (y * self.width + x) * 3;
-        [
-            self.data[offset],
-            self.data[offset + 1],
-            self.data[offset + 2],
-        ]
-    }
-}
-
 pub fn run_face(
     video: &Path,
     specs: &QaSpecs,
@@ -185,7 +138,11 @@ pub fn run_face(
         sha256: detect::sha256_file(&options.model)?,
         license: FACE_MODEL_LICENSE.into(),
     };
-    let mut engine = YunetEngine::load(&options.model, options.onnxruntime.as_deref())?;
+    let mut engine = YunetEngine::load(
+        &options.model,
+        options.onnxruntime.as_deref(),
+        options.intra_threads,
+    )?;
     let samples_meta = sample_times(specs.duration_s, segments, options.per_segment);
     let mut samples = Vec::with_capacity(samples_meta.len());
     let mut frame_errors = 0usize;
@@ -266,142 +223,17 @@ pub fn run_face(
     })
 }
 
-/// Échantillonne au milieu de chaque segment, ou à 10/50/90 % avec
-/// `per_segment = 3`. Sans projet, découpe la vidéo en fenêtres de 5 s.
-pub(crate) fn sample_times(
-    duration_s: f64,
-    segments: &[SegmentSpan],
-    per_segment: usize,
-) -> Vec<SampleTime> {
-    let fractions: &[f64] = if per_segment == 3 {
-        &[0.1, 0.5, 0.9]
-    } else {
-        &[0.5]
-    };
-    let mut windows = if segments.is_empty() {
-        let mut windows = Vec::new();
-        let mut start = 0.0;
-        while start < duration_s {
-            windows.push(SegmentSpan {
-                name: format!("win_{start:.0}"),
-                start,
-                end: (start + 5.0).min(duration_s),
-            });
-            start += 5.0;
-        }
-        windows
-    } else {
-        segments.to_vec()
-    };
-    windows.sort_by(|left, right| {
-        left.start
-            .total_cmp(&right.start)
-            .then(left.end.total_cmp(&right.end))
-            .then(left.name.cmp(&right.name))
-    });
-
-    let mut samples = Vec::new();
-    let mut seen = Vec::new();
-    for segment in windows {
-        if segment.end <= segment.start {
-            continue;
-        }
-        for fraction in fractions {
-            let time = segment.start + (segment.end - segment.start) * fraction;
-            if !(0.0..duration_s).contains(&time) {
-                continue;
-            }
-            let key = round_to(time, 2);
-            if seen.contains(&key) {
-                continue;
-            }
-            seen.push(key);
-            samples.push(SampleTime {
-                segment: segment.name.clone(),
-                time: round_to(time, 3),
-            });
-        }
-    }
-    samples
-}
-
-fn grab_frame(
-    ffmpeg: &Path,
-    video: &Path,
-    time: f64,
-    width: usize,
-    height: usize,
-) -> Result<Option<BgrFrame>> {
-    let output = Command::new(ffmpeg)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-ss",
-            &format!("{time:.3}"),
-            "-i",
-        ])
-        .arg(video)
-        .args([
-            "-frames:v",
-            "1",
-            "-an",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "bgr24",
-            "-",
-        ])
-        .output()
-        .with_context(|| format!("ffmpeg frame à {time:.3}s pour {}", video.display()))?;
-    if !output.status.success() || output.stdout.is_empty() {
-        return Ok(None);
-    }
-    if output.stdout.len() != width * height * 3 {
-        tracing::warn!(
-            expected = width * height * 3,
-            received = output.stdout.len(),
-            "frame YuNet de dimensions inattendues"
-        );
-        return Ok(None);
-    }
-    Ok(Some(BgrFrame::new(width, height, output.stdout)?))
-}
-
 struct YunetEngine {
     session: Session,
 }
 
 impl YunetEngine {
-    fn load(model: &Path, onnxruntime: Option<&Path>) -> Result<Self> {
-        static ORT_INIT: OnceLock<Result<(), String>> = OnceLock::new();
-        let initialized = ORT_INIT.get_or_init(|| {
-            if let Some(runtime) = onnxruntime {
-                ort::init_from(runtime.to_string_lossy().to_string())
-                    .commit()
-                    .map(|_| ())
-                    .map_err(|error| {
-                        format!("chargement ONNX Runtime {}: {error}", runtime.display())
-                    })
-            } else {
-                ort::init()
-                    .commit()
-                    .map(|_| ())
-                    .map_err(|error| format!("initialisation ONNX Runtime système: {error}"))
-            }
-        });
-        if let Err(message) = initialized {
-            bail!("{message}");
-        }
-
-        let builder = Session::builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)?
-            .with_parallel_execution(false)?
-            .with_memory_pattern(false)?
-            .with_execution_providers([CPUExecutionProvider::default().build()])
-            .context("enregistrement du provider CPU YuNet")?;
-        let session = builder
-            .commit_from_file(model)
+    fn load(
+        model: &Path,
+        onnxruntime: Option<&Path>,
+        intra_threads: Option<usize>,
+    ) -> Result<Self> {
+        let session = cpu_session(model, onnxruntime, intra_threads)
             .with_context(|| format!("ouverture du modèle YuNet {}", model.display()))?;
         for name in output_names() {
             ensure!(
@@ -858,44 +690,6 @@ fn letterbox(source: &BgrFrame) -> (BgrFrame, f32, usize, usize) {
     )
 }
 
-fn resize_bilinear(source: &BgrFrame, width: usize, height: usize) -> BgrFrame {
-    if source.width == width && source.height == height {
-        return source.clone();
-    }
-    let mut data = vec![0u8; width * height * 3];
-    let scale_x = source.width as f32 / width as f32;
-    let scale_y = source.height as f32 / height as f32;
-    for y in 0..height {
-        let source_y = (y as f32 + 0.5) * scale_y - 0.5;
-        let y0 = source_y.floor().max(0.0) as usize;
-        let y1 = (y0 + 1).min(source.height.saturating_sub(1));
-        let weight_y = (source_y - y0 as f32).clamp(0.0, 1.0);
-        for x in 0..width {
-            let source_x = (x as f32 + 0.5) * scale_x - 0.5;
-            let x0 = source_x.floor().max(0.0) as usize;
-            let x1 = (x0 + 1).min(source.width.saturating_sub(1));
-            let weight_x = (source_x - x0 as f32).clamp(0.0, 1.0);
-            let top_left = source.pixel(x0, y0);
-            let top_right = source.pixel(x1, y0);
-            let bottom_left = source.pixel(x0, y1);
-            let bottom_right = source.pixel(x1, y1);
-            let offset = (y * width + x) * 3;
-            for channel in 0..3 {
-                let top = f32::from(top_left[channel]) * (1.0 - weight_x)
-                    + f32::from(top_right[channel]) * weight_x;
-                let bottom = f32::from(bottom_left[channel]) * (1.0 - weight_x)
-                    + f32::from(bottom_right[channel]) * weight_x;
-                data[offset + channel] = (top * (1.0 - weight_y) + bottom * weight_y).round() as u8;
-            }
-        }
-    }
-    BgrFrame {
-        width,
-        height,
-        data,
-    }
-}
-
 fn pad_replicate(source: &BgrFrame, pad_x: usize, pad_y: usize) -> BgrFrame {
     let width = source.width + 2 * pad_x;
     let height = source.height + 2 * pad_y;
@@ -932,28 +726,6 @@ mod tests {
             score,
             source: FaceSource::Original,
         }
-    }
-
-    #[test]
-    fn samples_three_points_per_segment_and_deduplicates() {
-        let segments = vec![SegmentSpan {
-            name: "Segment 1".into(),
-            start: 0.0,
-            end: 10.0,
-        }];
-        let samples = sample_times(10.0, &segments, 3);
-        assert_eq!(samples.len(), 3);
-        assert_eq!(samples[0].time, 1.0);
-        assert_eq!(samples[1].time, 5.0);
-        assert_eq!(samples[2].time, 9.0);
-    }
-
-    #[test]
-    fn samples_fall_back_to_five_second_windows() {
-        let samples = sample_times(12.0, &[], 1);
-        assert_eq!(samples.len(), 3);
-        assert_eq!(samples[0].time, 2.5);
-        assert_eq!(samples[2].time, 11.0);
     }
 
     #[test]

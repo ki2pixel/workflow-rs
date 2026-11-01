@@ -5,21 +5,29 @@
 //! `qa.json` sous `--out`.
 //!
 //! État v1 : Stage 0 déterministe (specs, durée, timeline, template A6,
-//! noir/gel), Stage 1 visage (YuNet ONNX CPU) et agrégation. L'OCR sous-titres
-//! et les logos restent `not_applicable` ; `auto_approve_eligible` reste faux.
+//! noir/gel), Stage 1 OCR sous-titres (PP-OCRv6) et visage (YuNet), agrégation.
+//! Les logos restent `not_applicable` ; `auto_approve_eligible` reste faux.
 
 pub mod aggregate;
+pub mod batch;
 pub mod face;
+pub mod frame;
+pub mod inference;
 pub mod model;
+pub mod ocr;
 pub mod report;
+pub mod sample;
 pub mod stage0;
 
-pub use face::{FaceOptions, SegmentSpan, FACE_MODEL_FILENAME};
+pub use batch::{discover_exports, run_folder, BatchOutcome, BatchSummary};
+pub use face::{FaceOptions, FACE_MODEL_FILENAME};
 pub use model::{
     DefectType, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,
-    Stage1FaceEvidence,
+    Stage1FaceEvidence, Stage1OcrEvidence,
 };
+pub use ocr::{OcrOptions, OCR_DET_FILENAME, OCR_REC_FILENAME};
 pub use report::{read_report, report_path, write_report};
+pub use sample::SegmentSpan;
 pub use stage0::{run_stage0, Stage0Options, Stage0Result};
 
 use crate::post::model::now_iso;
@@ -39,6 +47,10 @@ pub struct QaOptions {
     pub models_dir: Option<PathBuf>,
     /// Bibliothèque ONNX Runtime explicite.
     pub onnxruntime: Option<PathBuf>,
+    /// Threads intra-op ONNX par session (None : défaut du runtime).
+    pub intra_threads: Option<usize>,
+    /// Active le contrôle OCR sous-titres.
+    pub ocr_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
     /// 1 ou 3 échantillons par segment.
@@ -57,6 +69,8 @@ impl Default for QaOptions {
             out_dir: PathBuf::new(),
             models_dir: None,
             onnxruntime: None,
+            intra_threads: None,
+            ocr_enabled: true,
             face_enabled: true,
             per_segment: 1,
             video_id: None,
@@ -74,16 +88,10 @@ pub struct QaOutcome {
 
 /// Vérifications de Stage 1 non encore portées en Rust.
 pub fn stage1_pending_checks() -> Vec<QaCheck> {
-    vec![
-        QaCheck::not_applicable(
-            "subtitle_ocr",
-            "OCR non porté en Rust ; PoC Python validé (0 faux positif sur 35 GOOD)",
-        ),
-        QaCheck::not_applicable(
-            "logo_residual",
-            "Détection de logos différée après construction du masque projet",
-        ),
-    ]
+    vec![QaCheck::not_applicable(
+        "logo_residual",
+        "Détection de logos différée après construction du masque projet",
+    )]
 }
 
 pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<QaOutcome> {
@@ -114,15 +122,66 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
 
     let mut checks = stage0.checks;
     let mut findings = stage0.findings;
+    let mut ocr_evidence = None;
+    let mut ocr_model = None;
+    let mut ocr_rec_model = None;
+    let mut ocr_ms = 0;
     let mut face_evidence = None;
     let mut face_model = None;
     let mut face_ms = 0;
 
-    if !options.face_enabled {
+    let spans = stage0
+        .segments
+        .iter()
+        .map(|segment| SegmentSpan {
+            name: segment.name.clone(),
+            start: segment.start,
+            end: segment.end,
+        })
+        .collect::<Vec<_>>();
+
+    let ocr_options = if !options.ocr_enabled {
+        checks.push(QaCheck::not_applicable(
+            "subtitle_ocr",
+            "contrôle OCR désactivé (--no-ocr)",
+        ));
+        None
+    } else if let Some(models_dir) = &options.models_dir {
+        let det_model = models_dir.join(OCR_DET_FILENAME);
+        let rec_model = models_dir.join(OCR_REC_FILENAME);
+        if !det_model.is_file() || !rec_model.is_file() {
+            checks.push(QaCheck::not_applicable(
+                "subtitle_ocr",
+                format!(
+                    "modèles OCR introuvables sous {} ({OCR_DET_FILENAME}, {OCR_REC_FILENAME})",
+                    models_dir.display()
+                ),
+            ));
+            None
+        } else {
+            Some(OcrOptions {
+                det_model,
+                rec_model,
+                onnxruntime: options.onnxruntime.clone(),
+                intra_threads: options.intra_threads,
+                ffmpeg: options.ffmpeg.clone(),
+                per_segment: options.per_segment,
+            })
+        }
+    } else {
+        checks.push(QaCheck::not_applicable(
+            "subtitle_ocr",
+            "modèles OCR non fournis (--models)",
+        ));
+        None
+    };
+
+    let face_options = if !options.face_enabled {
         checks.push(QaCheck::not_applicable(
             "face_cut",
             "contrôle visage désactivé (--no-face)",
         ));
+        None
     } else if let Some(models_dir) = &options.models_dir {
         let model = models_dir.join(FACE_MODEL_FILENAME);
         if !model.is_file() {
@@ -130,47 +189,76 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
                 "face_cut",
                 format!("modèle YuNet introuvable: {}", model.display()),
             ));
+            None
         } else {
-            let spans = stage0
-                .segments
-                .iter()
-                .map(|segment| SegmentSpan {
-                    name: segment.name.clone(),
-                    start: segment.start,
-                    end: segment.end,
-                })
-                .collect::<Vec<_>>();
-            let result = face::run_face(
-                video,
-                &stage0.specs,
-                &spans,
-                &FaceOptions {
-                    model,
-                    onnxruntime: options.onnxruntime.clone(),
-                    ffmpeg: options.ffmpeg.clone(),
-                    per_segment: options.per_segment,
-                },
-            )
-            .with_context(|| format!("Stage 1 visage sur {}", video.display()))?;
-            checks.extend(result.checks);
-            findings.extend(result.findings);
-            face_evidence = Some(result.evidence);
-            face_model = Some(result.model);
-            face_ms = result.timing_ms;
+            Some(FaceOptions {
+                model,
+                onnxruntime: options.onnxruntime.clone(),
+                intra_threads: options.intra_threads,
+                ffmpeg: options.ffmpeg.clone(),
+                per_segment: options.per_segment,
+            })
         }
     } else {
         checks.push(QaCheck::not_applicable(
             "face_cut",
             "modèle YuNet non fourni (--models)",
         ));
+        None
+    };
+
+    // Les deux contrôles sont indépendants et CPU-bound : les lancer en
+    // parallèle divise la latence du QA complet sur les exports longs.
+    let (ocr_result, face_result) = match (&ocr_options, &face_options) {
+        (Some(ocr_opts), Some(face_opts)) => {
+            let (ocr_joined, face_joined) = std::thread::scope(|scope| {
+                let ocr_handle =
+                    scope.spawn(|| ocr::run_ocr(video, &stage0.specs, &spans, ocr_opts));
+                let face_handle =
+                    scope.spawn(|| face::run_face(video, &stage0.specs, &spans, face_opts));
+                (ocr_handle.join(), face_handle.join())
+            });
+            (
+                Some(join_stage(ocr_joined, "OCR")?),
+                Some(join_stage(face_joined, "visage")?),
+            )
+        }
+        (Some(ocr_opts), None) => (
+            Some(ocr::run_ocr(video, &stage0.specs, &spans, ocr_opts)?),
+            None,
+        ),
+        (None, Some(face_opts)) => (
+            None,
+            Some(face::run_face(video, &stage0.specs, &spans, face_opts)?),
+        ),
+        (None, None) => (None, None),
+    };
+
+    if let Some(result) = ocr_result {
+        checks.extend(result.checks);
+        findings.extend(result.findings);
+        ocr_evidence = Some(result.evidence);
+        ocr_model = Some(result.det_model);
+        ocr_rec_model = Some(result.rec_model);
+        ocr_ms = result.timing_ms;
+    }
+    if let Some(result) = face_result {
+        checks.extend(result.checks);
+        findings.extend(result.findings);
+        face_evidence = Some(result.evidence);
+        face_model = Some(result.model);
+        face_ms = result.timing_ms;
     }
     checks.extend(stage1_pending_checks());
 
     let overall_status = aggregate::overall_status(&checks, &findings);
     let mut timings = stage0.timings;
+    timings.stage1_ocr_ms = ocr_ms;
     timings.stage1_face_ms = face_ms;
     timings.total_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
     let mut provenance = ModelsProvenance::stage0_only();
+    provenance.ocr_det = ocr_model;
+    provenance.ocr_rec = ocr_rec_model;
     provenance.face = face_model;
 
     let video_id = options
@@ -191,6 +279,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         checks,
         findings,
         stage0_evidence: stage0.evidence,
+        stage1_ocr_evidence: ocr_evidence,
         stage1_face_evidence: face_evidence,
         overall_status,
         auto_approve_eligible: false,
@@ -202,6 +291,15 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     };
     let qa_path = report::write_report(&options.out_dir, &report)?;
     Ok(QaOutcome { report, qa_path })
+}
+
+/// Transforme le résultat d'un `JoinHandle` de Stage 1 en erreur applicative.
+/// Un panic dans un worker ne doit pas laisser un `qa.json` partiel.
+fn join_stage<T>(result: std::thread::Result<anyhow::Result<T>>, stage: &str) -> Result<T> {
+    match result {
+        Ok(result) => result,
+        Err(_) => bail!("Stage 1 {stage} interrompu (panic du worker)"),
+    }
 }
 
 fn video_id_from_path(video: &Path) -> String {
@@ -220,7 +318,7 @@ mod tests {
     #[test]
     fn pending_stage1_checks_are_not_applicable() {
         let checks = stage1_pending_checks();
-        assert_eq!(checks.len(), 2);
+        assert_eq!(checks.len(), 1);
         assert!(checks
             .iter()
             .all(|check| check.status == QaStatus::NotApplicable));

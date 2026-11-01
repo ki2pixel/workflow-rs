@@ -7,7 +7,7 @@ description: Maintenir et exécuter la suite de tests Rust de workflow-rs (tests
 
 ## Portée
 
-- **375 tests** : 343 `#[test]` + 32 `#[tokio::test]`.
+- **399 tests** : 367 `#[test]` + 32 `#[tokio::test]`.
 - Tests **inline** dans les modules, sous `#[cfg(test)]`. Il n'y a pas de
   dossier `tests/` d'intégration.
 - Crates avec tests : `workflow-core`, `workflow-schema`, `workflow-steps`,

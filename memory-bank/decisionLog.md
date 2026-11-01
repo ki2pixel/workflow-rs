@@ -481,6 +481,43 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/face.rs`.
 
+## 2026-10-31 — D-038 : Stage 1 OCR PP-OCRv6 dans le QA Rust
+
+- **Contexte** : le PoC Python a validé l'OCR de la bande basse sur 1 124
+  échantillons (12/12 sous-titres synthétiques, 0 finding sur 35 GOOD). Le
+  contrôle restait `not_applicable` dans `qa run`, et le seul OCR disponible
+  dans le dépôt passait par RapidOCR/Python.
+- **Décision** :
+  1. Détection et reconnaissance PP-OCRv6 small (`PP-OCRv6_det_small.onnx`,
+     `PP-OCRv6_rec_small.onnx`, Apache-2.0) via `ort`, CPU, sur la bande basse
+     75–98,5 %. Aucun appel Python.
+  2. Post-traitement DB simplifié : seuil 0,30, dilation 2×2, composantes
+     8-connexes, score moyen ≥ 0,50, unclip 1,6 et boîtes axis-aligned. Les
+     sous-titres broadcast sont horizontaux ; cela évite pyclipper et le
+     rectangle minimal tourné.
+  3. Détection au côté court 480 px au lieu des 736 px de RapidOCR : la bande
+     d'un 1080×1920 fait 480 px, la détection reste à l'échelle native et
+     environ 1,8× plus rapide, avec les mêmes 12/12 synthétiques.
+  4. Reconnaissance par lots de 6, hauteur 48, CTC avec blank à l'index 0 ;
+     la liste de caractères est lue dans les métadonnées ONNX (`character`),
+     sans dictionnaire externe.
+  5. Filtres géométriques et agrégation identiques au PoC (score ≥ 0,55,
+     texte ≥ 2, hauteur 24–140 px, aspect ≥ 2, centre x 12–88 %, trois
+     échantillons consécutifs, dérive verticale ≤ 4 %).
+  6. `--no-ocr` désactive le contrôle ; sans modèles, `subtitle_ocr` est
+     `not_applicable`. L'OCR et le visage partagent l'échantillonnage et
+     tournent dans deux threads pour ne pas payer la somme des latences.
+  7. `auto_approve_eligible` reste faux : les logos ne sont pas mesurés.
+- **Validation** : 35 GOOD, 1 124 échantillons, 12 détections isolées, 0
+  épisode de 3 échantillons, 0 finding et 0 faux positif ; 12/12 sous-titres
+  synthétiques détectés, contrôle `187_control` propre. QA complet médian
+  35,4 s, max 63,6 s (OCR médian 21,7 s, max 43,5 s). Mode lot `--folder` :
+  Stage 0 sur 35 exports à 4 workers en 4,0 s/export, QA complet ×2,19 sur
+  5 exports. 58 tests `qa`, suite 399 tests, `fmt` et `clippy -D warnings`
+  verts.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/qa/ocr.rs`.
+
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI
 
 - **Contexte** : le lanceur affichait dans le terminal les 40 dernières lignes

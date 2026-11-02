@@ -50,6 +50,10 @@ const CENTER_X_MAX: f64 = 0.88;
 const MIN_CONSECUTIVE: usize = 3;
 const MAX_Y_DRIFT: f64 = 0.04;
 
+/// Taille minimale de la détection OCR. Les bandes 1080×480 (sous-titres)
+/// et 1080×614 (logos) restent à leur résolution native : le passage à 736
+/// (valeur du PoC Python) fusionne les boîtes des logos et dégrade le rappel
+/// (D-045).
 const DET_LIMIT_SIDE: f64 = 480.0;
 const DET_THRESH: f32 = 0.3;
 const DET_BOX_THRESH: f32 = 0.5;
@@ -904,6 +908,18 @@ mod tests {
         assert_eq!(width, 1088);
         assert_eq!(width % 32, 0);
         assert!((width as f64 / height as f64 - 1080.0 / 480.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn det_size_leaves_the_logo_band_native() {
+        // Bande haute 1080×614 : 1088×608, sans sur-échantillonnage.
+        assert_eq!(det_input_size(1080, 614), (1088, 608));
+    }
+
+    #[test]
+    fn det_size_leaves_a_full_frame_unscaled() {
+        let (width, height) = det_input_size(1080, 1920);
+        assert_eq!((width, height), (1088, 1920));
     }
 
     #[test]

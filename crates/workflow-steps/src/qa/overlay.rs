@@ -37,9 +37,10 @@ impl OverlayMask {
         self.regions.is_empty()
     }
 
-    /// Part maximale de `bbox` (coordonnées frame) couverte par un overlay
-    /// actif à `time_s`. Une valeur ≥ 0,5 signifie que la détection est
-    /// expliquée par un habillage déclaré.
+    /// Part du plus petit des deux rectangles (détection ou overlay) couverte
+    /// par l'intersection. Une boîte OCR plus grande que l'overlay mais qui le
+    /// contient est donc expliquée : la détection inclut du padding. Une valeur
+    /// ≥ 0,5 signifie que la détection est expliquée par un habillage déclaré.
     pub fn overlap_ratio(
         &self,
         bbox: [f64; 4],
@@ -52,7 +53,7 @@ impl OverlayMask {
         }
         let scale_x = f64::from(frame_width) / f64::from(self.comp_width);
         let scale_y = f64::from(frame_height) / f64::from(self.comp_height);
-        let area = (bbox[2] * bbox[3]).max(1.0);
+        let detection_area = (bbox[2] * bbox[3]).max(1.0);
         self.regions
             .iter()
             .filter(|region| time_s >= region.start_s && time_s <= region.end_s)
@@ -63,7 +64,8 @@ impl OverlayMask {
                     region.bbox_xywh[2] * scale_x,
                     region.bbox_xywh[3] * scale_y,
                 ];
-                intersection(bbox, region_bbox) / area
+                let region_area = (region_bbox[2] * region_bbox[3]).max(1.0);
+                intersection(bbox, region_bbox) / detection_area.min(region_area)
             })
             .fold(0.0, f64::max)
     }
@@ -513,6 +515,29 @@ mod tests {
         assert!(
             (mask.overlap_ratio([60.0, 530.0, 200.0, 100.0], 2.0, 2160, 3840) - 0.35).abs() < 1e-9
         );
+    }
+
+    #[test]
+    fn overlap_accepts_a_detection_that_contains_the_overlay() {
+        let mask = OverlayMask {
+            comp_width: 1080,
+            comp_height: 1920,
+            regions: vec![OverlayRegion {
+                name: "m6+.png".into(),
+                layer_id: 11,
+                start_s: 0.0,
+                end_s: 6.0,
+                bbox_xywh: [869.0, 341.0, 168.0, 87.0],
+                opaque_pixels: 100,
+            }],
+            skipped: Vec::new(),
+        };
+        // Boîte OCR avec padding : elle contient entièrement le logo.
+        let ratio = mask.overlap_ratio([844.0, 307.0, 218.0, 150.0], 2.0, 1080, 1920);
+        assert!((ratio - 1.0).abs() < 1e-9);
+        // Détection à moitié dans l'overlay : ratio 0,5.
+        let partial = mask.overlap_ratio([785.0, 341.0, 168.0, 87.0], 2.0, 1080, 1920);
+        assert!((partial - 0.5).abs() < 1e-9);
     }
 
     #[cfg(unix)]

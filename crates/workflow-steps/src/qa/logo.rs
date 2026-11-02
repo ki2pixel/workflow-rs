@@ -12,8 +12,9 @@
 //! seul confond logo et habillage éditorial.
 //!
 //! L'agrégation regroupe d'abord le texte exact, puis fusionne les variantes
-//! OCR proches dans la même zone (M6+ lu « 161+ », « 11+ », « 1+ ») sans
-//! fusionner deux logos éloignés.
+//! OCR proches dans la même zone (M6+ lu « 161+ », « 11+ », « 1+ »), y compris
+//! les boîtes imbriquées (« e=m6 » / « =m6 »), sans fusionner deux logos
+//! éloignés.
 
 use crate::qa::frame::{grab_frame, BgrFrame};
 use crate::qa::model::{DefectType, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence};
@@ -34,7 +35,8 @@ pub const MAX_BOX_HEIGHT: i64 = 180;
 pub const MIN_BOX_WIDTH: i64 = 30;
 pub const MIN_ASPECT: f64 = 1.2;
 pub const PERSISTENCE: f64 = 0.5;
-/// Part de la détection couverte par un overlay pour l'écarter.
+/// Part du plus petit rectangle (détection ou overlay) couverte par
+/// l'intersection ; une boîte OCR qui contient l'overlay est donc écartée.
 pub const MASK_OVERLAP: f64 = 0.5;
 
 #[derive(Debug, Clone)]
@@ -118,6 +120,13 @@ pub(crate) fn run_logo(
         let texts = rec.recognize(&band, &boxes)?;
         let mut detections = Vec::new();
         for ((text, score), det_box) in texts.into_iter().zip(boxes.iter()) {
+            tracing::trace!(
+                time,
+                text = %text,
+                score,
+                bbox = ?det_box.bbox,
+                "OCR brut bande haute"
+            );
             let Some(detection) = filter_detection(&text, score, det_box) else {
                 continue;
             };
@@ -266,8 +275,13 @@ fn text_distance(left: &str, right: &str) -> usize {
     previous[right.len()]
 }
 
-/// Même zone : IoU suffisant, ou centre proche avec une taille comparable.
+/// Même zone : une boîte contenue dans l'autre, un IoU suffisant, ou des
+/// centres proches avec une taille comparable. La containment couvre les
+/// recadrages OCR d'un même logo (« e=m6 », « =m6 », « m6 »).
 fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
+    if bbox_contains(left, right) || bbox_contains(right, left) {
+        return true;
+    }
     let area_left = (left[2].max(1) * left[3].max(1)) as f64;
     let area_right = (right[2].max(1) * right[3].max(1)) as f64;
     let intersection_width = (left[0] + left[2]).min(right[0] + right[2]) - left[0].max(right[0]);
@@ -291,6 +305,14 @@ fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
     let scale = left[2].max(left[3]).max(right[2]).max(right[3]) as f64;
     let ratio = area_left / area_right;
     distance <= 0.25 * scale && (0.5..=2.0).contains(&ratio)
+}
+
+fn bbox_contains(outer: [i64; 4], inner: [i64; 4]) -> bool {
+    const MARGIN: i64 = 2;
+    inner[0] >= outer[0] - MARGIN
+        && inner[1] >= outer[1] - MARGIN
+        && inner[0] + inner[2] <= outer[0] + outer[2] + MARGIN
+        && inner[1] + inner[3] <= outer[1] + outer[3] + MARGIN
 }
 
 fn aggregate(samples: &[LogoSample]) -> Vec<QaFinding> {
@@ -517,6 +539,45 @@ mod tests {
         assert!((findings[0].confidence - 0.583).abs() < 1e-9);
         assert!(findings[0].notes.contains("variantes OCR"));
         assert!(findings[0].notes.contains("11+"));
+    }
+
+    #[test]
+    fn aggregate_merges_a_tight_box_inside_a_wider_box() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: if index >= 10 {
+                    Vec::new()
+                } else {
+                    vec![match index {
+                        0 | 2 | 4 | 6 | 8 => detection("e=m6", [125, 357, 93, 40]),
+                        1 => detection("m6", [176, 367, 32, 21]),
+                        _ => detection("=m6", [158, 363, 53, 29]),
+                    }]
+                },
+            })
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples);
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].notes.contains("10/12"));
+    }
+
+    #[test]
+    fn aggregate_does_not_merge_distinct_texts_in_nested_boxes() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: vec![detection(
+                    if index < 6 { "PARIS" } else { "LONDRES" },
+                    if index < 6 {
+                        [100, 300, 200, 80]
+                    } else {
+                        [120, 305, 100, 40]
+                    },
+                )],
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(aggregate(&samples).len(), 2);
     }
 
     #[test]

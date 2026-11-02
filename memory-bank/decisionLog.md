@@ -566,6 +566,38 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-044 : regroupement spatial des variantes OCR de logos
+
+- **Contexte** : M6+ à l'échelle 0,75 était détecté sur 9 échantillons mais
+  l'OCR produisait « 161+ », « 11+ » puis « 1+ », donc aucun texte
+  n'atteignait 50 %. Gulli à 0,75 avait le même profil. La boîte est stable,
+  seul le texte varie.
+- **Décision** :
+  1. La clé texte exacte reste prioritaire, pour conserver le comportement du
+     baseline.
+  2. Une détection peut rejoindre un groupe si la distance d'édition est ≤ 1
+     (texte de 4 caractères ou moins) ou ≤ 2 (texte plus long), si la
+     similarité est ≥ 0,6, et si la boîte est dans la même zone (IoU ≥ 0,3,
+     ou centres proches avec une taille comparable).
+  3. Un groupe ne compte qu'une fois par échantillon, même si l'OCR produit
+     deux variantes. Les notes listent jusqu'à trois variantes OCR.
+  4. Quatre tests couvrent la fusion, le refus de fusion à des positions
+     distinctes, le refus de fusion de textes différents et le comptage
+     unique par échantillon.
+- **Validation** : assets réels 24/26 (92,3 %, IC 95 % de Wilson
+  75,9–97,9 %), 0/10 faux positifs, 6/6 masqués ; galerie texte 60/60,
+  0/16 ; lot 35 exports inchangé (30 `pass`, 2 exports `review` sur 270,
+  4 findings, 259/386 détections masquées). 421 tests, `fmt` et
+  `clippy -D warnings` verts.
+- **Limites** : M6+ à 1,0 et Les 100 à 1,0 ne sont détectés qu'une seule
+  fois ; le problème est le rappel OCR, pas l'agrégation. La borne basse de
+  Wilson reste sous 90 %, donc G3 n'est pas conclue. Le regroupement exact
+  par texte continue de fusionner deux logos identiques à des positions
+  différentes, comme le baseline.
+- **Références** : `docs/lots/LOT-10-QA.md`,
+  `/media/kidpixel/WORK/qa-poc/reports/POC-RESULTS.md`,
+  `crates/workflow-steps/src/qa/logo.rs`.
+
 ## 2026-11-02 — D-043 : galerie de logos réels et limite de l'OCR texte
 
 - **Contexte** : la galerie texte 60/60 ne teste que des chaînes `drawtext`

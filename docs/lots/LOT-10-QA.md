@@ -339,16 +339,17 @@ labellisée.
   `/media/kidpixel/WORK/qa-poc/scripts/`. Limite : texte `drawtext` net et
   overlay synthétique.
 - Galerie d'assets réels (36 clips, 13 PNG alpha du corpus, 22 fonds) :
-  **22/26 positifs** (84,6 %, IC 95 % 66,5–93,9 %), **0/10 faux positifs**,
-  6/6 masqués. Les échecs sont des logos stylisés ou carrés : M6+ lu
-  « 161+ »/« 11+ »/« 1+ », Gulli à l'échelle 0,75, Les 100 à l'échelle 1,0.
-  L'OCR texte ne tient pas la cible G3 de 90 % sur ces assets ; DINOv2 ou un
-  classifieur de logos reste nécessaire.
+  **24/26 positifs** (92,3 %, IC 95 % 75,9–97,9 %), **0/10 faux positifs**,
+  6/6 masqués. Le regroupement spatial des variantes OCR récupère M6+ et
+  Gulli à l'échelle 0,75 ; il reste M6+ à 1,0 et Les 100 à 1,0 (une seule
+  détection chacun). Le lot 35 exports reste inchangé (30 `pass`, 2 exports
+  `review`, 4 findings, 259/386 masquées). La borne basse de Wilson reste
+  sous 90 % : DINOv2 ou un classifieur de logos reste nécessaire.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
   rendus depuis les rushes. 270 est confirmé comme branding source.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
   logos et 14,2 s de visage.
-- 417 tests workspace (385 `#[test]` + 32 `#[tokio::test]`).
+- 421 tests workspace (389 `#[test]` + 32 `#[tokio::test]`).
 
 ### Stage 1 visage
 

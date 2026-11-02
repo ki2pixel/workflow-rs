@@ -423,10 +423,12 @@ pour invalider les rapports antérieurs au changement de sémantique de
 
 #### Validation réelle par ablation (2026-11-02)
 
-Les 15 projets GOOD qui déclarent des calques image ont été utilisés. Une
-copie du `.ecproj` retire ces calques, puis le même MP4 GOOD est contrôlé avec
+Parmi les 15 projets GOOD qui déclarent des calques image, 14 disposent d'un
+export principal ; ces 14 projets (16 calques) ont été utilisés. Une copie du
+`.ecproj` retire ces calques, puis le même MP4 GOOD est contrôlé avec
 `--logo-visual` : le logo est réel, mais sa déclaration manque. Le projet
-d'origine sert de contrôle négatif.
+d'origine sert de contrôle négatif. Le 15e projet (`266 Ce tueur...`) n'a
+qu'un export `_9x16_V2` de réserve et reste exclu.
 
 | Variante | Projets avec finding | Findings | Texte | DINOv2 | Union |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -435,10 +437,8 @@ d'origine sert de contrôle négatif.
 
 Union 14/14 (IC 95 % de Wilson 78,5–100 %), texte 13/14, DINOv2 6/14,
 0/14 faux positif avec le projet d'origine. Le cas 298 « The 100 » est le
-sauvetage visuel net : texte 0, DINOv2 **2/2**. Un projet
-(`266 Ce tueur...`) est exclu faute d'export principal ; un cas 211
-« Citroën 2CV » a un Stage 0 `fail` (`aucun segment`) sans impact sur les
-findings logos. Les 16 overlays sont confirmés intentionnels par le client ;
+sauvetage visuel net : texte 0, DINOv2 **2/2**. Un cas 211 « Citroën 2CV »
+a un Stage 0 `fail` (`aucun segment`) sans impact sur les findings logos. Les 16 overlays sont confirmés intentionnels par le client ;
 les deux exports 270 (split screen) restent `review` et sont labellisés
 `intentional`. Détail, preuves et labels :
 `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`.

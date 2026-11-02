@@ -77,10 +77,13 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## Interface
 
-- Timeline 8 étapes, sélection de séquence, progression, logs.
+- Timeline 8 étapes, sélection de séquence, progression (y compris le post
+  A5/A6 de STEP8), logs.
 - Overlay de logs avec focus trap et auto-ouverture configurable.
 - Polling via `PollingManager`.
-- Frontend copié du legacy ; pas de logique Rust spécifique.
+- Frontend copié du legacy ; écarts assumés : auto-ouverture des logs
+  désactivée par défaut et phase post STEP8 en orange avec statut
+  « Post-traitement » (D-050).
 - Pas de client desktop natif (Tauri/GTK/WebKit) : décision D-028 ;
   l'interface reste la page web legacy servie par le serveur.
 
@@ -98,7 +101,7 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## État de validation
 
-- 439 tests unitaires, sans matériel.
+- 442 tests unitaires, sans matériel.
 - QA read-only étape B : Stage 0 35/35, OCR 12/12 synthétiques, logos
   34/39 sur la galerie d'assets, DINOv2 actif par défaut (opt-out) 39/39 en
   union, 0 nouveau faux positif sur les exports GOOD ; validation réelle par

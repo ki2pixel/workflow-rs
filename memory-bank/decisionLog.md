@@ -566,6 +566,39 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
+
+- **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %
+  pendant le post-traitement A5/A6. L'avancement n'était visible qu'en ouvrant
+  le panneau de logs, alors que le post peut durer plusieurs minutes.
+- **Décision** :
+  1. `run_post_jobs` émet `POST_TOTAL: N`, `POST_CURRENT: i/N - <projet>`
+     avant le projet, `POST_PROGRESS: i/N - <projet>` après sa fin et
+     `POST_DONE: N - <échecs>`. Le hook STEP8 les écrit sur `stdout` avec
+     `MS_BATCH_*` pour préserver l'ordre ; `workflow-cli post run` les met
+     sur `stderr` et garde son JSON sur `stdout`.
+  2. `ProgressParser` ajoute les projets A5/A6 au total EffectCraft déjà reçu
+     (`MS_BATCH_TOTAL`) et publie `progress_phase = "post"` dans
+     `/status/<key>`. La barre ne repart donc pas de zéro.
+  3. `assets/web` affiche la phase post en orange, le badge
+     « Post-traitement » et le texte `Post-traitement A5/A6 : i/N — <projet>`
+     tel quel ; le compteur global n'est pas réapposé au texte.
+  4. La granularité reste le projet, pas les étages A1/A2/A3/A4/A6.
+- **Validation** : tests parser avec base EffectCraft (total 1+3,
+  `POST_CURRENT`, `POST_PROGRESS`, clôture `POST_DONE`) et sans base ;
+  marqueurs vérifiés sur deux projets avec `workflow-cli post run` (JSON
+  `stdout` intact) ; 442 tests workspace, `fmt`, `clippy -D warnings` et
+  `node --check` verts ; harnais navigateur sur le vrai `uiUpdater.js` :
+  barre orange, statut « Post-traitement », texte brut, complétion verte,
+  échec rouge et retour idle sans phase.
+- **Limite** : un projet long garde la même position dans la barre ; seuls
+  les changements de projet la font avancer.
+- **Références** : `crates/workflow-steps/src/post/run.rs`,
+  `crates/workflow-server/src/progress.rs`,
+  `crates/workflow-server/src/state.rs`,
+  `assets/web/static/uiUpdater.js`, `docs/lots/LOT-9-POST-STEP8.md`,
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md`.
+
 ## 2026-11-02 — D-049 : passage en production du QA, auto-approbation conditionnelle et DINOv2 par défaut
 
 - **Contexte** : l'ablation réelle valide 14/14 overlays non déclarés, avec

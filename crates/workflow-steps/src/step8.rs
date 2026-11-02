@@ -127,6 +127,9 @@ pub fn run_step8(options: &Step8Options) -> Result<Step8Outcome> {
     // panel, y compris quand `mediasolution_ec.json` change le nom du dossier.
     let mut post = options.post.clone();
     post.docs_subfolder = docs_subfolder.clone();
+    // Les marqueurs post partagent stdout avec MS_BATCH_* pour que le serveur
+    // les lise dans l'ordre, même quand le panel écrit sur un autre flux.
+    post.emit_progress = true;
     let folders = select_folders(manifest.as_ref(), &options.folders, &docs_subfolder);
     if folders.is_empty() {
         if candidate_count == 0 {

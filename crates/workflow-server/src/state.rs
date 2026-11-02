@@ -149,6 +149,8 @@ struct StepRecord {
     progress_total: u64,
     progress_current_fractional: Option<f64>,
     progress_text: String,
+    /// Phase explicite de progression, par exemple `post` pour A5/A6.
+    progress_phase: Option<String>,
     duration_str: Option<String>,
     log: VecDeque<String>,
     control: Option<Arc<RunControl>>,
@@ -164,6 +166,7 @@ impl StepRecord {
             progress_total: 0,
             progress_current_fractional: None,
             progress_text: String::new(),
+            progress_phase: None,
             duration_str: None,
             log: VecDeque::new(),
             control: None,
@@ -179,6 +182,7 @@ impl StepRecord {
             progress_total: 0,
             progress_current_fractional: None,
             progress_text: "En attente...".into(),
+            progress_phase: None,
             duration_str: None,
             log: VecDeque::new(),
             control: Some(control),
@@ -373,6 +377,13 @@ impl WorkflowState {
         let mut inner = self.inner.write();
         if let Some(record) = inner.steps.get_mut(&step) {
             record.progress_text = text;
+        }
+    }
+
+    pub fn set_progress_phase(&self, step: StepKey, phase: Option<String>) {
+        let mut inner = self.inner.write();
+        if let Some(record) = inner.steps.get_mut(&step) {
+            record.progress_phase = phase;
         }
     }
 
@@ -634,6 +645,7 @@ impl WorkflowState {
             progress_total: record.progress_total,
             progress_current_fractional: record.progress_current_fractional,
             progress_text: record.progress_text.clone(),
+            progress_phase: record.progress_phase.clone(),
             duration_str: record.duration_str.clone(),
             is_any_sequence_running: inner.sequence_running,
             log: include_logs.then(|| record.log.iter().cloned().collect()),
@@ -683,6 +695,9 @@ pub struct StepStatus {
     pub progress_total: u64,
     pub progress_current_fractional: Option<f64>,
     pub progress_text: String,
+    /// Phase explicite, absente hors phase connue (`post` pour A5/A6).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress_phase: Option<String>,
     pub duration_str: Option<String>,
     pub is_any_sequence_running: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

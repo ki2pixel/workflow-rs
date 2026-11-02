@@ -15,6 +15,11 @@ pub struct ProgressParser {
     processing: Regex,
     internal: Regex,
     internal_batches: Regex,
+    post_total: Regex,
+    post_current: Regex,
+    post_progress: Regex,
+    post_done: Regex,
+    post_base: Option<u64>,
     success: Regex,
     success_batch: Regex,
     success_finalize: Regex,
@@ -45,6 +50,18 @@ impl ProgressParser {
             .expect("motif interne"),
             internal_batches: Regex::new(r"INTERNAL[_ ]PROGRESS\s*:\s*(\d+)\s*batches\s*-\s*(.*)")
                 .expect("motif batches"),
+            post_total: Regex::new(r"^POST_TOTAL\s*:\s*(\d+)\s*$").expect("motif total post"),
+            post_current: Regex::new(
+                r"^POST_CURRENT\s*:\s*(\d+)/(\d+)\s*(?:-|:)?\s*(.*)$",
+            )
+            .expect("motif projet courant post"),
+            post_progress: Regex::new(
+                r"^POST_PROGRESS\s*:\s*(\d+)/(\d+)\s*(?:-|:)?\s*(.*)$",
+            )
+            .expect("motif progression post"),
+            post_done: Regex::new(r"^POST_DONE\s*:\s*(\d+)(?:\s*-\s*(\d+))?\s*$")
+                .expect("motif fin post"),
+            post_base: None,
             success: Regex::new(r"^\s*Succès\s*:\s*(.*)$").expect("motif succès"),
             success_batch: Regex::new(r"MS_BATCH_OK\s*:\s*(.*)$").expect("motif succès batch"),
             success_finalize: Regex::new(r"Finalisation terminée pour '(.*?)'")
@@ -145,6 +162,76 @@ impl ProgressParser {
                 state.set_progress_text(self.step, html_escape(text));
             }
         }
+        if let Some(captures) = self.post_total.captures(trimmed) {
+            if let Some(total) = captures
+                .get(1)
+                .and_then(|value| value.as_str().parse::<u64>().ok())
+            {
+                let base = self.post_base(state);
+                state.set_progress_phase(self.step, Some("post".into()));
+                state.set_progress(
+                    self.step,
+                    base,
+                    Some(base + total),
+                    Some(format!("Post-traitement A5/A6 : 0/{total}")),
+                    Some(None),
+                );
+            }
+        }
+        if let Some(captures) = self.post_current.captures(trimmed) {
+            let current = captures
+                .get(1)
+                .and_then(|value| value.as_str().parse::<u64>().ok());
+            let total = captures
+                .get(2)
+                .and_then(|value| value.as_str().parse::<u64>().ok());
+            let label = captures
+                .get(3)
+                .map(|value| value.as_str().trim())
+                .unwrap_or_default();
+            if let (Some(current), Some(total)) = (current, total) {
+                self.set_post_cursor(state, current, total, label, false);
+            }
+        }
+        if let Some(captures) = self.post_progress.captures(trimmed) {
+            let current = captures
+                .get(1)
+                .and_then(|value| value.as_str().parse::<u64>().ok());
+            let total = captures
+                .get(2)
+                .and_then(|value| value.as_str().parse::<u64>().ok());
+            let label = captures
+                .get(3)
+                .map(|value| value.as_str().trim())
+                .unwrap_or_default();
+            if let (Some(current), Some(total)) = (current, total) {
+                self.set_post_cursor(state, current, total, label, true);
+            }
+        }
+        if let Some(captures) = self.post_done.captures(trimmed) {
+            let total = captures
+                .get(1)
+                .and_then(|value| value.as_str().parse::<u64>().ok())
+                .unwrap_or(0);
+            let failures = captures
+                .get(2)
+                .and_then(|value| value.as_str().parse::<u64>().ok())
+                .unwrap_or(0);
+            let base = self.post_base(state);
+            let text = if failures > 0 {
+                format!("Post-traitement A5/A6 : {total} projet(s), {failures} échec(s)")
+            } else {
+                format!("Post-traitement A5/A6 : {total} projet(s)")
+            };
+            state.set_progress_phase(self.step, Some("post".into()));
+            state.set_progress(
+                self.step,
+                base + total,
+                Some(base + total),
+                Some(html_escape(&text)),
+                Some(None),
+            );
+        }
 
         let success = self
             .success
@@ -173,6 +260,41 @@ impl ProgressParser {
             }
         }
         true
+    }
+
+    fn post_base(&mut self, state: &WorkflowState) -> u64 {
+        *self
+            .post_base
+            .get_or_insert_with(|| state.progress_total(self.step))
+    }
+
+    fn set_post_cursor(
+        &mut self,
+        state: &WorkflowState,
+        current: u64,
+        total: u64,
+        label: &str,
+        completed: bool,
+    ) {
+        let base = self.post_base(state);
+        let done = if completed {
+            current.min(total)
+        } else {
+            current.saturating_sub(1).min(total)
+        };
+        let text = if label.is_empty() {
+            format!("Post-traitement A5/A6 : {current}/{total}")
+        } else {
+            format!("Post-traitement A5/A6 : {current}/{total} — {label}")
+        };
+        state.set_progress_phase(self.step, Some("post".into()));
+        state.set_progress(
+            self.step,
+            base + done,
+            Some(base + total),
+            Some(html_escape(&text)),
+            Some(None),
+        );
     }
 
     fn record_success(&mut self, name: String, state: &WorkflowState) {
@@ -253,6 +375,72 @@ mod tests {
         parser.process("MS_BATCH_FAIL: clip.mp4", &state);
         let status = state.step_status(StepKey::Step8, false).unwrap();
         assert_eq!(status.progress_current, 1);
+    }
+
+    #[test]
+    fn post_phase_extends_step8_progress() {
+        let state = WorkflowState::new();
+        let mut parser = ProgressParser::new(StepKey::Step8);
+        parser.process("MS_BATCH_TOTAL: 1", &state);
+        parser.process("MS_BATCH_PROGRESS: 1/1 - 300 Camille", &state);
+        parser.process("POST_TOTAL: 3", &state);
+
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_total, 4);
+        assert_eq!(status.progress_current, 1);
+        assert_eq!(status.progress_text, "Post-traitement A5/A6 : 0/3");
+        assert_eq!(status.progress_phase.as_deref(), Some("post"));
+
+        parser.process("POST_CURRENT: 1/3 - clip-a", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 1);
+        assert_eq!(status.progress_total, 4);
+        assert_eq!(status.progress_text, "Post-traitement A5/A6 : 1/3 — clip-a");
+
+        parser.process("POST_PROGRESS: 1/3 - clip-a", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 2);
+        assert_eq!(status.progress_total, 4);
+
+        parser.process("POST_CURRENT: 3/3 - clip-c", &state);
+        parser.process("POST_PROGRESS: 3/3 - clip-c", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 4);
+        assert_eq!(status.progress_total, 4);
+
+        parser.process("POST_DONE: 3 - 0", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 4);
+        assert_eq!(status.progress_total, 4);
+        assert_eq!(status.progress_text, "Post-traitement A5/A6 : 3 projet(s)");
+    }
+
+    #[test]
+    fn post_phase_without_effectcraft_base_starts_at_zero() {
+        let state = WorkflowState::new();
+        let mut parser = ProgressParser::new(StepKey::Step8);
+        parser.process("POST_TOTAL: 2", &state);
+        parser.process("POST_CURRENT: 1/2 - clip-a", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 0);
+        assert_eq!(status.progress_total, 2);
+
+        parser.process("POST_PROGRESS: 1/2 - clip-a", &state);
+        parser.process("POST_CURRENT: 2/2 - clip-b", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 1);
+
+        parser.process("POST_PROGRESS: 2/2 - clip-b", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 2);
+
+        parser.process("POST_DONE: 2 - 1", &state);
+        let status = state.step_status(StepKey::Step8, false).unwrap();
+        assert_eq!(status.progress_current, 2);
+        assert_eq!(
+            status.progress_text,
+            "Post-traitement A5/A6 : 2 projet(s), 1 échec(s)"
+        );
     }
 
     #[test]

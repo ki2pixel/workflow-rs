@@ -112,7 +112,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 439 tests.
+- `cargo test --workspace` : 442 tests.
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.
@@ -152,6 +152,10 @@ comportement legacy sont dans `parity/DRIFT.md`.
   (`justify-content: center`, `controls.css`) au lieu d'être calée à gauche
   comme dans le legacy. `.sequence-controls` centre aussi ses lignes en cas de
   wrap ; le media query 768 px conserve la disposition mobile en colonne.
+- Écart assumé : la carte STEP8 suit aussi le post-traitement A5/A6. Quand
+  `progress_phase = "post"`, la barre passe en orange, le badge affiche
+  « Post-traitement » et le texte du serveur (`Post-traitement A5/A6 : i/N —
+  <projet>`) est affiché tel quel, sans réapposer le compteur global.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
 - Pas de client desktop natif (D-028) : ne pas ajouter de dépendance
   GTK/WebKit/zbus/Tauri ; `assets/web` est l'unique interface.
@@ -178,4 +182,10 @@ comportement legacy sont dans `parity/DRIFT.md`.
   STEP8 côté CLI.
 - Configuration : `[steps.step8.post]` ; `--no-post` désactive le hook ;
   `workflow-cli post run --report-only` calcule les rapports sans publier.
+- Progression : `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et `POST_DONE`
+  prolongent la barre STEP8. Le hook STEP8 les écrit sur `stdout` avec
+  `MS_BATCH_*` pour préserver l'ordre ; `post run` les met sur `stderr` et
+  garde son JSON sur `stdout`. `POST_CURRENT` change le texte,
+  `POST_PROGRESS` avance la barre après le projet ; le serveur expose
+  `progress_phase = "post"`.
 - Détail : `docs/lots/LOT-9-POST-STEP8.md`.

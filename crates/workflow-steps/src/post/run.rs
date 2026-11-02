@@ -19,6 +19,7 @@ use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 use serde_json::{json, Map, Serializer, Value};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use workflow_core::fsutil::write_atomic;
@@ -43,6 +44,9 @@ pub struct PostOptions {
     pub a2_margin: f64,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.
     pub report_only: bool,
+    /// Émet les marqueurs `POST_*` sur `stdout` (hook STEP8) au lieu de
+    /// `stderr` (commande `post run` seule).
+    pub emit_progress: bool,
 }
 
 impl Default for PostOptions {
@@ -61,6 +65,7 @@ impl Default for PostOptions {
             a1_margin: 1.04,
             a2_margin: 1.05,
             report_only: false,
+            emit_progress: false,
         }
     }
 }
@@ -81,6 +86,7 @@ impl PostOptions {
             a1_margin: config.a1_margin,
             a2_margin: config.a2_margin,
             report_only: false,
+            emit_progress: false,
         }
     }
 }
@@ -90,10 +96,29 @@ pub fn run_post_for_folders(folders: &[String], options: &PostOptions) -> PostRu
     if !options.enabled {
         return summary;
     }
+    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    // Pré-scan de tous les dossiers : le total A5/A6 est publié avant le
+    // premier projet pour que la barre STEP8 couvre aussi cette phase.
+    let mut projects = Vec::new();
     for folder in folders {
-        let folder_summary = run_post_dir(options, Path::new(folder));
-        merge_summary(&mut summary, folder_summary);
+        let folder = Path::new(folder);
+        prepare_direct(options, folder, &bypass, &mut summary);
+        let discovered = discover_projects(options, folder, &bypass);
+        if discovered.is_empty() {
+            tracing::debug!(
+                "Post-traitement: aucun .ecproj brut dans {}",
+                folder.join(&options.projects_subfolder).display()
+            );
+        } else {
+            tracing::info!(
+                "Post-traitement: {} projet(s) dans {}",
+                discovered.len(),
+                folder.display()
+            );
+            projects.extend(discovered);
+        }
     }
+    run_post_jobs(options, &projects, &mut summary);
     summary
 }
 
@@ -103,37 +128,65 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
         return summary;
     }
     let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
-    if options.direct && !options.report_only && !bypass.is_empty() {
-        let direct = direct::ensure_folder(
-            folder,
-            &options.docs_subfolder,
-            &options.projects_subfolder,
-            &options.ffprobe,
-            &bypass,
-            false,
+    prepare_direct(options, folder, &bypass, &mut summary);
+    let projects = discover_projects(options, folder, &bypass);
+    if projects.is_empty() {
+        tracing::debug!(
+            "Post-traitement: aucun .ecproj brut dans {}",
+            folder.join(&options.projects_subfolder).display()
         );
-        if direct.templates > 0 {
-            tracing::info!(
-                "Template direct {}: {} vidéo(s), {} brut(s) créé(s), {} déjà présent(s)",
-                folder.display(),
-                direct.templates,
-                direct.created,
-                direct.existing
-            );
-        }
-        if direct.archive_only > 0 {
-            tracing::info!(
-                "Archive-only {}: {} vidéo(s), aucun brut",
-                folder.display(),
-                direct.archive_only
-            );
-        }
-        if direct.failed > 0 {
-            summary
-                .failures
-                .push(format!("template direct: {}", folder.display()));
-        }
+        return summary;
     }
+    tracing::info!(
+        "Post-traitement: {} projet(s) dans {}",
+        projects.len(),
+        folder.display()
+    );
+    run_post_jobs(options, &projects, &mut summary);
+    summary
+}
+
+fn prepare_direct(
+    options: &PostOptions,
+    folder: &Path,
+    bypass: &Bypass,
+    summary: &mut PostRunSummary,
+) {
+    if !(options.direct && !options.report_only && !bypass.is_empty()) {
+        return;
+    }
+    let direct = direct::ensure_folder(
+        folder,
+        &options.docs_subfolder,
+        &options.projects_subfolder,
+        &options.ffprobe,
+        bypass,
+        false,
+    );
+    if direct.templates > 0 {
+        tracing::info!(
+            "Template direct {}: {} vidéo(s), {} brut(s) créé(s), {} déjà présent(s)",
+            folder.display(),
+            direct.templates,
+            direct.created,
+            direct.existing
+        );
+    }
+    if direct.archive_only > 0 {
+        tracing::info!(
+            "Archive-only {}: {} vidéo(s), aucun brut",
+            folder.display(),
+            direct.archive_only
+        );
+    }
+    if direct.failed > 0 {
+        summary
+            .failures
+            .push(format!("template direct: {}", folder.display()));
+    }
+}
+
+fn discover_projects(options: &PostOptions, folder: &Path, bypass: &Bypass) -> Vec<PathBuf> {
     let projects_dir = folder.join(&options.projects_subfolder);
     if !projects_dir.is_dir() {
         tracing::debug!(
@@ -141,7 +194,7 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
             projects_dir.display(),
             folder.display()
         );
-        return summary;
+        return Vec::new();
     }
     let mut projects = Vec::new();
     let Ok(entries) = fs::read_dir(&projects_dir) else {
@@ -149,7 +202,7 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
             "Post-traitement: lecture de {} impossible",
             projects_dir.display()
         );
-        return summary;
+        return Vec::new();
     };
     for entry in entries.flatten() {
         let path = entry.path();
@@ -212,20 +265,29 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
             }
         }
     }
+    projects
+}
+
+fn run_post_jobs(options: &PostOptions, projects: &[PathBuf], summary: &mut PostRunSummary) {
     if projects.is_empty() {
-        tracing::debug!(
-            "Post-traitement: aucun .ecproj brut dans {}",
-            projects_dir.display()
-        );
-        return summary;
+        return;
     }
-    tracing::info!(
-        "Post-traitement: {} projet(s) dans {}",
-        projects.len(),
-        folder.display()
-    );
-    for project in projects {
-        let outcome = run_post_project(options, &project, None);
+    // Marqueurs lus par le serveur pour prolonger la barre STEP8 après
+    // EffectCraft. Dans le hook STEP8 ils partagent `stdout` avec
+    // `MS_BATCH_*` pour conserver l'ordre ; `post run` les garde sur `stderr`
+    // afin que son JSON `stdout` reste parsable.
+    emit_post_marker(options, format!("POST_TOTAL: {}", projects.len()));
+    for (index, project) in projects.iter().enumerate() {
+        let name = project
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .or_else(|| project.file_name().and_then(|name| name.to_str()))
+            .unwrap_or("?");
+        emit_post_marker(
+            options,
+            format!("POST_CURRENT: {}/{} - {}", index + 1, projects.len(), name),
+        );
+        let outcome = run_post_project(options, project, None);
         if let Some(error) = outcome.error.as_deref() {
             tracing::warn!("Post-traitement échoué pour {}: {error}", project.display());
         } else {
@@ -241,9 +303,25 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
                 outcome.audit_verdict
             );
         }
+        emit_post_marker(
+            options,
+            format!("POST_PROGRESS: {}/{} - {}", index + 1, projects.len(), name),
+        );
         summary.push(outcome);
     }
-    summary
+    emit_post_marker(
+        options,
+        format!("POST_DONE: {} - {}", projects.len(), summary.failures.len()),
+    );
+}
+
+fn emit_post_marker(options: &PostOptions, line: String) {
+    if options.emit_progress {
+        println!("{line}");
+        let _ = std::io::stdout().flush();
+    } else {
+        eprintln!("{line}");
+    }
 }
 
 pub fn run_post_project(
@@ -632,16 +710,6 @@ pub fn run_post_project(
         audit_verdict,
         error: outcome_error,
     }
-}
-
-fn merge_summary(target: &mut PostRunSummary, source: PostRunSummary) {
-    target.projects += source.projects;
-    target.assists += source.assists;
-    target.apply += source.apply;
-    target.review += source.review;
-    target.noop += source.noop;
-    target.failures.extend(source.failures);
-    target.items.extend(source.items);
 }
 
 fn docs_dir_for(project: &Path, projects_subfolder: &str, docs_subfolder: &str) -> PathBuf {
@@ -1449,6 +1517,37 @@ mod tests {
             .join("projets")
             .join("clip_9x16_assist.ecproj")
             .exists());
+    }
+
+    #[test]
+    fn run_post_for_folders_processes_every_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut folders = Vec::new();
+        for name in ["a", "b"] {
+            let root = dir.path().join(name);
+            fs::create_dir_all(root.join("projets")).unwrap();
+            fs::create_dir_all(root.join("docs")).unwrap();
+            fs::write(
+                root.join("projets").join("clip_9x16.ecproj"),
+                serde_json::to_vec(&project_doc()).unwrap(),
+            )
+            .unwrap();
+            folders.push(root.to_string_lossy().to_string());
+        }
+
+        let summary = run_post_for_folders(&folders, &PostOptions::default());
+
+        assert_eq!(summary.projects, 2);
+        assert_eq!(summary.assists, 2);
+        assert!(summary.failures.is_empty());
+        for name in ["a", "b"] {
+            assert!(dir
+                .path()
+                .join(name)
+                .join("projets")
+                .join("clip_9x16_assist.ecproj")
+                .is_file());
+        }
     }
 
     #[test]

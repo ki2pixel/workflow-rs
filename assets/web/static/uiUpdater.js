@@ -413,6 +413,7 @@ export function updateStepCardUI(stepKey, data) {
         progress_current_fractional: data.progress_current_fractional,
         status: data.status,
         progress_text: data.progress_text,
+        progress_phase: data.progress_phase,
         timestamp: new Date().toISOString()
     });
 
@@ -425,15 +426,26 @@ export function updateStepCardUI(stepKey, data) {
 
             const normalizedStatus = normalizeStatus(data.status || 'idle');
             const statusMeta = getStatusMeta(normalizedStatus);
+            // Phase A5/A6 : le serveur fournit déjà le texte `i/N` et son
+            // total inclut les projets post. On ne réappose donc pas le
+            // compteur global, et la barre passe en orange.
+            const progressPhase = data.progress_phase || null;
+            const isPostPhase = progressPhase === 'post';
+            const isActiveStatus = ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus);
 
             if (statusEl) {
-                statusEl.textContent = statusMeta.label;
+                statusEl.textContent = isPostPhase && isActiveStatus ? 'Post-traitement' : statusMeta.label;
                 statusEl.className = `status-badge ${statusMeta.badgeClass}`;
             }
 
             const stepCardEl = document.getElementById(`step-${stepKey}`);
             if (stepCardEl) {
                 stepCardEl.setAttribute('data-status', normalizedStatus);
+                if (progressPhase) {
+                    stepCardEl.setAttribute('data-progress-phase', progressPhase);
+                } else {
+                    stepCardEl.removeAttribute('data-progress-phase');
+                }
             }
 
             updateStepStateChip(stepKey, normalizedStatus);
@@ -479,7 +491,7 @@ export function updateStepCardUI(stepKey, data) {
                 if (data.progress_total > 0) {
                     currentProgress = data.progress_current_fractional || data.progress_current;
 
-                    if (data.progress_current_fractional === null && data.progress_text) {
+                    if (data.progress_current_fractional === null && data.progress_text && !isPostPhase) {
                         const isSpecialRunning = (['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running','starting','stopping','initiated'].includes(normalizedStatus);
                         if (!isSpecialRunning) {
                             const percentMatch = data.progress_text.match(/(\d+)%/);
@@ -519,7 +531,9 @@ export function updateStepCardUI(stepKey, data) {
                         progressBar.textContent = '✓';
                         progressBar.setAttribute('aria-valuenow', 0);
                     } else {
-                        let baseCompletionText = formatProgressText(data.progress_text || "Terminé", data.progress_current, data.progress_total);
+                        let baseCompletionText = isPostPhase && data.progress_text
+                            ? data.progress_text
+                            : formatProgressText(data.progress_text || "Terminé", data.progress_current, data.progress_total);
                         const config = STEPS_CONFIG_FROM_SERVER[stepKey];
                         if (config && config.post_completion_message_ui) {
                             progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
@@ -542,7 +556,9 @@ export function updateStepCardUI(stepKey, data) {
                     progressBar.style.backgroundColor = 'var(--red)';
                     let failureText = `Échec`;
                     if (data.progress_total > 0) {
-                        failureText = formatProgressText(data.progress_text ? `Échec: ${data.progress_text}` : `Échec`, data.progress_current, data.progress_total);
+                        failureText = isPostPhase && data.progress_text
+                            ? `Échec: ${data.progress_text}`
+                            : formatProgressText(data.progress_text ? `Échec: ${data.progress_text}` : `Échec`, data.progress_current, data.progress_total);
                         progressBar.style.width = `${percentage}%`;
                         progressBar.textContent = `${percentage}%`;
                         progressBar.setAttribute('aria-valuenow', percentage);
@@ -580,7 +596,7 @@ export function updateStepCardUI(stepKey, data) {
                     }
 
                     progressContainer.style.display = 'block';
-                    progressBar.style.backgroundColor = 'var(--blue)';
+                    progressBar.style.backgroundColor = isPostPhase ? 'var(--orange)' : 'var(--blue)';
                     progressBar.style.width = `${percentage}%`;
                     progressBar.textContent = `${percentage}%`;
                     progressBar.setAttribute('aria-valuenow', percentage);
@@ -590,7 +606,9 @@ export function updateStepCardUI(stepKey, data) {
                     if (data.progress_text && data.progress_text.trim()) {
                         lastProgressTextByStep[stepKey] = data.progress_text;
                     }
-                    const subText = formatProgressText(candidateText, displayCurrent, data.progress_total);
+                    const subText = isPostPhase
+                        ? candidateText
+                        : formatProgressText(candidateText, displayCurrent, data.progress_total);
                     progressTextEl.textContent = subText;
 
                     const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'stopping', 'initiated'].includes(normalizedStatus);
@@ -620,7 +638,7 @@ export function updateStepCardUI(stepKey, data) {
                     }
                 } else if (['running', 'starting', 'stopping', 'initiated'].includes(data.status)) {
                     progressContainer.style.display = 'block';
-                    progressBar.style.backgroundColor = 'var(--blue)';
+                    progressBar.style.backgroundColor = isPostPhase ? 'var(--orange)' : 'var(--blue)';
                     progressBar.setAttribute('data-active', 'true');
                     progressBar.style.width = '0%';
                     progressBar.textContent = '0%';

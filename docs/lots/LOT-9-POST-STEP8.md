@@ -36,8 +36,9 @@ appliqués.
 - Si A6 est éligible, il remplace le projet : A1–A4 ne sont pas exécutés.
   Si le préfixe SDM est présent mais la structure incompatible, A1–A4
   tournent quand même et A6 part en `review`.
-- Le panneau `MediaSolution.jsx` et `assets/web` ne sont pas modifiés. Les
-  artefacts sont consultables en lecture seule sur disque.
+- Le post-traitement ne modifie pas `MediaSolution.jsx` ; `assets/web` n'est
+  touché que par l'affichage de sa progression (`progress_phase = "post"`).
+  Les artefacts sont consultables en lecture seule sur disque.
 - Les écritures JSON utilisent temporaire voisin + `rename`.
 
 ## Pipeline
@@ -250,6 +251,33 @@ workflow-cli post run \
 # Calcul des rapports sans publier le projet assisté.
 workflow-cli post run --folder /tmp/projet --report-only
 ```
+
+## Progression STEP8/post-STEP8
+
+Le hook STEP8 ne se contente plus d'attendre la fin du post-traitement : il
+émet des marqueurs de progression lus par le serveur.
+
+```
+POST_TOTAL: N
+POST_CURRENT: i/N - <projet>
+POST_PROGRESS: i/N - <projet>
+POST_DONE: N - <échecs>
+```
+
+- `POST_TOTAL` ajoute les `N` projets A5/A6 au total EffectCraft déjà publié
+  par `MS_BATCH_TOTAL` ; la barre ne repart pas de zéro.
+- `POST_CURRENT` est émis avant chaque projet et expose le texte
+  `Post-traitement A5/A6 : i/N — <projet>` ; la barre reste au nombre de
+  projets déjà terminés.
+- `POST_PROGRESS` est émis après chaque projet et avance la barre.
+- `POST_DONE` clôt la phase avec le nombre d'échecs éventuels.
+- Le serveur publie `progress_phase = "post"` ; `assets/web` affiche la barre
+  en orange, le statut « Post-traitement » et le texte sans réapposer le
+  compteur global.
+- Les marqueurs partagent `stdout` avec `MS_BATCH_*` dans le hook STEP8 pour
+  préserver l'ordre ; `workflow-cli post run` les écrit sur `stderr` pour
+  garder son JSON intact sur `stdout`. La granularité est le projet, pas les
+  étages A1/A2/A3/A4/A6.
 
 ## Validation de production
 

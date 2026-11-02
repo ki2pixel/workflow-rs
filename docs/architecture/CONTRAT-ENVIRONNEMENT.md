@@ -104,7 +104,7 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
 }
 ```
 
-`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`. Le serveur Rust ajoute le champ `is_stopping` et publie `stopping` pendant un arrêt demandé (voir §3).
+`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`. Le serveur Rust ajoute le champ `is_stopping` et publie `stopping` pendant un arrêt demandé (voir §3). Le champ optionnel `progress_phase` vaut `"post"` pendant le post-traitement A5/A6 de STEP8 et est absent sinon.
 
 `GET /sequence/status` :
 
@@ -206,7 +206,7 @@ Les messages français sont utilisés par le frontend (`"en cours"`, `"inconnue"
 
 - `status` parmi `idle`, `starting`, `running`, `completed`, `failed`, `cancelled`, plus `stopped` et `initiated` utilisés par le service. Le serveur Rust ajoute `stopping` entre la demande d'arrêt et la mort effective du sous-processus ; `stopped` n'est publié qu'ensuite.
 - `log`, `deque(maxlen=300)`, lignes déjà échappées en HTML.
-- `return_code`, `process`, `progress_current`, `progress_total`, `progress_text`, `start_time_epoch`, `duration_str`, `progress_current_fractional`, `files_completed`.
+- `return_code`, `process`, `progress_current`, `progress_total`, `progress_text`, `progress_phase`, `start_time_epoch`, `duration_str`, `progress_current_fractional`, `files_completed`.
 
 Globalement : `sequence_running`, `sequence_outcome`, `active_csv_downloads`, `kept_csv_downloads` (20 entrées), `csv_monitor_status`.
 
@@ -374,6 +374,14 @@ Progression sur `stdout`, parsée en continu :
 - `[Progression-MultiLine] texte || texte` remplace le texte de progression, les `||` devenant des retours à la ligne.
 - Succès : `Succès: ... créé`, `Succès: analyse audio terminée pour ...`, `Finalisation terminée pour '...'`, `MS_BATCH_OK: ...`.
 - Échec : `Échec: ... échoué`, `MS_BATCH_FAIL: ...`.
+- Post-traitement STEP8 : `POST_TOTAL: N`,
+  `POST_CURRENT: <i>/<N> - <projet>`, `POST_PROGRESS: <i>/<N> - <projet>`,
+  `POST_DONE: <N> - <échecs>`. Dans le hook STEP8, ils sont écrits sur
+  `stdout` avec `MS_BATCH_*` pour préserver l'ordre ; `workflow-cli post run`
+  les écrit sur `stderr` pour garder son JSON sur `stdout`. Le serveur les
+  ajoute au total STEP8 et publie `progress_phase = "post"` ;
+  `POST_CURRENT` met à jour le texte, puis `POST_PROGRESS` avance la barre
+  après le projet.
 
 Les lignes contenant `\r` ou des séquences ANSI sont ignorées. Chaque ligne conservée est échappée en HTML avant stockage.
 
@@ -407,9 +415,11 @@ jamais l'Anchor Point ; A3/A4 restent en revue ; A6 applique le template SDM
 si le préfixe configuré correspond et si la structure est mono-segment sans
 keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
-avec `workflow-cli post run`. Depuis D-034, `steps.step8.post.direct`
-court-circuite STEP2–STEP6 pour les vidéos SDM au profil 1920×1080 25 fps :
-STEP7 synthétise le CSV mono-segment et STEP8 construit le brut sans panel.
+avec `workflow-cli post run`. Sa progression (`POST_*`) prolonge la barre
+STEP8 et publie `progress_phase = "post"`. Depuis D-034,
+`steps.step8.post.direct` court-circuite STEP2–STEP6 pour les vidéos SDM au
+profil 1920×1080 25 fps : STEP7 synthétise le CSV mono-segment et STEP8
+construit le brut sans panel.
 Depuis D-035, `steps.step8.post.archive_only_prefixes` (par défaut
 `["W9 - LPHDF"]` dans la configuration de production) applique le même
 bypass mais sans aucun `.ecproj` : seul le CSV de scènes est archivé et

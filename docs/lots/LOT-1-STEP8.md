@@ -55,6 +55,22 @@ MS_BATCH_END: <résumé>
 MS_BATCH_RESULT: {...}
 ```
 
+Le post-traitement A5/A6 qui suit prolonge la même progression. Le CLI émet :
+
+```
+POST_TOTAL: N
+POST_CURRENT: i/N - <projet>
+POST_PROGRESS: i/N - <projet>
+POST_DONE: N - <échecs>
+```
+
+Dans le hook STEP8, ces marqueurs partagent `stdout` avec `MS_BATCH_*` pour
+préserver l'ordre. `workflow-cli post run` les écrit sur `stderr` pour garder
+son JSON intact sur `stdout`. `POST_CURRENT` met à jour le texte avant le
+projet, `POST_PROGRESS` avance la barre après sa fin. Le serveur ajoute ces
+projets au total STEP8 et publie `progress_phase = "post"` ; `assets/web`
+affiche alors la barre en orange avec le statut « Post-traitement ».
+
 Le résultat final `MS_BATCH_RESULT` reste produit par le driver et évalué par
 Rust (`ok == true` et `errors` vide).
 
@@ -92,8 +108,9 @@ si aucune décision ne s'applique). Les artefacts `post.json`, `review.json` et
 `audit.json` sont écrits sous `<docs>/post/<projet_assisté>/`.
 
 Le post-traitement est activé par `[steps.step8.post]` et désactivable avec
-`--no-post`. Il peut aussi être lancé seul avec `workflow-cli post run`.
-Détail des décisions A1/A2/A3/A4/A6, du template SDM et des validations :
+`--no-post`. Il peut aussi être lancé seul avec `workflow-cli post run`. Sa
+progression (`POST_*`) prolonge la barre STEP8 (D-050). Détail des décisions
+A1/A2/A3/A4/A6, du template SDM et des validations :
 `docs/lots/LOT-9-POST-STEP8.md`.
 
 ## Commandes

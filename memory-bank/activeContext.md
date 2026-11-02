@@ -2,7 +2,16 @@
 
 ## Tâche en cours
 
-**Contrôle QA read-only après export humain (scénario B).**
+**Progression STEP8/post-STEP8 dans l'interface.**
+La carte STEP8 prolonge sa barre pendant le post-traitement A5/A6 : le CLI
+émet `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et `POST_DONE` sur
+`stdout` dans le hook STEP8 (même flux que `MS_BATCH_*`) et sur `stderr`
+pour `post run`, le serveur ajoute ces projets au total STEP8 et expose
+`progress_phase = "post"`, et
+`assets/web` affiche la phase en orange avec le statut « Post-traitement ».
+Le détail est dans D-050.
+
+**Contexte QA (production, D-049).**
 Le module `crates/workflow-steps/src/qa/` et `workflow-cli qa run` sont intégrés
 pour le Stage 0 (specs, durée MP4/composition, timeline, template A6,
 noir/gel), le Stage 1 OCR PP-OCRv6 (sous-titres et logos) et le Stage 1 visage
@@ -34,6 +43,20 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-02] **Progression post-STEP8 dans l'interface (D-050)** :
+  - `post/run.rs` émet `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et
+    `POST_DONE` avant/après chaque projet A5/A6, sur `stdout` avec
+    `MS_BATCH_*` dans le hook STEP8 et sur `stderr` pour `post run` ;
+  - `progress.rs` ajoute ces projets au total EffectCraft et publie
+    `progress_phase = "post"` ;
+  - `uiUpdater.js` affiche la barre en orange, le badge « Post-traitement »
+    et le texte `i/N` du serveur sans réapposer le compteur global ;
+  - tests parser avec et sans base EffectCraft, marqueurs vérifiés sur deux
+    projets, 442 tests workspace, `fmt`, `clippy` et `node --check` verts ;
+  - harnais navigateur sur le vrai `uiUpdater.js` : barre orange, statut
+    « Post-traitement », texte `i/N` brut, complétion verte, échec rouge et
+    retour idle sans `data-progress-phase`.
 
 - [2026-11-02] **Passage en production du QA (D-049)** :
   - `auto_approve_eligible` calculé par `aggregate::auto_approve` : vrai
@@ -417,7 +440,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 439 tests unitaires ; pas de CI.
+- 442 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

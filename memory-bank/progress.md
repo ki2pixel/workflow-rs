@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 439 tests unitaires, sans matériel.
+- 442 tests unitaires, sans matériel.
 - **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-048)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
@@ -70,8 +70,10 @@
   bannière, A3/A4 en revue, A6 template SDM. Commande `workflow-cli post`.
   Validation 295 au pixel (0/255), parité de décisions avec le prototype sur
   268/187/191/181, 270/276/286/287 sans changement d'échelle, A2 synthétique
-  11/11, 315 tests, fmt/clippy verts. Reste : exposer `review.json` dans
-  l'UI, recalibrer A3/A4 et traiter 179/287.
+  11/11, 315 tests, fmt/clippy verts. Depuis D-050, la barre STEP8 prolonge
+  sa progression pendant le post (`progress_phase = "post"`, marqueurs
+  `POST_*`). Reste : exposer `review.json` dans l'UI, recalibrer A3/A4 et
+  traiter 179/287.
 
 ## Synchronisation documentaire (2026-10-28)
 

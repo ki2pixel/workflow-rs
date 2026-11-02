@@ -55,8 +55,8 @@ D-034, D-035).
   - temps DINOv2 1,25–1,31 s par export isolé, jusqu'à 5,9 s sous 4 workers ;
   - 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`), `fmt` et
     `clippy -D warnings` verts ;
-  - docs : `LOT-10-QA.md`, note d'architecture, `POC-RESULTS.md` §2.10,
-    `assets/models/qa/`, D-048.
+  - docs : `LOT-10-QA.md`, note d'architecture, `POC-RESULTS.md`
+    §2.10–2.11, `assets/models/qa/`, D-048.
 
 - [2026-11-01/02] **Stage 1 logos, masque overlays et galeries (D-041 à D-044)** :
   - `qa/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
@@ -428,11 +428,13 @@ D-034, D-035).
   `docs/lots/LOT-9-POST-STEP8.md`).
 - Poursuivre les scénarios B/C décrits dans
   `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`, sans toucher à la production.
-- QA logos : faire relire et signer les labels dev (`review_status = done`),
-  puis valider DINOv2 sur de vrais positifs résiduels avant d'envisager son
+- QA logos : faire relire et signer les 12 labels dev (`review_status = done`) ;
+  les 2 labels 270 sont `arbitrated` (branding source intentionnel). Valider
+  DINOv2 sur des logos inconnus et des masques partiels avant d'envisager son
   activation par défaut ; le probe reste entraîné sur 13 assets synthétiques.
-- QA logos : étendre la galerie à des assets non textuels et comparer raw vs
-  GOOD ; le corpus ne fournit que 13 PNG alpha valides.
+- QA logos : étendre la validation aux assets non textuels et aux logos
+  inconnus ; l'ablation couvre 14/14 overlays non déclarés, mais les 39 cas
+  de galerie ne sont pas indépendants (13 PNG alpha).
 - Diagnostiquer D-024 sans modifier les données de production.
 - Lire `docs/exploitation/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.

@@ -10,6 +10,10 @@
 //! d'émission) ne doivent pas devenir des findings. Sans projet, le contrôle
 //! est marqué `not_applicable` par l'orchestrateur : un OCR de bande haute
 //! seul confond logo et habillage éditorial.
+//!
+//! L'agrégation regroupe d'abord le texte exact, puis fusionne les variantes
+//! OCR proches dans la même zone (M6+ lu « 161+ », « 11+ », « 1+ ») sans
+//! fusionner deux logos éloignés.
 
 use crate::qa::frame::{grab_frame, BgrFrame};
 use crate::qa::model::{DefectType, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence};
@@ -59,6 +63,7 @@ struct LogoSample {
 struct Group {
     key: String,
     text: String,
+    variants: Vec<String>,
     first: f64,
     last: f64,
     count: usize,
@@ -216,6 +221,78 @@ fn normalize_text(text: &str) -> String {
         .collect()
 }
 
+/// Fusion prudente des variantes OCR d'un même logo : texte proche et boîte
+/// au même endroit. Deux logos distincts de même texte restent fusionnés par
+/// la clé exacte, comme dans le baseline.
+fn can_merge(group: &Group, detection: &LogoDetection) -> bool {
+    if group.bbox[2] <= 0 || group.bbox[3] <= 0 {
+        return false;
+    }
+    text_distance(&group.key, &detection.normalized) <= max_edits(&group.key, &detection.normalized)
+        && text_similarity(&group.key, &detection.normalized) >= 0.6
+        && bbox_similarity(group.bbox, detection.bbox)
+}
+
+fn max_edits(left: &str, right: &str) -> usize {
+    let shortest = left.chars().count().min(right.chars().count());
+    if shortest <= 4 {
+        1
+    } else {
+        2
+    }
+}
+
+fn text_similarity(left: &str, right: &str) -> f64 {
+    let longest = left.chars().count().max(right.chars().count());
+    if longest == 0 {
+        return 1.0;
+    }
+    1.0 - text_distance(left, right) as f64 / longest as f64
+}
+
+fn text_distance(left: &str, right: &str) -> usize {
+    let left = left.chars().collect::<Vec<_>>();
+    let right = right.chars().collect::<Vec<_>>();
+    let mut previous = (0..=right.len()).collect::<Vec<_>>();
+    let mut current = vec![0usize; right.len() + 1];
+    for (i, left_char) in left.iter().enumerate() {
+        current[0] = i + 1;
+        for (j, right_char) in right.iter().enumerate() {
+            let substitution = previous[j] + usize::from(left_char != right_char);
+            current[j + 1] = (current[j] + 1).min(previous[j + 1] + 1).min(substitution);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
+}
+
+/// Même zone : IoU suffisant, ou centre proche avec une taille comparable.
+fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
+    let area_left = (left[2].max(1) * left[3].max(1)) as f64;
+    let area_right = (right[2].max(1) * right[3].max(1)) as f64;
+    let intersection_width = (left[0] + left[2]).min(right[0] + right[2]) - left[0].max(right[0]);
+    let intersection_height = (left[1] + left[3]).min(right[1] + right[3]) - left[1].max(right[1]);
+    let intersection = (intersection_width.max(0) * intersection_height.max(0)) as f64;
+    let union = area_left + area_right - intersection;
+    if union > 0.0 && intersection / union >= 0.3 {
+        return true;
+    }
+    let center_left = (
+        left[0] as f64 + left[2] as f64 / 2.0,
+        left[1] as f64 + left[3] as f64 / 2.0,
+    );
+    let center_right = (
+        right[0] as f64 + right[2] as f64 / 2.0,
+        right[1] as f64 + right[3] as f64 / 2.0,
+    );
+    let distance = ((center_left.0 - center_right.0).powi(2)
+        + (center_left.1 - center_right.1).powi(2))
+    .sqrt();
+    let scale = left[2].max(left[3]).max(right[2]).max(right[3]) as f64;
+    let ratio = area_left / area_right;
+    distance <= 0.25 * scale && (0.5..=2.0).contains(&ratio)
+}
+
 fn aggregate(samples: &[LogoSample]) -> Vec<QaFinding> {
     let total = samples.len();
     if total == 0 {
@@ -224,27 +301,40 @@ fn aggregate(samples: &[LogoSample]) -> Vec<QaFinding> {
     let mut groups: Vec<Group> = Vec::new();
     for sample in samples {
         let mut seen = HashSet::new();
+        let mut used_groups = HashSet::new();
         for detection in &sample.detections {
             if !seen.insert(detection.normalized.clone()) {
                 continue;
             }
-            if let Some(group) = groups
-                .iter_mut()
-                .find(|group| group.key == detection.normalized)
-            {
+            let index = groups
+                .iter()
+                .position(|group| group.key == detection.normalized)
+                .or_else(|| groups.iter().position(|group| can_merge(group, detection)));
+            if let Some(index) = index {
+                // Un même logo ne compte qu'une fois par échantillon, même si
+                // l'OCR en produit deux variantes.
+                if !used_groups.insert(index) {
+                    continue;
+                }
+                let group = &mut groups[index];
                 group.count += 1;
                 group.last = sample.time;
                 group.scores.push(detection.score);
+                if !group.variants.iter().any(|text| text == &detection.text) {
+                    group.variants.push(detection.text.clone());
+                }
             } else {
                 groups.push(Group {
                     key: detection.normalized.clone(),
                     text: detection.text.clone(),
+                    variants: vec![detection.text.clone()],
                     first: sample.time,
                     last: sample.time,
                     count: 1,
                     scores: vec![detection.score],
                     bbox: detection.bbox,
                 });
+                used_groups.insert(groups.len() - 1);
             }
         }
     }
@@ -261,8 +351,20 @@ fn aggregate(samples: &[LogoSample]) -> Vec<QaFinding> {
         } else {
             Severity::Low
         };
+        let variants = if group.variants.len() > 1 {
+            let listed = group
+                .variants
+                .iter()
+                .take(3)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(" (variantes OCR : {listed})")
+        } else {
+            String::new()
+        };
         let notes = format!(
-            "texte « {} » persistant sur {}/{} échantillon(s) de la bande haute (0–{:.0} %), score moyen {:.3}",
+            "texte « {} » persistant sur {}/{} échantillon(s) de la bande haute (0–{:.0} %), score moyen {:.3}{variants}",
             group.text,
             group.count,
             total,
@@ -393,6 +495,80 @@ mod tests {
         assert_eq!(findings[0].defect_type, DefectType::LogoResidual);
         assert!((findings[0].confidence - 0.5).abs() < 1e-9);
         assert_eq!(findings[0].bbox_xywh, Some([70.0, 280.0, 240.0, 140.0]));
+    }
+
+    #[test]
+    fn aggregate_merges_ocr_variants_at_the_same_position() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: vec![detection(
+                    match index {
+                        0..=4 => "161+",
+                        5..=6 => "11+",
+                        _ => "1+",
+                    },
+                    [930, 316, 150, 114],
+                )],
+            })
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples);
+        assert_eq!(findings.len(), 1);
+        assert!((findings[0].confidence - 0.583).abs() < 1e-9);
+        assert!(findings[0].notes.contains("variantes OCR"));
+        assert!(findings[0].notes.contains("11+"));
+    }
+
+    #[test]
+    fn aggregate_does_not_merge_variants_at_distinct_positions() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: vec![detection(
+                    if index < 6 { "161+" } else { "11+" },
+                    if index < 6 {
+                        [100, 300, 150, 100]
+                    } else {
+                        [700, 300, 150, 100]
+                    },
+                )],
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(aggregate(&samples).len(), 2);
+    }
+
+    #[test]
+    fn aggregate_does_not_merge_distinct_texts_at_the_same_position() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: vec![detection(
+                    if index < 6 { "PARIS" } else { "LONDRES" },
+                    [100, 300, 150, 100],
+                )],
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(aggregate(&samples).len(), 2);
+    }
+
+    #[test]
+    fn aggregate_counts_a_group_once_per_sample() {
+        let samples = (0..12)
+            .map(|index| LogoSample {
+                time: index as f64,
+                detections: if index == 11 {
+                    vec![
+                        detection("161+", [930, 316, 150, 114]),
+                        detection("11+", [930, 316, 150, 114]),
+                    ]
+                } else {
+                    vec![detection("161+", [930, 316, 150, 114])]
+                },
+            })
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples);
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].notes.contains("12/12"));
     }
 
     #[test]

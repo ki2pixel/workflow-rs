@@ -218,7 +218,7 @@ La double annotation exige un Kappa de Cohen ≥ 0,8 sur les défauts objectifs 
 | G0 | Manifeste 36 exports principaux + 1 réserve, split 12/24, labels dev, synthèse reproductible |
 | G1 | Stage 0 : 0 faux positif sur les 35 GOOD ; temps moyen < 5 s/vidéo en batch de 4 workers, max < 30 s sur un export long |
 | G2 | OCR : rappel sous-titre ≥ 85 % ; visage coupé ≥ 95 % ; FP ≤ 10 % — PoC : 0 FP sur 35 GOOD, 12/12 sous-titres et 2/2 visages synthétiques ; rappel réel à mesurer sur 50+ positifs |
-| G3 | Logo : rappel ≥ 90 % sur galerie, FP ≤ 10 %. Masque `.ecproj` intégré : 30/32 exports évalués `pass`, 2 exports `review` (270, branding source, 6,25 %) ; galerie texte 60/60 sur 22 fonds (IC 95 % 94,0–100 %) et 0/16 FP, assets réels 24/26 (92,3 %), galerie réelle à faire |
+| G3 | Logo : rappel ≥ 90 % sur galerie, FP ≤ 10 %. Masque `.ecproj` intégré : 30/32 exports évalués `pass`, 2 exports `review` (270, branding source, 6,25 %) ; galerie texte 60/60 sur 22 fonds (IC 95 % 94,0–100 %) et 0/16 FP, assets réels 34/39 (87,2 %), 11/13 à l'échelle 1,0, galerie réelle à faire |
 | G4 | VLM : +5 points de rappel sur les ambigus, < 5 min, sinon abandon |
 | G5 | Intégration : fmt, clippy, tests, zéro régression, docs |
 
@@ -242,7 +242,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 | Visage Rust | 1 124 échantillons, YuNet ONNX CPU | 0 finding sur 35 GOOD, 25 coupés isolés, 2/2 synthétiques, 0/2 FP | **G2 partielle** |
 | Visage synthétique | 2 recadrages + 2 contrôles | 2/2 détectés, 0/2 faux positifs | à étendre |
 | Logo textuel | 12 frames/vidéo, texte persistant ≥ 50 % | 15/35 flags, dont 13 habillages d'émission légitimes | **G3 non testée** (baseline texte insuffisant) |
-| Logo Rust | 12 frames, bande haute, masque alpha `.ecproj` | 30/32 exports évalués `pass`, 2 exports `review` (270, branding source), 259/386 détections masquées ; galerie texte 60/60 sur 22 fonds et 0/16 FP ; assets réels 24/26 (92,3 %) | **G3 partielle** |
+| Logo Rust | 12 frames, bande haute, masque alpha `.ecproj` | 30/32 exports évalués `pass`, 2 exports `review` (270, branding source), 264/386 détections masquées ; galerie texte 60/60 sur 22 fonds et 0/16 FP ; assets réels 34/39 (87,2 %), 11/13 à 1,0 | **G3 partielle** |
 | Latence mono-vidéo | 191, 3 min 23 | Stage 0 24,8 s + OCR 56,1 s + visage 77,4 s ≈ 158 s | sous 5 min, marge faible |
 | Latence Rust | 35 exports | QA complet médiane 35,4 s, max 63,6 s (OCR médian 21,7 s) | < 60 s en médiane, 63,6 s au pire |
 
@@ -636,7 +636,7 @@ La feuille de route est dimensionnée pour 1 à 2 ingénieurs et le corpus de 36
 | **0. Manifeste et labels** *(2–3 j)* | Inventaire des 36 exports principaux + 1 réserve, split 12/24, schéma `qa_label.json`, générateur synthétique — **fait** : manifeste, split, schéma, 37 gabarits ; labels dev à pré-remplir puis relire | `qa_manifest.json`, `split.json`, labels dev | **G0** : corpus, split et labels prêts |
 | **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder`, cache | **G1** : 0 FP sur 35 GOOD ; 4,01 s/export en lot de 4, 12,3 s en séquentiel — mode lot et cache intégrés |
 | **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques, hash et preuves WebP — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
-| **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, persistance, synthèse appariée — **fait en Rust** : masque alpha, 30/32 exports `pass`, 2 exports `review` (270, branding source, 6,25 %), 259/386 détections masquées, galerie texte 60/60 sur 22 fonds et 0/16 FP, assets réels 24/26 (92,3 %) ; galerie DINOv2 et rappel réel à faire | Galerie + courbes P/R | **G3 partielle** : FP ≤ 10 % tenue sur les exports évalués, rappel texte 100 % mais assets réels 92,3 % (IC bas 75,9 %), rappel réel non mesuré |
+| **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, persistance, synthèse appariée — **fait en Rust** : masque alpha, 30/32 exports `pass`, 2 exports `review` (270, branding source, 6,25 %), 264/386 détections masquées, galerie texte 60/60 sur 22 fonds et 0/16 FP, assets réels 34/39 (87,2 %), 11/13 à 1,0 ; galerie DINOv2 et rappel réel à faire | Galerie + courbes P/R | **G3 partielle** : FP ≤ 10 % tenue sur les exports évalués, rappel texte 100 % mais assets réels 87,2 % (11/13 à 1,0), rappel réel non mesuré |
 | **4. VLM optionnel** *(3–5 j)* | SmolVLM2/Qwen2.5-VL sur 5–10 frames ambiguës | Rapport latence/VRAM/rappel | **G4** : +5 pts, < 5 min, sinon abandon |
 | **5. Intégration** *(3–5 j)* | Module `qa/`, CLI, tests, docs | `LOT-10-QA.md`, `qa.json` figé | **G5** : fmt, clippy, tests, zéro régression |
 

@@ -12,16 +12,17 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 421 tests unitaires, sans matériel.
-- **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-043)** :
+- 426 tests unitaires, sans matériel.
+- **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-047)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
   PP-OCRv6 ONNX CPU : 1 124 échantillons, 12 détections isolées, 0 finding
   sur 35 GOOD, 12/12 sous-titres synthétiques. Logos : masque alpha des
   overlays `.ecproj`, 30/32 exports évalués `pass`, 2 exports `review` (270,
-  branding source, 4 findings), 259/386 détections masquées, galerie
+  branding source, 4 findings), 264/386 détections masquées, galerie
   synthétique 60/60 sur 22 fonds (IC 95 % 94,0–100 %) et 0/16 FP, assets
-  réels 24/26 (92,3 %) et 0/10 FP, regroupement spatial des variantes OCR.
+  réels 34/39 (87,2 %) et 0/17 FP, 13/13 masqués, 11/13 à l'échelle 1,0 ;
+  regroupement spatial et containment des boîtes OCR.
   YuNet : 745 échantillons avec visage, 0 finding sur 35 GOOD, 2/2
   recadrages synthétiques. QA complet 298 en
   32,1 s ; mode lot `--folder` à 4 workers (Stage 0 : 4,01 s/export), cache

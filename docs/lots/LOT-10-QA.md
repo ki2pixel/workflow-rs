@@ -338,18 +338,27 @@ labellisée.
   `gen_logo_gallery.py` et `eval_logo_gallery.py` dans
   `/media/kidpixel/WORK/qa-poc/scripts/`. Limite : texte `drawtext` net et
   overlay synthétique.
-- Galerie d'assets réels (36 clips, 13 PNG alpha du corpus, 22 fonds) :
-  **24/26 positifs** (92,3 %, IC 95 % 75,9–97,9 %), **0/10 faux positifs**,
-  6/6 masqués. Le regroupement spatial des variantes OCR récupère M6+ et
-  Gulli à l'échelle 0,75 ; il reste M6+ à 1,0 et Les 100 à 1,0 (une seule
-  détection chacun). Le lot 35 exports reste inchangé (30 `pass`, 2 exports
-  `review`, 4 findings, 259/386 masquées). La borne basse de Wilson reste
-  sous 90 % : DINOv2 ou un classifieur de logos reste nécessaire.
+- Galerie d'assets réels (56 clips, 13 PNG alpha × 3 échelles, split
+  dev/holdout par asset 7/6) : **34/39 positifs** (87,2 %, IC 95 %
+  73,3–94,4 %), **0/17 faux positifs**, 13/13 masqués ; à l'échelle de
+  production 1,0 : 11/13, à 0,75 : 12/13, à 0,5 : 11/13 ; dev 19/21,
+  holdout 15/18. Échecs : M6+ (0/3), Les 100 à 1,0, Gulli à 0,5.
+- Le test 736 (`limit_side_len` du PoC Python) a été essayé sur la galerie
+  précédente : 22/26 contre 24/26 à 480, avec 0 faux positif dans les deux
+  cas. Les boîtes fusionnent (Les 100 : 216 px de haut > 180 ; Gulli carré ;
+  M6+ mal reconnu), donc le 480 natif est conservé ; un test fige
+  `1088×608` pour la bande logos.
+- Le masque et l'agrégation comptent la containment : une boîte OCR qui
+  contient l'overlay est masquée (M6+ : 12/12 au lieu de 1/12) et les
+  boîtes imbriquées de même texte sont fusionnées (e=m6 à 0,5 récupéré).
+- Le lot 35 exports confirme 30 `pass`, 3 `not_applicable` (179), 2 exports
+  `review` (270), 4 findings et 264/386 détections masquées (contre 259
+  avant la containment). La galerie texte reste 60/60, 0/16 FP, 8/8 masqués.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
   rendus depuis les rushes. 270 est confirmé comme branding source.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
   logos et 14,2 s de visage.
-- 421 tests workspace (389 `#[test]` + 32 `#[tokio::test]`).
+- 426 tests workspace (394 `#[test]` + 32 `#[tokio::test]`).
 
 ### Stage 1 visage
 

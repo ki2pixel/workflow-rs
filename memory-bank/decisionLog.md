@@ -566,6 +566,83 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-047 : containment pour le masque et l'agrégation des logos
+
+- **Contexte** : la galerie 13×3 a révélé deux erreurs liées aux boîtes OCR
+  plus grandes que le logo :
+  1. M6+ masqué : la détection 218×150 contient le logo 168×87 mais ne le
+     recouvre qu'à 44,7 %, sous le seuil 0,5 ; 11/12 détections échappaient
+     au masque.
+  2. e=m6 à 0,5 : « e=m6 » (5 échantillons) et « =m6 »/« m6 » (5) formaient
+     deux groupes, car la petite boîte n'avait pas l'IoU suffisant avec la
+     grande.
+- **Décision** :
+  1. `OverlayMask::overlap_ratio` divise l'intersection par la plus petite
+     des deux aires (détection ou overlay) : une boîte qui contient
+     l'overlay est expliquée. Le seuil 0,5 est conservé.
+  2. `bbox_similarity` accepte la containment (marge 2 px) en plus de l'IoU
+     et du centre proche.
+  3. Tests : détection qui contient l'overlay → 1,0 ; détection à moitié
+     dans l'overlay → 0,5 ; boîtes imbriquées de même texte → un finding ;
+     textes différents dans des boîtes imbriquées → deux findings.
+  4. `CACHE_VERSION` passe à 3 : l'agrégation, le masque et le préprocessing
+     changent les résultats à entrées identiques.
+- **Validation** : galerie 13×3 34/39, 0/17 FP, 13/13 masqués ; M6+ masqué
+  12/12 ; e=m6 à 0,5 récupéré (10/12). Lot 35 exports : 30 `pass`,
+  3 `not_applicable` (179), 2 `review` (270), 4 findings, 264/386 détections
+  masquées. Galerie texte : 60/60, 0/16 FP, 8/8 masqués.
+- **Références** : `crates/workflow-steps/src/qa/overlay.rs`,
+  `crates/workflow-steps/src/qa/logo.rs`,
+  `crates/workflow-steps/src/qa/cache.rs`.
+
+## 2026-11-02 — D-046 : galerie d'assets 13×3 et métriques par échelle
+
+- **Contexte** : la galerie 13×2 changeait le fond et la position entre les
+  deux transformations, ce qui confondait l'effet de l'échelle avec celui du
+  contexte. Le corpus ne contient que 13 PNG alpha valides (14 noms ;
+  `211 LFAUIT.png` est un fichier texte de 15 octets).
+- **Décision** :
+  1. Trois échelles par asset (1,0 production, 0,75, 0,5), avec le même
+     fond, le même offset et la même position du coin haut-gauche ; seule
+     l'échelle change.
+  2. 56 clips : 39 positifs, 13 masqués (un par asset), 4 négatifs.
+  3. Split dev/holdout par asset (7/6), jamais par crop ; tags `square` et
+     `short` pour l'analyse.
+  4. `eval_logo_gallery.py` expose `by_split`, `false_positives_by_split`,
+     `by_scale`, `by_tag`, `by_asset` et un résumé `assets`
+     (`any_detected`/`all_detected`).
+  5. Garde-fous de génération : PNG validé, ffmpeg borné à 120 s, image
+     overlay bornée à 6 s, offset < 9 s (fonds de 15 s).
+- **Validation** : 34/39 (87,2 %, IC 95 % de Wilson 73,3–94,4 %),
+  0/17 faux positifs, 13/13 masqués ; 1,0 : 11/13, 0,75 : 12/13,
+  0,5 : 11/13 ; dev 19/21, holdout 15/18. Échecs : M6+ (0/3), Les 100 à
+  1,0, Gulli à 0,5.
+- **Limite** : 13 assets indépendants seulement ; les 39 cas ne sont pas
+  indépendants et les 22 fonds sont partagés. La borne basse de Wilson
+  (73,3 %) reste sous 90 %.
+- **Références** : `scripts/gen_logo_asset_gallery.py`,
+  `scripts/eval_logo_gallery.py`, `POC-RESULTS.md` §2.9.
+
+## 2026-11-02 — D-045 : détection OCR à 736 testée et rejetée
+
+- **Contexte** : RapidOCR (PoC Python) utilise `limit_side_len=736` avec
+  `limit_type=min`. Rust gardait 480 : les bandes 1080×480 (sous-titres) et
+  1080×614 (logos) restaient à leur résolution native, alors que Python les
+  sur-échantillonne.
+- **Test** : `DET_LIMIT_SIDE` passé à 736, sans autre changement, sur la
+  galerie 13 assets × 2 transformations (26 positifs).
+- **Résultat** : 22/26 positifs contre 24/26 à 480 ; 0 faux positif dans les
+  deux cas. Les boîtes de détection fusionnent : Les 100 à 1,0 produit une
+  boîte de 216 px de haut (filtre `MAX_BOX_HEIGHT = 180`), Gulli à 1,0
+  devient carré (`MIN_ASPECT = 1,2`) et M6+ est lu « Ma+ », « al+ », « K+ »
+  au lieu de « 161+ », « 11+ », « 1+ ».
+- **Décision** : conserver 480 pour les deux bandes. La parité de
+  préprocessing avec RapidOCR n'est pas un objectif en soi : le rappel et les
+  filtres priment. Un test fige la taille native des bandes (`1088×608` pour
+  1080×614, `1088×1920` pour une frame pleine).
+- **Références** : `crates/workflow-steps/src/qa/ocr.rs`,
+  `POC-RESULTS.md` §2.9, D-043/D-044.
+
 ## 2026-11-02 — D-044 : regroupement spatial des variantes OCR de logos
 
 - **Contexte** : M6+ à l'échelle 0,75 était détecté sur 9 échantillons mais

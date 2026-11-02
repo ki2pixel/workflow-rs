@@ -13,12 +13,12 @@ les 35 exports : 35 `pass`, 0 écart avec le PoC Python, médiane 12,3 s.
 Validation OCR : 1 124 échantillons, 12 détections isolées, 0 finding sur
 35 GOOD, 12/12 sous-titres synthétiques. Validation logos : masque alpha des
 overlays `.ecproj`, 30/32 exports évalués `pass`, 2 exports `review` (270,
-branding source, 4 findings), 259/386 détections masquées ; galerie
+branding source, 4 findings), 264/386 détections masquées ; galerie
 synthétique 60/60 sur 22 fonds (IC 95 % 94,0–100 %) et 0/16 faux positifs ;
-assets réels 24/26 (92,3 %, IC 75,9–97,9 %), 0/10 faux positifs, 6/6 masqués.
-Validation visage : 745 échantillons avec visage, 0 finding, 2/2 recadrages
-synthétiques. Les sous-titres et les logos partagent le thread OCR ; QA
-complet 298 en 32,1 s. Le mode lot `--folder` répartit les exports sur
+assets réels 34/39 (87,2 %, IC 73,3–94,4 %), 0/17 faux positifs, 13/13
+masqués, 11/13 à l'échelle de production. Validation visage : 745
+échantillons avec visage, 0 finding, 2/2 recadrages synthétiques. Les
+sous-titres et les logos partagent le thread OCR ; QA complet 298 en 32,1 s. Le mode lot `--folder` répartit les exports sur
 4 workers (Stage 0 : 4,01 s/export) et réutilise les
 `qa.json` dont l'empreinte correspond. `auto_approve_eligible = false`. Le
 post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
@@ -35,22 +35,25 @@ D-034, D-035).
   - `--no-logo`, `overlays_skipped`, `stage1_logo_evidence` et
     `stage1_logo_ms` ; le cache passe en `cache_version=2` ;
   - lot 35 exports : 30 `pass`, 3 `not_applicable` (sans projet), 2 exports
-    `review` (270, 4 findings), 259/386 détections masquées, 6,25 % de faux
+    `review` (270, 4 findings), 264/386 détections masquées, 6,25 % de faux
     positifs connus ; logo confirmé dans les rushes ;
   - synthétiques : logo persistant détecté, contrôle masqué propre, texte
     transitoire non flagué ;
   - galerie texte 76 clips sur 22 fonds : 60/60 positifs (24–96 px, IC 95 %
     94,0–100 %), 0/16 faux positifs (8 masqués, 4 transitoires, 4 négatifs),
     177,2 s ;
-  - galerie assets réels 36 clips (13 PNG, 22 fonds) : 24/26 positifs
-    (92,3 %, IC 75,9–97,9 %), 0/10 faux positifs, 6/6 masqués ;
-  - regroupement spatial des variantes OCR (D-044) : M6+/Gulli récupérés,
-    M6+ et Les 100 à l'échelle 1,0 restent non détectés ;
-  - lot 35 exports inchangé : 30 `pass`, 2 exports `review`, 4 findings ;
+  - galerie assets réels 56 clips (13 PNG × 3 échelles, split dev/holdout
+    7/6) : 34/39 positifs (87,2 %, IC 73,3–94,4 %), 0/17 faux positifs,
+    13/13 masqués ; 1,0 : 11/13, 0,75 : 12/13, 0,5 : 11/13 ;
+  - regroupement spatial et containment (D-044, D-047) : M6+/Gulli à 0,75
+    et e=m6 à 0,5 récupérés ; M6+ (toutes échelles), Les 100 à 1,0 et
+    Gulli à 0,5 restent non détectés ;
+  - test 736 rejeté (D-045) : 22/26 contre 24/26 à 480, boîtes fusionnées ;
   - labels dev régénérés depuis `reports/rust-logo` (plus de baseline) ;
   - QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s) ;
-  - 80 tests `qa`, suite 421 tests, `fmt` et `clippy -D warnings` verts ;
-  - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS, D-041 à D-044.
+  - 84 tests `qa`, suite 426 tests, `fmt` et `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS,
+    D-041 à D-047.
 
 - [2026-11-01] **Stage 1 OCR, lot, preuves et cache (D-038 à D-040)** :
   - `qa/ocr.rs` : détection DB et reconnaissance CTC sur la bande basse

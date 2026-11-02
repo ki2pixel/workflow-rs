@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const QA_SCHEMA_VERSION: &str = "1.1.0";
+pub const QA_SCHEMA_VERSION: &str = "1.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

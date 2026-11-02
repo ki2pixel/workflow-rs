@@ -2,7 +2,8 @@
 #
 # Le binaire DINOv2 n'est pas versionné ; le probe linéaire (384 poids,
 # biais, seuil) l'est, car il est petit et auditable. `workflow-cli qa run`
-# ne charge ces fichiers qu'avec `--logo-visual`.
+# charge ces fichiers par défaut ; `--no-logo-visual` désactive le
+# vérificateur visuel.
 
 version = 1
 source = "https://huggingface.co/onnx-community/dinov2-small"

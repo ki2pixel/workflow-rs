@@ -7,8 +7,9 @@
 //! État v1 : Stage 0 déterministe (specs, durée, timeline, template A6,
 //! noir/gel), Stage 1 OCR sous-titres et logos (PP-OCRv6) et visage (YuNet),
 //! agrégation. Le contrôle logos exige un `.ecproj` pour masquer les overlays
-//! déclarés ; sans projet il reste `not_applicable`. `auto_approve_eligible`
-//! reste faux.
+//! déclarés ; sans projet il reste `not_applicable`. DINOv2 est actif par
+//! défaut (`--no-logo-visual` pour l'opt-out). `auto_approve_eligible` n'est
+//! vrai que sur un `pass` complet, avec les contrôles requis exécutés.
 
 pub mod aggregate;
 pub mod batch;
@@ -87,7 +88,7 @@ impl Default for QaOptions {
             intra_threads: None,
             ocr_enabled: true,
             logo_enabled: true,
-            logo_visual_enabled: false,
+            logo_visual_enabled: true,
             face_enabled: true,
             evidence_enabled: true,
             per_segment: 1,
@@ -251,8 +252,9 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         ));
     }
 
-    // Le vérificateur visuel est opt-in : sans modèle et probe présents, le
-    // contrôle reste explicitement `not_applicable` au lieu d'échouer.
+    // Le vérificateur visuel est actif par défaut. Sans modèle et probe
+    // présents, le contrôle reste explicitement `not_applicable` au lieu
+    // d'échouer ; l'auto-approbation est alors refusée.
     let mut logo_visual_options = None;
     if options.logo_visual_enabled {
         if !options.logo_enabled || !options.ocr_enabled {
@@ -401,6 +403,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     };
 
     let overall_status = aggregate::overall_status(&checks, &findings);
+    let (auto_approve_eligible, auto_approve_reason) = aggregate::auto_approve(&checks, &findings);
     let mut timings = stage0.timings;
     timings.stage1_ocr_ms = ocr_ms;
     timings.stage1_logo_ms = logo_ms;
@@ -439,8 +442,8 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         stage1_logo_visual_evidence: logo_visual_evidence,
         stage1_face_evidence: face_evidence,
         overall_status,
-        auto_approve_eligible: false,
-        auto_approve_reason: aggregate::auto_approve_reason().into(),
+        auto_approve_eligible,
+        auto_approve_reason,
         models_provenance: provenance,
         execution_metrics: ExecutionMetrics {
             timings_ms: timings,

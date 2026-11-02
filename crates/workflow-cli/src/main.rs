@@ -731,9 +731,14 @@ enum QaCommand {
         /// Désactive le contrôle logos de la bande haute.
         #[arg(long)]
         no_logo: bool,
-        /// Active le vérificateur visuel DINOv2 des candidats logos
-        /// (`dinov2_vits14_quantized.onnx` + `dinov2_logo_probe.json`).
+        /// Désactive le vérificateur visuel DINOv2 des candidats logos
+        /// (`dinov2_vits14_quantized.onnx` + `dinov2_logo_probe.json`),
+        /// actif par défaut.
         #[arg(long)]
+        no_logo_visual: bool,
+        /// Ancien flag opt-in conservé pour compatibilité ; DINOv2 est
+        /// désormais actif par défaut.
+        #[arg(long, hide = true, conflicts_with = "no_logo_visual")]
         logo_visual: bool,
         /// N'écrit pas les frames de preuve WebP.
         #[arg(long)]
@@ -1612,6 +1617,7 @@ fn run() -> Result<()> {
                 intra_threads,
                 no_ocr,
                 no_logo,
+                no_logo_visual,
                 logo_visual,
                 no_face,
                 no_evidence,
@@ -1636,7 +1642,7 @@ fn run() -> Result<()> {
                     intra_threads,
                     ocr_enabled: !no_ocr,
                     logo_enabled: !no_logo,
-                    logo_visual_enabled: logo_visual,
+                    logo_visual_enabled: !no_logo_visual || logo_visual,
                     face_enabled: !no_face,
                     evidence_enabled: !no_evidence,
                     per_segment,

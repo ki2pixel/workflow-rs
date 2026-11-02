@@ -16,10 +16,11 @@
 //! les boîtes imbriquées (« e=m6 » / « =m6 »), sans fusionner deux logos
 //! éloignés.
 //!
-//! Quand `--logo-visual` est actif, un second étage DINOv2 note toutes les
-//! boîtes OCR géométriquement valides, y compris celles dont le texte est trop
-//! court ou peu sûr. Un logo visuel n'est retenu que sur au moins trois des
-//! douze échantillons et s'il ne recoupe pas un finding texte.
+//! DINOv2 est actif par défaut (`--no-logo-visual` pour l'opt-out) : un
+//! second étage note toutes les boîtes OCR géométriquement valides, y compris
+//! celles dont le texte est trop court ou peu sûr. Un logo visuel n'est
+//! retenu que sur au moins trois des douze échantillons et s'il ne recoupe pas
+//! un finding texte.
 
 use crate::qa::dino::{visual_geometry_ok, DinoEngine, DinoOptions, DINO_MIN_TIMES};
 use crate::qa::frame::{grab_frame, BgrFrame};

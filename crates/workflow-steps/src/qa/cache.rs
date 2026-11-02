@@ -15,7 +15,7 @@ use std::path::Path;
 
 /// À incrémenter dès qu'un changement de code modifie les résultats pour les
 /// mêmes export, projet, modèles et options (préprocessing OCR, seuils…).
-const CACHE_VERSION: u32 = 5;
+const CACHE_VERSION: u32 = 6;
 
 /// Empreinte complète : hash de l'export puis empreinte des autres entrées.
 pub fn fingerprint(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<String> {
@@ -170,7 +170,7 @@ mod tests {
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
 
         let mut changed = options();
-        changed.logo_visual_enabled = true;
+        changed.logo_visual_enabled = false;
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
     }
 

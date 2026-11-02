@@ -566,6 +566,44 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-049 : passage en production du QA, auto-approbation conditionnelle et DINOv2 par défaut
+
+- **Contexte** : l'ablation réelle valide 14/14 overlays non déclarés, avec
+  0/14 finding quand le projet d'origine est utilisé ; les 2 exports 270
+  restent `review` et sont confirmés intentionnels (split screen). Le client
+  juge le lot assez complet pour la production.
+- **Décision** :
+  1. `auto_approve_eligible` n'est plus une constante : il est calculé par
+     `aggregate::auto_approve`. Il est vrai seulement si le statut global est
+     `pass` et si `project_readable`, `subtitle_ocr`, `logo_residual` et
+     `face_cut` sont `pass`/`info`. Un `review`, un `fail` ou un contrôle
+     requis `not_applicable` le laisse faux, avec un motif explicite.
+  2. Si un check `logo_visual` est présent (DINOv2 actif mais modèle/probe
+     absent), il doit être `pass`/`info` ; un `not_applicable` bloque
+     l'auto-approbation. `--no-logo-visual` retire le check et assume un
+     contrôle texte seul.
+  3. DINOv2 passe en opt-out : `logo_visual_enabled = true` par défaut,
+     `--no-logo-visual` pour le désactiver. L'ancien `--logo-visual` reste
+     accepté en alias caché, sans effet.
+  4. Schéma `qa.json` **1.2.0**, `CACHE_VERSION = 6` : les anciens rapports
+     avec `auto_approve_eligible = false` et les anciennes empreintes sont
+     invalidés. `summary.json` passe en schéma **2** avec le drapeau par
+     export et le compte `auto_approve_eligible`.
+- **Validation** : 6 tests d'agrégation ajoutés (pass complet, review/fail,
+  contrôle requis absent ou `not_applicable`, `logo_visual` non exécuté,
+  opt-out explicite) ; **439 tests workspace**, `fmt` et
+  `clippy -D warnings` verts. Spot-check release : 300 JOSEPH `pass` +
+  `auto_approve_eligible = true` avec DINOv2, `pass` + vrai avec
+  `--no-logo-visual`, `pass` + faux si le modèle DINOv2 manque
+  (`logo_visual=not_applicable`) ; 270 GOAL `review` + faux.
+- **Limite** : les logos inconnus, les masques partiels et les erreurs de
+  montage effectives ne sont pas labellisés. L'auto-approbation ne vaut que
+  pour les contrôles exécutés ; `--no-logo-visual` reste une soupape
+  explicite.
+- **Références** : `crates/workflow-steps/src/qa/aggregate.rs`,
+  `crates/workflow-steps/src/qa/mod.rs`,
+  `crates/workflow-cli/src/main.rs`, `docs/lots/LOT-10-QA.md`, D-048.
+
 ## 2026-11-02 — D-048 : vérificateur visuel DINOv2 opt-in
 
 - **Contexte** : le contrôle texte plafonne à 34/39 sur la galerie d'assets
@@ -575,7 +613,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Décision** :
   1. Ajouter un second étage DINOv2 ViT-S/14 quantifié (24,4 Mo,
      Apache-2.0), ONNX Runtime CPU, derrière `--logo-visual`, sans remplacer
-     l'OCR.
+     l'OCR. D-049 le passe en actif par défaut avec `--no-logo-visual` en
+     opt-out.
   2. Entraîner un probe logistique sur les embeddings CLS des assets **dev**
      (7/6 holdout) : 438 positifs, 284 négatifs, AUC holdout 0,824.
   3. Préprocessing Rust aligné sur le PoC : pad carré, bicubique 256,
@@ -592,8 +631,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Validation** : galerie 56 clips, union **39/39** (34 texte + 5 visuels),
   0/13 masqués, 0/4 négatifs ; corpus 32 exports avec projet, **0 nouveau
   `pass` signalé**, 2 exports 270 toujours `review` ; temps 1,25–1,31 s par
-  export isolé, jusqu'à 5,9 s sous 4 workers. 433 tests workspace,
-  `fmt` et `clippy -D warnings` verts.
+  export isolé, jusqu'à 5,9 s sous 4 workers. 433 tests workspace à cette
+  date, `fmt` et `clippy -D warnings` verts.
 - **Validation réelle (2026-11-02)** : 14 exports GOOD avec 16 overlays
   image, projet copié sans les calques image. Projet d'origine : **0/14**
   finding ; déclaration retirée : **14/14** (26 findings, 19 texte,
@@ -604,8 +643,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`.
 - **Limite** : probe entraîné sur 13 assets synthétiques ; l'ablation réelle
   couvre 14/14 overlays non déclarés, mais aucun défaut de montage réel ni
-  logo inconnu n'est labellisé. Flag opt-in et `auto_approve_eligible =
-  false` conservés.
+  logo inconnu n'est labellisé. À cette date, flag opt-in et
+  `auto_approve_eligible = false` conservés ; D-049 les remplace.
 - **Références** : `crates/workflow-steps/src/qa/dino.rs`,
   `crates/workflow-steps/src/qa/logo.rs`, `assets/models/qa/`,
   `POC-RESULTS.md` §2.10–2.11, `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`,
@@ -744,7 +783,8 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Conséquence** : la cible G3 de rappel ≥ 90 % n'est pas tenue sur les
   assets réels. La galerie texte 60/60 reste valable pour le sous-ensemble
   texte, mais DINOv2 ou un classifieur de logos reste nécessaire avant de
-  considérer G3 acquise. `auto_approve_eligible` reste faux.
+  considérer G3 acquise. À cette date, `auto_approve_eligible` restait faux ;
+  D-049 le remplace par un calcul conditionnel.
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `/media/kidpixel/WORK/qa-poc/reports/POC-RESULTS.md`,
   `scripts/gen_logo_asset_gallery.py`, `scripts/eval_logo_gallery.py`.

@@ -2,9 +2,11 @@
 
 > Statut : module Rust v1 démarré le 2026-10-30. Stage 0 déterministe,
 > Stage 1 OCR PP-OCRv6 (sous-titres et logos), visage YuNet et vérificateur
-> visuel DINOv2 optionnel, agrégation intégrés. Le contrôle logos s'appuie sur
-> le masque des overlays `.ecproj`.
+> visuel DINOv2 actif par défaut, agrégation intégrés. Le contrôle logos
+> s'appuie sur le masque des overlays `.ecproj`.
 > Décision : scénario B de `docs/etudes/Architecture_QA_Vidéo_Locale.md`.
+> Passage en production le 2026-11-02 : auto-approbation conditionnelle et
+> DINOv2 en opt-out (D-049).
 > Code : `crates/workflow-steps/src/qa/`, commande `workflow-cli qa run`.
 
 ## Problème
@@ -25,10 +27,14 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
 - Aucune écriture dans le corpus, `runtime/` ou `/mnt/cache`.
 - Pas de fallback Python : le module Rust est autonome pour Stage 0, l'OCR et
   le visage.
-- `auto_approve_eligible` reste **false** en v1. Le contrôle logos produit
-  des candidats `review` et aucune validation humaine n'a encore eu lieu.
+- `auto_approve_eligible` n'est **vrai** que pour un `pass` complet, avec
+  `project_readable`, `subtitle_ocr`, `logo_residual` et `face_cut`
+  réellement exécutés. Si DINOv2 est actif, un éventuel check
+  `logo_visual` doit être `pass` ou `info` (un `not_applicable` bloque). Un
+  `review`, un `fail` ou un contrôle requis `not_applicable` laisse le champ
+  faux avec un motif.
 - Un modèle ou un projet absent produit `not_applicable`, pas un échec
-  global.
+  global ; l'auto-approbation est alors refusée.
 - Les écritures JSON utilisent temporaire voisin + `rename`
   (`workflow_core::fsutil::write_atomic`).
 
@@ -50,9 +56,10 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
    frames uniformes, puis persistance ≥ 50 %. Les zones alpha des PNG
    d'overlay déclarés dans le `.ecproj` sont masquées par intervalle ; un
    texte persistant hors masque devient un candidat `logo_residual`.
-   Avec `--logo-visual`, un second étage DINOv2 note toutes les boîtes OCR
-   géométriquement valides, y compris celles dont le texte est trop court ou
-   peu sûr, et complète les findings texte sans les remplacer.
+   DINOv2 est actif par défaut (`--no-logo-visual` pour l'opt-out) : un
+   second étage note toutes les boîtes OCR géométriquement valides, y compris
+   celles dont le texte est trop court ou peu sûr, et complète les findings
+   texte sans les remplacer.
 4. **Stage 1 — visage** : YuNet ONNX Runtime CPU sur les mêmes instants. Le
    détecteur tourne sur la frame et sur une version étendue de 15 % de chaque
    côté ; les deux jeux de boîtes sont fusionnés. Seuls les visages dont un
@@ -62,7 +69,8 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
 5. **Stage 2 — agrégation** : un `fail` de check ou un défaut objectif
    (`spec_mismatch`, `template_logo_missing`) bloque ; tout autre finding ou
    check `review` demande une revue ; `info` et `not_applicable` ne dégradent
-   pas le statut.
+   pas le statut. L'agrégation calcule aussi `auto_approve_eligible` : vrai
+   seulement pour un `pass` complet avec les contrôles requis exécutés.
 6. **Preuves** : hash SHA-256 de l'export, puis une frame WebP par finding
    sous `<out>/evidence/`, à mi-intervalle ou 250 ms après le début.
 7. **Rapport** : `qa.json` avec specs, hash, méta projet, checks, findings,
@@ -148,10 +156,11 @@ n'est exploitable, le contrôle passe `not_applicable` au lieu de produire des
 faux positifs. Sans `.ecproj`, il est aussi `not_applicable` : un OCR de bande
 haute seul confond logo de chaîne et habillage éditorial.
 
-### Vérificateur visuel DINOv2 (optionnel)
+### Vérificateur visuel DINOv2 (actif par défaut)
 
-`--logo-visual` active un second étage qui ne remplace pas l'OCR : il note les
-candidats OCR que le texte rejette ou lit mal. Le modèle est DINOv2 ViT-S/14
+DINOv2 est actif par défaut ; `--no-logo-visual` est l'opt-out explicite. Ce
+second étage ne remplace pas l'OCR : il note les candidats OCR que le texte
+rejette ou lit mal. Le modèle est DINOv2 ViT-S/14
 quantifié (24,4 Mo, Apache-2.0), exécuté en ONNX Runtime CPU. Le probe
 logistique (384 poids, biais, seuil) est versionné dans
 `assets/models/qa/dinov2_logo_probe.json` ; le binaire se télécharge à part
@@ -215,10 +224,13 @@ workflow-cli qa run \
 `not_applicable` et l'échantillonnage retombe sur des fenêtres de 5 s.
 `--models` est optionnel : sans lui, `subtitle_ocr`, `logo_residual` et
 `face_cut` sont `not_applicable`. `--no-ocr`, `--no-logo` et `--no-face`
-désactivent explicitement un contrôle. `--logo-visual` active DINOv2 ; sans
-les fichiers `dinov2_vits14_quantized.onnx` et `dinov2_logo_probe.json` dans
-`--models`, le check `logo_visual` est `not_applicable` et le contrôle texte
-continue. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
+désactivent explicitement un contrôle. `--no-logo-visual` désactive DINOv2 ;
+sans les fichiers `dinov2_vits14_quantized.onnx` et
+`dinov2_logo_probe.json` dans `--models`, le check `logo_visual` est
+`not_applicable`, le contrôle texte continue et l'auto-approbation est
+refusée. L'ancien `--logo-visual` reste accepté en alias caché, sans effet
+puisque DINOv2 est actif par défaut. `--per-segment` accepte 1 ou 3.
+`--no-evidence` n'écrit pas les
 frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration
 `steps.step8.post`. `--intra-threads` borne les threads intra-op ONNX par
@@ -255,20 +267,21 @@ workflow-cli qa run \
   --workers 4
 ```
 
-`summary.json` contient `schema`, `generated_at`, `folder`, `workers`,
+`summary.json` contient `schema` (2), `generated_at`, `folder`, `workers`,
 `intra_threads`, `videos`, `counts` (`pass`, `info`, `review`, `fail`,
-`not_applicable`, `error`), `findings_total` et `items` (identifiants,
-chemins, statut, nombre de findings, latence, `cached`, `export_sha256`,
-`qa_path` ou `error`).
+`not_applicable`, `error`), `findings_total`, `auto_approve_eligible` et
+`items` (identifiants, chemins, statut, nombre de findings,
+`auto_approve_eligible`, latence, `cached`, `export_sha256`, `qa_path` ou
+`error`).
 
 ## Schéma `qa.json`
 
-Champs principaux : `schema_version` (1.1.0), `generated_at`, `video_id`,
+Champs principaux : `schema_version` (1.2.0), `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
 `stage1_ocr_evidence`, `stage1_logo_evidence`,
-`stage1_logo_visual_evidence` (si `--logo-visual`), `stage1_face_evidence`
+`stage1_logo_visual_evidence` (si DINOv2 est actif), `stage1_face_evidence`
 (si le contrôle tourne), `overall_status`, `auto_approve_eligible`,
 `auto_approve_reason`,
 `models_provenance`, `execution_metrics.timings_ms`.
@@ -418,15 +431,16 @@ pour invalider les rapports antérieurs au changement de sémantique de
 - Coût DINOv2 : 1,25–1,31 s pour 12 crops sur un export isolé, jusqu'à 5,9 s
   sous contention à 4 workers ; le contrôle texte reste majoritaire.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
-  logos et 14,2 s de visage. Le flag `--logo-visual` ajoute ~1,3 s.
-- 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`).
+  logos et 14,2 s de visage. DINOv2 ajoute ~1,3 s ; `--no-logo-visual`
+  retire ce surcoût.
+- 439 tests workspace (407 `#[test]` + 32 `#[tokio::test]`).
 
 #### Validation réelle par ablation (2026-11-02)
 
 Parmi les 15 projets GOOD qui déclarent des calques image, 14 disposent d'un
 export principal ; ces 14 projets (16 calques) ont été utilisés. Une copie du
-`.ecproj` retire ces calques, puis le même MP4 GOOD est contrôlé avec
-`--logo-visual` : le logo est réel, mais sa déclaration manque. Le projet
+`.ecproj` retire ces calques, puis le même MP4 GOOD est contrôlé avec DINOv2
+(actif par défaut) : le logo est réel, mais sa déclaration manque. Le projet
 d'origine sert de contrôle négatif. Le 15e projet (`266 Ce tueur...`) n'a
 qu'un export `_9x16_V2` de réserve et reste exclu.
 
@@ -442,6 +456,27 @@ a un Stage 0 `fail` (`aucun segment`) sans impact sur les findings logos. Les 16
 les deux exports 270 (split screen) restent `review` et sont labellisés
 `intentional`. Détail, preuves et labels :
 `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`.
+
+#### Passage en production (2026-11-02)
+
+Le lot est déclaré assez complet pour la production :
+
+- `auto_approve_eligible` devient **vrai** pour un `pass` complet avec les
+  contrôles requis exécutés ; tout `review`, `fail` ou contrôle requis
+  `not_applicable` reste faux. Le motif est explicite dans
+  `auto_approve_reason`.
+- DINOv2 passe en **opt-out** : actif par défaut, désactivable avec
+  `--no-logo-visual`. L'ancien `--logo-visual` reste accepté sans effet.
+- La décision s'appuie sur l'ablation réelle 14/14 et l'absence de faux
+  positif avec le projet d'origine. Les limites acceptées restent les logos
+  inconnus, les masques partiels et les erreurs de montage non labellisées.
+- `qa.json` passe en schéma **1.2.0** et le cache en version **6** pour
+  invalider les rapports qui portaient l'ancien `auto_approve_eligible =
+  false`.
+- Spot-check release : 300 JOSEPH `pass` + auto vrai, 298 GOOD `pass` +
+  auto vrai, 298 ablaté `review` + auto faux, 270 GOAL `review` + auto faux ;
+  modèle DINOv2 absent → `not_applicable` + auto faux ; `--no-logo-visual`
+  → `pass` + auto vrai sans preuve visuelle.
 
 ### Stage 1 visage
 
@@ -466,19 +501,22 @@ les deux exports 270 (split screen) restent `review` et sont labellisés
 ## Limites v1
 
 - Logos : 2 exports en `review` sur 270 (branding source intentionnel,
-  split screen) et aucun défaut réel labellisé. Le détecteur produit des
-  candidats `review`, jamais une auto-approbation.
-- DINOv2 est **opt-in** (`--logo-visual`) et entraîné sur des assets PNG
-  collés synthétiquement. L'ablation réelle valide 14/14 overlays non
-  déclarés, mais elle ne prouve pas le rappel sur un logo inconnu ni sur un
-  masque partiellement décalé. Le probe et le modèle ne sont pas réentraînés
-  en production ; un nouveau logo inconnu peut passer.
+  split screen) et aucun défaut réel labellisé. Un `pass` complet peut être
+  auto-approuvé ; tout finding ou contrôle requis non exécuté impose une
+  revue.
+- DINOv2 est **actif par défaut** (`--no-logo-visual` pour l'opt-out) et
+  entraîné sur des assets PNG collés synthétiquement. L'ablation réelle
+  valide 14/14 overlays non déclarés, mais elle ne prouve pas le rappel sur
+  un logo inconnu ni sur un masque partiellement décalé. Le probe et le
+  modèle ne sont pas réentraînés en production ; un nouveau logo inconnu peut
+  passer.
 - Le plafond de 220 px du vérificateur est calibré sur Les 100 à 1,0 ; un
   logo plus haut ou plus carré reste hors géométrie.
 - Le gain DINOv2 est mesuré sur 13 assets seulement (7 dev / 6 holdout) ;
   les 39 cas partagent 22 fonds et ne sont pas indépendants.
 - Le modèle DINOv2 n'est pas versionné (24,4 Mo) ; le probe l'est. Sans les
-  deux fichiers, `logo_visual` est `not_applicable`.
+  deux fichiers, `logo_visual` est `not_applicable` et l'auto-approbation est
+  refusée.
 - Le masque ne couvre que les PNG déclarés ; un habillage incrusté dans la
   source reste indistinguable d'un logo résiduel sans galerie labellisée.
 - Détection OCR axis-aligned, sans classifieur d'orientation 180° : les
@@ -501,12 +539,11 @@ les deux exports 270 (split screen) restent `review` et sont labellisés
 
 ## Prochaines étapes
 
-1. Étendre la validation réelle aux logos inconnus, aux masques partiels et
+1. Surveiller les auto-approbations en production et conserver
+   `--no-logo-visual` comme soupape ; le probe reste un PoC synthétique.
+2. Étendre la validation réelle aux logos inconnus, aux masques partiels et
    aux erreurs de montage effectives ; l'ablation couvre les overlays non
    déclarés, pas ces cas.
-2. Envisager l'activation par défaut de DINOv2 seulement après cette
-   extension ; le probe actuel reste un PoC synthétique, même si l'ablation
-   réelle est concluante sur les 14 exports.
 3. Réserver le VLM local aux frames ambiguës (phase 4).
 4. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
 5. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.

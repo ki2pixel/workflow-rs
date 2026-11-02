@@ -43,6 +43,8 @@ pub struct BatchItem {
     /// `pass`, `info`, `review`, `fail`, `not_applicable` ou `error`.
     pub status: String,
     pub findings: usize,
+    /// Le `qa.json` de cet export est auto-approbable sans revue humaine.
+    pub auto_approve_eligible: bool,
     pub total_ms: u64,
     /// Rapport réutilisé sans réexécution (mêmes entrées).
     pub cached: bool,
@@ -64,6 +66,8 @@ pub struct BatchSummary {
     pub videos: usize,
     pub counts: BTreeMap<String, usize>,
     pub findings_total: usize,
+    /// Nombre d'exports dont le `qa.json` est auto-approbable.
+    pub auto_approve_eligible: usize,
     pub items: Vec<BatchItem>,
 }
 
@@ -162,13 +166,15 @@ pub fn run_folder(
         counts.insert(key.to_string(), 0usize);
     }
     let mut findings_total = 0usize;
+    let mut auto_approve_eligible = 0usize;
     for item in &items {
         *counts.entry(item.status.clone()).or_insert(0) += 1;
         findings_total += item.findings;
+        auto_approve_eligible += usize::from(item.auto_approve_eligible);
     }
 
     let summary = BatchSummary {
-        schema: 1,
+        schema: 2,
         generated_at: now_iso(),
         folder: folder.to_string_lossy().to_string(),
         workers,
@@ -176,6 +182,7 @@ pub fn run_folder(
         videos: items.len(),
         counts,
         findings_total,
+        auto_approve_eligible,
         items,
     };
     let summary_path = base.out_dir.join("summary.json");
@@ -248,6 +255,7 @@ fn run_export(
                     .map(|path| path.to_string_lossy().to_string()),
                 status,
                 findings: report.findings.len(),
+                auto_approve_eligible: report.auto_approve_eligible,
                 total_ms: elapsed,
                 cached: false,
                 export_sha256: Some(report.export_sha256),
@@ -274,6 +282,7 @@ fn run_export(
                     .map(|path| path.to_string_lossy().to_string()),
                 status: "error".into(),
                 findings: 0,
+                auto_approve_eligible: false,
                 total_ms: elapsed,
                 cached: false,
                 export_sha256: None,
@@ -351,6 +360,7 @@ fn cached_item(export: &BatchExport, base: &QaOptions, index: usize) -> Option<B
             .map(|path| path.to_string_lossy().to_string()),
         status: report.overall_status.as_str().to_string(),
         findings: report.findings.len(),
+        auto_approve_eligible: report.auto_approve_eligible,
         total_ms: 0,
         cached: true,
         export_sha256: Some(report.export_sha256),
@@ -539,7 +549,7 @@ mod tests {
         counts.insert("pass".to_string(), 1);
         counts.insert("error".to_string(), 1);
         let summary = BatchSummary {
-            schema: 1,
+            schema: 2,
             generated_at: "2026-10-31T00:00:00Z".into(),
             folder: "/corpus".into(),
             workers: 4,
@@ -547,6 +557,7 @@ mod tests {
             videos: 2,
             counts,
             findings_total: 0,
+            auto_approve_eligible: 0,
             items: Vec::new(),
         };
         assert!(summary.has_failures());

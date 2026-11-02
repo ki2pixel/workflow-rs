@@ -25,7 +25,10 @@
   regroupement spatial et containment des boîtes OCR. Vérificateur DINOv2
   opt-in (`--logo-visual`) : union 39/39 sur la galerie (5 sauvetages),
   0/13 masqués, 0/4 négatifs, 0 nouveau `pass` signalé sur les 32 exports
-  avec projet ; 270 reste `review`. YuNet : 745 échantillons avec visage,
+  avec projet ; 270 reste `review` et est confirmé intentionnel (split
+  screen). Validation réelle par ablation : 14/14 overlays non déclarés
+  détectés, 0/14 avec le projet d'origine, 298 sauvé par DINOv2 (2/2).
+  YuNet : 745 échantillons avec visage,
   0 finding sur 35 GOOD, 2/2 recadrages synthétiques. QA complet 298 en
   32,1 s ; mode lot `--folder` à 4 workers (Stage 0 : 4,01 s/export), cache
   par empreinte (0,23 s sur hit) et `export_sha256` avec une frame WebP par

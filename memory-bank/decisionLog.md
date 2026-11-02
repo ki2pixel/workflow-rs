@@ -594,11 +594,22 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `pass` signalé**, 2 exports 270 toujours `review` ; temps 1,25–1,31 s par
   export isolé, jusqu'à 5,9 s sous 4 workers. 433 tests workspace,
   `fmt` et `clippy -D warnings` verts.
-- **Limite** : probe entraîné sur 13 assets synthétiques, aucun positif réel
-  labellisé ; flag opt-in et `auto_approve_eligible = false` conservé.
+- **Validation réelle (2026-11-02)** : 14 exports GOOD avec 16 overlays
+  image, projet copié sans les calques image. Projet d'origine : **0/14**
+  finding ; déclaration retirée : **14/14** (26 findings, 19 texte,
+  7 DINOv2 ; IC 95 % 78,5–100 %). Le cas 298 « The 100 » est sauvé par
+  DINOv2 (2/2). Les overlays et les deux exports 270 (split screen) sont
+  confirmés intentionnels par le client. Cette ablation valide les overlays
+  non déclarés, pas les logos inconnus ni les masques partiels. Détail :
+  `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`.
+- **Limite** : probe entraîné sur 13 assets synthétiques ; l'ablation réelle
+  couvre 14/14 overlays non déclarés, mais aucun défaut de montage réel ni
+  logo inconnu n'est labellisé. Flag opt-in et `auto_approve_eligible =
+  false` conservés.
 - **Références** : `crates/workflow-steps/src/qa/dino.rs`,
   `crates/workflow-steps/src/qa/logo.rs`, `assets/models/qa/`,
-  `POC-RESULTS.md` §2.10, D-047.
+  `POC-RESULTS.md` §2.10–2.11, `/media/kidpixel/WORK/qa-poc/reports/real-ablation/`,
+  D-047.
 
 ## 2026-11-02 — D-047 : containment pour le masque et l'agrégation des logos
 

@@ -402,8 +402,9 @@ pour invalider les rapports antérieurs au changement de sémantique de
 - Le lot 35 exports confirme 30 `pass`, 3 `not_applicable` (179), 2 exports
   `review` (270), 4 findings et 264/386 détections masquées (contre 259
   avant la containment). La galerie texte reste 60/60, 0/16 FP, 8/8 masqués.
-- Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
-  rendus depuis les rushes. 270 est confirmé comme branding source.
+- Le rappel de défauts réels reste non mesurable sur les GOOD : les positifs
+  doivent être rendus depuis les rushes. 270 est confirmé comme branding
+  source intentionnel (split screen).
 - Vérificateur DINOv2 (probe entraîné sur les 7 assets dev, évalué sur les 6
   assets holdout) : 736 candidats géométriques, 465 au-dessus du seuil 0,50.
   Galerie 56 clips : **39/39 positifs** en union texte + visuel (IC 95 % de
@@ -419,6 +420,28 @@ pour invalider les rapports antérieurs au changement de sémantique de
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
   logos et 14,2 s de visage. Le flag `--logo-visual` ajoute ~1,3 s.
 - 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`).
+
+#### Validation réelle par ablation (2026-11-02)
+
+Les 15 projets GOOD qui déclarent des calques image ont été utilisés. Une
+copie du `.ecproj` retire ces calques, puis le même MP4 GOOD est contrôlé avec
+`--logo-visual` : le logo est réel, mais sa déclaration manque. Le projet
+d'origine sert de contrôle négatif.
+
+| Variante | Projets avec finding | Findings | Texte | DINOv2 | Union |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GOOD + projet d'origine | **0/14** | 0 | 0 | 0 | 0 |
+| GOOD + overlay non déclaré | **14/14** | 26 | 19 | 7 | **14/14** |
+
+Union 14/14 (IC 95 % de Wilson 78,5–100 %), texte 13/14, DINOv2 6/14,
+0/14 faux positif avec le projet d'origine. Le cas 298 « The 100 » est le
+sauvetage visuel net : texte 0, DINOv2 **2/2**. Un projet
+(`266 Ce tueur...`) est exclu faute d'export principal ; un cas 211
+« Citroën 2CV » a un Stage 0 `fail` (`aucun segment`) sans impact sur les
+findings logos. Les 16 overlays sont confirmés intentionnels par le client ;
+les deux exports 270 (split screen) restent `review` et sont labellisés
+`intentional`. Détail, preuves et labels :
+`/media/kidpixel/WORK/qa-poc/reports/real-ablation/`.
 
 ### Stage 1 visage
 
@@ -442,13 +465,14 @@ pour invalider les rapports antérieurs au changement de sémantique de
 
 ## Limites v1
 
-- Logos : 2 exports en `review` sur 270 (branding source non déclaré ou
-  oublié) et aucun positif réel labellisé. Le détecteur produit des candidats `review`,
-  jamais une auto-approbation.
+- Logos : 2 exports en `review` sur 270 (branding source intentionnel,
+  split screen) et aucun défaut réel labellisé. Le détecteur produit des
+  candidats `review`, jamais une auto-approbation.
 - DINOv2 est **opt-in** (`--logo-visual`) et entraîné sur des assets PNG
-  collés synthétiquement : les 39/39 ne prouvent pas le rappel sur de vrais
-  logos résiduels. Le probe et le modèle ne sont pas réentraînés en
-  production ; un nouveau logo inconnu peut passer.
+  collés synthétiquement. L'ablation réelle valide 14/14 overlays non
+  déclarés, mais elle ne prouve pas le rappel sur un logo inconnu ni sur un
+  masque partiellement décalé. Le probe et le modèle ne sont pas réentraînés
+  en production ; un nouveau logo inconnu peut passer.
 - Le plafond de 220 px du vérificateur est calibré sur Les 100 à 1,0 ; un
   logo plus haut ou plus carré reste hors géométrie.
 - Le gain DINOv2 est mesuré sur 13 assets seulement (7 dev / 6 holdout) ;
@@ -477,11 +501,12 @@ pour invalider les rapports antérieurs au changement de sémantique de
 
 ## Prochaines étapes
 
-1. Constituer la galerie labellisée de vrais logos résiduels et comparer raw
-   vs GOOD pour mesurer le rappel réel, notamment sur les exports GOOD sans
-   positif défectueux.
-2. Valider DINOv2 sur ces positifs réels avant d'envisager son activation par
-   défaut ; le probe actuel reste un PoC synthétique.
+1. Étendre la validation réelle aux logos inconnus, aux masques partiels et
+   aux erreurs de montage effectives ; l'ablation couvre les overlays non
+   déclarés, pas ces cas.
+2. Envisager l'activation par défaut de DINOv2 seulement après cette
+   extension ; le probe actuel reste un PoC synthétique, même si l'ablation
+   réelle est concluante sur les 14 exports.
 3. Réserver le VLM local aux frames ambiguës (phase 4).
 4. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
 5. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.

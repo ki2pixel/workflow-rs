@@ -24,6 +24,10 @@ sous-titres et les logos partagent le thread OCR ; QA complet 298 en 32,1 s. Le 
 vérificateur visuel DINOv2 ViT-S/14 est intégré en opt-in (`--logo-visual`) :
 il complète l'OCR sur les candidats géométriques et atteint 39/39 en union
 sur la galerie synthétique, sans nouveau faux positif sur les exports GOOD.
+Validation réelle par ablation : 14/14 exports avec overlay non déclaré
+détectés (26 findings), 0/14 avec le projet d'origine ; 298 « The 100 »
+est sauvé par DINOv2 (2/2). Les overlays et les deux exports 270 (split
+screen) sont confirmés intentionnels.
 Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
@@ -42,6 +46,12 @@ D-034, D-035).
     Les 100 1,0, M6+ ×3), 0/13 masqués, 0/4 négatifs ;
   - corpus 32 exports avec projet : 0 nouveau `pass` signalé, 270 toujours
     `review` ; 736 candidats, 465 au-dessus du seuil ;
+  - validation réelle par ablation : 14 GOOD avec 16 overlays image, projet
+    copié sans les calques image ; 0/14 finding avec le projet d'origine,
+    **14/14** avec la déclaration retirée (26 findings, 19 texte, 7 DINOv2),
+    298 « The 100 » sauvé par DINOv2 (2/2) ; overlays et 270 confirmés
+    intentionnels par le client ; détail dans
+    `/media/kidpixel/WORK/qa-poc/reports/real-ablation/` ;
   - temps DINOv2 1,25–1,31 s par export isolé, jusqu'à 5,9 s sous 4 workers ;
   - 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`), `fmt` et
     `clippy -D warnings` verts ;

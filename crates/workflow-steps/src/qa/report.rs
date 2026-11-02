@@ -36,13 +36,13 @@ mod tests {
     use super::*;
     use crate::qa::model::{
         ExecutionMetrics, ModelsProvenance, QaCheck, QaProjectMeta, QaSpecs, QaStatus,
-        Stage0Evidence, Stage0Thresholds,
+        Stage0Evidence, Stage0Thresholds, QA_SCHEMA_VERSION,
     };
     use tempfile::tempdir;
 
     fn report() -> QaReport {
         QaReport {
-            schema_version: "1.0.0".into(),
+            schema_version: QA_SCHEMA_VERSION.into(),
             generated_at: "2026-10-30T00:00:00Z".into(),
             video_id: "300_TEST".into(),
             folder_id: Some("300".into()),
@@ -80,6 +80,7 @@ mod tests {
             },
             stage1_ocr_evidence: None,
             stage1_logo_evidence: None,
+            stage1_logo_visual_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

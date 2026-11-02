@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const QA_SCHEMA_VERSION: &str = "1.0.0";
+pub const QA_SCHEMA_VERSION: &str = "1.1.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -293,6 +293,21 @@ pub struct Stage1LogoEvidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stage1LogoVisualEvidence {
+    pub model: String,
+    pub samples_total: usize,
+    pub candidates_total: usize,
+    pub candidates_scored: usize,
+    pub detections_total: usize,
+    pub findings_total: usize,
+    pub threshold: f64,
+    pub persistence_min: usize,
+    pub top_end: f64,
+    pub frame_errors: usize,
+    pub timing_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub name: String,
     pub sha256: String,
@@ -330,6 +345,8 @@ pub struct Timings {
     pub stage1_ocr_ms: u64,
     #[serde(default)]
     pub stage1_logo_ms: u64,
+    #[serde(default)]
+    pub stage1_logo_visual_ms: u64,
     #[serde(default)]
     pub stage1_face_ms: u64,
     #[serde(default)]
@@ -370,6 +387,8 @@ pub struct QaReport {
     pub stage1_ocr_evidence: Option<Stage1OcrEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage1_logo_evidence: Option<Stage1LogoEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage1_logo_visual_evidence: Option<Stage1LogoVisualEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage1_face_evidence: Option<Stage1FaceEvidence>,
     pub overall_status: QaStatus,
@@ -455,6 +474,7 @@ mod tests {
             },
             stage1_ocr_evidence: None,
             stage1_logo_evidence: None,
+            stage1_logo_visual_evidence: None,
             stage1_face_evidence: None,
             overall_status: QaStatus::Pass,
             auto_approve_eligible: false,

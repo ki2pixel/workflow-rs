@@ -93,7 +93,7 @@ La sélection des briques logicielles pour une agence de post-production livrant
 | **Grounding DINO (Swin-T / Swin-B)**25 | **Détecteur Open-Vocabulary** Détection d'objets guidée par texte libre (ex. "logo . watermark . text")25 | **Apache 2.0** *(Usage commercial autorisé)*25 | **FP16 / FP32** : **1,8 à 3,2 Go VRAM** (\~700 Mo sur disque)25 | **Fine-tuning** : 12–16 Go VRAM | transformers, **ONNX Runtime**, PyTorch25 | COCO Zero-shot : **52,5 AP** ; ODinW zero-shot : **26,1 AP**25 | **Forces** : Très fort rappel zero-shot sur boîtes englobantes25. **Faiblesses** : Plus lent et lourd que Florence-2-base sur GPU Turing sans Tensor Cores BF16. **Alternative secondaire**. |
 | **YOLO-World v2 (s / m / l)**41 | **Détecteur Open-Vocabulary temps réel** YOLOv8 \+ CLIP RepVL-PAN (12,7 M à 46,8 M params)41 | **GPL-3.0 / AGPL-3.0** *(Ultralytics : **Interdit en usage commercial fermé** sans licence Enterprise payante)*40 | **FP16 / INT8** : **\< 1 Go VRAM** (52–74 FPS sur V100)41 | **Fine-tuning** : 4–8 Go VRAM | ultralytics, ONNX Runtime, TensorRT41 | LVIS Zero-shot : 26,2 AP (small, 74,1 FPS) à 35,4 AP (large, 52 FPS)41 | **Forces** : Très rapide. **Faiblesses** : **Disqualifié juridiquement** par la licence contaminante GPL-3.0 / AGPL-3.0 d'Ultralytics et Tencent AI Lab40. **Écarté**. |
 | **MediaPipe Face / YuNet / SCRFD**1 | **Détection de visages & Landmarks** Boîte visage \+ 5 à 468 points clés (yeux, nez, bouche, contour)1 | **MediaPipe : Apache 2.0 YuNet : MIT** *(Attention : **InsightFace ArcFace \= Non-Commercial**)*47 | **\< 50 Mo RAM/VRAM** *(Exécutable sur **Coral Edge TPU** en INT8 TFLite ou CPU ONNX)*1 | Non requis (Modèles finaux figés) | **TFLite (Coral Edge TPU déjà dans STEP4)**, ort (ONNX Runtime Rust), OpenCV1 | WIDER FACE : \> 95 % rappel sur visages proches/moyens (\> 60 px de large)1 | **Forces** : Coût nul, tourne sur le Coral Edge TPU ou en \< 3 ms sur CPU, résout à 100 % le défaut « visage coupé ou hors cadre »1. **Faiblesses** : Ne pas utiliser les poids non-commerciaux d'InsightFace47. **Retenu (Étage 1\)**. |
-| **DINOv2 (ViT-S/14 & ViT-B/14)**14 | **Embeddings visuels universels** Caractéristiques image (CLS) et patchs locaux sans supervision (22,1 M et 86 M params)15 | **Apache 2.0** *(Usage commercial 100 % libre)*15 | **ViT-S/14 ONNX** : **\~90 Mo sur disque**, \< 300 Mo RAM/VRAM15 | **Gelé (0 Go train)** *(Tête linéaire ou k-NN sur CPU en \< 5 s)*43 | **ONNX Runtime (ort en Rust)**, transformers15 | Surpasse OpenCLIP sur la reconnaissance d'instances, le matching de patchs et la détection de copie14 | **Forces** : Idéal pour le matching few-shot de logos dans les coins et la détection d'anomalies (PatchCore) sans entraînement15. **Retenu (Étage 1\)**. |
+| **DINOv2 (ViT-S/14 & ViT-B/14)**14 | **Embeddings visuels universels** Caractéristiques image (CLS) et patchs locaux sans supervision (22,1 M et 86 M params)15 | **Apache 2.0** *(Usage commercial 100 % libre)*15 | **ViT-S/14 ONNX quantifié** : **24,4 Mo sur disque**, \< 300 Mo RAM/VRAM15 | **Gelé (0 Go train)** *(Tête linéaire ou k-NN sur CPU en \< 5 s)*43 | **ONNX Runtime (ort en Rust)**, transformers15 | Surpasse OpenCLIP sur la reconnaissance d'instances, le matching de patchs et la détection de copie14 | **Forces** : Idéal pour le matching few-shot de logos dans les coins et la détection d'anomalies (PatchCore) sans entraînement15. **Retenu (Étage 1\)**. |
 | **TransNet V2 & Silero VAD v5**10 | **Temporel & Audio** TransNet V2 : 3D DDCNN (cuts/fondus, 7,7 M params)10. Silero VAD : détection de voix11. | **MIT License** (tous les deux) *(Usage commercial 100 % libre)*10 | **ONNX CPU** : TransNet V2 : **30 Mio**10 Silero VAD : **\~2 Mio**11 | Non requis (Modèles figés de référence)10 | **ONNX Runtime (ort en Rust)** — TransNet V2 prend un tenseur \[1, 100, 3, 27, 48\]10 | TransNet V2 : F1 **96,2 %** (BBC), **93,9 %** (RAI)12. | **Forces** : Déterministes, licences MIT, empreinte disque négligeable (32 Mio cumulés), valident les cuts et l'activité vocale sur CPU10. **Retenus (Étage 1\)**. |
 
 Trois enseignements juridiques et techniques majeurs ressortent de cet audit. Premièrement, YOLO-World et YOLOv8/v11 (Ultralytics) doivent être formellement écartés : bien que rapides, ils sont distribués sous licence GPL-3.0 ou AGPL-3.040, ce qui interdit leur intégration dans un pipeline propriétaire en production fermée sans souscrire une licence commerciale Enterprise auprès d'Ultralytics41. Deuxièmement, les modèles de reconnaissance faciale de la suite InsightFace (notamment ArcFace) portent une licence strictement non-commerciale47 ; l'équipe doit s'en tenir à MediaPipe Face (Apache 2.0, déjà utilisé en STEP4) ou à YuNet (MIT)1. Troisièmement, sur le segment des VLM locaux, Llama 3.2 Vision 11B (\~8 Go VRAM, sujet à des erreurs de chargement sur des versions récentes d'Ollama35) ainsi que Gemma 3 4B (\~6,4 Go en BF16, \~3,4 Go en 4-bit60) et Gemma 4 E4B (6,6 à 9,5 Go35) dépassent l'enveloppe sécuritaire des 4 Go de la GTX 1650\. Le choix VLM se resserre donc sur SmolVLM2-2.2B-Instruct (1,11 Go en Q4\_K\_M, Apache 2.03), Qwen2-VL-2B-Instruct (\~1,6 Go en Q4\_K\_M, Apache 2.054) et Qwen2.5-VL-3B-Instruct (\~2,4 Go en Q4\_K\_M2).
@@ -243,6 +243,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 | Visage synthétique | 2 recadrages + 2 contrôles | 2/2 détectés, 0/2 faux positifs | à étendre |
 | Logo textuel | 12 frames/vidéo, texte persistant ≥ 50 % | 15/35 flags, dont 13 habillages d'émission légitimes | **G3 non testée** (baseline texte insuffisant) |
 | Logo Rust | 12 frames, bande haute, masque alpha `.ecproj` | 30/32 exports évalués `pass`, 2 exports `review` (270, branding source), 264/386 détections masquées ; galerie texte 60/60 sur 22 fonds et 0/16 FP ; assets réels 34/39 (87,2 %), 11/13 à 1,0 | **G3 partielle** |
+| Logo visuel Rust | DINOv2 ViT-S/14 optionnel, probe dev, seuil 0,50, 3/12 | galerie 39/39 en union, 5 sauvetages, 0/13 masqués, 0/4 négatifs ; corpus 0 nouveau `pass` signalé, 270 toujours `review` | **G3 partielle, opt-in** |
 | Latence mono-vidéo | 191, 3 min 23 | Stage 0 24,8 s + OCR 56,1 s + visage 77,4 s ≈ 158 s | sous 5 min, marge faible |
 | Latence Rust | 35 exports | QA complet médiane 35,4 s, max 63,6 s (OCR médian 21,7 s) | < 60 s en médiane, 63,6 s au pire |
 
@@ -257,6 +258,8 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 **Décision PoC** : Stage 0 + OCR sous-titres + visage coupé passent en phase de validation ; le masque des overlays projet est construit en Rust, mais la galerie labellisée et le rappel réel des logos restent à faire ; VLM hors v1 ; `auto_approve_eligible = false` tant que la validation humaine n'est pas en place.
 
 **Portage Rust Stage 0, OCR et visage (2026-10-31)** : le module `crates/workflow-steps/src/qa/` et la commande `workflow-cli qa run` sont intégrés. Le Stage 0 reproduit le Python sur les 35 exports : 35 `pass`, 0 écart de statut, de findings ou de statut de check ; médiane 12,3 s, max 21,8 s. Le Stage 1 OCR PP-OCRv6 (det/rec ONNX CPU, bande basse) ajoute 1 124 échantillons, 12 détections isolées, 0 épisode de 3 échantillons et donc 0 finding sur les 35 GOOD ; les 12 sous-titres synthétiques sont détectés et le contrôle négatif reste propre. Le Stage 1 visage YuNet ajoute 745 échantillons avec visage, 25 visages coupés isolés, 0 finding et 2/2 recadrages synthétiques détectés. Les sous-titres et les logos partagent le thread OCR ; le masque des overlays `.ecproj` écarte 259 détections sur 386 et laisse 2 candidats connus (270). `auto_approve_eligible` reste faux. Détail : `docs/lots/LOT-10-QA.md`.
+
+**Vérificateur DINOv2 (2026-11-02)** : `qa/dino.rs` charge DINOv2 ViT-S/14 quantifié en ONNX Runtime CPU et un probe logistique versionné. Le second étage note toutes les boîtes OCR géométriquement valides (18–220 px), y compris celles dont le texte est trop court, puis agrège sur 3/12 échantillons et écarte les doublons texte. Sur la galerie 56 clips, l'union texte + visuel passe de 34/39 à **39/39**, avec 5 sauvetages (Gulli 0,5, Les 100 1,0, M6+ aux trois échelles), 0/13 masqués et 0/4 négatifs. Sur les 32 exports du corpus avec projet, aucun export `pass` n'est signalé à tort ; les 2 exports 270 restent `review`. Le flag `--logo-visual` est opt-in : le probe est entraîné sur 13 assets synthétiques, aucun positif réel n'est encore labellisé. `auto_approve_eligible` reste faux. Détail : `docs/lots/LOT-10-QA.md` et `POC-RESULTS.md` §2.10.
 
 ### **6.4 Schémas d'artefacts**
 
@@ -299,7 +302,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
 
 ```json
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "generated_at": "2026-10-30T14:40:03+00:00",
   "video_id": "300_UJUD - JOSEPH",
   "folder_id": "300",
@@ -348,7 +351,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
     {"id": "template_a6", "status": "not_applicable", "detail": "projet hors template SDM"},
     {"id": "subtitle_ocr", "status": "pass", "detail": "36 échantillon(s), 0 avec texte, 0 détection(s), 0 erreur(s)"},
     {"id": "face_cut", "status": "pass", "detail": "36 échantillon(s), 21 avec visage, 0 coupé(s), 0 erreur(s)"},
-    {"id": "logo_residual", "status": "not_applicable", "detail": "Détection de logos différée"}
+    {"id": "logo_residual", "status": "pass", "detail": "12 échantillon(s), 0 avec texte hors overlay, 0 détection(s), 0 masquée(s) par overlay, 0 erreur(s)"}
   ],
   "findings": [],
   "stage0_evidence": {
@@ -389,6 +392,19 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
     "overlays": [],
     "overlays_skipped": []
   },
+  "stage1_logo_visual_evidence": {
+    "model": "dinov2_vits14_quantized.onnx",
+    "samples_total": 12,
+    "candidates_total": 0,
+    "candidates_scored": 0,
+    "detections_total": 0,
+    "findings_total": 0,
+    "threshold": 0.5,
+    "persistence_min": 3,
+    "top_end": 0.32,
+    "frame_errors": 0,
+    "timing_ms": 0
+  },
   "stage1_face_evidence": {
     "model": "face_detection_yunet_2023mar.onnx",
     "samples_total": 36,
@@ -420,7 +436,11 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
       "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
       "license": "MIT"
     },
-    "embedding": null
+    "embedding": {
+      "name": "dinov2_vits14_quantized.onnx",
+      "sha256": "c179f8f7f592449c4c1bca4cd124a7538021428c5ffb89afde9503935b197efb",
+      "license": "Apache-2.0"
+    }
   },
   "execution_metrics": {
     "timings_ms": {
@@ -429,6 +449,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
       "project_ms": 10,
       "stage1_ocr_ms": 27954,
       "stage1_logo_ms": 5120,
+      "stage1_logo_visual_ms": 0,
       "stage1_face_ms": 23095,
       "evidence_ms": 0,
       "total_ms": 42662
@@ -437,7 +458,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
 }
 ```
 
-L'exemple ci-dessus décrit le contrat v1 réellement émis pour Stage 0 + OCR + logos + visage. `export_sha256` identifie l'export contrôlé ; chaque finding peut porter `evidence_frame`, un chemin relatif à `--out` vers une frame WebP (par exemple `evidence/001_face_cut_7.50.webp`). `stage1_logo_evidence` expose les overlays déclarés (`overlays`) et ceux qui n'ont pas pu être exploités (`overlays_skipped`) ; les champs prévus pour le VLM (`vlm_verification`, galerie DINOv2) seront ajoutés lors de leur portage et ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
+L'exemple ci-dessus décrit le contrat v1.1 réellement émis pour Stage 0 + OCR + logos + visage. `export_sha256` identifie l'export contrôlé ; chaque finding peut porter `evidence_frame`, un chemin relatif à `--out` vers une frame WebP (par exemple `evidence/001_face_cut_7.50.webp`). `stage1_logo_evidence` expose les overlays déclarés (`overlays`) et ceux qui n'ont pas pu être exploités (`overlays_skipped`) ; `stage1_logo_visual_evidence` n'est présent qu'avec `--logo-visual`. Les champs prévus pour le VLM (`vlm_verification`) seront ajoutés lors de son portage et ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
 
 ## **7. Modèle de coût total et comparaison build/buy**
 
@@ -520,8 +541,8 @@ Stage 0 — déterministe
         │
         ▼
 Stage 1 — spécialistes
-  v1 : RapidOCR (tiers bas) + YuNet/BlazeFace (visages)
-  phase 3 : DINOv2 (coins/logos) + masque des overlays projet
+  v1 : PP-OCRv6 (sous-titres + logos) + YuNet (visages)
+  option : DINOv2 ViT-S/14 (vérificateur logos) + masque overlays
         │
         ▼
 Stage 2 — agrégation
@@ -540,7 +561,8 @@ Stage 2 — agrégation
 | `qa/model.rs` | Schémas `qa.json`, `Finding`, `Check`, `Status` | serde |
 | `qa/stage0.rs` | Specs, noir/figé, durée, template A6, cuts | `post::detect`, `post::a6` |
 | `qa/ocr.rs` | OCR PP-OCRv6 des sous-titres (tiers bas) | `ort` |
-| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque | `ort`, `qa/overlay.rs` |
+| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque, agrégation visuelle | `ort`, `qa/overlay.rs`, `qa/dino.rs` |
+| `qa/dino.rs` | Vérificateur DINOv2 ViT-S/14 et probe logistique | `ort`, `qa/frame.rs` |
 | `qa/overlay.rs` | Masque alpha des overlays image du `.ecproj` | `png`, `post::ecproj` |
 | `qa/face.rs` | Visages YuNet, landmarks, padding, agrégation | `ort` |
 | `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
@@ -550,7 +572,7 @@ Stage 2 — agrégation
 | `qa/report.rs` | `qa.json` (hash et chemins de preuves) | serde |
 | `qa/mod.rs` | API publique, options | — |
 
-État au 2026-11-01 : `model.rs`, `stage0.rs`, `ocr.rs`, `logo.rs`, `overlay.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0 ; `ocr` et `logo` partagent le même jeu de modèles et le même thread, `face` tourne en parallèle. `overlay` lit les calques image du `.ecproj`, réduit chaque PNG à sa boîte alpha et applique les transformations statiques ; `logo` écarte les textes qui tombent dans ces zones. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP.
+État au 2026-11-02 : `model.rs`, `stage0.rs`, `ocr.rs`, `logo.rs`, `dino.rs`, `overlay.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0 ; `ocr` et `logo` partagent le même jeu de modèles et le même thread, `dino` est appelé dans la passe logos quand `--logo-visual` est actif, `face` tourne en parallèle. `overlay` lit les calques image du `.ecproj`, réduit chaque PNG à sa boîte alpha et applique les transformations statiques ; `logo` écarte les textes qui tombent dans ces zones. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP.
 
 ### 8.4 Commande CLI
 
@@ -567,7 +589,7 @@ workflow-cli qa run \
   --split dev
 ```
 
-`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr`, `logo_residual` et `face_cut` sont `not_applicable`. `--no-ocr`, `--no-logo`, `--no-face` et `--no-evidence` désactivent un contrôle ou les preuves, `--no-cache` force le recalcul d'un lot, et `--per-segment` accepte 1 ou 3. Le contrôle logos exige un `.ecproj` : sans masque d'overlays, un OCR de bande haute confond logo et habillage éditorial. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
+`--project` est optionnel : sans lui, B exécute les checks vidéo-only et marque `project_readable` en `not_applicable`. `--models` est optionnel : sans lui, `subtitle_ocr`, `logo_residual` et `face_cut` sont `not_applicable`. `--no-ocr`, `--no-logo`, `--no-face` et `--no-evidence` désactivent un contrôle ou les preuves, `--no-cache` force le recalcul d'un lot, et `--per-segment` accepte 1 ou 3. `--logo-visual` active le vérificateur DINOv2 si le modèle et le probe sont présents sous `--models`. Le contrôle logos exige un `.ecproj` : sans masque d'overlays, un OCR de bande haute confond logo et habillage éditorial. `--docs` est accepté mais réservé aux contrôles futurs. Le VLM (`--no-vlm`) reste une phase ultérieure.
 
 `--folder` remplace `--video` pour traiter un dossier complet : chaque export écrit `<out>/<slug>/qa.json`, le lot écrit `<out>/summary.json`, et `--workers` (défaut 4) fixe le parallélisme. Le projet `projets/<stem>.ecproj` est associé automatiquement quand il existe.
 
@@ -596,7 +618,7 @@ Le PoC a utilisé **YuNet ONNX** (0,23 Mo, MIT) plutôt que BlazeFace/FaceMesh, 
 | OCR | RapidOCR PP-OCRv6 small (det 9,5 Mo + rec 21 Mo + cls 0,6 Mo) | ~31 Mo | Apache 2.0 | sous-titres |
 | Visage (PoC) | YuNet 2023mar ONNX | 0,23 Mo | MIT | visage coupé |
 | Visage (cible Rust) | BlazeFace + FaceMesh | ~1,4 Mo | Apache 2.0 | visage coupé, réutilise `step4` |
-| Embeddings | DINOv2 ViT-S/14 ONNX | ~90 Mo | Apache 2.0 | galerie logos (différé) |
+| Embeddings | DINOv2 ViT-S/14 quantifié ONNX + probe | 24,4 Mo + 11 Ko | Apache 2.0 | vérificateur logos, opt-in |
 | Cuts | TransNetV2 ONNX | ~30 Mo | MIT | continuité |
 | VLM optionnel | SmolVLM2-2.2B Q4 | ~1,1 Go | Apache 2.0 | ambiguïtés |
 | VLM optionnel | Qwen2.5-VL-3B Q4 | ~2,4 Go | Qwen Research | ambiguïtés, **pas défaut** |
@@ -605,7 +627,7 @@ Le manifeste `assets/models/qa/manifest.toml` (ou une section du manifeste exist
 
 ### 8.8 Cache, fallback, VLM
 
-- Cache par SHA-256 de l'export, du projet, des modèles et des options qui changent le résultat, avec une version de cache interne.
+- Cache par SHA-256 de l'export, du projet, des modèles (dont le probe DINOv2 quand `--logo-visual` est actif) et des options qui changent le résultat, avec une version de cache interne.
 - Si un modèle manque : check `not_applicable`, pas d'échec global.
 - Si le VLM timeout : `review`, pas `fail`.
 - VLM via `llama-server` local, grammaire JSON stricte, température 0, seed fixe, 5–10 frames maximum.
@@ -636,7 +658,7 @@ La feuille de route est dimensionnée pour 1 à 2 ingénieurs et le corpus de 36
 | **0. Manifeste et labels** *(2–3 j)* | Inventaire des 36 exports principaux + 1 réserve, split 12/24, schéma `qa_label.json`, générateur synthétique — **fait** : manifeste, split, schéma, 37 gabarits ; labels dev à pré-remplir puis relire | `qa_manifest.json`, `split.json`, labels dev | **G0** : corpus, split et labels prêts |
 | **1. Stage 0** *(3–5 j)* | Specs ffprobe, noir/figé, durée, template A6, cuts — **fait en PoC et en Rust** : 35 `pass`, 0 finding, 0 écart vs Python, médiane 12,3 s | `workflow-cli qa run`, `qa.json`, `--folder`, cache | **G1** : 0 FP sur 35 GOOD ; 4,01 s/export en lot de 4, 12,3 s en séquentiel — mode lot et cache intégrés |
 | **2. OCR + visage** *(5–8 j)* | PP-OCRv6 tiers bas, YuNet + landmarks, filtres géométriques, hash et preuves WebP — **fait en PoC et en Rust** : 0 FP sur 35, 12/12 sous-titres et 2/2 visages synthétiques, 50+ positifs et labels humains à étendre | Métriques + preuves WebP | **G2** : sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 % |
-| **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, persistance, synthèse appariée — **fait en Rust** : masque alpha, 30/32 exports `pass`, 2 exports `review` (270, branding source, 6,25 %), 264/386 détections masquées, galerie texte 60/60 sur 22 fonds et 0/16 FP, assets réels 34/39 (87,2 %), 11/13 à 1,0 ; galerie DINOv2 et rappel réel à faire | Galerie + courbes P/R | **G3 partielle** : FP ≤ 10 % tenue sur les exports évalués, rappel texte 100 % mais assets réels 87,2 % (11/13 à 1,0), rappel réel non mesuré |
+| **3. Logos + agrégation** *(5–8 j)* | Masque des overlays intentionnels depuis le `.ecproj`, persistance, synthèse appariée — **fait en Rust** : masque alpha, 30/32 exports `pass`, 2 exports `review` (270, branding source, 6,25 %), 264/386 détections masquées, galerie texte 60/60 sur 22 fonds et 0/16 FP, assets réels 34/39 (87,2 %), 11/13 à 1,0 ; vérificateur DINOv2 opt-in intégré (39/39 en union synthétique), rappel réel à faire | Galerie + courbes P/R | **G3 partielle** : FP ≤ 10 % tenue sur les exports évalués, rappel texte 100 % mais assets réels 87,2 % (11/13 à 1,0), rappel réel non mesuré |
 | **4. VLM optionnel** *(3–5 j)* | SmolVLM2/Qwen2.5-VL sur 5–10 frames ambiguës | Rapport latence/VRAM/rappel | **G4** : +5 pts, < 5 min, sinon abandon |
 | **5. Intégration** *(3–5 j)* | Module `qa/`, CLI, tests, docs | `LOT-10-QA.md`, `qa.json` figé | **G5** : fmt, clippy, tests, zéro régression |
 
@@ -677,7 +699,7 @@ Trois expériences à coût financier nul (**0,00 €**, 2 à 3 jours d'ingénie
 | :---- | :---- | :---- | :---- |
 | **1. Stage 0 sur les 36 exports** | Exécuter `ffprobe`, `blackdetect`, `freezedetect`, le contrôle du template A6 et la continuité des cuts sur les 36 exports GOOD. Écrire un `qa.json` par export. | Taux de faux positifs sur les 35 exports évaluables, temps par vidéo, cohérence specs/durée. | **Go** si 0 faux positif sur les contrôles objectifs et < 5 s/vidéo. |
 | **2. OCR + visage sur 12 dev + 6 holdout** | RapidOCR sur le tiers bas et YuNet sur 3 frames par segment. Inclure 298 (logos de chaîne), 295 (template SDM), 181/300 (négatifs), 187 ECOLE (hard negative). | Rappel sous-titre, rappel visage coupé, faux positifs sur GOOD, temps CPU total. | **Go** si rappel sous-titre ≥ 85 %, visage ≥ 95 %, FP ≤ 10 %. |
-| **3. Galerie DINOv2 + synthèse appariée** | Extraire 150 frames propres de 295/181, incruster 30 logos (fixes, mobiles, alpha 20–80 %), ré-encoder H.264 10 Mbit/s. Tester une galerie DINOv2 ViT-S/14 à 3 patchs par logo + persistance temporelle. | Courbe précision/rappel, IC de Wilson, faux positifs sur 187 ECOLE. | **Go** si rappel ≥ 90 % sur la galerie et FP ≤ 10 % ; sinon tête linéaire DINOv2. |
+| **3. Galerie DINOv2 + synthèse appariée** | Extraire 150 frames propres de 295/181, incruster 30 logos (fixes, mobiles, alpha 20–80 %), ré-encoder H.264 10 Mbit/s. Tester une galerie DINOv2 ViT-S/14 à 3 patchs par logo + persistance temporelle. **Fait** : 13 assets × 3 échelles, probe logistique dev, 39/39 en union, 0/13 masqués, 0/4 négatifs ; reste à valider sur de vrais positifs. | Courbe précision/rappel, IC de Wilson, faux positifs sur 187 ECOLE. | **Go** si rappel ≥ 90 % sur la galerie et FP ≤ 10 % ; sinon tête linéaire DINOv2. |
 
 **VLM différé** : SmolVLM2-2.2B et Qwen2.5-VL-3B ne sont téléchargés qu'en phase 4, après G2/G3. Leur objectif est de rattraper les logos hors galerie et les cadrages ambigus, pas de remplacer l'OCR ou le détecteur de visages.
 
@@ -685,7 +707,7 @@ Trois expériences à coût financier nul (**0,00 €**, 2 à 3 jours d'ingénie
 
 - **Expérience 1 — Go** : 35/35 `pass`, 0 finding, 4,0 s/vidéo en batch, max 25,6 s. Les seuils bas produisaient 13 faux positifs sur 35 ; les fondus/gels/flash-cuts sont normaux.
 - **Expérience 2 — Go partiel** : 0 finding sur 35 GOOD pour l'OCR et le visage ; 12/12 sous-titres synthétiques et 2/2 visages coupés synthétiques détectés. Le rappel réel reste à mesurer sur 50+ positifs annotés.
-- **Expérience 3 — No-Go pour l'OCR textuel** : 15/35 exports flags, dont 13 habillages d'émission légitimes (« LES APPRENTIS AVENTURIERS », « TALENT SPÉCIAL TikTok », « e=m6 », « MASUPER LIGUEZ »…). Seuls 298 (« 100 ») et 179 (« 161+ ») sont des logos de chaîne candidats. La galerie DINOv2 reste à tester, mais elle exige le masque des overlays intentionnels et une galerie labellisée ; elle est différée.
+- **Expérience 3 — No-Go pour l'OCR textuel** : 15/35 exports flags, dont 13 habillages d'émission légitimes (« LES APPRENTIS AVENTURIERS », « TALENT SPÉCIAL TikTok », « e=m6 », « MASUPER LIGUEZ »…). Seuls 298 (« 100 ») et 179 (« 161+ ») sont des logos de chaîne candidats. Le vérificateur DINOv2 est intégré en opt-in et rattrape les 5 échecs de la galerie synthétique, mais il exige le masque des overlays intentionnels et une validation sur positifs réels ; il ne remplace pas l'OCR.
 
 ## **12\. Bibliographie annotée des sources primaires et benchmarks de référence**
 

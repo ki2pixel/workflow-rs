@@ -1,8 +1,9 @@
 # Lot 10 — contrôle qualité read-only après export humain
 
 > Statut : module Rust v1 démarré le 2026-10-30. Stage 0 déterministe,
-> Stage 1 OCR PP-OCRv6 (sous-titres et logos) et visage YuNet, agrégation
-> intégrés. Le contrôle logos s'appuie sur le masque des overlays `.ecproj`.
+> Stage 1 OCR PP-OCRv6 (sous-titres et logos), visage YuNet et vérificateur
+> visuel DINOv2 optionnel, agrégation intégrés. Le contrôle logos s'appuie sur
+> le masque des overlays `.ecproj`.
 > Décision : scénario B de `docs/etudes/Architecture_QA_Vidéo_Locale.md`.
 > Code : `crates/workflow-steps/src/qa/`, commande `workflow-cli qa run`.
 
@@ -49,6 +50,9 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
    frames uniformes, puis persistance ≥ 50 %. Les zones alpha des PNG
    d'overlay déclarés dans le `.ecproj` sont masquées par intervalle ; un
    texte persistant hors masque devient un candidat `logo_residual`.
+   Avec `--logo-visual`, un second étage DINOv2 note toutes les boîtes OCR
+   géométriquement valides, y compris celles dont le texte est trop court ou
+   peu sûr, et complète les findings texte sans les remplacer.
 4. **Stage 1 — visage** : YuNet ONNX Runtime CPU sur les mêmes instants. Le
    détecteur tourne sur la frame et sur une version étendue de 15 % de chaque
    côté ; les deux jeux de boîtes sont fusionnés. Seuls les visages dont un
@@ -144,6 +148,32 @@ n'est exploitable, le contrôle passe `not_applicable` au lieu de produire des
 faux positifs. Sans `.ecproj`, il est aussi `not_applicable` : un OCR de bande
 haute seul confond logo de chaîne et habillage éditorial.
 
+### Vérificateur visuel DINOv2 (optionnel)
+
+`--logo-visual` active un second étage qui ne remplace pas l'OCR : il note les
+candidats OCR que le texte rejette ou lit mal. Le modèle est DINOv2 ViT-S/14
+quantifié (24,4 Mo, Apache-2.0), exécuté en ONNX Runtime CPU. Le probe
+logistique (384 poids, biais, seuil) est versionné dans
+`assets/models/qa/dinov2_logo_probe.json` ; le binaire se télécharge à part
+(`assets/models/qa/manifest.toml`).
+
+| Paramètre | Valeur |
+| --- | --- |
+| Modèle | `dinov2_vits14_quantized.onnx` |
+| Entrée | crop RGB, pad carré, resize bicubique 256×256, crop 224×224 |
+| Normalisation | ImageNet (moyenne/écart types) |
+| Score | sigmoïde(`w·CLS` normalisé L2 + biais) |
+| Seuil | 0,50 |
+| Persistance | ≥ 3 des 12 échantillons |
+| Boîte | hauteur 18–220 px, largeur ≥ 30 px, aspect ≥ 1,2 |
+| Exclusion | masque overlay ≥ 50 %, comme le texte |
+| Déduplication | un finding visuel qui recoupe un finding texte est ignoré |
+| Sévérité | `low` à 3–9 échantillons, `medium` à partir de 10 |
+
+Le plafond de 220 px est propre au vérificateur : le contrôle texte garde
+18–180 px, mais le logo Les 100 à l'échelle 1,0 produit une boîte OCR de
+204 px de haut. Les boîtes pleine frame (613 px) restent exclues.
+
 ## Stage 1 visage
 
 | Paramètre | Valeur |
@@ -185,7 +215,10 @@ workflow-cli qa run \
 `not_applicable` et l'échantillonnage retombe sur des fenêtres de 5 s.
 `--models` est optionnel : sans lui, `subtitle_ocr`, `logo_residual` et
 `face_cut` sont `not_applicable`. `--no-ocr`, `--no-logo` et `--no-face`
-désactivent explicitement un contrôle. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
+désactivent explicitement un contrôle. `--logo-visual` active DINOv2 ; sans
+les fichiers `dinov2_vits14_quantized.onnx` et `dinov2_logo_probe.json` dans
+`--models`, le check `logo_visual` est `not_applicable` et le contrôle texte
+continue. `--per-segment` accepte 1 ou 3. `--no-evidence` n'écrit pas les
 frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration
 `steps.step8.post`. `--intra-threads` borne les threads intra-op ONNX par
@@ -230,12 +263,13 @@ chemins, statut, nombre de findings, latence, `cached`, `export_sha256`,
 
 ## Schéma `qa.json`
 
-Champs principaux : `schema_version`, `generated_at`, `video_id`,
+Champs principaux : `schema_version` (1.1.0), `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
-`stage1_ocr_evidence`, `stage1_logo_evidence`, `stage1_face_evidence` (si le
-contrôle tourne), `overall_status`, `auto_approve_eligible`,
+`stage1_ocr_evidence`, `stage1_logo_evidence`,
+`stage1_logo_visual_evidence` (si `--logo-visual`), `stage1_face_evidence`
+(si le contrôle tourne), `overall_status`, `auto_approve_eligible`,
 `auto_approve_reason`,
 `models_provenance`, `execution_metrics.timings_ms`.
 
@@ -259,6 +293,17 @@ détection et `models_provenance.ocr_rec` celui de la reconnaissance.
 `overlays` (nom, intervalle, bbox dans la composition, pixels opaques) et
 `overlays_skipped`. `timings_ms` ajoute `stage1_logo_ms`.
 
+`stage1_logo_visual_evidence` contient le modèle DINOv2, `samples_total`,
+`candidates_total`, `candidates_scored`, `detections_total`, `findings_total`,
+`threshold`, `persistence_min`, `top_end`, `frame_errors` et `timing_ms`.
+Le `findings_total` de `stage1_logo_evidence` reste limité aux findings texte ;
+celui du vérificateur visuel compte les findings DINOv2.
+`timings_ms.stage1_logo_visual_ms` est un sous-ensemble de
+`stage1_logo_ms`. `models_provenance.embedding` porte le SHA-256 et la licence
+du modèle DINOv2. Les findings visuels utilisent
+`detected_by_stage = stage1_dinov2_top` et `bbox_xywh` ; `notes` contient la
+persistance, le score moyen, le seuil et le texte OCR brut s'il existe.
+
 `stage1_face_evidence` contient le modèle, le nombre d'échantillons, les
 compteurs `samples_with_face`, `samples_with_cut`, `frame_errors`, et les
 paramètres (`per_segment`, score, NMS, padding). `timings_ms` ajoute
@@ -269,10 +314,13 @@ Les findings Stage 0 utilisent `timecode_start_sec` / `timecode_end_sec`,
 utilisent `detected_by_stage = stage1_ppocr_bottom` et résument dans `notes`
 les textes lus, les segments, les scores moyen/max et le centre vertical. Les
 findings visage ajoutent `bbox_xywh` et
-`detected_by_stage = stage1_yunet_face`. Les findings logo ajoutent
+`detected_by_stage = stage1_yunet_face`. Les findings logo texte ajoutent
 `bbox_xywh` et `detected_by_stage = stage1_ppocr_top` ; `notes` contient le
-texte, la persistance et le score moyen. Le schéma sera figé après la galerie
-labellisée.
+texte, la persistance et le score moyen. Les findings visuels utilisent
+`detected_by_stage = stage1_dinov2_top`, avec le score DINOv2 et le seuil. Le
+schéma sera figé après la galerie labellisée. Le cache QA passe en version 5
+pour invalider les rapports antérieurs au changement de sémantique de
+`stage1_logo_evidence.findings_total`.
 
 ## Validation
 
@@ -356,9 +404,21 @@ labellisée.
   avant la containment). La galerie texte reste 60/60, 0/16 FP, 8/8 masqués.
 - Le rappel réel n'est pas mesurable sur les GOOD : les positifs doivent être
   rendus depuis les rushes. 270 est confirmé comme branding source.
+- Vérificateur DINOv2 (probe entraîné sur les 7 assets dev, évalué sur les 6
+  assets holdout) : 736 candidats géométriques, 465 au-dessus du seuil 0,50.
+  Galerie 56 clips : **39/39 positifs** en union texte + visuel (IC 95 % de
+  Wilson 91,0–100 %), dont **5 sauvetages visuels** (Gulli à 0,5, Les 100 à
+  1,0, M6+ aux trois échelles), **0/13 masqués**, **0/4 négatifs**. Dev 21/21,
+  holdout 18/18 (IC 82,4–100 %).
+- Corpus 32 exports avec projet : **0 nouvel export `pass` signalé** ; les 2
+  exports 270 restent `review` (2 et 1 findings visuels, en plus des findings
+  texte). Les 3 exports 179 sans projet restent sans contrôle logos. Le cas
+  191 « LFAUIT » est toujours entièrement masqué.
+- Coût DINOv2 : 1,25–1,31 s pour 12 crops sur un export isolé, jusqu'à 5,9 s
+  sous contention à 4 workers ; le contrôle texte reste majoritaire.
 - QA complet 298 (OCR + logos + visage) : 32,1 s, dont 17,2 s d'OCR, 7,4 s de
-  logos et 14,2 s de visage.
-- 426 tests workspace (394 `#[test]` + 32 `#[tokio::test]`).
+  logos et 14,2 s de visage. Le flag `--logo-visual` ajoute ~1,3 s.
+- 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`).
 
 ### Stage 1 visage
 
@@ -385,6 +445,16 @@ labellisée.
 - Logos : 2 exports en `review` sur 270 (branding source non déclaré ou
   oublié) et aucun positif réel labellisé. Le détecteur produit des candidats `review`,
   jamais une auto-approbation.
+- DINOv2 est **opt-in** (`--logo-visual`) et entraîné sur des assets PNG
+  collés synthétiquement : les 39/39 ne prouvent pas le rappel sur de vrais
+  logos résiduels. Le probe et le modèle ne sont pas réentraînés en
+  production ; un nouveau logo inconnu peut passer.
+- Le plafond de 220 px du vérificateur est calibré sur Les 100 à 1,0 ; un
+  logo plus haut ou plus carré reste hors géométrie.
+- Le gain DINOv2 est mesuré sur 13 assets seulement (7 dev / 6 holdout) ;
+  les 39 cas partagent 22 fonds et ne sont pas indépendants.
+- Le modèle DINOv2 n'est pas versionné (24,4 Mo) ; le probe l'est. Sans les
+  deux fichiers, `logo_visual` est `not_applicable`.
 - Le masque ne couvre que les PNG déclarés ; un habillage incrusté dans la
   source reste indistinguable d'un logo résiduel sans galerie labellisée.
 - Détection OCR axis-aligned, sans classifieur d'orientation 180° : les
@@ -407,8 +477,11 @@ labellisée.
 
 ## Prochaines étapes
 
-1. Constituer la galerie labellisée (logos et habillages) et comparer raw vs
-   GOOD pour mesurer le rappel réel ; DINOv2 seulement ensuite.
-2. Réserver le VLM local aux frames ambiguës (phase 4).
-3. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
-4. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.
+1. Constituer la galerie labellisée de vrais logos résiduels et comparer raw
+   vs GOOD pour mesurer le rappel réel, notamment sur les exports GOOD sans
+   positif défectueux.
+2. Valider DINOv2 sur ces positifs réels avant d'envisager son activation par
+   défaut ; le probe actuel reste un PoC synthétique.
+3. Réserver le VLM local aux frames ambiguës (phase 4).
+4. Figer `qa.json` et l'ajouter au contrat si le serveur l'expose un jour.
+5. Faire relire les 12 labels dev pré-remplis avant d'étendre le corpus.

@@ -98,7 +98,10 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## État de validation
 
-- 426 tests unitaires, sans matériel.
+- 433 tests unitaires, sans matériel.
+- QA read-only étape B : Stage 0 35/35, OCR 12/12 synthétiques, logos
+  34/39 sur la galerie d'assets, DINOv2 opt-in 39/39 en union, 0 nouveau
+  faux positif sur les exports GOOD ; `auto_approve_eligible = false`.
 - Parité STEP2/3/4/5/6 sur les corpus de référence.
 - Chaîne STEP1 → STEP8 validée sur `1720 Camille.zip`.
 - Shadow STEP5/6 `162/162` sur 20 projets.

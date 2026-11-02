@@ -9,6 +9,10 @@ __pycache__/
 /assets/models/*
 !/assets/models/README.md
 !/assets/models/manifest.toml
+!/assets/models/qa/
+/assets/models/qa/*
+!/assets/models/qa/manifest.toml
+!/assets/models/qa/dinov2_logo_probe.json
 
 # Corpus de parité : médias dérivés de productions et sorties volumineuses.
 /parity/cases/*

@@ -13,6 +13,7 @@
 pub mod aggregate;
 pub mod batch;
 pub mod cache;
+pub mod dino;
 pub mod evidence;
 pub mod face;
 pub mod frame;
@@ -26,10 +27,11 @@ pub mod sample;
 pub mod stage0;
 
 pub use batch::{discover_exports, run_folder, BatchOutcome, BatchSummary};
+pub use dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
 pub use face::{FaceOptions, FACE_MODEL_FILENAME};
 pub use model::{
     DefectType, OverlayRegion, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,
-    Stage1FaceEvidence, Stage1LogoEvidence, Stage1OcrEvidence,
+    Stage1FaceEvidence, Stage1LogoEvidence, Stage1LogoVisualEvidence, Stage1OcrEvidence,
 };
 pub use ocr::{OcrOptions, OCR_DET_FILENAME, OCR_REC_FILENAME};
 pub use overlay::{read_mask, OverlayMask};
@@ -60,6 +62,8 @@ pub struct QaOptions {
     pub ocr_enabled: bool,
     /// Active le contrôle logos de la bande haute.
     pub logo_enabled: bool,
+    /// Active le vérificateur visuel DINOv2 des candidats logos.
+    pub logo_visual_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
     /// Écrit une frame WebP par finding sous `<out>/evidence/`.
@@ -83,6 +87,7 @@ impl Default for QaOptions {
             intra_threads: None,
             ocr_enabled: true,
             logo_enabled: true,
+            logo_visual_enabled: false,
             face_enabled: true,
             evidence_enabled: true,
             per_segment: 1,
@@ -133,10 +138,13 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     let mut findings = stage0.findings;
     let mut ocr_evidence = None;
     let mut logo_evidence = None;
+    let mut logo_visual_evidence = None;
     let mut ocr_model = None;
     let mut ocr_rec_model = None;
+    let mut logo_visual_model = None;
     let mut ocr_ms = 0;
     let mut logo_ms = 0;
+    let mut logo_visual_ms = 0;
     let mut face_evidence = None;
     let mut face_model = None;
     let mut face_ms = 0;
@@ -151,7 +159,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         })
         .collect::<Vec<_>>();
 
-    let ocr_options = if !options.ocr_enabled {
+    let mut ocr_options = if !options.ocr_enabled {
         checks.push(QaCheck::not_applicable(
             "subtitle_ocr",
             "contrôle OCR désactivé (--no-ocr)",
@@ -177,6 +185,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
                 intra_threads: options.intra_threads,
                 ffmpeg: options.ffmpeg.clone(),
                 per_segment: options.per_segment,
+                logo_visual: None,
             })
         }
     } else {
@@ -240,6 +249,50 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             "logo_residual",
             "projet .ecproj requis pour le masque d'overlays",
         ));
+    }
+
+    // Le vérificateur visuel est opt-in : sans modèle et probe présents, le
+    // contrôle reste explicitement `not_applicable` au lieu d'échouer.
+    let mut logo_visual_options = None;
+    if options.logo_visual_enabled {
+        if !options.logo_enabled || !options.ocr_enabled {
+            checks.push(QaCheck::not_applicable(
+                "logo_visual",
+                "contrôle logos ou OCR désactivé",
+            ));
+        } else if logo_mask.is_none() {
+            checks.push(QaCheck::not_applicable(
+                "logo_visual",
+                "projet .ecproj requis pour le masque d'overlays",
+            ));
+        } else if let Some(models_dir) = &options.models_dir {
+            let model = models_dir.join(DINO_MODEL_FILENAME);
+            let probe = models_dir.join(DINO_PROBE_FILENAME);
+            if !model.is_file() || !probe.is_file() {
+                checks.push(QaCheck::not_applicable(
+                    "logo_visual",
+                    format!(
+                        "modèle DINOv2 ou probe introuvable sous {} ({DINO_MODEL_FILENAME}, {DINO_PROBE_FILENAME})",
+                        models_dir.display()
+                    ),
+                ));
+            } else {
+                logo_visual_options = Some(DinoOptions {
+                    model,
+                    probe,
+                    onnxruntime: options.onnxruntime.clone(),
+                    intra_threads: options.intra_threads,
+                });
+            }
+        } else {
+            checks.push(QaCheck::not_applicable(
+                "logo_visual",
+                "modèles non fournis (--models)",
+            ));
+        }
+    }
+    if let Some(ref mut ocr_opts) = ocr_options {
+        ocr_opts.logo_visual = logo_visual_options;
     }
 
     let face_options = if !options.face_enabled {
@@ -312,10 +365,13 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         findings.extend(result.findings);
         ocr_evidence = Some(result.evidence);
         logo_evidence = result.logo_evidence;
+        logo_visual_evidence = result.logo_visual_evidence;
         ocr_model = Some(result.det_model);
         ocr_rec_model = Some(result.rec_model);
+        logo_visual_model = result.logo_visual_model;
         ocr_ms = result.timing_ms;
         logo_ms = result.logo_timing_ms;
+        logo_visual_ms = result.logo_visual_timing_ms;
     }
     if let Some(result) = face_result {
         checks.extend(result.checks);
@@ -348,6 +404,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     let mut timings = stage0.timings;
     timings.stage1_ocr_ms = ocr_ms;
     timings.stage1_logo_ms = logo_ms;
+    timings.stage1_logo_visual_ms = logo_visual_ms;
     timings.stage1_face_ms = face_ms;
     timings.evidence_ms = evidence_ms;
     timings.total_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
@@ -355,6 +412,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     provenance.ocr_det = ocr_model;
     provenance.ocr_rec = ocr_rec_model;
     provenance.face = face_model;
+    provenance.embedding = logo_visual_model;
 
     let video_id = options
         .video_id
@@ -378,6 +436,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         stage0_evidence: stage0.evidence,
         stage1_ocr_evidence: ocr_evidence,
         stage1_logo_evidence: logo_evidence,
+        stage1_logo_visual_evidence: logo_visual_evidence,
         stage1_face_evidence: face_evidence,
         overall_status,
         auto_approve_eligible: false,

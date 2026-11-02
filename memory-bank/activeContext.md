@@ -21,10 +21,32 @@ masqués, 11/13 à l'échelle de production. Validation visage : 745
 sous-titres et les logos partagent le thread OCR ; QA complet 298 en 32,1 s. Le mode lot `--folder` répartit les exports sur
 4 workers (Stage 0 : 4,01 s/export) et réutilise les
 `qa.json` dont l'empreinte correspond. `auto_approve_eligible = false`. Le
-post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
+vérificateur visuel DINOv2 ViT-S/14 est intégré en opt-in (`--logo-visual`) :
+il complète l'OCR sur les candidats géométriques et atteint 39/39 en union
+sur la galerie synthétique, sans nouveau faux positif sur les exports GOOD.
+Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-02] **Vérificateur visuel DINOv2 (D-048)** :
+  - `qa/dino.rs` : DINOv2 ViT-S/14 quantifié ONNX CPU, probe logistique
+    versionné, préprocessing Python (pad carré, bicubique 256, crop 224,
+    ImageNet), batch 12 ;
+  - `qa/logo.rs` : second étage sur les boîtes OCR 18–220 px, persistance
+    3/12, déduplication texte, findings `stage1_dinov2_top` ;
+  - `--logo-visual` opt-in ; `logo_visual` `not_applicable` si modèle/probe
+    absents ; `stage1_logo_visual_evidence`, `models_provenance.embedding`,
+    `stage1_logo_visual_ms` ; schéma `qa.json` 1.1.0, cache 5 ;
+  - galerie 56 clips : union **39/39** (34 texte + 5 visuels : Gulli 0,5,
+    Les 100 1,0, M6+ ×3), 0/13 masqués, 0/4 négatifs ;
+  - corpus 32 exports avec projet : 0 nouveau `pass` signalé, 270 toujours
+    `review` ; 736 candidats, 465 au-dessus du seuil ;
+  - temps DINOv2 1,25–1,31 s par export isolé, jusqu'à 5,9 s sous 4 workers ;
+  - 433 tests workspace (401 `#[test]` + 32 `#[tokio::test]`), `fmt` et
+    `clippy -D warnings` verts ;
+  - docs : `LOT-10-QA.md`, note d'architecture, `POC-RESULTS.md` §2.10,
+    `assets/models/qa/`, D-048.
 
 - [2026-11-01/02] **Stage 1 logos, masque overlays et galeries (D-041 à D-044)** :
   - `qa/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
@@ -51,7 +73,7 @@ D-034, D-035).
   - test 736 rejeté (D-045) : 22/26 contre 24/26 à 480, boîtes fusionnées ;
   - labels dev régénérés depuis `reports/rust-logo` (plus de baseline) ;
   - QA complet 298 : 32,1 s (OCR 17,2 s, logos 7,4 s, visage 14,2 s) ;
-  - 84 tests `qa`, suite 426 tests, `fmt` et `clippy -D warnings` verts ;
+  - 92 tests `qa`, suite 433 tests, `fmt` et `clippy -D warnings` verts ;
   - docs : `LOT-10-QA.md`, note d'architecture, POC-RESULTS,
     D-041 à D-047.
 
@@ -369,7 +391,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 362 tests unitaires ; pas de CI.
+- 433 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
@@ -396,6 +418,11 @@ D-034, D-035).
   `docs/lots/LOT-9-POST-STEP8.md`).
 - Poursuivre les scénarios B/C décrits dans
   `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`, sans toucher à la production.
+- QA logos : faire relire et signer les labels dev (`review_status = done`),
+  puis valider DINOv2 sur de vrais positifs résiduels avant d'envisager son
+  activation par défaut ; le probe reste entraîné sur 13 assets synthétiques.
+- QA logos : étendre la galerie à des assets non textuels et comparer raw vs
+  GOOD ; le corpus ne fournit que 13 PNG alpha valides.
 - Diagnostiquer D-024 sans modifier les données de production.
 - Lire `docs/exploitation/SWITCH-PUBLIC.md` avant toute bascule publique.
 - Vérifier `history stats`, `webhook probe --plan` et les logs du moniteur.

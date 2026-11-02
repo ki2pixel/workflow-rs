@@ -8,14 +8,14 @@
 
 use crate::post::detect;
 use crate::qa::model::{Stage0Thresholds, QA_SCHEMA_VERSION};
-use crate::qa::{face, ocr, QaOptions};
+use crate::qa::{dino, face, ocr, QaOptions};
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
 /// À incrémenter dès qu'un changement de code modifie les résultats pour les
 /// mêmes export, projet, modèles et options (préprocessing OCR, seuils…).
-const CACHE_VERSION: u32 = 3;
+const CACHE_VERSION: u32 = 5;
 
 /// Empreinte complète : hash de l'export puis empreinte des autres entrées.
 pub fn fingerprint(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<String> {
@@ -44,9 +44,12 @@ pub fn fingerprint_from_export(
          model.det={}\n\
          model.rec={}\n\
          model.face={}\n\
+         model.dino={}\n\
+         model.probe={}\n\
          per_segment={}\n\
          ocr={}\n\
          logo={}\n\
+         logo_visual={}\n\
          face={}\n\
          evidence={}\n\
          template_prefix={}\n\
@@ -58,9 +61,20 @@ pub fn fingerprint_from_export(
         model_hash(options, ocr::OCR_DET_FILENAME)?,
         model_hash(options, ocr::OCR_REC_FILENAME)?,
         model_hash(options, face::FACE_MODEL_FILENAME)?,
+        model_hash_if(
+            options,
+            options.logo_visual_enabled,
+            dino::DINO_MODEL_FILENAME
+        )?,
+        model_hash_if(
+            options,
+            options.logo_visual_enabled,
+            dino::DINO_PROBE_FILENAME
+        )?,
         options.per_segment,
         u8::from(options.ocr_enabled),
         u8::from(options.logo_enabled),
+        u8::from(options.logo_visual_enabled),
         u8::from(options.face_enabled),
         u8::from(options.evidence_enabled),
         options.template_prefix,
@@ -82,6 +96,14 @@ fn model_hash(options: &QaOptions, filename: &str) -> Result<String> {
         return Ok("missing".into());
     }
     detect::sha256_file(&path).with_context(|| format!("hachage du modèle {}", path.display()))
+}
+
+fn model_hash_if(options: &QaOptions, enabled: bool, filename: &str) -> Result<String> {
+    if enabled {
+        model_hash(options, filename)
+    } else {
+        Ok("none".into())
+    }
 }
 
 fn sha256_text(value: &str) -> String {
@@ -145,6 +167,10 @@ mod tests {
 
         let mut changed = options();
         changed.logo_enabled = false;
+        assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
+
+        let mut changed = options();
+        changed.logo_visual_enabled = true;
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
     }
 

@@ -14,12 +14,13 @@
 //! `qa.json` à `report::write_report`.
 
 use crate::post::detect;
+use crate::qa::dino::DinoOptions;
 use crate::qa::frame::{grab_frame, resize_bilinear, BgrFrame};
 use crate::qa::inference::cpu_session;
 use crate::qa::logo;
 use crate::qa::model::{
     DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence,
-    Stage1OcrEvidence,
+    Stage1LogoVisualEvidence, Stage1OcrEvidence,
 };
 use crate::qa::overlay::OverlayMask;
 use crate::qa::sample::{sample_times, SegmentSpan};
@@ -75,6 +76,8 @@ pub struct OcrOptions {
     pub ffmpeg: PathBuf,
     /// 1 ou 3 échantillons par segment, comme le PoC.
     pub per_segment: usize,
+    /// Second étage visuel DINOv2, optionnel.
+    pub logo_visual: Option<DinoOptions>,
 }
 
 impl Default for OcrOptions {
@@ -86,6 +89,7 @@ impl Default for OcrOptions {
             intra_threads: None,
             ffmpeg: PathBuf::from("ffmpeg"),
             per_segment: 1,
+            logo_visual: None,
         }
     }
 }
@@ -96,12 +100,16 @@ pub struct OcrResult {
     pub findings: Vec<QaFinding>,
     pub evidence: Stage1OcrEvidence,
     pub logo_evidence: Option<Stage1LogoEvidence>,
+    pub logo_visual_evidence: Option<Stage1LogoVisualEvidence>,
     pub det_model: ModelInfo,
     pub rec_model: ModelInfo,
+    pub logo_visual_model: Option<ModelInfo>,
     /// Temps du contrôle sous-titres, hors passe logos.
     pub timing_ms: u64,
     /// Temps de la passe logos, quand elle est active.
     pub logo_timing_ms: u64,
+    /// Part du temps logos consacrée à DINOv2.
+    pub logo_visual_timing_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -277,7 +285,10 @@ pub fn run_ocr(
     let mut checks = vec![ocr_check(&evidence)];
     let mut findings = subtitle_findings;
     let mut logo_evidence = None;
+    let mut logo_visual_evidence = None;
+    let mut logo_visual_model = None;
     let mut logo_timing_ms = 0;
+    let mut logo_visual_timing_ms = 0;
     if let Some(mask) = logo_mask {
         let result = logo::run_logo(
             video,
@@ -288,21 +299,28 @@ pub fn run_ocr(
             &rec_model.name,
             &mut det,
             &mut rec,
+            options.logo_visual.as_ref(),
         )?;
         checks.push(result.check);
         findings.extend(result.findings);
         logo_evidence = Some(result.evidence);
+        logo_visual_evidence = result.visual_evidence;
+        logo_visual_model = result.visual_model;
         logo_timing_ms = result.timing_ms;
+        logo_visual_timing_ms = result.visual_timing_ms;
     }
     Ok(OcrResult {
         checks,
         findings,
         evidence,
         logo_evidence,
+        logo_visual_evidence,
         det_model,
         rec_model,
+        logo_visual_model,
         timing_ms: subtitle_timing_ms,
         logo_timing_ms,
+        logo_visual_timing_ms,
     })
 }
 

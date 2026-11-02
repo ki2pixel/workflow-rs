@@ -15,15 +15,24 @@
 //! OCR proches dans la même zone (M6+ lu « 161+ », « 11+ », « 1+ »), y compris
 //! les boîtes imbriquées (« e=m6 » / « =m6 »), sans fusionner deux logos
 //! éloignés.
+//!
+//! Quand `--logo-visual` est actif, un second étage DINOv2 note toutes les
+//! boîtes OCR géométriquement valides, y compris celles dont le texte est trop
+//! court ou peu sûr. Un logo visuel n'est retenu que sur au moins trois des
+//! douze échantillons et s'il ne recoupe pas un finding texte.
 
+use crate::qa::dino::{visual_geometry_ok, DinoEngine, DinoOptions, DINO_MIN_TIMES};
 use crate::qa::frame::{grab_frame, BgrFrame};
-use crate::qa::model::{DefectType, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence};
+use crate::qa::model::{
+    DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence,
+    Stage1LogoVisualEvidence,
+};
 use crate::qa::ocr::{DetBox, DetEngine, OcrOptions, RecEngine};
 use crate::qa::overlay::OverlayMask;
 use anyhow::Result;
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use workflow_schema::round::round_to;
 
 pub const TOP_END: f64 = 0.32;
@@ -44,7 +53,10 @@ pub(crate) struct LogoResult {
     pub(crate) check: QaCheck,
     pub(crate) findings: Vec<QaFinding>,
     pub(crate) evidence: Stage1LogoEvidence,
+    pub(crate) visual_evidence: Option<Stage1LogoVisualEvidence>,
+    pub(crate) visual_model: Option<ModelInfo>,
     pub(crate) timing_ms: u64,
+    pub(crate) visual_timing_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +85,31 @@ struct Group {
     bbox: [i64; 4],
 }
 
+#[derive(Debug, Clone)]
+struct VisualDetection {
+    score: f32,
+    bbox: [i64; 4],
+    text: String,
+}
+
+#[derive(Debug, Clone)]
+struct VisualSample {
+    time: f64,
+    detections: Vec<VisualDetection>,
+}
+
+#[derive(Debug, Clone)]
+struct VisualGroup {
+    first: f64,
+    last: f64,
+    count: usize,
+    scores: Vec<f32>,
+    bbox: [i64; 4],
+    best_bbox: [i64; 4],
+    best_score: f32,
+    best_text: String,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_logo(
     video: &Path,
@@ -83,13 +120,21 @@ pub(crate) fn run_logo(
     rec_model: &str,
     det: &mut DetEngine,
     rec: &mut RecEngine,
+    visual: Option<&DinoOptions>,
 ) -> Result<LogoResult> {
     let started = Instant::now();
+    let mut visual_engine = visual.map(DinoEngine::load).transpose()?;
     let mut samples = Vec::with_capacity(SAMPLES_PER_VIDEO);
+    let mut visual_samples = Vec::with_capacity(SAMPLES_PER_VIDEO);
     let mut frame_errors = 0usize;
+    let mut visual_frame_errors = 0usize;
     let mut detections_total = 0usize;
     let mut masked_total = 0usize;
     let mut samples_with_text = 0usize;
+    let mut visual_candidates_total = 0usize;
+    let mut visual_scored_total = 0usize;
+    let mut visual_detections_total = 0usize;
+    let mut visual_timing = Duration::ZERO;
 
     for index in 0..SAMPLES_PER_VIDEO {
         let time = specs.duration_s * (index as f64 + 0.5) / SAMPLES_PER_VIDEO as f64;
@@ -103,6 +148,13 @@ pub(crate) fn run_logo(
             Ok(Some(frame)) => frame,
             Ok(None) => {
                 frame_errors += 1;
+                if visual_engine.is_some() {
+                    visual_frame_errors += 1;
+                    visual_samples.push(VisualSample {
+                        time,
+                        detections: Vec::new(),
+                    });
+                }
                 continue;
             }
             Err(error) => {
@@ -112,19 +164,91 @@ pub(crate) fn run_logo(
                     "extraction de frame logo en échec"
                 );
                 frame_errors += 1;
+                if visual_engine.is_some() {
+                    visual_frame_errors += 1;
+                    visual_samples.push(VisualSample {
+                        time,
+                        detections: Vec::new(),
+                    });
+                }
                 continue;
             }
         };
         let band = top_band(&frame);
         let boxes = det.detect(&band)?;
         let texts = rec.recognize(&band, &boxes)?;
+
+        // Second étage visuel : toutes les boîtes géométriquement valides,
+        // même si l'OCR est vide ou peu sûr. Le texte brut sert uniquement
+        // aux notes de finding.
+        if let Some(engine) = visual_engine.as_mut() {
+            let mut candidate_boxes = Vec::new();
+            let mut candidate_indices = Vec::new();
+            for (box_index, det_box) in boxes.iter().enumerate() {
+                let [x1, y1, x2, y2] = det_box.bbox;
+                let width = x2 - x1;
+                let height = y2 - y1;
+                let aspect = width as f64 / height.max(1) as f64;
+                if !visual_geometry_ok(width, height, aspect) {
+                    continue;
+                }
+                let bbox = [x1 as f64, y1 as f64, width as f64, height as f64];
+                if mask.overlap_ratio(bbox, time, frame.width as u32, frame.height as u32)
+                    >= MASK_OVERLAP
+                {
+                    continue;
+                }
+                candidate_boxes.push([x1, y1, width, height]);
+                candidate_indices.push(box_index);
+            }
+            visual_candidates_total += candidate_boxes.len();
+            let visual_started = Instant::now();
+            let scores = engine.score_boxes(&band, &candidate_boxes)?;
+            visual_timing += visual_started.elapsed();
+            visual_scored_total += candidate_boxes.len();
+            let threshold = engine.threshold();
+            let mut visual_detections = Vec::new();
+            for ((bbox, box_index), score) in
+                candidate_boxes.iter().zip(candidate_indices).zip(scores)
+            {
+                tracing::trace!(
+                    time,
+                    bbox = ?bbox,
+                    score,
+                    "candidat logo visuel DINOv2"
+                );
+                if score < threshold {
+                    continue;
+                }
+                visual_detections_total += 1;
+                visual_detections.push(VisualDetection {
+                    score,
+                    bbox: *bbox,
+                    text: texts[box_index].0.trim().to_string(),
+                });
+            }
+            visual_samples.push(VisualSample {
+                time,
+                detections: visual_detections,
+            });
+        }
+
         let mut detections = Vec::new();
         for ((text, score), det_box) in texts.into_iter().zip(boxes.iter()) {
+            let raw_bbox = [
+                det_box.bbox[0] as f64,
+                det_box.bbox[1] as f64,
+                (det_box.bbox[2] - det_box.bbox[0]) as f64,
+                (det_box.bbox[3] - det_box.bbox[1]) as f64,
+            ];
+            let raw_overlap =
+                mask.overlap_ratio(raw_bbox, time, frame.width as u32, frame.height as u32);
             tracing::trace!(
                 time,
                 text = %text,
                 score,
                 bbox = ?det_box.bbox,
+                overlap = round_to(raw_overlap, 3),
                 "OCR brut bande haute"
             );
             let Some(detection) = filter_detection(&text, score, det_box) else {
@@ -163,7 +287,35 @@ pub(crate) fn run_logo(
         samples.push(LogoSample { time, detections });
     }
 
-    let findings = aggregate(&samples);
+    let text_findings = aggregate(&samples);
+    let visual_findings = match visual_engine.as_ref() {
+        Some(engine) => aggregate_visual(&visual_samples, &text_findings, engine.threshold()),
+        None => Vec::new(),
+    };
+    let text_findings_total = text_findings.len();
+    let visual_findings_total = visual_findings.len();
+    let mut findings = text_findings;
+    findings.extend(visual_findings);
+
+    let visual_evidence = visual_engine
+        .as_ref()
+        .map(|engine| Stage1LogoVisualEvidence {
+            model: engine.model_info().name.clone(),
+            samples_total: visual_samples.len(),
+            candidates_total: visual_candidates_total,
+            candidates_scored: visual_scored_total,
+            detections_total: visual_detections_total,
+            findings_total: visual_findings_total,
+            threshold: round_to(f64::from(engine.threshold()), 3),
+            persistence_min: DINO_MIN_TIMES,
+            top_end: TOP_END,
+            frame_errors: visual_frame_errors,
+            timing_ms: visual_timing.as_millis().min(u128::from(u64::MAX)) as u64,
+        });
+    let visual_model = visual_engine
+        .as_ref()
+        .map(|engine| engine.model_info().clone());
+
     let evidence = Stage1LogoEvidence {
         det_model: det_model.to_string(),
         rec_model: rec_model.to_string(),
@@ -171,7 +323,7 @@ pub(crate) fn run_logo(
         samples_with_text,
         detections_total,
         masked_total,
-        findings_total: findings.len(),
+        findings_total: text_findings_total,
         frame_errors,
         persistence_min: PERSISTENCE,
         top_end: TOP_END,
@@ -179,12 +331,15 @@ pub(crate) fn run_logo(
         overlays: mask.regions.clone(),
         overlays_skipped: mask.skipped.clone(),
     };
-    let check = logo_check(&evidence);
+    let check = logo_check(&evidence, text_findings_total, visual_findings_total);
     Ok(LogoResult {
         check,
         findings,
         evidence,
+        visual_evidence,
+        visual_model,
         timing_ms: started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        visual_timing_ms: visual_timing.as_millis().min(u128::from(u64::MAX)) as u64,
     })
 }
 
@@ -414,7 +569,127 @@ fn aggregate(samples: &[LogoSample]) -> Vec<QaFinding> {
     findings
 }
 
-fn logo_check(evidence: &Stage1LogoEvidence) -> QaCheck {
+fn aggregate_visual(
+    samples: &[VisualSample],
+    text_findings: &[QaFinding],
+    threshold: f32,
+) -> Vec<QaFinding> {
+    let total = samples.len();
+    if total == 0 {
+        return Vec::new();
+    }
+    let mut groups: Vec<VisualGroup> = Vec::new();
+    for sample in samples {
+        let mut used_groups = HashSet::new();
+        for detection in &sample.detections {
+            let index = groups
+                .iter()
+                .position(|group| bbox_similarity(group.bbox, detection.bbox));
+            if let Some(index) = index {
+                // Un même logo ne compte qu'une fois par échantillon.
+                if !used_groups.insert(index) {
+                    continue;
+                }
+                let group = &mut groups[index];
+                group.count += 1;
+                group.last = sample.time;
+                group.scores.push(detection.score);
+                if detection.score > group.best_score {
+                    group.best_score = detection.score;
+                    group.best_bbox = detection.bbox;
+                    group.best_text = detection.text.clone();
+                }
+            } else {
+                groups.push(VisualGroup {
+                    first: sample.time,
+                    last: sample.time,
+                    count: 1,
+                    scores: vec![detection.score],
+                    bbox: detection.bbox,
+                    best_bbox: detection.bbox,
+                    best_score: detection.score,
+                    best_text: detection.text.clone(),
+                });
+                used_groups.insert(groups.len() - 1);
+            }
+        }
+    }
+
+    let mut findings = Vec::new();
+    for group in groups {
+        if group.count < DINO_MIN_TIMES {
+            continue;
+        }
+        if overlaps_text(&group, text_findings) {
+            continue;
+        }
+        let ratio = group.count as f64 / total as f64;
+        let mean_score = group.scores.iter().sum::<f32>() / group.scores.len() as f32;
+        let severity = if ratio >= 0.8 {
+            Severity::Medium
+        } else {
+            Severity::Low
+        };
+        let text_note = if group.best_text.is_empty() {
+            String::new()
+        } else {
+            format!(" (texte OCR : « {} »)", group.best_text)
+        };
+        let notes = format!(
+            "logo visuel persistant sur {}/{} échantillon(s) de la bande haute (0–{:.0} %), score DINOv2 moyen {:.3}, seuil {:.2}{text_note}",
+            group.count,
+            total,
+            TOP_END * 100.0,
+            mean_score,
+            threshold
+        );
+        findings.push(
+            QaFinding::new(
+                DefectType::LogoResidual,
+                round_to(group.first, 2),
+                Some(round_to(group.last, 2)),
+                severity,
+                round_to(ratio.min(1.0), 3),
+                "stage1_dinov2_top",
+                notes,
+            )
+            .with_bbox([
+                group.best_bbox[0] as f64,
+                group.best_bbox[1] as f64,
+                group.best_bbox[2] as f64,
+                group.best_bbox[3] as f64,
+            ]),
+        );
+    }
+    findings
+}
+
+fn overlaps_text(group: &VisualGroup, findings: &[QaFinding]) -> bool {
+    findings.iter().any(|finding| {
+        let Some(bbox) = finding.bbox_xywh else {
+            return false;
+        };
+        let text_bbox = [
+            bbox[0].round() as i64,
+            bbox[1].round() as i64,
+            bbox[2].round() as i64,
+            bbox[3].round() as i64,
+        ];
+        if !bbox_similarity(group.bbox, text_bbox) && !bbox_similarity(group.best_bbox, text_bbox) {
+            return false;
+        }
+        let text_end = finding
+            .timecode_end_sec
+            .unwrap_or(finding.timecode_start_sec);
+        group.first <= text_end && finding.timecode_start_sec <= group.last
+    })
+}
+
+fn logo_check(
+    evidence: &Stage1LogoEvidence,
+    text_findings: usize,
+    visual_findings: usize,
+) -> QaCheck {
     if evidence.samples_total == 0 {
         return QaCheck::warn(
             "logo_residual",
@@ -440,14 +715,18 @@ fn logo_check(evidence: &Stage1LogoEvidence) -> QaCheck {
         evidence.masked_total,
         evidence.frame_errors
     );
-    if evidence.findings_total == 0 {
+    let visual = if visual_findings > 0 {
+        format!(", {visual_findings} logo(s) visuel(s) DINOv2")
+    } else {
+        String::new()
+    };
+    if text_findings + visual_findings == 0 {
         QaCheck::pass("logo_residual", detail)
     } else {
         QaCheck::warn(
             "logo_residual",
             format!(
-                "{} texte(s) persistant(s) hors overlays déclarés ; {detail}",
-                evidence.findings_total
+                "{text_findings} texte(s) persistant(s){visual} hors overlays déclarés ; {detail}"
             ),
         )
     }
@@ -464,6 +743,86 @@ mod tests {
             score: 0.9,
             bbox,
         }
+    }
+
+    fn visual_sample(time: f64, bbox: [i64; 4]) -> VisualSample {
+        VisualSample {
+            time,
+            detections: vec![VisualDetection {
+                score: 0.9,
+                bbox,
+                text: "M6".into(),
+            }],
+        }
+    }
+
+    #[test]
+    fn visual_aggregate_requires_three_samples() {
+        let samples = (0..2)
+            .map(|index| visual_sample(index as f64, [10, 10, 100, 50]))
+            .collect::<Vec<_>>();
+        assert!(aggregate_visual(&samples, &[], 0.5).is_empty());
+
+        let samples = (0..3)
+            .map(|index| visual_sample(index as f64, [10, 10, 100, 50]))
+            .collect::<Vec<_>>();
+        let findings = aggregate_visual(&samples, &[], 0.5);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].detected_by_stage, "stage1_dinov2_top");
+        assert_eq!(findings[0].bbox_xywh, Some([10.0, 10.0, 100.0, 50.0]));
+    }
+
+    #[test]
+    fn visual_aggregate_skips_a_text_duplicate() {
+        let samples = (0..3)
+            .map(|index| visual_sample(index as f64, [10, 10, 100, 50]))
+            .collect::<Vec<_>>();
+        let text = QaFinding::new(
+            DefectType::LogoResidual,
+            0.0,
+            Some(3.0),
+            Severity::Low,
+            1.0,
+            "stage1_ppocr_top",
+            "test",
+        )
+        .with_bbox([10.0, 10.0, 100.0, 50.0]);
+        assert!(aggregate_visual(&samples, &[text], 0.5).is_empty());
+    }
+
+    fn logo_evidence(findings_total: usize) -> Stage1LogoEvidence {
+        Stage1LogoEvidence {
+            det_model: "det".into(),
+            rec_model: "rec".into(),
+            samples_total: 12,
+            samples_with_text: 0,
+            detections_total: 0,
+            masked_total: 0,
+            findings_total,
+            frame_errors: 0,
+            persistence_min: 0.5,
+            top_end: TOP_END,
+            overlays_total: 0,
+            overlays: Vec::new(),
+            overlays_skipped: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn logo_check_reviews_a_visual_only_finding() {
+        let evidence = logo_evidence(0);
+        assert_eq!(
+            logo_check(&evidence, 0, 1).status,
+            crate::qa::model::QaStatus::Review
+        );
+        assert_eq!(
+            logo_check(&evidence, 0, 0).status,
+            crate::qa::model::QaStatus::Pass
+        );
+        assert_eq!(
+            logo_check(&evidence, 1, 0).status,
+            crate::qa::model::QaStatus::Review
+        );
     }
 
     #[test]

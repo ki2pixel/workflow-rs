@@ -566,6 +566,40 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-02 — D-048 : vérificateur visuel DINOv2 opt-in
+
+- **Contexte** : le contrôle texte plafonne à 34/39 sur la galerie d'assets
+  (87,2 %) et rate M6+ aux trois échelles, Les 100 à 1,0 et Gulli à 0,5. Les
+  candidats OCR existent pourtant : M6+ est lu « 1+ », « 161+ », « K+ », et
+  Les 100 produit une boîte de 204 px de haut, au-delà du filtre texte 180.
+- **Décision** :
+  1. Ajouter un second étage DINOv2 ViT-S/14 quantifié (24,4 Mo,
+     Apache-2.0), ONNX Runtime CPU, derrière `--logo-visual`, sans remplacer
+     l'OCR.
+  2. Entraîner un probe logistique sur les embeddings CLS des assets **dev**
+     (7/6 holdout) : 438 positifs, 284 négatifs, AUC holdout 0,824.
+  3. Préprocessing Rust aligné sur le PoC : pad carré, bicubique 256,
+     crop 224, normalisation ImageNet ; le probe versionné contient les 384
+     poids, le biais et le seuil.
+  4. Point de fonctionnement : seuil 0,50, persistance 3/12, géométrie
+     18–220 px, aspect ≥ 1,2. Le plafond 220 inclut Les 100 à 1,0 sans
+     laisser passer les boîtes pleine frame ; le texte garde 18–180.
+  5. Un finding visuel qui recoupe un finding texte est ignoré ; les
+     findings visuels utilisent `detected_by_stage = stage1_dinov2_top`.
+  6. `stage1_logo_visual_evidence`, `models_provenance.embedding` et
+     `timings_ms.stage1_logo_visual_ms` documentent la passe ; schéma
+     `qa.json` 1.1.0, `CACHE_VERSION = 5`.
+- **Validation** : galerie 56 clips, union **39/39** (34 texte + 5 visuels),
+  0/13 masqués, 0/4 négatifs ; corpus 32 exports avec projet, **0 nouveau
+  `pass` signalé**, 2 exports 270 toujours `review` ; temps 1,25–1,31 s par
+  export isolé, jusqu'à 5,9 s sous 4 workers. 433 tests workspace,
+  `fmt` et `clippy -D warnings` verts.
+- **Limite** : probe entraîné sur 13 assets synthétiques, aucun positif réel
+  labellisé ; flag opt-in et `auto_approve_eligible = false` conservé.
+- **Références** : `crates/workflow-steps/src/qa/dino.rs`,
+  `crates/workflow-steps/src/qa/logo.rs`, `assets/models/qa/`,
+  `POC-RESULTS.md` §2.10, D-047.
+
 ## 2026-11-02 — D-047 : containment pour le masque et l'agrégation des logos
 
 - **Contexte** : la galerie 13×3 a révélé deux erreurs liées aux boîtes OCR

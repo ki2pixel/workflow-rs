@@ -1,0 +1,28 @@
+# Modèles QA optionnels du contrôle read-only.
+#
+# Le binaire DINOv2 n'est pas versionné ; le probe linéaire (384 poids,
+# biais, seuil) l'est, car il est petit et auditable. `workflow-cli qa run`
+# ne charge ces fichiers qu'avec `--logo-visual`.
+
+version = 1
+source = "https://huggingface.co/onnx-community/dinov2-small"
+base_model = "facebook/dinov2-small"
+license = "Apache-2.0"
+
+[[model]]
+role = "qa.dinov2"
+path = "dinov2_vits14_quantized.onnx"
+source_url = "https://huggingface.co/onnx-community/dinov2-small/resolve/main/onnx/model_quantized.onnx"
+size = 24446700
+sha256 = "c179f8f7f592449c4c1bca4cd124a7538021428c5ffb89afde9503935b197efb"
+purpose = "DINOv2 ViT-S/14 quantifié, embeddings CLS pour le vérificateur visuel"
+
+[[model]]
+role = "qa.dinov2_probe"
+path = "dinov2_logo_probe.json"
+size = 11052
+sha256 = "e7fa8a7d0a09dbc78d2a3746b9fe54c092746b6bd328eb52961be682d0afcce4"
+purpose = "Probe logistique logo/non-logo entraîné sur les assets dev de la galerie"
+input = "CLS 384, normalisé L2, sigmoïde(w·x + b)"
+operating_point = "seuil 0.50, persistance 3/12"
+geometry = "hauteur 18–220 px, largeur ≥ 30 px, aspect ≥ 1.2"

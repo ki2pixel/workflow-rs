@@ -48,8 +48,13 @@ const MIN_ASPECT: f64 = 2.0;
 const MAX_AREA_RATIO: f64 = 0.15;
 const CENTER_X_MIN: f64 = 0.12;
 const CENTER_X_MAX: f64 = 0.88;
-const MIN_CONSECUTIVE: usize = 3;
+const MIN_CLUSTER_COUNT: usize = 3;
 const MAX_Y_DRIFT: f64 = 0.04;
+/// Un bandeau fixe doit être présent sur au moins 60 % des échantillons et
+/// son texte dominant doit couvrir 80 % du cluster. En dessous, le texte est
+/// considéré comme changeant (sous-titres probables).
+const FIXED_PERSISTENCE: f64 = 0.60;
+const FIXED_DOMINANT_RATIO: f64 = 0.80;
 
 /// Taille minimale de la détection OCR. Les bandes 1080×480 (sous-titres)
 /// et 1080×614 (logos) restent à leur résolution native : le passage à 736
@@ -123,7 +128,6 @@ struct Detection {
 struct OcrSample {
     segment: String,
     time: f64,
-    block_y_ratio: Option<f64>,
     detections: Vec<Detection>,
 }
 
@@ -250,40 +254,47 @@ pub fn run_ocr(
             samples_with_text += 1;
         }
         detections_total += detections.len();
-        let block_y_ratio = if detections.is_empty() {
-            None
-        } else {
-            let mean = detections
-                .iter()
-                .map(|detection| detection.bbox[1] as f64 + detection.bbox[3] as f64 / 2.0)
-                .sum::<f64>()
-                / detections.len() as f64;
-            Some(round_to(mean / frame.height as f64, 4))
-        };
         samples.push(OcrSample {
             segment: item.segment,
             time: item.time,
-            block_y_ratio,
             detections,
         });
     }
 
     let subtitle_timing_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
-    let subtitle_findings = aggregate(&samples);
+    let ocr_findings = aggregate(&samples, specs.height as f64);
+    let subtitle_total = ocr_findings
+        .iter()
+        .filter(|finding| finding.defect_type == DefectType::SubtitleBurnedIn)
+        .count();
+    let fixed_total = ocr_findings
+        .iter()
+        .filter(|finding| finding.defect_type == DefectType::FixedOverlay)
+        .count();
     let evidence = Stage1OcrEvidence {
         det_model: det_model.name.clone(),
         rec_model: rec_model.name.clone(),
         samples_total: samples.len(),
         samples_with_text,
         detections_total,
-        findings_total: subtitle_findings.len(),
+        findings_total: subtitle_total,
         frame_errors,
         per_segment: options.per_segment,
         min_score: MIN_SCORE,
         bottom_start: BOTTOM_START,
+        fixed_overlays_total: fixed_total,
     };
     let mut checks = vec![ocr_check(&evidence)];
-    let mut findings = subtitle_findings;
+    if fixed_total > 0 {
+        checks.push(QaCheck::warn(
+            "fixed_overlay",
+            format!(
+                "{fixed_total} bandeau(x) fixe(s) détecté(s) ; vérifier l'intentionnalité \
+                 (habillage de chaîne ou défaut)"
+            ),
+        ));
+    }
+    let mut findings = ocr_findings;
     let mut logo_evidence = None;
     let mut logo_visual_evidence = None;
     let mut logo_visual_model = None;
@@ -374,110 +385,230 @@ fn filter_detection(
     })
 }
 
-fn aggregate(samples: &[OcrSample]) -> Vec<QaFinding> {
-    struct Episode {
-        start: f64,
-        end: f64,
-        samples: usize,
-        texts: Vec<String>,
+/// Regroupe les détections par boîte stable, puis décide s'il s'agit d'un
+/// bandeau fixe (texte persistant et dominant) ou d'un sous-titre incrusté
+/// (texte qui change dans la même zone). Les clusters de moins de trois
+/// échantillons restent du bruit de décor.
+///
+/// Le texte n'entre pas dans la clé de regroupement : deux sous-titres
+/// successifs partagent la même boîte mais pas le même texte, et doivent
+/// rester un seul cluster pour que leur dominance basse les classe
+/// `subtitle_burned_in`. Le texte normalisé sert uniquement à mesurer cette
+/// dominance.
+fn aggregate(samples: &[OcrSample], frame_height: f64) -> Vec<QaFinding> {
+    struct Cluster {
+        variants: Vec<(String, String, usize)>,
+        first: f64,
+        last: f64,
+        count: usize,
         scores: Vec<f64>,
-        segments: Vec<String>,
         ys: Vec<f64>,
+        last_bbox: [i64; 4],
+        union_bbox: [i64; 4],
+        segments: Vec<String>,
+        last_sample: usize,
     }
 
-    let mut episodes = Vec::new();
-    let mut current: Option<Episode> = None;
-    for sample in samples {
-        if sample.detections.is_empty() {
-            if let Some(episode) = current.take() {
-                episodes.push(episode);
-            }
-            continue;
-        }
-        let episode = current.get_or_insert_with(|| Episode {
-            start: sample.time,
-            end: sample.time,
-            samples: 0,
-            texts: Vec::new(),
-            scores: Vec::new(),
-            segments: Vec::new(),
-            ys: Vec::new(),
-        });
-        episode.end = sample.time;
-        episode.samples += 1;
-        episode
-            .texts
-            .extend(sample.detections.iter().map(|det| det.text.clone()));
-        episode
-            .scores
-            .extend(sample.detections.iter().map(|det| det.score));
-        if let Some(ratio) = sample.block_y_ratio {
-            episode.ys.push(ratio);
-        }
-        episode.segments.push(sample.segment.clone());
+    if samples.is_empty() || frame_height <= 0.0 {
+        return Vec::new();
     }
-    if let Some(episode) = current {
-        episodes.push(episode);
+    let total = samples.len();
+    let mut clusters: Vec<Cluster> = Vec::new();
+    for (sample_index, sample) in samples.iter().enumerate() {
+        for detection in &sample.detections {
+            let normalized = logo::normalize_text(&detection.text);
+            if normalized.is_empty() {
+                continue;
+            }
+            let index = clusters
+                .iter()
+                .position(|cluster| boxes_similar(cluster.last_bbox, detection.bbox));
+            let index = match index {
+                Some(index) => index,
+                None => {
+                    clusters.push(Cluster {
+                        variants: vec![(normalized.clone(), detection.text.clone(), 0)],
+                        first: sample.time,
+                        last: sample.time,
+                        count: 0,
+                        scores: Vec::new(),
+                        ys: Vec::new(),
+                        last_bbox: detection.bbox,
+                        union_bbox: detection.bbox,
+                        segments: Vec::new(),
+                        last_sample: usize::MAX,
+                    });
+                    clusters.len() - 1
+                }
+            };
+            let cluster = &mut clusters[index];
+            // Un même emplacement ne compte qu'une fois par échantillon, même
+            // si l'OCR renvoie deux variantes de la même ligne.
+            if cluster.last_sample == sample_index {
+                continue;
+            }
+            cluster.last_sample = sample_index;
+            cluster.count += 1;
+            cluster.last = sample.time;
+            cluster.scores.push(detection.score);
+            cluster
+                .ys
+                .push((detection.bbox[1] as f64 + detection.bbox[3] as f64 / 2.0) / frame_height);
+            if let Some((_, _, count)) = cluster
+                .variants
+                .iter_mut()
+                .find(|(variant, _, _)| *variant == normalized)
+            {
+                *count += 1;
+            } else {
+                cluster
+                    .variants
+                    .push((normalized, detection.text.clone(), 1));
+            }
+            cluster.last_bbox = detection.bbox;
+            let right = (cluster.union_bbox[0] + cluster.union_bbox[2])
+                .max(detection.bbox[0] + detection.bbox[2]);
+            let bottom = (cluster.union_bbox[1] + cluster.union_bbox[3])
+                .max(detection.bbox[1] + detection.bbox[3]);
+            cluster.union_bbox[0] = cluster.union_bbox[0].min(detection.bbox[0]);
+            cluster.union_bbox[1] = cluster.union_bbox[1].min(detection.bbox[1]);
+            cluster.union_bbox[2] = right - cluster.union_bbox[0];
+            cluster.union_bbox[3] = bottom - cluster.union_bbox[1];
+            cluster.segments.push(sample.segment.clone());
+        }
     }
 
     let mut findings = Vec::new();
-    for episode in episodes {
-        if episode.samples < MIN_CONSECUTIVE {
+    for cluster in clusters {
+        if cluster.count < MIN_CLUSTER_COUNT {
             continue;
         }
-        if let (Some(min), Some(max)) = (
-            episode.ys.iter().copied().reduce(f64::min),
-            episode.ys.iter().copied().reduce(f64::max),
-        ) {
-            if max - min > MAX_Y_DRIFT {
-                continue;
-            }
-        }
-        let mean_score = episode.scores.iter().sum::<f64>() / episode.scores.len() as f64;
-        let max_score = episode
-            .scores
-            .iter()
-            .copied()
-            .reduce(f64::max)
-            .unwrap_or_default();
-        let center_y = if episode.ys.is_empty() {
-            None
-        } else {
-            Some(episode.ys.iter().sum::<f64>() / episode.ys.len() as f64)
+        let (Some(y_min), Some(y_max)) = (
+            cluster.ys.iter().copied().reduce(f64::min),
+            cluster.ys.iter().copied().reduce(f64::max),
+        ) else {
+            continue;
         };
-        let mut texts = episode.texts.iter().take(20).cloned().collect::<Vec<_>>();
-        if episode.texts.len() > texts.len() {
+        if y_max - y_min > MAX_Y_DRIFT {
+            continue;
+        }
+        let persistence = cluster.count as f64 / total as f64;
+        let dominant = cluster
+            .variants
+            .iter()
+            .map(|(_, _, count)| *count)
+            .max()
+            .unwrap_or(0);
+        let dominant_ratio = dominant as f64 / cluster.count as f64;
+        let fixed = persistence >= FIXED_PERSISTENCE && dominant_ratio >= FIXED_DOMINANT_RATIO;
+        let mean_score = cluster.scores.iter().sum::<f64>() / cluster.scores.len() as f64;
+        let center_y = cluster.ys.iter().sum::<f64>() / cluster.ys.len() as f64;
+        let mut texts = cluster
+            .variants
+            .iter()
+            .take(4)
+            .map(|(_, text, _)| text.clone())
+            .collect::<Vec<_>>();
+        if cluster.variants.len() > texts.len() {
             texts.push("…".into());
         }
-        let mut segments = episode.segments.iter().take(6).cloned().collect::<Vec<_>>();
-        if episode.segments.len() > segments.len() {
+        let mut segments = cluster.segments.iter().take(6).cloned().collect::<Vec<_>>();
+        if cluster.segments.len() > segments.len() {
             segments.push("…".into());
         }
-        let notes = format!(
-            "sous-titre incrusté sur {} échantillon(s) [{}], textes: {}, score moyen {:.3}, score max {:.3}, centre y {}",
-            episode.samples,
-            segments.join(", "),
-            texts.join(" / "),
-            mean_score,
-            max_score,
-            center_y.map_or_else(|| "n/a".into(), |value| format!("{value:.4}"))
-        );
-        let severity = if episode.samples >= 4 {
-            Severity::High
+        let (defect_type, severity, notes) = if fixed {
+            (
+                DefectType::FixedOverlay,
+                if persistence >= 0.8 {
+                    Severity::Medium
+                } else {
+                    Severity::Low
+                },
+                format!(
+                    "bandeau fixe sur {} échantillon(s) [{}], texte: {}, persistance {:.0}%, \
+                     dominance {:.0}%, score moyen {:.3}, centre y {:.4}",
+                    cluster.count,
+                    segments.join(", "),
+                    texts.join(" / "),
+                    persistence * 100.0,
+                    dominant_ratio * 100.0,
+                    mean_score,
+                    center_y
+                ),
+            )
         } else {
-            Severity::Medium
+            (
+                DefectType::SubtitleBurnedIn,
+                if cluster.count >= 4 {
+                    Severity::High
+                } else {
+                    Severity::Medium
+                },
+                format!(
+                    "sous-titre incrusté sur {} échantillon(s) [{}], textes: {}, score moyen {:.3}, \
+                     dominance {:.0}%, centre y {:.4}",
+                    cluster.count,
+                    segments.join(", "),
+                    texts.join(" / "),
+                    mean_score,
+                    dominant_ratio * 100.0,
+                    center_y
+                ),
+            )
         };
-        findings.push(QaFinding::new(
-            DefectType::SubtitleBurnedIn,
-            round_to(episode.start, 2),
-            Some(round_to(episode.end, 2)),
-            severity,
-            round_to(mean_score.clamp(0.0, 1.0), 3),
-            "stage1_ppocr_bottom",
-            notes,
-        ));
+        findings.push(
+            QaFinding::new(
+                defect_type,
+                round_to(cluster.first, 2),
+                Some(round_to(cluster.last, 2)),
+                severity,
+                round_to(mean_score.clamp(0.0, 1.0), 3),
+                "stage1_ppocr_bottom",
+                notes,
+            )
+            .with_bbox([
+                cluster.union_bbox[0] as f64,
+                cluster.union_bbox[1] as f64,
+                cluster.union_bbox[2] as f64,
+                cluster.union_bbox[3] as f64,
+            ]),
+        );
     }
     findings
+}
+
+/// Deux lignes OCR partagent le même emplacement si l'une contient l'autre,
+/// si leur IoU atteint 0,3, ou si leurs centres sont proches sur la même
+/// ligne avec des tailles comparables. Le seuil vertical est volontairement
+/// strict (demi-hauteur) : un sous-titre au-dessus d'un bandeau ne doit pas
+/// être fusionné avec lui.
+fn boxes_similar(left: [i64; 4], right: [i64; 4]) -> bool {
+    if logo::bbox_contains(left, right) || logo::bbox_contains(right, left) {
+        return true;
+    }
+    let area_left = (left[2].max(1) * left[3].max(1)) as f64;
+    let area_right = (right[2].max(1) * right[3].max(1)) as f64;
+    let intersection_width = (left[0] + left[2]).min(right[0] + right[2]) - left[0].max(right[0]);
+    let intersection_height = (left[1] + left[3]).min(right[1] + right[3]) - left[1].max(right[1]);
+    let intersection = (intersection_width.max(0) * intersection_height.max(0)) as f64;
+    let union = area_left + area_right - intersection;
+    if union > 0.0 && intersection / union >= 0.3 {
+        return true;
+    }
+    let center_left = (
+        left[0] as f64 + left[2] as f64 / 2.0,
+        left[1] as f64 + left[3] as f64 / 2.0,
+    );
+    let center_right = (
+        right[0] as f64 + right[2] as f64 / 2.0,
+        right[1] as f64 + right[3] as f64 / 2.0,
+    );
+    let dx = (center_left.0 - center_right.0).abs();
+    let dy = (center_left.1 - center_right.1).abs();
+    let max_width = left[2].max(right[2]) as f64;
+    let max_height = left[3].max(right[3]) as f64;
+    let area_ratio = area_left / area_right;
+    dx <= 0.25 * max_width && dy <= 0.5 * max_height && (0.5..=2.0).contains(&area_ratio)
 }
 
 fn ocr_check(evidence: &Stage1OcrEvidence) -> QaCheck {
@@ -491,10 +622,11 @@ fn ocr_check(evidence: &Stage1OcrEvidence) -> QaCheck {
         );
     }
     let detail = format!(
-        "{} échantillon(s), {} avec texte, {} détection(s), {} erreur(s)",
+        "{} échantillon(s), {} avec texte, {} détection(s), {} bandeau(x) fixe(s), {} erreur(s)",
         evidence.samples_total,
         evidence.samples_with_text,
         evidence.detections_total,
+        evidence.fixed_overlays_total,
         evidence.frame_errors
     );
     if evidence.findings_total == 0 {
@@ -503,7 +635,7 @@ fn ocr_check(evidence: &Stage1OcrEvidence) -> QaCheck {
         QaCheck::warn(
             "subtitle_ocr",
             format!(
-                "{} épisode(s) de sous-titre incrusté ; {detail}",
+                "{} cluster(s) de sous-titre incrusté ; {detail}",
                 evidence.findings_total
             ),
         )
@@ -911,6 +1043,24 @@ mod tests {
         BgrFrame::new(width, height, color.repeat(width * height)).unwrap()
     }
 
+    const FRAME_HEIGHT: f64 = 1920.0;
+
+    fn detection(text: &str, y: i64) -> Detection {
+        Detection {
+            text: text.into(),
+            score: 0.9,
+            bbox: [100, y, 800, 70],
+        }
+    }
+
+    fn sample(index: usize, detections: Vec<Detection>) -> OcrSample {
+        OcrSample {
+            segment: "1".into(),
+            time: index as f64,
+            detections,
+        }
+    }
+
     #[test]
     fn bottom_band_keeps_the_last_quarter() {
         let image = frame(4, 8, [1, 2, 3]);
@@ -996,25 +1146,77 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_requires_three_consecutive_samples() {
-        let detection = Detection {
-            text: "SOUS-TITRE".into(),
-            score: 0.9,
-            bbox: [100, 1500, 800, 70],
-        };
+    fn aggregate_promotes_a_persistent_text_to_fixed_overlay() {
         let samples = (0..3)
-            .map(|index| OcrSample {
-                segment: "1".into(),
-                time: f64::from(index),
-                block_y_ratio: Some(0.82),
-                detections: vec![detection.clone()],
-            })
+            .map(|index| sample(index, vec![detection("BANDEAU FIXE", 1500)]))
             .collect::<Vec<_>>();
-        let findings = aggregate(&samples);
+        let findings = aggregate(&samples, FRAME_HEIGHT);
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].defect_type, DefectType::SubtitleBurnedIn);
+        assert_eq!(findings[0].defect_type, DefectType::FixedOverlay);
         assert_eq!(findings[0].timecode_start_sec, 0.0);
         assert_eq!(findings[0].timecode_end_sec, Some(2.0));
+        assert_eq!(findings[0].bbox_xywh, Some([100.0, 1500.0, 800.0, 70.0]));
+    }
+
+    #[test]
+    fn aggregate_separates_fixed_banner_from_transient_subtitles() {
+        let samples = (0..10)
+            .map(|index| {
+                let mut detections = vec![detection("BANDEAU FIXE", 1500)];
+                if index < 2 {
+                    detections.push(detection("SOUS TITRE", 1400));
+                }
+                sample(index, detections)
+            })
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples, FRAME_HEIGHT);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].defect_type, DefectType::FixedOverlay);
+        // Le sous-titre au-dessus ne doit pas élargir la boîte du bandeau.
+        assert_eq!(findings[0].bbox_xywh, Some([100.0, 1500.0, 800.0, 70.0]));
+    }
+
+    #[test]
+    fn aggregate_reports_changing_banner_text_as_subtitle() {
+        let texts = ["ALPHA", "BRAVO", "CHARLIE"];
+        let samples = (0..9)
+            .map(|index| sample(index, vec![detection(texts[index % texts.len()], 1500)]))
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples, FRAME_HEIGHT);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].defect_type, DefectType::SubtitleBurnedIn);
+    }
+
+    #[test]
+    fn aggregate_marks_mixed_variants_as_subtitle() {
+        let samples = (0..6)
+            .map(|index| {
+                let text = if index % 2 == 0 {
+                    "CLIENT HOTEL"
+                } else {
+                    "CLIENT HOTES"
+                };
+                sample(index, vec![detection(text, 1500)])
+            })
+            .collect::<Vec<_>>();
+        let findings = aggregate(&samples, FRAME_HEIGHT);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].defect_type, DefectType::SubtitleBurnedIn);
+    }
+
+    #[test]
+    fn aggregate_ignores_one_or_two_occurrences() {
+        let samples = (0..3)
+            .map(|index| {
+                let detections = if index < 2 {
+                    vec![detection("TEXTE ISOLE", 1500)]
+                } else {
+                    Vec::new()
+                };
+                sample(index, detections)
+            })
+            .collect::<Vec<_>>();
+        assert!(aggregate(&samples, FRAME_HEIGHT).is_empty());
     }
 
     #[test]
@@ -1037,21 +1239,19 @@ mod tests {
 
     #[test]
     fn aggregate_marks_four_samples_as_high_severity() {
-        let detection = Detection {
-            text: "SOUS-TITRE".into(),
-            score: 0.9,
-            bbox: [100, 1500, 800, 70],
-        };
-        let samples = (0..4)
-            .map(|index| OcrSample {
-                segment: "1".into(),
-                time: f64::from(index),
-                block_y_ratio: Some(0.82),
-                detections: vec![detection.clone()],
+        let samples = (0..8)
+            .map(|index| {
+                let detections = if index < 4 {
+                    vec![detection("SOUS-TITRE", 1500)]
+                } else {
+                    Vec::new()
+                };
+                sample(index, detections)
             })
             .collect::<Vec<_>>();
-        let findings = aggregate(&samples);
+        let findings = aggregate(&samples, FRAME_HEIGHT);
         assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].defect_type, DefectType::SubtitleBurnedIn);
         assert_eq!(findings[0].severity, Severity::High);
     }
 
@@ -1075,20 +1275,10 @@ mod tests {
 
     #[test]
     fn aggregate_skips_unstable_vertical_position() {
-        let detection = Detection {
-            text: "SOUS-TITRE".into(),
-            score: 0.9,
-            bbox: [100, 1500, 800, 70],
-        };
         let mut samples = (0..3)
-            .map(|index| OcrSample {
-                segment: "1".into(),
-                time: f64::from(index),
-                block_y_ratio: Some(0.82),
-                detections: vec![detection.clone()],
-            })
+            .map(|index| sample(index, vec![detection("BANDEAU FIXE", 1500)]))
             .collect::<Vec<_>>();
-        samples[2].block_y_ratio = Some(0.92);
-        assert!(aggregate(&samples).is_empty());
+        samples[2].detections[0].bbox[1] = 1620;
+        assert!(aggregate(&samples, FRAME_HEIGHT).is_empty());
     }
 }

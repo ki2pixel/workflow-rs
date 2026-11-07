@@ -2,14 +2,20 @@
 
 ## Tâche en cours
 
-**Étude logos/bandeaux fixes (2026-11-07, D-051).** Audit de `post/a2.rs`
-et du QA, benchmark de sept dépôts GitHub, diagnostic en lecture seule sur
-`40`, `54` et `58 Camille`, architecture cible du gate OCR et du clustering
-QA. Conclusion : aucun dépôt externe n'est importé ; le QA doit passer à un
-clustering par détection (`fixed_overlay`, schéma 1.3.0) et A2 doit recevoir
-un gate OCR conservateur derrière `a2_ocr = false`. Aucun code de production
-modifié ; 442 tests, `fmt` et `clippy -D warnings` verts. Détail dans
-`docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
+**QA 1.3.0 — clustering OCR (2026-11-07, D-051).** La phase 1 est
+implémentée : `qa/ocr.rs` regroupe les détections par **boîte stable** (le
+texte normalisé sert à la dominance), ajoute `DefectType::FixedOverlay`, le
+check `fixed_overlay` et `fixed_overlays_total`, passe `QA_SCHEMA_VERSION` à
+**1.3.0** et `CACHE_VERSION` à **7**. Un bandeau persistant (≥ 60 %) et
+dominant (≥ 80 %) devient `fixed_overlay = review` ; un texte changeant
+reste `subtitle_burned_in`. Validation réelle sous
+`/tmp/workflow_investigation/qa13b/` : un `fixed_overlay` sur chacun des
+quatre rushes `40 ABHARTACH`, `40 FOOTBALLEUR`, `54`, `58`, plus un vrai
+`subtitle_burned_in` sur `54` auparavant manqué ; `sub_fast` donne un
+sous-titre (dominance 29 %), `181_sub_center` un `fixed_overlay`. Tests
+workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
+`/mnt/cache`. Phases 2 (module `vision`) et 3 (gate OCR A2) à suivre.
+Détail : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
 
 **Progression STEP8/post-STEP8 dans l'interface.**
 La carte STEP8 prolonge sa barre pendant le post-traitement A5/A6 : le CLI
@@ -52,6 +58,24 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-07] **Implémentation QA 1.3.0 (D-051, phase 1)** :
+  - `qa/ocr.rs` : agrégation par boîte (`boxes_similar` : containment,
+    IoU ≥ 0,3, ou centres proches sur la même ligne), variantes de texte
+    suivies pour la dominance, `MIN_CLUSTER_COUNT = 3`,
+    `FIXED_PERSISTENCE = 0.60`, `FIXED_DOMINANT_RATIO = 0.80` ;
+  - `qa/model.rs` : `DefectType::FixedOverlay`, `QA_SCHEMA_VERSION = 1.3.0`,
+    `fixed_overlays_total` dans `Stage1OcrEvidence` ;
+  - `qa/cache.rs` : `CACHE_VERSION = 7` ; `subtitle_ocr` reste `pass` si
+    seuls des bandeaux fixes existent, le check `fixed_overlay` porte le
+    `review` ;
+  - rejeu réel des quatre rushes : 4/4 `fixed_overlay`, 0 régression,
+    `54` gagne un `subtitle_burned_in` réel (3 échantillons au-dessus du
+    bandeau) ; `sub_fast` → sous-titre (dominance 29 %), `181_sub_center` →
+    `fixed_overlay` ; sorties sous `/tmp/workflow_investigation/qa13b/` ;
+  - lot de régression OCR sur 36 exports GOOD :
+    `/tmp/workflow_investigation/corpus35-qa13/` → 36 `pass`, 0 finding,
+    aucun `fixed_overlay` ni `subtitle_burned_in` ;
 
 - [2026-11-07] **Étude logos et bandeaux fixes (D-051)** :
   - audit de `post/a2.rs` et de `qa/ocr.rs`, `qa/logo.rs`, `qa/dino.rs`,
@@ -467,7 +491,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 442 tests unitaires ; pas de CI.
+- 446 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

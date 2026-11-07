@@ -36,8 +36,9 @@ néanmoins en évidence deux défauts précis, indépendants du benchmark :
 La recommandation est de **ne pas importer** YOLO, Logodetect ni les
 détecteurs morphologiques OpenCV, mais de :
 
-- corriger l'agrégation QA par un **clustering par détection** (texte
-  normalisé + boîte) et d'ajouter un type `fixed_overlay` ;
+- corriger l'agrégation QA par un **clustering par boîte stable** (le texte
+  normalisé sert à mesurer la dominance) et d'ajouter un type
+  `fixed_overlay` ;
 - ajouter à A2 un **gate OCR conservateur** : l'OCR ne peut jamais contourner
   les garde-fous durs (largeur, hauteur, scale, keyframes, bande haute,
   conflit A1/A2) ; il peut confirmer un bandeau clair et stable, et surtout
@@ -49,7 +50,7 @@ détecteurs morphologiques OpenCV, mais de :
   dépendre `post` de `qa`.
 
 Aucun code de production n'a été modifié par cette étude. La suite de tests
-reste verte : **442 tests**, `fmt` et `clippy -D warnings` OK.
+reste verte : **446 tests**, `fmt` et `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
 
@@ -442,7 +443,8 @@ renverrait en `review`.
 ### 5.2 Preuve OCR par échantillon
 
 Les logs `RUST_LOG=workflow_steps::qa::ocr=debug` donnent les boîtes et les
-textes. Regroupement par texte normalisé + boîte :
+textes. Regroupement du prototype par texte normalisé, avec contrôle de
+boîte :
 
 | Projet | Texte dominant | Occurrences | `y0` médian | Hauteur | Dérive `y` | Score | Ratio dominant |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -707,11 +709,15 @@ Le correctif QA est indépendant de A2 et peut être livré en premier.
 
 1. Pour chaque échantillon, conserver les détections filtrées
    (`text`, `score`, `bbox`, `time`).
-2. Créer des clusters par **texte normalisé + similarité de boîte**
-   (containment, IoU ≥ 0,3, ou centres proches avec tailles comparables),
-   comme `qa/logo.rs::can_merge`, mais sans exiger la même bande.
+2. Créer des clusters par **boîte stable** (containment, IoU ≥ 0,3, ou
+   centres proches sur la même ligne avec des tailles comparables), comme
+   `qa/logo.rs::bbox_similarity` mais sans exiger la même bande. Le texte
+   normalisé n'est **pas** une clé de regroupement : deux sous-titres
+   successifs partagent la même boîte et doivent rester dans le même
+   cluster pour que leur dominance basse les classe en sous-titre.
 3. Pour chaque cluster : `count`, `first`, `last`, `persistence =
-   count/total`, `dominant_ratio`, `y_drift`, `mean_score`.
+   count/total`, `dominant_ratio` (occurrences du texte normalisé dominant
+   / `count`), `y_drift`, `mean_score`.
 4. Un cluster devient un finding si :
    - `count ≥ 3` **et** `y_drift ≤ 0.04 × height` ; et
    - soit `persistence ≥ 0.60` et `dominant_ratio ≥ 0.80` →
@@ -727,7 +733,7 @@ Le correctif QA est indépendant de A2 et peut être livré en premier.
 | --- | --- | --- |
 | 40 ABHARTACH | `subtitle_burned_in` (0,978) | `fixed_overlay` (review) |
 | 40 FOOTBALLEUR | aucun finding sous-titre ; logo DINOv2 | `fixed_overlay` + logo DINOv2 |
-| 54 CLIENT HOTEL | aucun finding sous-titre | `fixed_overlay` (review) |
+| 54 CLIENT HOTEL | aucun finding sous-titre | `fixed_overlay` (review) + `subtitle_burned_in` (3 échantillons) |
 | 58 CROUSTY | aucun finding sous-titre ; logo texte haut | `fixed_overlay` + logo texte haut |
 
 Les sous-titres transitoires de `58` (1 occurrence) ne produisent toujours
@@ -865,6 +871,42 @@ ce n'est pas la recommandation par défaut.
 - il ne teste pas les logos non textuels dans A2 ;
 - il ne valide pas le niveau 2 sur des lower-thirds sombres variés ;
 - il ne remplace pas une validation humaine des décisions `apply`.
+
+### 7.4 Implémentation QA 1.3.0 (2026-11-07)
+
+Le premier lot (QA v1.3) est implémenté dans `qa/ocr.rs`, `qa/model.rs` et
+`qa/cache.rs` : agrégation par boîte stable, `DefectType::FixedOverlay`,
+check `fixed_overlay`, schéma **1.3.0**, cache **7**. Le texte normalisé
+sert à la dominance mais n'entre pas dans la clé de regroupement, sinon
+deux sous-titres successifs dans la même boîte produiraient deux clusters
+au lieu d'un `subtitle_burned_in` à dominance basse.
+
+Rejeu réel sur les quatre rushes, modèles et ONNX Runtime de production,
+sorties sous `/tmp/workflow_investigation/qa13b/` :
+
+| Projet | `fixed_overlay` | `subtitle_burned_in` | Persistance / dominance |
+| --- | :---: | :---: | --- |
+| 40 ABHARTACH | 1 | 0 | 100 % / 96 %, score 0,978 |
+| 40 FOOTBALLEUR | 1 | 0 | 100 % / 100 %, score 0,984 |
+| 54 CLIENT HOTEL | 1 | 1 | 100 % / 100 %, score 0,984 ; sous-titre temporaire à 3 échantillons |
+| 58 CROUSTY | 1 | 0 | 100 % / 100 %, score 0,983 |
+
+Le `subtitle_burned_in` de `54` est un vrai positif supplémentaire : trois
+échantillons lus au-dessus du bandeau (`est sympatique, proactif,` / `les
+demandes des clients.` / `Pourquoi elle ne fait pas le café ici ?`), que
+l'ancienne moyenne de bloc supprimait. Les clips synthétiques confirment le
+partage : `sub_fast` (texte changeant toutes les 3 s) donne un
+`subtitle_burned_in` à dominance 29 %, `181_sub_center` (texte fixe) donne
+un `fixed_overlay`. Un texte statique est donc classé `fixed_overlay` même
+s'il vient d'un sous-titre : la catégorie décrit la persistance, pas
+l'intention éditoriale.
+
+Lot de non-régression sur le corpus GOOD, OCR seul
+(`--no-face --no-logo --no-logo-visual`, 4 workers, 36 exports hors un exclu) :
+**36 `pass`, 0 finding, 0 `fixed_overlay`, 0 `subtitle_burned_in`**. Les
+quelques textes isolés du corpus restent sous le seuil de trois échantillons
+d'un même cluster. Sorties sous
+`/tmp/workflow_investigation/corpus35-qa13/`.
 
 ## 8. Risques et points ouverts
 

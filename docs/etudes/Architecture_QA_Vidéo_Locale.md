@@ -262,7 +262,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 
 **Vérificateur DINOv2 (2026-11-02)** : `qa/dino.rs` charge DINOv2 ViT-S/14 quantifié en ONNX Runtime CPU et un probe logistique versionné. Le second étage note toutes les boîtes OCR géométriquement valides (18–220 px), y compris celles dont le texte est trop court, puis agrège sur 3/12 échantillons et écarte les doublons texte. Sur la galerie 56 clips, l'union texte + visuel passe de 34/39 à **39/39**, avec 5 sauvetages (Gulli 0,5, Les 100 1,0, M6+ aux trois échelles), 0/13 masqués et 0/4 négatifs. Sur les 32 exports du corpus avec projet, aucun export `pass` n'est signalé à tort ; les 2 exports 270 restent `review`. À cette date, le flag `--logo-visual` était opt-in : le probe est entraîné sur 13 assets synthétiques. Une validation réelle par ablation (14 exports GOOD, 16 overlays image retirés du projet) donne 0/14 finding avec le projet d'origine et **14/14** sans déclaration (26 findings, 19 texte, 7 DINOv2), avec 298 « The 100 » sauvé par DINOv2 (2/2). Les overlays et les deux exports 270 (split screen) sont confirmés intentionnels. Les logos inconnus et les masques partiels restent à tester.
 
-**Passage en production (2026-11-02)** : le lot est déclaré assez complet pour la production. `auto_approve_eligible` devient vrai sur un `pass` complet si `project_readable`, `subtitle_ocr`, `logo_residual` et `face_cut` ont tourné et si un éventuel check `logo_visual` est `pass`/`info` quand DINOv2 est actif ; un contrôle requis `not_applicable`, un `review` ou un `fail` le laisse faux. DINOv2 passe en opt-out (`--no-logo-visual`), l'ancien `--logo-visual` restant accepté sans effet. `qa.json` passe en schéma 1.2.0 et le cache en version 6. Détail : `docs/lots/LOT-10-QA.md`, `POC-RESULTS.md` §2.10–2.11 et `reports/real-ablation/`.
+**Passage en production (2026-11-02)** : le lot est déclaré assez complet pour la production. `auto_approve_eligible` devient vrai sur un `pass` complet si `project_readable`, `subtitle_ocr`, `logo_residual` et `face_cut` ont tourné et si un éventuel check `logo_visual` est `pass`/`info` quand DINOv2 est actif ; un contrôle requis `not_applicable`, un `review` ou un `fail` le laisse faux. DINOv2 passe en opt-out (`--no-logo-visual`), l'ancien `--logo-visual` restant accepté sans effet. `qa.json` passe en schéma 1.2.0 et le cache en version 6. Détail : `docs/lots/LOT-10-QA.md`, `POC-RESULTS.md` §2.10–2.11 et `reports/real-ablation/`. Depuis le 2026-11-07, le schéma est **1.3.0** et le cache **7** (D-051, clustering OCR `fixed_overlay`).
 
 ### **6.4 Schémas d'artefacts**
 
@@ -305,7 +305,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
 
 ```json
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "generated_at": "2026-10-30T14:40:03+00:00",
   "video_id": "300_UJUD - JOSEPH",
   "folder_id": "300",
@@ -461,7 +461,7 @@ Le schéma complet est `qa_label.schema.json`. Les champs `segment_num`, `segmen
 }
 ```
 
-L'exemple ci-dessus décrit le contrat v1.2 réellement émis pour Stage 0 + OCR + logos + visage. `export_sha256` identifie l'export contrôlé ; chaque finding peut porter `evidence_frame`, un chemin relatif à `--out` vers une frame WebP (par exemple `evidence/001_face_cut_7.50.webp`). `stage1_logo_evidence` expose les overlays déclarés (`overlays`) et ceux qui n'ont pas pu être exploités (`overlays_skipped`) ; `stage1_logo_visual_evidence` est présent quand DINOv2 est actif (`--no-logo-visual` pour l'opt-out). Les champs prévus pour le VLM (`vlm_verification`) seront ajoutés lors de son portage et ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
+L'exemple ci-dessus décrit le contrat v1.3 réellement émis pour Stage 0 + OCR + logos + visage. Depuis la v1.3 (D-051), l'OCR regroupe les détections par boîte stable et distingue `fixed_overlay` (texte persistant et dominant, check `fixed_overlay = review`) de `subtitle_burned_in` (texte changeant) ; `stage1_ocr_evidence` expose `fixed_overlays_total` en plus de `findings_total`. `export_sha256` identifie l'export contrôlé ; chaque finding peut porter `evidence_frame`, un chemin relatif à `--out` vers une frame WebP (par exemple `evidence/001_face_cut_7.50.webp`). `stage1_logo_evidence` expose les overlays déclarés (`overlays`) et ceux qui n'ont pas pu être exploités (`overlays_skipped`) ; `stage1_logo_visual_evidence` est présent quand DINOv2 est actif (`--no-logo-visual` pour l'opt-out). Les champs prévus pour le VLM (`vlm_verification`) seront ajoutés lors de son portage et ne doivent pas être supposés présents aujourd'hui. `qa.json` reste additif et ne remplace jamais l'`audit.json` de A5/A6.
 
 ## **7. Modèle de coût total et comparaison build/buy**
 

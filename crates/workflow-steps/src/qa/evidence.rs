@@ -153,6 +153,7 @@ mod tests {
     #[test]
     fn defect_names_are_stable_for_paths() {
         assert_eq!(DefectType::SubtitleBurnedIn.as_str(), "subtitle_burned_in");
+        assert_eq!(DefectType::FixedOverlay.as_str(), "fixed_overlay");
         assert_eq!(DefectType::FaceCut.as_str(), "face_cut");
     }
 }

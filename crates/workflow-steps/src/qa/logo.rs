@@ -379,7 +379,7 @@ fn filter_detection(text: &str, score: f64, det_box: &DetBox) -> Option<LogoDete
 }
 
 /// Clé de persistance : minuscules, caractères alphanumériques seulement.
-fn normalize_text(text: &str) -> String {
+pub(crate) fn normalize_text(text: &str) -> String {
     text.chars()
         .filter(|character| character.is_alphanumeric())
         .flat_map(char::to_lowercase)
@@ -434,7 +434,7 @@ fn text_distance(left: &str, right: &str) -> usize {
 /// Même zone : une boîte contenue dans l'autre, un IoU suffisant, ou des
 /// centres proches avec une taille comparable. La containment couvre les
 /// recadrages OCR d'un même logo (« e=m6 », « =m6 », « m6 »).
-fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
+pub(crate) fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
     if bbox_contains(left, right) || bbox_contains(right, left) {
         return true;
     }
@@ -463,7 +463,7 @@ fn bbox_similarity(left: [i64; 4], right: [i64; 4]) -> bool {
     distance <= 0.25 * scale && (0.5..=2.0).contains(&ratio)
 }
 
-fn bbox_contains(outer: [i64; 4], inner: [i64; 4]) -> bool {
+pub(crate) fn bbox_contains(outer: [i64; 4], inner: [i64; 4]) -> bool {
     const MARGIN: i64 = 2;
     inner[0] >= outer[0] - MARGIN
         && inner[1] >= outer[1] - MARGIN

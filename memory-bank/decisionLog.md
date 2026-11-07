@@ -596,11 +596,13 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      Logodetect exige des exemplaires, les deux sont lourds ou copyleft
      (GPL/AGPL), et les détecteurs morphologiques OpenCV n'ont ni OCR ni
      persistance ; `OverlayMask` couvre déjà les assets déclarés ;
-  2. faire évoluer le QA en **1.3.0** avec un clustering par détection
-     (texte normalisé + boîte), un type `fixed_overlay` non bloquant et un
-     cache 7 ; un bandeau fixe reste `review` mais n'est plus confondu avec
-     un sous-titre et n'est plus masqué par la dérive d'un sous-titre
-     concurrent ;
+  2. faire évoluer le QA en **1.3.0** avec un clustering par **boîte
+     stable** (le texte normalisé ne sert qu'à mesurer la dominance), un
+     type `fixed_overlay` non bloquant et un cache 7 ; un bandeau fixe
+     (persistance ≥ 60 %, dominance ≥ 80 %) reste `review` mais n'est plus
+     confondu avec un sous-titre et n'est plus masqué par la dérive d'un
+     sous-titre concurrent ; un texte changeant dans la même boîte reste
+     `subtitle_burned_in` ;
   3. ajouter à A2 un **gate OCR** derrière `a2_ocr = false` : il ne peut
      jamais contourner les garde-fous durs (largeur, hauteur, scale,
      keyframes, bande haute, conflit A1/A2) ; il peut confirmer un bandeau
@@ -625,8 +627,17 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
     validée sans corpus dédié.
 - **Validation** : quatre projets du corpus, QA en lecture seule sous
   `/tmp/workflow_investigation/`, frames et médianes sous `/tmp`, aucun
-  fichier de `/mnt/cache` modifié ; 442 tests, `fmt` et
-  `clippy -D warnings` verts ; aucun code de production modifié.
+  fichier de `/mnt/cache` modifié. **Phase 1 (QA 1.3.0) implémentée** dans
+  `qa/ocr.rs`, `qa/model.rs` et `qa/cache.rs` : rejeu réel des quatre rushes,
+  un `fixed_overlay` par projet (persistance 100 %, dominance 96–100 %),
+  zéro régression, plus un `subtitle_burned_in` réel sur `54` auparavant
+  manqué ; `sub_fast` donne un sous-titre à dominance 29 % et
+  `181_sub_center` un `fixed_overlay`. Tests workspace, `fmt` et
+  `clippy -D warnings` verts ; aucune écriture dans `/mnt/cache`. Lot OCR
+  sur 36 exports GOOD : 36 `pass`, 0 finding, aucun faux positif
+  `fixed_overlay` ni `subtitle_burned_in`.
+- **Suites** : phase 2 (module neutre `vision`) et phase 3 (gate OCR A2
+  derrière `a2_ocr = false`) non commencées.
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`,
   `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/post/a2.rs`,

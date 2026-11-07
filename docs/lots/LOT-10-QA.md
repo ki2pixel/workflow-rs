@@ -276,7 +276,7 @@ workflow-cli qa run \
 
 ## Schéma `qa.json`
 
-Champs principaux : `schema_version` (1.2.0), `generated_at`, `video_id`,
+Champs principaux : `schema_version` (1.3.0), `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
@@ -295,10 +295,23 @@ l'extraction des preuves ; un échec ffmpeg laisse le finding sans preuve et
 n'invalide pas le rapport.
 
 `stage1_ocr_evidence` contient les deux modèles, le nombre d'échantillons,
-`samples_with_text`, `detections_total`, `findings_total`, `frame_errors`,
-`per_segment`, le score minimal et le début de la bande. `timings_ms` ajoute
+`samples_with_text`, `detections_total`, `findings_total` (sous-titres),
+`fixed_overlays_total` (bandeaux fixes), `frame_errors`, `per_segment`, le
+score minimal et le début de la bande. `timings_ms` ajoute
 `stage1_ocr_ms` ; `models_provenance.ocr_det` porte le SHA-256 de la
 détection et `models_provenance.ocr_rec` celui de la reconnaissance.
+
+Depuis le schéma 1.3.0, l'agrégation OCR regroupe les détections par **boîte
+stable**, et non plus par moyenne de tous les blocs de l'échantillon. Un
+cluster devient un finding à partir de trois échantillons si sa dérive
+verticale reste sous 4 % de la hauteur. Il est classé `fixed_overlay` quand
+la persistance atteint 60 % et que le texte normalisé dominant couvre 80 %
+du cluster ; sinon il est classé `subtitle_burned_in` (texte changeant). Le
+texte n'entre pas dans la clé de regroupement : deux sous-titres successifs
+partagent la même boîte et doivent rester dans le même cluster pour que leur
+dominance basse les classe en sous-titre. Un `fixed_overlay` produit un
+check `fixed_overlay = review` et laisse `subtitle_ocr = pass` ; tout finding
+interdit l'auto-approbation.
 
 `stage1_logo_evidence` contient les deux modèles, 12 échantillons,
 `samples_with_text`, `detections_total`, `masked_total`, `findings_total`,
@@ -325,8 +338,9 @@ paramètres (`per_segment`, score, NMS, padding). `timings_ms` ajoute
 Les findings Stage 0 utilisent `timecode_start_sec` / `timecode_end_sec`,
 `severity`, `confidence`, `detected_by_stage` et `notes`. Les findings OCR
 utilisent `detected_by_stage = stage1_ppocr_bottom` et résument dans `notes`
-les textes lus, les segments, les scores moyen/max et le centre vertical. Les
-findings visage ajoutent `bbox_xywh` et
+les textes lus, les segments, la dominance du texte dominant, le score moyen
+et le centre vertical ; les findings portent aussi `bbox_xywh` (union des
+boîtes du cluster). Les findings visage ajoutent `bbox_xywh` et
 `detected_by_stage = stage1_yunet_face`. Les findings logo texte ajoutent
 `bbox_xywh` et `detected_by_stage = stage1_ppocr_top` ; `notes` contient le
 texte, la persistance et le score moyen. Les findings visuels utilisent
@@ -477,6 +491,32 @@ Le lot est déclaré assez complet pour la production :
   auto vrai, 298 ablaté `review` + auto faux, 270 GOAL `review` + auto faux ;
   modèle DINOv2 absent → `not_applicable` + auto faux ; `--no-logo-visual`
   → `pass` + auto vrai sans preuve visuelle.
+
+#### Clustering OCR 1.3.0 (2026-11-07, D-051)
+
+- L'ancienne agrégation calculait une moyenne Y de tous les blocs de la bande
+  basse ; un sous-titre concurrent au-dessus du bandeau faisait dépasser
+  `MAX_Y_DRIFT = 0.04` et supprimait l'épisode entier. Mesures : dérive
+  `block_y` 0,0562–0,0642 sur `40 FOOTBALLEUR`, `54` et `58`.
+- Le clustering par boîte sépare le bandeau des sous-titres ; le texte
+  normalisé ne sert qu'à la dominance. Un cluster `fixed_overlay` est
+  persistant (≥ 60 %) et dominant (≥ 80 %) ; sinon `subtitle_burned_in`.
+- `qa.json` passe en schéma **1.3.0** et le cache en version **7**.
+- Validation sur les rushes 1920×1080 : `40 ABHARTACH`, `40 FOOTBALLEUR`,
+  `54` et `58` produisent chacun **un `fixed_overlay`** (persistance 100 %,
+  dominance 96–100 %, score 0,978–0,984). `54` détecte en plus un vrai
+  sous-titre temporaire (`subtitle_burned_in`, 3 échantillons, dominance
+  basse). `sub_fast` (texte changeant toutes les 3 s) donne
+  `subtitle_burned_in` avec dominance 29 % ; `181_sub_center` (texte fixe)
+  donne `fixed_overlay`. Aucun `fixed_overlay` sur les textes transitoires.
+- La catégorie d'un texte statique est désormais `fixed_overlay`, même s'il
+  provient d'un sous-titre synthétique : le critère est la persistance et la
+  dominance, pas l'intention éditoriale. Le finding reste non bloquant et
+  demande une revue.
+- Non-régression OCR sur le corpus GOOD (36 exports hors un exclu, OCR seul,
+  4 workers) : **36 `pass`, 0 finding**, aucun `fixed_overlay` ni
+  `subtitle_burned_in`. Les quelques textes isolés restent sous le seuil de
+  trois échantillons.
 
 ### Stage 1 visage
 

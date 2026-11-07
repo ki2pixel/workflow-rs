@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const QA_SCHEMA_VERSION: &str = "1.2.0";
+pub const QA_SCHEMA_VERSION: &str = "1.3.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -56,6 +56,9 @@ pub enum DefectType {
     TemplateLogoMissing,
     CutContinuity,
     SubtitleBurnedIn,
+    /// Texte persistant et stable, typiquement un bandeau de chaîne ou un
+    /// lower-third fixe. Non bloquant : l'intentionnalité reste humaine.
+    FixedOverlay,
     LogoResidual,
     FaceCut,
     FramingReview,
@@ -77,6 +80,7 @@ impl DefectType {
             Self::TemplateLogoMissing => "template_logo_missing",
             Self::CutContinuity => "cut_continuity",
             Self::SubtitleBurnedIn => "subtitle_burned_in",
+            Self::FixedOverlay => "fixed_overlay",
             Self::LogoResidual => "logo_residual",
             Self::FaceCut => "face_cut",
             Self::FramingReview => "framing_review",
@@ -258,6 +262,9 @@ pub struct Stage1OcrEvidence {
     pub per_segment: usize,
     pub min_score: f64,
     pub bottom_start: f64,
+    /// Bandeaux fixes retenus par le clustering, distincts des sous-titres.
+    #[serde(default)]
+    pub fixed_overlays_total: usize,
 }
 
 /// Overlay déclaré dans le `.ecproj`, réduit à sa zone alpha visible.
@@ -411,6 +418,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&DefectType::SubtitleBurnedIn).unwrap(),
             "\"subtitle_burned_in\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DefectType::FixedOverlay).unwrap(),
+            "\"fixed_overlay\""
         );
         assert_eq!(serde_json::to_string(&Severity::High).unwrap(), "\"high\"");
     }

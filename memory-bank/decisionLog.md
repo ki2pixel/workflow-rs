@@ -566,6 +566,74 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 - **Références** : `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
+## 2026-11-07 — D-051 : preuve OCR des bandeaux fixes, QA par clustering et non-import des dépôts logos/sous-titres
+
+- **Contexte** : étude comparative demandée sur la détection de logos et de
+  bandeaux/sous-titres fixes dans `post/a2.rs` et `qa/`, confrontée à sept
+  dépôts GitHub (YOLOv7, YOLOv8 API, open-set YOLOv5, Logodetect, VideOCR,
+  deux détecteurs morphologiques OpenCV) et au corpus réel `40`, `54`, `58
+  Camille`.
+- **Constats mesurés** :
+  1. la pile Rust existante (PP-OCRv6 + DINOv2 + `OverlayMask` + persistance)
+     surpasse les sept dépôts pour le broadcast généraliste ; aucun ne
+     combine open-set, temporel, masque d'overlays et exécution Rust/ONNX ;
+  2. l'agrégation OCR de `qa/ocr.rs` jette les bandeaux persistants dès qu'un
+     sous-titre coexiste : la moyenne verticale du bloc dérive de 0,0642
+     (`54`), 0,0637 (`58`) et 0,0562 (`40 FOOTBALLEUR`), au-delà de
+     `MAX_Y_DRIFT = 0.04`, alors que `40 ABHARTACH` (dérive 0,0019) est
+     signalé ; trois bandeaux persistants sur quatre sont donc manqués et le
+     quatrième est classé `subtitle_burned_in` ;
+  3. A2 ne peut pas exploiter l'OCR : les bandeaux `40` sont sombres
+     (médiane 37 et 55) et les candidats `40`/`58` ont une géométrie de
+     scène instable, alors que l'OCR lit le même texte fixe sur 96–100 %
+     des échantillons (score 0,979–0,987, dérive Y 2–9 px) ;
+  4. l'application A2 de `54` est propre : 112 différences JSON, toutes des
+     valeurs `Scale 180.0 → 200.8`, aucune ancre ni position modifiée ;
+  5. DINOv2 détecte `VIDÉO TIKTOK` sur `40 FOOTBALLEUR` (4/12, score 0,671)
+     là où l'OCR texte échoue.
+- **Décision** :
+  1. ne pas importer les dépôts étudiés : YOLO est fermé au monde ouvert,
+     Logodetect exige des exemplaires, les deux sont lourds ou copyleft
+     (GPL/AGPL), et les détecteurs morphologiques OpenCV n'ont ni OCR ni
+     persistance ; `OverlayMask` couvre déjà les assets déclarés ;
+  2. faire évoluer le QA en **1.3.0** avec un clustering par détection
+     (texte normalisé + boîte), un type `fixed_overlay` non bloquant et un
+     cache 7 ; un bandeau fixe reste `review` mais n'est plus confondu avec
+     un sous-titre et n'est plus masqué par la dérive d'un sous-titre
+     concurrent ;
+  3. ajouter à A2 un **gate OCR** derrière `a2_ocr = false` : il ne peut
+     jamais contourner les garde-fous durs (largeur, hauteur, scale,
+     keyframes, bande haute, conflit A1/A2) ; il peut confirmer un bandeau
+     clair stable et oppose un veto si le texte change trop vite ; les
+     bandeaux sombres restent en `review` avec preuve OCR et scale proposé
+     (niveau 1), le niveau 2 automatique étant réservé à une validation
+     ultérieure ;
+  4. extraire `frame`, `inference`, `ocr`, `dino` et le texte dans un module
+     neutre `vision` avant de brancher `post` sur l'OCR, pour ne pas faire
+     dépendre le pré-export du QA post-export ;
+  5. conserver la formule de scale A2 actuelle : le bord visible après scale
+     reste au-dessus du texte OCR sur les quatre cas, au prix d'un sur-crop
+     de 24–65 px de scène ; une formule basée sur `y0` est laissée à une
+     étude séparée.
+- **Alternatives rejetées** :
+  - import direct `post → qa` : couple les couches et masque le cycle
+    conceptuel ; acceptable seulement pour un spike ;
+  - duplication d'un OCR léger dans `post` : deux préprocessings à maintenir ;
+  - seuil Sobel/bright global plus haut : mesuré insuffisant, des bords de
+    scène restent détectés au-dessus du texte ;
+  - application automatique des bandeaux sombres : change une politique
+    validée sans corpus dédié.
+- **Validation** : quatre projets du corpus, QA en lecture seule sous
+  `/tmp/workflow_investigation/`, frames et médianes sous `/tmp`, aucun
+  fichier de `/mnt/cache` modifié ; 442 tests, `fmt` et
+  `clippy -D warnings` verts ; aucun code de production modifié.
+- **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`,
+  `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
+  `crates/workflow-steps/src/post/a2.rs`,
+  `crates/workflow-steps/src/qa/ocr.rs`,
+  `crates/workflow-steps/src/qa/logo.rs`,
+  `crates/workflow-steps/src/qa/dino.rs`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

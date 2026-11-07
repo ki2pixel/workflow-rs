@@ -2,6 +2,15 @@
 
 ## Tâche en cours
 
+**Étude logos/bandeaux fixes (2026-11-07, D-051).** Audit de `post/a2.rs`
+et du QA, benchmark de sept dépôts GitHub, diagnostic en lecture seule sur
+`40`, `54` et `58 Camille`, architecture cible du gate OCR et du clustering
+QA. Conclusion : aucun dépôt externe n'est importé ; le QA doit passer à un
+clustering par détection (`fixed_overlay`, schéma 1.3.0) et A2 doit recevoir
+un gate OCR conservateur derrière `a2_ocr = false`. Aucun code de production
+modifié ; 442 tests, `fmt` et `clippy -D warnings` verts. Détail dans
+`docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
+
 **Progression STEP8/post-STEP8 dans l'interface.**
 La carte STEP8 prolonge sa barre pendant le post-traitement A5/A6 : le CLI
 émet `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et `POST_DONE` sur
@@ -43,6 +52,24 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-07] **Étude logos et bandeaux fixes (D-051)** :
+  - audit de `post/a2.rs` et de `qa/ocr.rs`, `qa/logo.rs`, `qa/dino.rs`,
+    `qa/overlay.rs` ; benchmark des sept dépôts fournis (YOLOv7, YOLOv8 API,
+    open-set YOLOv5, Logodetect, VideOCR, deux détecteurs morphologiques) ;
+  - diagnostic en lecture seule de `40`, `54` et `58 Camille` : l'agrégation
+    QA par moyenne de bloc manque trois bandeaux persistants sur quatre
+    (dérive verticale 0,0562–0,0642 > `MAX_Y_DRIFT = 0.04`) et A2 ne peut
+    pas exploiter l'OCR (bandeaux sombres, géométrie de scène instable) ;
+  - décision : QA 1.3.0 avec clustering par détection et `fixed_overlay` ;
+    A2 v3 avec gate OCR conservateur (`a2_ocr = false`), garde-fous durs
+    inchangés, veto sur texte changeant, bandeaux sombres en `review` ;
+    extraction ultérieure d'un module neutre `vision` ;
+  - application A2 de `54` vérifiée propre : 112 différences JSON, toutes
+    des `Scale` 180,0 → 200,8, aucune ancre ni position modifiée ;
+  - 442 tests, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
+    `/mnt/cache`, preuves sous `/tmp/workflow_investigation/` ;
+  - rapport : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
 
 - [2026-11-02] **Progression post-STEP8 dans l'interface (D-050)** :
   - `post/run.rs` émet `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et

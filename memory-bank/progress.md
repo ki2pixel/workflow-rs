@@ -75,6 +75,40 @@
   `POST_*`). Reste : exposer `review.json` dans l'UI, recalibrer A3/A4 et
   traiter 179/287.
 
+## Étude logos et bandeaux fixes (2026-11-07)
+
+- **Périmètre** : audit de `post/a2.rs` et de `qa/ocr.rs`, `qa/logo.rs`,
+  `qa/dino.rs`, `qa/overlay.rs` ; benchmark de sept dépôts GitHub (YOLOv7,
+  YOLOv8 API, open-set YOLOv5, Logodetect, VideOCR, deux détecteurs
+  morphologiques OpenCV) ; diagnostic en lecture seule sur `40`, `54` et
+  `58 Camille`.
+- **Conclusion benchmark** : la pile Rust existante (PP-OCRv6 + DINOv2 +
+  `OverlayMask` + persistance) reste la référence pour le broadcast
+  généraliste. Les YOLO sont fermés et/ou copyleft, Logodetect exige un
+  asset exact et est AGPL, VideOCR confirme PaddleOCR mais reste une
+  application Python, les détecteurs morphologiques n'ont ni OCR ni
+  persistance. Aucun import retenu.
+- **Défaut QA mesuré** : l'agrégation par moyenne de bloc jette les bandeaux
+  persistants dès qu'un sous-titre coexiste. Dérive verticale 0,0642 (`54`),
+  0,0637 (`58`), 0,0562 (`40 FOOTBALLEUR`) contre `MAX_Y_DRIFT = 0.04` ;
+  trois bandeaux sur quatre sont manqués, `40 ABHARTACH` (dérive 0,0019) est
+  signalé mais classé `subtitle_burned_in`.
+- **Défaut A2 mesuré** : décision purement géométrique ; `40 ABHARTACH` et
+  `40 FOOTBALLEUR` sont sombres (médiane 37 et 55) et les quatre candidats
+  ont une géométrie de scène instable, alors que l'OCR lit le même texte
+  fixe sur 96–100 % des échantillons (score 0,979–0,987, dérive Y 2–9 px).
+  L'application `54` est propre : 112 différences JSON, toutes des `Scale`
+  180,0 → 200,8, aucune ancre ni position.
+- **Décision D-051** : QA 1.3.0 avec clustering par détection et
+  `fixed_overlay` ; A2 v3 avec gate OCR derrière `a2_ocr = false`, garde-fous
+  durs inchangés, veto sur texte changeant, bandeaux sombres en `review`
+  avec preuve et scale proposé ; extraction ultérieure d'un module neutre
+  `vision`. Aucun code de production modifié.
+- **Validation** : 442 tests, `fmt` et `clippy -D warnings` verts ; QA, frames
+  et médianes sous `/tmp/workflow_investigation/` ; aucune écriture dans
+  `/mnt/cache`.
+- **Référence** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
+
 ## Synchronisation documentaire (2026-10-28)
 
 - Audit du workflow `docs-updater` : 315 tests (283 `#[test]` + 32

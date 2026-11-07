@@ -50,7 +50,7 @@ détecteurs morphologiques OpenCV, mais de :
   dépendre `post` de `qa`.
 
 Aucun code de production n'a été modifié par cette étude. La suite de tests
-reste verte : **446 tests**, `fmt` et `clippy -D warnings` OK.
+reste verte : **447 tests**, `fmt` et `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
 
@@ -569,11 +569,11 @@ crates/workflow-steps/src/
     inference.rs    # init_ort, cpu_session
     ocr.rs          # DetEngine, RecEngine, decode CTC, filtres communs
     dino.rs         # DinoEngine, preprocessing, probe
-    text.rs         # normalize_text, similarité, clustering
+    text.rs         # normalize_text, similarité, boîtes
+    hash.rs         # sha256_file partagé
   qa/
-    ocr.rs          # orchestration QA : bande basse, épisodes, findings
+    ocr.rs          # orchestration QA : bande basse, clusters, findings
     logo.rs         # orchestration QA : bande haute, overlays, DINOv2
-    dino.rs         # supprimé ou simple ré-export
   post/
     a2.rs           # orchestration A2 + gate OCR
 ```
@@ -581,6 +581,13 @@ crates/workflow-steps/src/
 Le déplacement doit être un lot séparé, **sans changement de comportement**,
 validé par `cargo test --workspace` et un `qa run` réel sur les 35 exports
 de référence. C'est un prérequis pour éviter que `post` dépende de `qa`.
+
+**État au 2026-11-07** : option B implémentée. `vision/` contient `frame`,
+`inference`, `ocr`, `dino`, `text` et `hash` ; `qa/frame.rs`,
+`qa/inference.rs` et `qa/dino.rs` sont supprimés. Le rejeu QA de `54` donne
+des findings, checks, preuves et modèles identiques à la version précédente
+(seuls les temps changent) ; 295 tests `workflow-steps`, `fmt` et clippy
+verts.
 
 ### 6.3 Protocole A2 v3 — gate OCR conservateur
 

@@ -20,5 +20,6 @@ pub mod template;
 #[cfg(all(test, unix))]
 mod test_support;
 mod value;
+pub mod vision;
 
 pub use error::StepError;

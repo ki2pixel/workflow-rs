@@ -14,8 +14,16 @@ quatre rushes `40 ABHARTACH`, `40 FOOTBALLEUR`, `54`, `58`, plus un vrai
 `subtitle_burned_in` sur `54` auparavant manqué ; `sub_fast` donne un
 sous-titre (dominance 29 %), `181_sub_center` un `fixed_overlay`. Tests
 workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
-`/mnt/cache`. Phases 2 (module `vision`) et 3 (gate OCR A2) à suivre.
-Détail : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
+`/mnt/cache`.
+
+**Module `vision` (D-051, phase 2).** Les moteurs `frame`, `inference`,
+`ocr`, `dino`, `text` et `hash` sont sortis de `qa` vers
+`crates/workflow-steps/src/vision/` ; `qa/ocr.rs` ne garde que
+l'orchestration des sous-titres et `qa/logo.rs` celle des logos. `post` peut
+désormais réutiliser PP-OCRv6 sans dépendre de `qa`. Rejeu QA de `54` :
+findings, checks, preuves et provenance identiques, seuls les temps
+changent. Phase 3 (gate OCR A2 derrière `a2_ocr = false`) à suivre. Détail :
+`docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
 
 **Progression STEP8/post-STEP8 dans l'interface.**
 La carte STEP8 prolonge sa barre pendant le post-traitement A5/A6 : le CLI
@@ -58,6 +66,20 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-07] **Module `vision` (D-051, phase 2)** :
+  - `qa/frame.rs`, `qa/inference.rs` et `qa/dino.rs` déplacés vers
+    `vision/` ; ajout de `vision/text.rs` (normalisation, distance,
+    similarité de boîtes) et `vision/hash.rs` (`sha256_file`) ;
+  - `vision/ocr.rs` porte `DetEngine`, `RecEngine`, le décodage CTC et les
+    filtres communs ; `qa/ocr.rs` ne garde que la bande basse, le
+    clustering et les findings ; `qa/logo.rs` importe les moteurs depuis
+    `vision` ;
+  - `ModelInfo` déplacé dans `vision/mod.rs` et ré-exporté par
+    `qa/model.rs` ; `post::detect` ré-exporte `sha256_file` ;
+  - rejeu QA de `54` : findings, checks, preuves et provenance identiques
+    (écart uniquement sur les timings) ; `cargo test -p workflow-steps`
+    295 passed, `fmt` et clippy verts.
 
 - [2026-11-07] **Implémentation QA 1.3.0 (D-051, phase 1)** :
   - `qa/ocr.rs` : agrégation par boîte (`boxes_similar` : containment,
@@ -491,7 +513,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 446 tests unitaires ; pas de CI.
+- 447 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

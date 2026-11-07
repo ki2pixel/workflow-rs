@@ -8,7 +8,8 @@
 
 use crate::post::detect;
 use crate::qa::model::{Stage0Thresholds, QA_SCHEMA_VERSION};
-use crate::qa::{dino, face, ocr, QaOptions};
+use crate::qa::{face, ocr, QaOptions};
+use crate::vision::dino;
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::Path;

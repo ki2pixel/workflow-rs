@@ -10,12 +10,12 @@
 //! `qa.json` à `report::write_report`.
 
 use crate::post::detect;
-use crate::qa::frame::{grab_frame, resize_bilinear, BgrFrame};
-use crate::qa::inference::cpu_session;
 use crate::qa::model::{
     DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1FaceEvidence,
 };
 use crate::qa::sample::{sample_times, SegmentSpan};
+use crate::vision::frame::{grab_frame, resize_bilinear, BgrFrame};
+use crate::vision::inference::cpu_session;
 use anyhow::{bail, ensure, Context, Result};
 use ort::session::Session;
 use ort::value::Tensor;

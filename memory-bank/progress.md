@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 446 tests unitaires, sans matériel.
+- 447 tests unitaires, sans matériel.
 - **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-048)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
@@ -45,6 +45,11 @@
   en plus un sous-titre temporaire auparavant manqué. Schéma `qa.json`
   1.3.0, cache 7. Non-régression OCR sur 36 exports GOOD : 36 `pass`,
   0 finding.
+- **Module `vision` (D-051, phase 2, 2026-11-07)** : `frame`, `inference`,
+  `ocr`, `dino`, `text` et `hash` sont partagés sous
+  `crates/workflow-steps/src/vision/` ; `qa/ocr.rs` et `qa/logo.rs` ne
+  portent plus que l'orchestration. Rejeu QA de `54` identique (hors
+  timings), ce qui prépare le gate OCR de A2 sans dépendance `post → qa`.
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
   sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
   aucun `.ecproj` (validé sur 295, 340, 341 et lots mixtes).

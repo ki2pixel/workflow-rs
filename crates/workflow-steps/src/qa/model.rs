@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub use crate::vision::ModelInfo;
+
 pub const QA_SCHEMA_VERSION: &str = "1.3.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -312,13 +314,6 @@ pub struct Stage1LogoVisualEvidence {
     pub top_end: f64,
     pub frame_errors: usize,
     pub timing_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelInfo {
-    pub name: String,
-    pub sha256: String,
-    pub license: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

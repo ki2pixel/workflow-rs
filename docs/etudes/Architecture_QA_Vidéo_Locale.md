@@ -260,7 +260,7 @@ Le PoC Python est documenté dans `/media/kidpixel/WORK/qa-poc/reports/POC-RESUL
 
 **Portage Rust Stage 0, OCR et visage (2026-10-31)** : le module `crates/workflow-steps/src/qa/` et la commande `workflow-cli qa run` sont intégrés. Le Stage 0 reproduit le Python sur les 35 exports : 35 `pass`, 0 écart de statut, de findings ou de statut de check ; médiane 12,3 s, max 21,8 s. Le Stage 1 OCR PP-OCRv6 (det/rec ONNX CPU, bande basse) ajoute 1 124 échantillons, 12 détections isolées, 0 épisode de 3 échantillons et donc 0 finding sur les 35 GOOD ; les 12 sous-titres synthétiques sont détectés et le contrôle négatif reste propre. Le Stage 1 visage YuNet ajoute 745 échantillons avec visage, 25 visages coupés isolés, 0 finding et 2/2 recadrages synthétiques détectés. Les sous-titres et les logos partagent le thread OCR ; le masque des overlays `.ecproj` écarte 259 détections sur 386 et laisse 2 candidats connus (270). À cette date, `auto_approve_eligible` restait faux. Détail : `docs/lots/LOT-10-QA.md`.
 
-**Vérificateur DINOv2 (2026-11-02)** : `qa/dino.rs` charge DINOv2 ViT-S/14 quantifié en ONNX Runtime CPU et un probe logistique versionné. Le second étage note toutes les boîtes OCR géométriquement valides (18–220 px), y compris celles dont le texte est trop court, puis agrège sur 3/12 échantillons et écarte les doublons texte. Sur la galerie 56 clips, l'union texte + visuel passe de 34/39 à **39/39**, avec 5 sauvetages (Gulli 0,5, Les 100 1,0, M6+ aux trois échelles), 0/13 masqués et 0/4 négatifs. Sur les 32 exports du corpus avec projet, aucun export `pass` n'est signalé à tort ; les 2 exports 270 restent `review`. À cette date, le flag `--logo-visual` était opt-in : le probe est entraîné sur 13 assets synthétiques. Une validation réelle par ablation (14 exports GOOD, 16 overlays image retirés du projet) donne 0/14 finding avec le projet d'origine et **14/14** sans déclaration (26 findings, 19 texte, 7 DINOv2), avec 298 « The 100 » sauvé par DINOv2 (2/2). Les overlays et les deux exports 270 (split screen) sont confirmés intentionnels. Les logos inconnus et les masques partiels restent à tester.
+**Vérificateur DINOv2 (2026-11-02)** : `vision/dino.rs` (anciennement `qa/dino.rs`) charge DINOv2 ViT-S/14 quantifié en ONNX Runtime CPU et un probe logistique versionné. Le second étage note toutes les boîtes OCR géométriquement valides (18–220 px), y compris celles dont le texte est trop court, puis agrège sur 3/12 échantillons et écarte les doublons texte. Sur la galerie 56 clips, l'union texte + visuel passe de 34/39 à **39/39**, avec 5 sauvetages (Gulli 0,5, Les 100 1,0, M6+ aux trois échelles), 0/13 masqués et 0/4 négatifs. Sur les 32 exports du corpus avec projet, aucun export `pass` n'est signalé à tort ; les 2 exports 270 restent `review`. À cette date, le flag `--logo-visual` était opt-in : le probe est entraîné sur 13 assets synthétiques. Une validation réelle par ablation (14 exports GOOD, 16 overlays image retirés du projet) donne 0/14 finding avec le projet d'origine et **14/14** sans déclaration (26 findings, 19 texte, 7 DINOv2), avec 298 « The 100 » sauvé par DINOv2 (2/2). Les overlays et les deux exports 270 (split screen) sont confirmés intentionnels. Les logos inconnus et les masques partiels restent à tester.
 
 **Passage en production (2026-11-02)** : le lot est déclaré assez complet pour la production. `auto_approve_eligible` devient vrai sur un `pass` complet si `project_readable`, `subtitle_ocr`, `logo_residual` et `face_cut` ont tourné et si un éventuel check `logo_visual` est `pass`/`info` quand DINOv2 est actif ; un contrôle requis `not_applicable`, un `review` ou un `fail` le laisse faux. DINOv2 passe en opt-out (`--no-logo-visual`), l'ancien `--logo-visual` restant accepté sans effet. `qa.json` passe en schéma 1.2.0 et le cache en version 6. Détail : `docs/lots/LOT-10-QA.md`, `POC-RESULTS.md` §2.10–2.11 et `reports/real-ablation/`. Depuis le 2026-11-07, le schéma est **1.3.0** et le cache **7** (D-051, clustering OCR `fixed_overlay`).
 
@@ -563,11 +563,16 @@ Stage 2 — agrégation
 | --- | --- | --- |
 | `qa/model.rs` | Schémas `qa.json`, `Finding`, `Check`, `Status` | serde |
 | `qa/stage0.rs` | Specs, noir/figé, durée, template A6, cuts | `post::detect`, `post::a6` |
-| `qa/ocr.rs` | OCR PP-OCRv6 des sous-titres (tiers bas) | `ort` |
-| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque, agrégation visuelle | `ort`, `qa/overlay.rs`, `qa/dino.rs` |
-| `qa/dino.rs` | Vérificateur DINOv2 ViT-S/14 et probe logistique | `ort`, `qa/frame.rs` |
+| `qa/ocr.rs` | Orchestration OCR des sous-titres (tiers bas) | `vision/ocr`, `vision/frame` |
+| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque, agrégation visuelle | `vision/ocr`, `vision/dino`, `qa/overlay.rs` |
+| `vision/ocr.rs` | Moteurs PP-OCRv6 det/rec, CTC, filtres communs | `ort`, `vision/frame`, `vision/inference` |
+| `vision/dino.rs` | Vérificateur DINOv2 ViT-S/14 et probe logistique | `ort`, `vision/frame` |
+| `vision/frame.rs` | `BgrFrame`, extraction ffmpeg, resize | `ffmpeg` |
+| `vision/inference.rs` | Initialisation ONNX Runtime et sessions CPU | `ort` |
+| `vision/text.rs` | Normalisation, distance et similarité de boîtes | — |
+| `vision/hash.rs` | SHA-256 de fichiers | sha2 |
 | `qa/overlay.rs` | Masque alpha des overlays image du `.ecproj` | `png`, `post::ecproj` |
-| `qa/face.rs` | Visages YuNet, landmarks, padding, agrégation | `ort` |
+| `qa/face.rs` | Visages YuNet, landmarks, padding, agrégation | `vision/frame`, `vision/inference` |
 | `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
 | `qa/aggregate.rs` | Hystérésis, calibration, sévérité | règles |
 | `qa/evidence.rs` | Frames WebP par finding | `ffmpeg` |
@@ -576,6 +581,8 @@ Stage 2 — agrégation
 | `qa/mod.rs` | API publique, options | — |
 
 État au 2026-11-02 : `model.rs`, `stage0.rs`, `ocr.rs`, `logo.rs`, `dino.rs`, `overlay.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0 ; `ocr` et `logo` partagent le même jeu de modèles et le même thread, `dino` est appelé dans la passe logos par défaut (`--no-logo-visual` pour l'opt-out), `face` tourne en parallèle. `overlay` lit les calques image du `.ecproj`, réduit chaque PNG à sa boîte alpha et applique les transformations statiques ; `logo` écarte les textes qui tombent dans ces zones. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP.
+
+Depuis le 2026-11-07 (D-051, phase 2), les moteurs `frame`, `inference`, `ocr`, `dino`, `text` et `hash` sont dans `crates/workflow-steps/src/vision/` ; `qa/ocr.rs` et `qa/logo.rs` ne portent plus que l'orchestration QA. Aucun comportement n'a changé : le rejeu QA de `54` produit des findings, checks et preuves identiques.
 
 ### 8.4 Commande CLI
 

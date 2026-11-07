@@ -12,10 +12,10 @@
 //! ImageNet. Le score est la sigmoïde de `w·CLS + b`, le CLS étant normalisé
 //! L2. Aucune écriture : le module retourne des scores.
 
-use crate::post::detect;
-use crate::qa::frame::BgrFrame;
-use crate::qa::inference::cpu_session;
-use crate::qa::model::ModelInfo;
+use crate::vision::frame::BgrFrame;
+use crate::vision::hash::sha256_file;
+use crate::vision::inference::cpu_session;
+use crate::vision::ModelInfo;
 use anyhow::{bail, ensure, Context, Result};
 use ort::session::Session;
 use ort::value::Tensor;
@@ -145,7 +145,7 @@ impl DinoEngine {
                 .and_then(|name| name.to_str())
                 .unwrap_or(DINO_MODEL_FILENAME)
                 .to_string(),
-            sha256: detect::sha256_file(&options.model)?,
+            sha256: sha256_file(&options.model)?,
             license: DINO_LICENSE.into(),
         };
         Ok(Self {

@@ -713,21 +713,7 @@ fn sobel_y(image: &[u8], width: usize, height: usize) -> (Vec<f32>, Vec<f32>) {
     (pixels, rows)
 }
 
-pub fn sha256_file(path: &Path) -> Result<String> {
-    let mut file = File::open(path).with_context(|| format!("ouverture de {}", path.display()))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; 1 << 20];
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .with_context(|| format!("lecture de {}", path.display()))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(format!("{:x}", hasher.finalize()))
-}
+pub use crate::vision::hash::sha256_file;
 
 pub fn sha256_sample(path: &Path, chunk: u64) -> Result<VideoHash> {
     let size = std::fs::metadata(path)

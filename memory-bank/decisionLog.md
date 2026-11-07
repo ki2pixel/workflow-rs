@@ -636,8 +636,10 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `clippy -D warnings` verts ; aucune écriture dans `/mnt/cache`. Lot OCR
   sur 36 exports GOOD : 36 `pass`, 0 finding, aucun faux positif
   `fixed_overlay` ni `subtitle_burned_in`.
-- **Suites** : phase 2 (module neutre `vision`) et phase 3 (gate OCR A2
-  derrière `a2_ocr = false`) non commencées.
+- **Suites** : phase 2 (module neutre `vision`) **implémentée le
+  2026-11-07** : `frame`, `inference`, `ocr`, `dino`, `text` et `hash` sous
+  `crates/workflow-steps/src/vision/`, rejeu QA de `54` identique hors
+  timings ; phase 3 (gate OCR A2 derrière `a2_ocr = false`) à faire.
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`,
   `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/post/a2.rs`,

@@ -14,11 +14,8 @@
 pub mod aggregate;
 pub mod batch;
 pub mod cache;
-pub mod dino;
 pub mod evidence;
 pub mod face;
-pub mod frame;
-pub mod inference;
 pub mod logo;
 pub mod model;
 pub mod ocr;
@@ -27,8 +24,8 @@ pub mod report;
 pub mod sample;
 pub mod stage0;
 
+pub use crate::vision::dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
 pub use batch::{discover_exports, run_folder, BatchOutcome, BatchSummary};
-pub use dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
 pub use face::{FaceOptions, FACE_MODEL_FILENAME};
 pub use model::{
     DefectType, OverlayRegion, QaCheck, QaFinding, QaReport, QaStatus, Severity, Stage0Thresholds,

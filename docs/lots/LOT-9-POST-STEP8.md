@@ -1,10 +1,12 @@
 # Lot 9 — post-traitement A5/A6 après STEP8
 
 > Statut : intégré à la production le 2026-10-27 ; bypass direct SDM ajouté
-> le 2026-10-28, bypass archive-only LPHDF le 2026-10-29.
+> le 2026-10-28, bypass archive-only LPHDF le 2026-10-29, gate OCR A2
+> opt-in ajouté le 2026-11-07.
 > Décisions : **D-030** (A3 en review, A1/A2 durcis), **D-031** (A5 v2,
 > hash échantillonné, A6 mesuré), **D-032** (écriture du projet assisté),
-> **D-034** (bypass direct des vidéos SDM).
+> **D-034** (bypass direct des vidéos SDM), **D-051** (QA 1.3, module
+> `vision`, gate OCR A2).
 > Code : `crates/workflow-steps/src/post/`, hook dans
 > `crates/workflow-steps/src/step8.rs`, commande `workflow-cli post`.
 
@@ -95,6 +97,63 @@ coordonnées composition. Les ancres restent identiques au brut.
 Validation : 187 DISNEYWORLD et ECOLE → **206,6 %** (bannière de 104 px),
 bannière supprimée à 10/40/100 s. Les 11 cas synthétiques donnent 3 `apply`,
 7 `review`, 1 `noop`, conformes au prototype.
+
+### Gate OCR A2 v3 (D-051, 2026-11-07)
+
+Le gate est **opt-in** (`a2_ocr = false`) : sans flag, la décision A2 reste
+strictement géométrique et aucun modèle ONNX n'est ouvert. Quand il est
+activé, 12 timestamps uniformes sont lus sur le crop du candidat (marge de
+16 px sur les quatre côtés), PP-OCRv6 det/rec tourne en CPU (2 threads), et
+les boîtes d'une même ligne sont fusionnées avant l'agrégation. Le texte
+d'un seul caractère est ignoré.
+
+Features : `text_persistence` (échantillons avec texte / total),
+`dominant_ratio`, `y_drift_px`, `score`, `overlap`, `coverage_x`.
+
+Décision :
+
+- texte absent ou persistance < 60 % → décision A2 actuelle, sans
+  dégradation ;
+- texte changeant (dominance < 60 %) → `review` (veto), jamais `apply` ;
+- texte persistant, dominant ≥ 80 %, score médian ≥ 0,80, `y_drift`
+  ≤ 12 px (1080), overlap ≥ 0,50 et couverture ≥ 25 % :
+  - bande claire et géométrie modérément instable → `apply` (override
+    borné à 2× `GEOM_STD`) ;
+  - bande sombre (médiane < 60) → `review` avec `details.scale_target` ;
+  - géométrie stable → `apply` comme avant ;
+- preuve ambiguë → décision A2 actuelle, mais un `apply` est dégradé en
+  `review` ;
+- garde-fous durs inchangés : keyframes, échelles hétérogènes, bande
+  haute, largeur < 50 %, hauteur hors 24–200, persistance < 60 %,
+  `temporal_std` > 35 et scale > 300 % ;
+- candidat étroit : texte persistant → `review` logo, texte changeant →
+  `noop` sous-titre, sinon `review`.
+
+`details.ocr` expose `samples`, `samples_with_text`, `detections_total`,
+`frame_errors`, `text`, `bbox`, `text_persistence`, `dominant_ratio`,
+`y_drift_px`, `score`, `overlap`, `coverage_x`, `texts` (trois premiers
+groupes) et `timing_ms`.
+
+Validation réelle du 2026-11-07 (config OCR dédiée, copies `/tmp`, run
+complet pour `54`/`58`) :
+
+- `54 CLIENT HOTEL` : `apply` **200,8 %**, texte « FAUX CLIENTS, VRAIS
+  ENQUÊTEURS : RIEN NE LEUR ÉCHAPPE » persistant (12/12, dominance 100 %,
+  couverture 80 %) ; 112 diffs de projet, toutes `Scale 180,0 → 200,8` ;
+  audit `pass` ;
+- `58 CROUSTY` : `review` → `apply` **210,0 %**, même texte ; 40 diffs,
+  toutes `Scale 180,0 → 210,0` ; audit `pass` ;
+- `40 ABHARTACH` et `40 FOOTBALLEUR` : restent `review` (géométrie
+  instable) avec `details.ocr` enrichi ; le texte complet du bandeau
+  apparaît dans `texts`, mais le groupe dominant reste le fragment « 66 »
+  (couverture 9–11 %), donc la preuve est ambiguë ;
+- `sub_fast` synthétique (sous-titres changeants) : `review` « texte
+  changeant (dominance 25 %) », aucun recadrage.
+
+Coût mesuré : 15–25 s par projet sur le Threadripper. Modèles absents ou
+OCR en échec → warning et retour à la décision A2 actuelle, sans échec du
+post. Les fichiers `PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx`
+doivent être copiés sous `paths.models/qa/`, ou renseignés en absolu.
 
 ## A3/A4 — revue seulement
 
@@ -222,6 +281,11 @@ ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 a1_margin = 1.04
 a2_margin = 1.05
+# Gate OCR A2 (D-051), désactivé par défaut.
+a2_ocr = false
+a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
+a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
+# a2_ocr_onnxruntime = "/chemin/vers/libonnxruntime.so"
 ```
 
 Le timeout `steps.step8.timeout_s` couvre EffectCraft **et** le
@@ -295,6 +359,9 @@ POST_DONE: N - <échecs>
 | 340 direct | CSV 531 frames, brut + assist, rendu conforme |
 | Lot mixte 303 + 340 | non-SDM identique octet pour octet à l'ancien pipeline (chemins normalisés), rendu identique |
 | A2 synthétique | 11/11 conformes (3 `apply`, 7 `review`, 1 `noop`) |
+| A2 v3 OCR (54/58) | 54 `apply` 200,8 % inchangé, 58 `review` → `apply` 210,0 %, diffs limitées à `Scale`, audits `pass` |
+| A2 v3 OCR (40) | 2 `review` conservés, `details.ocr` et `texts` enrichis |
+| A2 v3 OCR (sub_fast) | sous-titres changeants → `review` « texte changeant », aucun recadrage |
 
 Les décisions A1/A2/A3/A4 de 268, 187 DISNEYWORLD, 187 ECOLE, 191 et 181 sont
 **identiques au prototype Python** (code, action, cible, raison et détails).
@@ -306,8 +373,10 @@ GOOD sur trois, donc la comparaison y est partielle.
 - A3/A4 restent en revue ; aucun keyframe ni cut n'est appliqué.
 - A1 ne couvre pas les bords non noirs ni les recadrages sémantiques ; ces cas
   restent en `review`.
-- A2 n'a pas d'OCR : une bannière sombre sans bord horizontal net, un logo de
-  coin ou une bande partielle ne sont pas appliqués.
+- A2 OCR est **opt-in** (`a2_ocr = false`) et coûte 15–25 s par projet ; il
+  ne couvre que le texte, pas les logos purement visuels. Les bandeaux
+  sombres restent en `review` (niveau 1) et les candidats étroits ne sont
+  jamais recadrés.
 - A6 est un template SDM mesuré ; un projet multi-segment ou keyframé part en
   `review`. Le profil est volontairement figé.
 - Les artefacts ne sont pas encore exposés dans l'interface web ou le panneau
@@ -326,6 +395,7 @@ GOOD sur trois, donc la comparaison y est partielle.
 
 ```sh
 cargo test -p workflow-steps post:: --lib
+cargo test -p workflow-steps post::a2 --lib
 cargo test -p workflow-steps step8 --lib
 cargo test -p workflow-steps template --lib
 cargo test --workspace

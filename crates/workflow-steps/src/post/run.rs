@@ -42,6 +42,11 @@ pub struct PostOptions {
     pub archive_only_prefixes: Vec<String>,
     pub a1_margin: f64,
     pub a2_margin: f64,
+    /// Gate OCR A2 : désactivé, aucune session ONNX n'est ouverte.
+    pub a2_ocr: bool,
+    pub a2_ocr_det: PathBuf,
+    pub a2_ocr_rec: PathBuf,
+    pub a2_ocr_onnxruntime: Option<PathBuf>,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.
     pub report_only: bool,
     /// Émet les marqueurs `POST_*` sur `stdout` (hook STEP8) au lieu de
@@ -64,6 +69,10 @@ impl Default for PostOptions {
             archive_only_prefixes: Vec::new(),
             a1_margin: 1.04,
             a2_margin: 1.05,
+            a2_ocr: false,
+            a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
+            a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
+            a2_ocr_onnxruntime: None,
             report_only: false,
             emit_progress: false,
         }
@@ -71,23 +80,36 @@ impl Default for PostOptions {
 }
 
 impl PostOptions {
-    pub fn from_config(config: &workflow_core::config::PostConfig, docs_subfolder: &str) -> Self {
+    pub fn from_config(config: &workflow_core::config::Config, docs_subfolder: &str) -> Self {
+        let post = &config.steps.step8.post;
         Self {
-            enabled: config.enabled,
-            direct: config.direct,
-            ffmpeg: config.ffmpeg.clone(),
-            ffprobe: config.ffprobe.clone(),
-            suffix: config.suffix.clone(),
-            projects_subfolder: config.projects_subfolder.clone(),
+            enabled: post.enabled,
+            direct: post.direct,
+            ffmpeg: post.ffmpeg.clone(),
+            ffprobe: post.ffprobe.clone(),
+            suffix: post.suffix.clone(),
+            projects_subfolder: post.projects_subfolder.clone(),
             docs_subfolder: docs_subfolder.to_string(),
-            artifacts_subfolder: config.artifacts_subfolder.clone(),
-            template_prefix: config.template_prefix.clone(),
-            archive_only_prefixes: config.archive_only_prefixes.clone(),
-            a1_margin: config.a1_margin,
-            a2_margin: config.a2_margin,
+            artifacts_subfolder: post.artifacts_subfolder.clone(),
+            template_prefix: post.template_prefix.clone(),
+            archive_only_prefixes: post.archive_only_prefixes.clone(),
+            a1_margin: post.a1_margin,
+            a2_margin: post.a2_margin,
+            a2_ocr: post.a2_ocr,
+            a2_ocr_det: resolve_models_path(&config.paths.models, &post.a2_ocr_det),
+            a2_ocr_rec: resolve_models_path(&config.paths.models, &post.a2_ocr_rec),
+            a2_ocr_onnxruntime: post.a2_ocr_onnxruntime.clone(),
             report_only: false,
             emit_progress: false,
         }
+    }
+}
+
+fn resolve_models_path(root: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
     }
 }
 
@@ -468,6 +490,14 @@ pub fn run_post_project(
         ));
         a1_ms = start.elapsed().as_secs_f64() * 1000.0;
         let start = Instant::now();
+        let a2_options = a2::A2Options {
+            margin: options.a2_margin,
+            ocr: options.a2_ocr.then(|| a2::A2OcrOptions {
+                det_model: options.a2_ocr_det.clone(),
+                rec_model: options.a2_ocr_rec.clone(),
+                onnxruntime: options.a2_ocr_onnxruntime.clone(),
+            }),
+        };
         decisions.extend(a2::decide_a2(
             &segments,
             video.as_deref(),
@@ -475,7 +505,7 @@ pub fn run_post_project(
             &options.ffprobe,
             &meta,
             source_height,
-            options.a2_margin,
+            &a2_options,
         ));
         a2_ms = start.elapsed().as_secs_f64() * 1000.0;
         let start = Instant::now();

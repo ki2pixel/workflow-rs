@@ -212,6 +212,14 @@ ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 a1_margin = 1.04
 a2_margin = 1.05
+# Gate OCR A2 (D-051) : confirme un bandeau clair par texte persistant et
+# oppose un veto si le texte change. Désactivé par défaut.
+a2_ocr = false
+# Modèles PP-OCRv6, relatifs à paths.models ou absolus.
+a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
+a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
+# Bibliothèque ONNX Runtime explicite (décommenter si absent du système).
+# a2_ocr_onnxruntime = "/home/kidpixel/workflow_mediapipe/coral_env/lib/python3.11/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
 
 [retention]
 # Projets sources : `steps.step7.cleanup_threshold_hours` (48 h) est utilisé.

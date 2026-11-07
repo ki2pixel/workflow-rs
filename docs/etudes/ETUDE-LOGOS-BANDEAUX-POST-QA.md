@@ -5,7 +5,7 @@
 | Type | Étude comparative et technique |
 | Statut | Référence (non normative) |
 | Date | 2026-11-07 |
-| Portée | `post/a2.rs`, `qa/ocr.rs`, `qa/logo.rs`, `qa/dino.rs`, `qa/overlay.rs` |
+| Portée | `post/a2.rs`, `qa/ocr.rs`, `qa/logo.rs`, `vision/dino.rs`, `qa/overlay.rs` |
 | Décision associée | **D-051** |
 | Voir aussi | [`../lots/LOT-9-POST-STEP8.md`](../lots/LOT-9-POST-STEP8.md), [`../lots/LOT-10-QA.md`](../lots/LOT-10-QA.md), [`Architecture_QA_Vidéo_Locale.md`](Architecture_QA_Vidéo_Locale.md), D-032, D-049 |
 
@@ -50,7 +50,7 @@ détecteurs morphologiques OpenCV, mais de :
   dépendre `post` de `qa`.
 
 Aucun code de production n'a été modifié par cette étude. La suite de tests
-reste verte : **447 tests**, `fmt` et `clippy -D warnings` OK.
+reste verte : **467 tests**, `fmt` et `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
 
@@ -60,9 +60,10 @@ Lecture intégrale de :
 
 - `crates/workflow-steps/src/post/a2.rs` et `post/detect.rs` pour la
   génération des candidats, les seuils et la formule de scale ;
-- `crates/workflow-steps/src/qa/ocr.rs`, `qa/logo.rs`, `qa/dino.rs`,
-  `qa/overlay.rs`, `qa/mod.rs`, `qa/aggregate.rs`, `qa/model.rs`,
-  `qa/cache.rs` pour les constantes, les tenseurs et l'agrégation ;
+- `crates/workflow-steps/src/qa/ocr.rs`, `qa/logo.rs`,
+  `vision/dino.rs` (anciennement `qa/dino.rs`), `qa/overlay.rs`,
+  `qa/mod.rs`, `qa/aggregate.rs`, `qa/model.rs`, `qa/cache.rs` pour les
+  constantes, les tenseurs et l'agrégation ;
 - `crates/workflow-cli/src/main.rs` pour le câblage `qa run` ;
 - `config/config.toml`, `assets/models/qa/manifest.toml` et le manifeste
   local `/media/kidpixel/WORK/qa-poc/models/manifest.toml` pour les modèles.
@@ -203,7 +204,8 @@ aspect ≥ 1,2, score ≥ 0,50), puis conserve un texte présent sur au moins
 **50 %** des échantillons. Les variantes OCR proches sont fusionnées par
 distance d'édition et similarité de boîte.
 
-`qa/dino.rs` ajoute un second étage **open-set** :
+`vision/dino.rs` (anciennement `qa/dino.rs`) ajoute un second étage
+**open-set** :
 
 - `dinov2_vits14_quantized.onnx`, entrée `pixel_values` 224×224, sortie
   `last_hidden_state` ; préprocessing Python : pad carré par la moyenne des
@@ -586,8 +588,8 @@ de référence. C'est un prérequis pour éviter que `post` dépende de `qa`.
 `inference`, `ocr`, `dino`, `text` et `hash` ; `qa/frame.rs`,
 `qa/inference.rs` et `qa/dino.rs` sont supprimés. Le rejeu QA de `54` donne
 des findings, checks, preuves et modèles identiques à la version précédente
-(seuls les temps changent) ; 295 tests `workflow-steps`, `fmt` et clippy
-verts.
+(seuls les temps changent) ; 467 tests `workflow-steps`, `fmt` et clippy
+verts. La phase 3 (gate OCR A2) est aussi implémentée : voir §6.3.7.
 
 ### 6.3 Protocole A2 v3 — gate OCR conservateur
 
@@ -597,9 +599,17 @@ verts.
   `qa/logo.rs`), ou 6 si le budget l'exige ; les cas du corpus sont à 100 %
   de persistance, donc 6 suffisent pour les valider, mais 12 restent plus
   sûrs pour un bandeau intermittent ;
-- crop du candidat A2, avec 16 px de marge en haut et en bas, à la
-  résolution source ;
+- crop du candidat A2, avec 16 px de marge sur les quatre côtés, à la
+  résolution source ; si le crop fait moins de 30 px de haut, le gate est
+  ignoré ;
 - OCR det + rec PP-OCRv6, CPU, threads bornés ;
+- fusion des boîtes d'une même ligne (centres Y proches, hauteurs
+  comparables, écart horizontal borné) avant l'agrégation : PP-OCR découpe
+  parfois « PREMIERE PHRASE » en deux boîtes, et le mot constant « PHRASE »
+  masquerait le changement de sous-titre ;
+- texte normalisé d'au moins deux caractères ;
+- si moins de 6 frames sont extraites, le gate est ignoré et la décision
+  A2 actuelle s'applique ;
 - si le crop est trop petit (< 30 px de haut) ou si l'OCR échoue, ignorer
   le gate et revenir au comportement A2 actuel.
 
@@ -626,13 +636,16 @@ candidat bas sélectionné
   │
   ├── garde-fous durs (keyframe, échelles hétérogènes, bande haute,
   │   conflit A1/A2, largeur < 50 %, hauteur hors 24–200, persistance < 60 %,
-  │   scale > 300 %) → décision actuelle, OCR interdit d'y déroger
+  │   temporal_std > 35, scale > 300 %) → décision actuelle, OCR interdit
+  │   d'y déroger
   │
-  ├── OCR indisponible / texte non persistant
-  │     └── décision A2 actuelle (géométrie + luminance)
+  ├── OCR indisponible / texte trop rare (persistance < 60 %)
+  │     └── décision A2 actuelle, sans dégradation
   │
-  ├── texte persistant, dominant ≥ 80 %, y_drift ≤ 12 px, score ≥ 0,80
+  ├── texte persistant, dominant ≥ 80 %, y_drift ≤ 12 px, score ≥ 0,80,
+  │   overlap ≥ 0,50, couverture ≥ 25 %
   │     ├── bande claire (médiane ≥ 60) et géométrie instable
+  │     │   (amplitude ≤ 2× GEOM_STD)
   │     │     └── apply (override OCR), même formule de scale
   │     ├── bande sombre (médiane < 60)
   │     │     └── review enrichi : preuve OCR + scale proposé
@@ -644,9 +657,16 @@ candidat bas sélectionné
   │         pas de recadrage destructif »
   │
   └── preuve OCR ambiguë (dominant 60–80 %, y_drift > 12 px,
-      score < 0,80)
+      score < 0,80, overlap < 0,50 ou couverture < 25 %)
         └── décision A2 actuelle ; si elle serait apply, downgrade review
 ```
+
+La fusion des boîtes d'une même ligne précède l'agrégation : sans elle, un
+mot commun aux sous-titres (« PHRASE ») dominerait à tort. Le tri du groupe
+dominant est déterministe : nombre d'échantillons, puis largeur couverte,
+puis texte. Le groupe dominant peut donc rester un fragment fréquent
+(« 66 ») ; la couverture < 25 % le classe alors en preuve ambiguë, et
+`details.ocr.texts` expose les autres lignes pour la revue.
 
 Le **veto** est la partie la plus importante : si un candidat ressemble à
 une bannière par sa géométrie mais que l'OCR lit des textes différents sur
@@ -707,6 +727,38 @@ supprimée. Le prix est un sur-crop de 24–65 px de scène au-dessus. Une
 formule plus précise utiliserait `y0` du texte, mais elle changerait les
 valeurs validées sur 187 et n'est pas nécessaire pour la sécurité. Elle est
 laissée à une étude ultérieure.
+
+#### 6.3.7 Validation de la phase 3 (2026-11-07)
+
+Le gate est implémenté dans `post/a2.rs` derrière `a2_ocr = false`. Les
+modèles et le runtime sont configurables (`a2_ocr_det`, `a2_ocr_rec`,
+`a2_ocr_onnxruntime`) ; les chemins relatifs sont résolus depuis
+`paths.models`. Les moteurs sont ceux du module `vision` (phase 2).
+
+Rejeu réel sur copies `/tmp`, avec `--report-only` puis run complet :
+
+| Projet | Décision | Texte OCR dominant | Projet assisté |
+| --- | --- | --- | --- |
+| 54 CLIENT HOTEL | `apply` 200,8 % (inchangé) | « FAUX CLIENTS, VRAIS ENQUÊTEURS : RIEN NE LEUR ÉCHAPPE » (12/12, 100 %, couverture 80 %) | 112 diffs, toutes `Scale 180,0 → 200,8` ; audit `pass` |
+| 58 CROUSTY | `review` → `apply` 210,0 % | même texte (12/12, 100 %, couverture 80 %) | 40 diffs, toutes `Scale 180,0 → 210,0` ; audit `pass` |
+| 40 ABHARTACH | `review` conservé | fragment « 66 » (12/12, couverture 11 %) ; texte complet « DERRY: GRAND FRISSON EN IRLANDE » dans `texts` | aucun changement |
+| 40 FOOTBALLEUR | `review` conservé | fragment « 66 » (12/12, couverture 9 %) ; texte complet dans `texts` | aucun changement |
+| sub_fast synthétique | `review` « texte changeant » | 4 lignes de sous-titres, dominance 25 % | aucun changement |
+
+Deux défauts ont été trouvés et corrigés pendant cette validation :
+
+1. **Découpage OCR des lignes** : PP-OCR lit « PREMIERE » et « PHRASE »
+   dans deux boîtes distinctes. Sans fusion, « PHRASE » est présent dans
+   10/12 échantillons et confirme à tort un bandeau fixe. La fusion des
+   boîtes d'une même ligne ramène la dominance à 25 % et déclenche le veto.
+2. **Fragments et logos** : une boîte de logo plus haute que le texte
+   (« UNDOC », 60 px contre 38 px) ne doit pas être fusionnée avec la
+   bannière. La fusion exige un rapport de hauteur ≤ 1,35.
+
+Le coût mesuré est de 15–25 s par projet (12 frames, 2 threads), sans
+verrou matériel. Modèles absents ou OCR en échec : warning et décision A2
+actuelle, jamais d'échec du post. La phase 3 est couverte par 26 tests
+`post::a2` (features, seuils, veto, garde-fous, fusion de lignes).
 
 ### 6.4 QA v1.3 — clustering par détection
 
@@ -792,9 +844,10 @@ les candidats étroits, compter 0,3–0,8 s de plus.
 - `qa.json` : nouveau `defect_type` et nouveau check, donc **schéma 1.3.0**
   explicite. Les consommateurs doivent accepter un type inconnu ou être
   mis à jour ; `auto_approve_eligible` reste faux.
-- `config.toml` : nouveau flag `a2_ocr` (défaut `false`) et, si le niveau 2
-  est un jour activé, `a2_ocr_dark` (défaut `false`). `deny_unknown_fields`
-  impose de documenter ces clés dans le contrat.
+- `config.toml` : nouveaux flags `a2_ocr` (défaut `false`), `a2_ocr_det`,
+  `a2_ocr_rec` et `a2_ocr_onnxruntime` (optionnel). `deny_unknown_fields`
+  impose de documenter ces clés dans le contrat. Le niveau 2 sombre n'est
+  pas implémenté : aucune clé `a2_ocr_dark` n'existe.
 - CLI : aucun changement d'interface ; `--no-ocr`/`--no-logo` restent
   spécifiques au QA.
 
@@ -965,28 +1018,31 @@ d'un même cluster. Sorties sous
    `text` dans un module neutre avant de brancher A2 sur l'OCR. Le faire
    sans changement de comportement, validé par la suite QA.
 5. **Aucun changement de production** dans cette étude : les artefacts
-   existants et les 442 tests restent la référence.
+   existants et la suite de tests (442 au moment de l'étude, 467 après les
+   phases 1–3) restent la référence.
 
 ### 9.2 Phasage proposé
 
 | Phase | Contenu | Critère de sortie |
 | --- | --- | --- |
 | 0 (fait) | Audit, benchmark, diagnostic corpus, prototype analytique | rapport + D-051 |
-| 1 | QA v1.3 clustering + `fixed_overlay` | 4/4 bandeaux persistants classés `fixed_overlay` ; 0 régression sur 35 GOOD |
-| 2 | Module `vision` sans changement de comportement | 442 tests + QA réel identique |
-| 3 | A2 v3 gate OCR, flag `a2_ocr=false` | `58` promu, `54` inchangé, `40` review enrichis ; 0 faux positif |
+| 1 (fait) | QA v1.3 clustering + `fixed_overlay` | 4/4 bandeaux persistants classés `fixed_overlay` ; 36 GOOD sans finding |
+| 2 (fait) | Module `vision` sans changement de comportement | 447 tests + QA réel identique |
+| 3 (fait) | A2 v3 gate OCR, flag `a2_ocr=false` | `58` promu à 210,0 %, `54` inchangé à 200,8 %, `40` reviews enrichis, `sub_fast` veto ; audits `pass` |
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
 
 ### 9.3 Prochaines actions concrètes
 
-- ouvrir un lot « QA v1.3 » avec tests unitaires de clustering et un
-  `qa.json` 1.3.0 ;
-- ajouter les fixtures synthétiques « bandeau fixe + sous-titres
-  concurrents » et « sous-titres seuls » ;
-- rejouer `qa run` sur les 35 exports GOOD après le correctif ;
-- préparer le refactor `vision` sans toucher aux seuils ;
-- ne pas activer `a2_ocr` en production avant la phase 3 et la validation
-  humaine des quatre cas du corpus.
+- faire valider humainement les quatre cas du corpus (54, 58, 40 ×2) avant
+  d'activer `a2_ocr` en production ; le flag reste `false` par défaut ;
+- mesurer le coût du gate sur un lot complet (15–25 s par projet mesuré) et
+  vérifier le timeout STEP8 ;
+- décider du niveau 2 des bandeaux sombres et du volet logo avec le client ;
+  aucun des deux n'est implémenté ;
+- si le niveau 2 est retenu, constituer un corpus dédié de lower-thirds
+  sombres et de logos bas, puis rouvrir une décision ;
+- conserver la parité QA : toute évolution du clustering ou des moteurs
+  `vision` doit rejouer les 36 exports GOOD et les cas synthétiques.
 
 ## 10. Références
 
@@ -997,11 +1053,12 @@ d'un même cluster. Sorties sous
 - `crates/workflow-steps/src/post/run.rs`
 - `crates/workflow-steps/src/qa/ocr.rs`
 - `crates/workflow-steps/src/qa/logo.rs`
-- `crates/workflow-steps/src/qa/dino.rs`
 - `crates/workflow-steps/src/qa/overlay.rs`
 - `crates/workflow-steps/src/qa/aggregate.rs`
 - `crates/workflow-steps/src/qa/model.rs`
 - `crates/workflow-steps/src/qa/cache.rs`
+- `crates/workflow-steps/src/vision/dino.rs`
+- `crates/workflow-steps/src/vision/ocr.rs`
 - `crates/workflow-cli/src/main.rs`
 - `config/config.toml`, `assets/models/qa/manifest.toml`
 

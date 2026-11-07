@@ -77,7 +77,10 @@ Linux et le panneau CEP continue d'appeler Python.
   basse, A3/A4 en revue, A6 template SDM. Le brut `<vidéo>_9x16.ecproj` reste
   inchangé ; `<vidéo>_9x16_assist.ecproj` et `post.json`/`review.json`/
   `audit.json` sont toujours produits. Validation 295 au pixel (0/255) et
-  parité de décisions avec le prototype sur 268/187/191/181. Détail dans
+  parité de décisions avec le prototype sur 268/187/191/181. Depuis D-051,
+  un gate OCR A2 opt-in (`a2_ocr = false`) confirme un bandeau texte stable
+  ou oppose un veto aux sous-titres changeants ; la preuve est ajoutée sous
+  `details.ocr`, sans changer le schéma `post.json`. Détail dans
   `docs/lots/LOT-9-POST-STEP8.md`.
 - Bypass direct : quand `steps.step8.post.direct = true`, les vidéos
   `M6 - SDM - ` et `W9 - LPHDF` au profil 1920×1080 25 fps sautent

@@ -1003,6 +1003,14 @@ pub struct PostConfig {
     pub ffprobe: PathBuf,
     pub a1_margin: f64,
     pub a2_margin: f64,
+    /// Gate OCR du candidat A2 (D-051). Désactivé par défaut : sans flag,
+    /// la décision géométrie/luminance reste strictement identique.
+    pub a2_ocr: bool,
+    /// Modèles PP-OCRv6 det/rec, relatifs à `paths.models` ou absolus.
+    pub a2_ocr_det: PathBuf,
+    pub a2_ocr_rec: PathBuf,
+    /// Bibliothèque ONNX Runtime explicite ; vide = runtime système.
+    pub a2_ocr_onnxruntime: Option<PathBuf>,
 }
 
 impl Default for PostConfig {
@@ -1019,6 +1027,10 @@ impl Default for PostConfig {
             ffprobe: PathBuf::from("ffprobe"),
             a1_margin: 1.04,
             a2_margin: 1.05,
+            a2_ocr: false,
+            a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
+            a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
+            a2_ocr_onnxruntime: None,
         }
     }
 }

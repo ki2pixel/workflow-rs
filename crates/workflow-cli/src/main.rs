@@ -1498,10 +1498,8 @@ fn run() -> Result<()> {
                         .then(|| configured_panel_config.clone())
                 });
                 let cwd = std::env::current_dir().context("répertoire courant introuvable")?;
-                let mut post = PostOptions::from_config(
-                    &config.steps.step8.post,
-                    &config.steps.step8.docs_subfolder,
-                );
+                let mut post =
+                    PostOptions::from_config(&config, &config.steps.step8.docs_subfolder);
                 if no_post {
                     post.enabled = false;
                 }
@@ -1557,10 +1555,8 @@ fn run() -> Result<()> {
                 if direct && !projects.is_empty() {
                     anyhow::bail!("--direct ne s'applique qu'aux dossiers --folder");
                 }
-                let mut options = PostOptions::from_config(
-                    &config.steps.step8.post,
-                    &config.steps.step8.docs_subfolder,
-                );
+                let mut options =
+                    PostOptions::from_config(&config, &config.steps.step8.docs_subfolder);
                 if let Some(prefix) = template_prefix {
                     options.template_prefix = prefix;
                 }

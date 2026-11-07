@@ -112,7 +112,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 447 tests.
+- `cargo test --workspace` : 467 tests.
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.
@@ -180,6 +180,11 @@ comportement legacy sont dans `parity/DRIFT.md`.
   template SDM mesuré et court-circuite A1–A4.
 - Un conflit A1/A2 part en `review`. Un échec de post-traitement fait échouer
   STEP8 côté CLI.
+- Depuis D-051, A2 dispose d'un gate OCR opt-in (`a2_ocr = false`) : preuve
+  additive sous `details.ocr`, veto si le texte change, override de
+  géométrie borné, bandeaux sombres laissés en `review` avec scale proposé.
+  Les garde-fous durs (largeur, hauteur, persistance, `temporal_std`,
+  keyframes, bande haute) restent inchangés.
 - Configuration : `[steps.step8.post]` ; `--no-post` désactive le hook ;
   `workflow-cli post run --report-only` calcule les rapports sans publier.
 - Progression : `POST_TOTAL`, `POST_CURRENT`, `POST_PROGRESS` et `POST_DONE`

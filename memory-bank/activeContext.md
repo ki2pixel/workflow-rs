@@ -22,8 +22,20 @@ workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
 l'orchestration des sous-titres et `qa/logo.rs` celle des logos. `post` peut
 désormais réutiliser PP-OCRv6 sans dépendre de `qa`. Rejeu QA de `54` :
 findings, checks, preuves et provenance identiques, seuls les temps
-changent. Phase 3 (gate OCR A2 derrière `a2_ocr = false`) à suivre. Détail :
-`docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`.
+changent.
+
+**Gate OCR A2 (D-051, phase 3).** `post/a2.rs` expose `A2Options` (marge +
+OCR optionnel) et un gate derrière `a2_ocr = false`. Il échantillonne 12
+frames, lit le crop du candidat avec PP-OCRv6, fusionne les boîtes d'une
+même ligne, mesure persistance/dominance/dérive/score/recouvrement et
+oppose un veto au texte changeant. Garde-fous durs inchangés, override de
+géométrie borné à 2× `GEOM_STD`, bandeaux sombres en `review` avec scale
+proposé, texte trop rare → décision A2 actuelle. Validation : `54` reste
+`apply` 200,8 %, `58` passe `review` → `apply` 210,0 %, `40` restent
+`review` avec `details.ocr`, `sub_fast` est vétoé (dominance 25 %) ; les
+projets assistés ne changent que par `Scale`. Détail :
+`docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md` et
+`docs/lots/LOT-9-POST-STEP8.md`.
 
 **Progression STEP8/post-STEP8 dans l'interface.**
 La carte STEP8 prolonge sa barre pendant le post-traitement A5/A6 : le CLI
@@ -66,6 +78,25 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-07] **Gate OCR A2 (D-051, phase 3)** :
+  - `PostConfig`/`PostOptions` : `a2_ocr` (défaut `false`), `a2_ocr_det`,
+    `a2_ocr_rec`, `a2_ocr_onnxruntime` ; `A2Options` regroupe la marge et
+    l'OCR, `decide_a2` garde 7 arguments ;
+  - 12 frames, crop 16 px sur quatre côtés, PP-OCRv6 2 threads, fusion des
+    boîtes d'une même ligne (rapport de hauteur ≤ 1,35, écart borné), texte
+    d'au moins deux caractères ;
+  - arbre : garde-fous durs d'abord, texte trop rare → décision actuelle,
+    veto si dominance < 60 %, confirmation si persistance ≥ 60 %,
+    dominance ≥ 80 %, score ≥ 0,80, `y_drift` ≤ 12 px, overlap ≥ 0,50,
+    couverture ≥ 25 % ; override de géométrie borné à 2× `GEOM_STD`,
+    `temporal_std` reste dur, bandeaux sombres en `review` + scale ;
+  - `details.ocr` expose texte, bbox, features, `texts` (3 groupes) et
+    timing ; `post.json` reste schéma 1 ;
+  - validation : `54` apply 200,8 % (112 diffs `Scale 180→200,8`), `58`
+    review → apply 210,0 % (40 diffs `Scale 180→210`), `40` reviews
+    enrichis, `sub_fast` veto « texte changeant 25 % », audits `pass` ;
+  - 26 tests `post::a2`, 467 tests workspace, `fmt` et clippy verts.
 
 - [2026-11-07] **Module `vision` (D-051, phase 2)** :
   - `qa/frame.rs`, `qa/inference.rs` et `qa/dino.rs` déplacés vers
@@ -513,7 +544,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 447 tests unitaires ; pas de CI.
+- 467 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

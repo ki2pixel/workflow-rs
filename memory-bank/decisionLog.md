@@ -635,11 +635,19 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `181_sub_center` un `fixed_overlay`. Tests workspace, `fmt` et
   `clippy -D warnings` verts ; aucune écriture dans `/mnt/cache`. Lot OCR
   sur 36 exports GOOD : 36 `pass`, 0 finding, aucun faux positif
-  `fixed_overlay` ni `subtitle_burned_in`.
+  `fixed_overlay` ni `subtitle_burned_in`. **Phase 3** : `54` apply 200,8 %
+  inchangé (112 diffs `Scale`), `58` promu à 210,0 % (40 diffs `Scale`),
+  `40` reviews enrichis, `sub_fast` vétoé, audits `pass` ; 467 tests
+  workspace.
 - **Suites** : phase 2 (module neutre `vision`) **implémentée le
   2026-11-07** : `frame`, `inference`, `ocr`, `dino`, `text` et `hash` sous
   `crates/workflow-steps/src/vision/`, rejeu QA de `54` identique hors
-  timings ; phase 3 (gate OCR A2 derrière `a2_ocr = false`) à faire.
+  timings. Phase 3 (gate OCR A2 derrière `a2_ocr = false`) **implémentée le
+  2026-11-07** : `54` reste `apply` 200,8 %, `58` passe à `apply` 210,0 %,
+  les deux `40` restent `review` avec `details.ocr`, `sub_fast` est vétoé
+  (dominance 25 %) ; les diffs de projet se limitent à `Scale`, audits
+  `pass`. Restent le niveau 2 des bandeaux sombres, le volet logo et
+  l'activation en production après validation humaine.
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`,
   `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
   `crates/workflow-steps/src/post/a2.rs`,

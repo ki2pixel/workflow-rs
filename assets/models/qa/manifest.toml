@@ -1,14 +1,41 @@
 # Modèles QA optionnels du contrôle read-only.
 #
-# Le binaire DINOv2 n'est pas versionné ; le probe linéaire (384 poids,
-# biais, seuil) l'est, car il est petit et auditable. `workflow-cli qa run`
-# charge ces fichiers par défaut ; `--no-logo-visual` désactive le
-# vérificateur visuel.
+# Les binaires DINOv2, PP-OCRv6 et YuNet ne sont pas versionnés ; le probe
+# linéaire (384 poids, biais, seuil) l'est, car il est petit et auditable.
+# `workflow-cli qa run` et le gate OCR A2 (`a2_ocr = true`) chargent ces
+# fichiers par défaut ; `--no-logo-visual` désactive le vérificateur visuel.
 
 version = 1
 source = "https://huggingface.co/onnx-community/dinov2-small"
 base_model = "facebook/dinov2-small"
 license = "Apache-2.0"
+
+[[model]]
+role = "qa.ocr.det"
+path = "PP-OCRv6_det_small.onnx"
+size = 9929594
+sha256 = "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+license = "Apache-2.0"
+source = "rapidocr 3.10.0, https://github.com/RapidAI/RapidOCR"
+purpose = "détection de texte (sous-titres, logos, gate OCR A2)"
+
+[[model]]
+role = "qa.ocr.rec"
+path = "PP-OCRv6_rec_small.onnx"
+size = 21234383
+sha256 = "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+license = "Apache-2.0"
+source = "rapidocr 3.10.0, https://github.com/RapidAI/RapidOCR"
+purpose = "reconnaissance de texte (sous-titres, logos, gate OCR A2)"
+
+[[model]]
+role = "qa.face.yunet"
+path = "face_detection_yunet_2023mar.onnx"
+size = 232589
+sha256 = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+license = "MIT"
+source = "OpenCV Zoo, https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet"
+purpose = "visages et landmarks 5 points"
 
 [[model]]
 role = "qa.dinov2"

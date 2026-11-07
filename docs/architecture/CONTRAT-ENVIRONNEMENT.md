@@ -426,6 +426,16 @@ bypass mais sans aucun `.ecproj` : seul le CSV de scènes est archivé et
 copié, STEP8 ignore la vidéo par son nom. Détail :
 `docs/lots/LOT-9-POST-STEP8.md`.
 
+Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
+opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes
+d'une même ligne, veto si le texte change et confirmation d'un bandeau
+stable. La preuve est ajoutée sous `details.ocr` dans `post.json` (champs
+additifs, schéma `post.json` inchangé) ; les bandeaux sombres restent en
+`review` avec `details.scale_target`. Les modèles sont configurables via
+`a2_ocr_det` et `a2_ocr_rec` (relatifs à `paths.models`), le runtime via
+`a2_ocr_onnxruntime`. Sans flag ou sans modèle, la décision A2 actuelle
+s'applique.
+
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée

@@ -865,7 +865,80 @@ fixtures sans gain de décision. **`gray` est le candidat A1.**
 La sortie brute du spike est conservée dans
 [`ETUDE-VSLETTERBOX-A1/results/spike-rust.md`](ETUDE-VSLETTERBOX-A1/results/spike-rust.md).
 
+## 10. Évaluation à l'échelle — 201 segments GOOD
+
+Le spike a été exécuté en mode `gray` sur l'échantillon complet de l'étude
+GOOD : **65 `apply`**, **116 `review`** segment et **20 `noop`** sans barre
+(20 vidéos distinctes, premier `noop` sans barre et sans crop humain par
+vidéo). Fenêtre A1 : `start = in + 0,05`, `duration = clamp(out − in − 0,1,
+0,3, 4,0)`, échantillonnage `fps = clamp(2 / durée, 2, 8)` pour garantir au
+moins deux frames. Une seule répétition par segment ; seuils 32/1020,
+couverture 2/3, clustering ±2 px, dominant ≥ 60 %.
+
+Matrice A1 (`cropdetect`) × natif :
+
+| A1 \ natif | `apply` | `review` | `noop` |
+| --- | ---: | ---: | ---: |
+| `apply` (65) | **25** | 26 | 14 |
+| `review` (116) | **0** | 12 | 104 |
+| `noop` (20) | **0** | 1 | 19 |
+
+Détail des applies et revues :
+
+| Sous-ensemble | n | natif `apply` | `review` | `noop` |
+| --- | ---: | ---: | ---: | ---: |
+| apply accepté | 11 | 6 | 2 | 3 |
+| apply ajusté | 45 | 18 | 21 | 6 |
+| apply reverté | 9 | 1 | 3 | 5 |
+| review veto correct | 92 | 0 | 2 | 90 |
+| review résolue | 13 | 0 | 5 | 8 |
+| — dont asymétrique | 7 | 0 | 2 | 5 |
+| — dont couverture | 6 | 0 | 3 | 3 |
+| review persistée / sans défaut | 11 | 0 | 5 | 6 |
+| noop | 20 | 0 | 1 | 19 |
+
+### 10.1 Constats
+
+- **Précision excellente, rappel insuffisant.** Le natif seul ne produit
+  **aucun faux `apply`** sur 123 segments A1 `review`/`noop` (0,0 %), et ses
+  25 applies sont à **≤ 2 px** de `cropdetect=24:2:0` (24/25 à ≤ 1 px,
+  MAE 0,84/0,68 px). Mais il rate **32/56 applies clairs (57,1 %)** :
+  23 `review` et 9 `noop`.
+- **Le 89 concentre l'échec.** Sur les 34 applies du film 89, le natif
+  n'applique que **4/34** : la barre basse (140 px) a une couverture Sobel
+  de 0,45–0,59, parfois aucun déclenchement EWMA, et le clustering voit des
+  clusters 137/137, 137/0 et 0/0 sans majorité. Le 305 reste excellent
+  (**15/17**), le 68 à **6/7**.
+- **Aucun faux veto résolu.** Sur les 7 revues asymétriques résolues, le
+  natif donne 5 `noop` (0/0) et 2 `review` (23/0) : il ne remplace pas le
+  veto A1. Les 6 revues de couverture résolues donnent 3 `noop` et 3
+  `review`. Le gain de revue est donc **nul** sur cet échantillon.
+- **304 seg 34** reste un `noop` natif : la barre 80/56 ne déclenche pas
+  l'EWMA (bord faible), alors que `cropdetect` applique 211,5 %. Le cas est
+  cohérent avec la limite déjà documentée.
+- **Coût** : natif médian 451 ms, ratio médian 1,12× `cropdetect=24:16:0`.
+  L'analyse Rust reste marginale ; le décodage domine.
+
+### 10.2 Conséquence : pas de promotion du natif seul
+
+Le natif seul est **haute précision, bas rappel**. Il ne peut pas devenir
+`a1_detector = "native"` au sens strict : il manquerait plus d'un apply
+clair sur deux et ne résoudrait aucune revue asymétrique. Le mode sûr est un
+**natif gardé** : `cropdetect` d'abord ; le natif ne raffine un `apply` que
+si `cropdetect` a déjà conclu `apply` et que le cluster natif est dominant.
+Sinon, on conserve la décision `cropdetect` (fallback). Le projeté de ce mode
+sur les 63 applies comparables donne une erreur pixel de **1,98/1,54 px**
+contre **2,95/2,06 px** pour `cropdetect=16 px`, avec **53/63** segments à
+≤ 2 px (contre 37/63), sans nouveau `apply` sur les `review`/`noop`.
+
+Le draft D-058 est dans
+[`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`](../decisions/DECISION-A1-NATIVE-GARDE-D058.md).
+La sortie complète est dans
+[`ETUDE-VSLETTERBOX-A1/results/spike-good-sample.md`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample.md)
+et le CSV par segment dans
+[`ETUDE-VSLETTERBOX-A1/results/spike-good-sample.csv`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample.csv).
+
 ---
 
-*Fin de l'étude. D-057 ouvre un spike opt-in ; aucune modification de
-production n'est incluse.*
+*Fin de l'étude. D-057 ouvre un spike opt-in ; D-058 propose un mode natif
+gardé. Aucune modification de production n'est incluse.*

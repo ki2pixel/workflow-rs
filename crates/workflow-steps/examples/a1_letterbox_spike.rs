@@ -16,6 +16,11 @@
 //! cargo run -p workflow-steps --release --example a1_letterbox_spike -- \
 //!   --corpus "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2" \
 //!   --out /tmp/opencode/a1-letterbox-spike
+//!
+//! # échantillon complet (manifeste JSON de segments)
+//! cargo run -p workflow-steps --release --example a1_letterbox_spike -- \
+//!   --manifest /tmp/opencode/a1-letterbox-sample/manifest.json \
+//!   --pre gray --runs 1 --out /tmp/opencode/a1-letterbox-sample/run
 //! ```
 //!
 //! Les écritures sont limitées à `--out`, qui doit être sous `/tmp`. Le corpus
@@ -23,7 +28,8 @@
 
 use anyhow::{bail, Context, Result};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufReader, Read};
@@ -353,6 +359,58 @@ struct TimingSamples {
     total_ms: f64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct ManifestEntry {
+    name: String,
+    project: String,
+    segment: String,
+    video: PathBuf,
+    start: f64,
+    duration: f64,
+    fps: f64,
+    kind: String,
+    category: String,
+    review_outcome: String,
+    apply_acceptance: String,
+    bars_present: String,
+    human_keyframes: u32,
+    good_removed: String,
+    good_cleared: String,
+    zoom_rel: String,
+    scale_target: String,
+    reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SampleReport {
+    name: String,
+    project: String,
+    segment: String,
+    video: String,
+    start: f64,
+    duration: f64,
+    fps: f64,
+    kind: String,
+    category: String,
+    review_outcome: String,
+    apply_acceptance: String,
+    bars_present: String,
+    human_keyframes: u32,
+    good_removed: String,
+    good_cleared: String,
+    zoom_rel: String,
+    scale_target: String,
+    reason: String,
+    n_frames: usize,
+    native: DecisionJson,
+    dominant: Option<Cluster>,
+    clusters: Vec<Cluster>,
+    cropdetect16: CropSummary,
+    cropdetect2: CropSummary,
+    timings: TimingJson,
+    frames: Vec<FrameMeasure>,
+}
+
 fn main() -> Result<()> {
     let mut corpus = PathBuf::from(std::env::var("CORPUS").unwrap_or_else(|_| {
         "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2".into()
@@ -362,6 +420,7 @@ fn main() -> Result<()> {
     let mut edge_threshold = DEFAULT_EDGE_THRESHOLD;
     let mut runs = DEFAULT_RUNS;
     let mut only: Option<String> = None;
+    let mut manifest: Option<PathBuf> = None;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut index = 0;
@@ -403,10 +462,17 @@ fn main() -> Result<()> {
                 index += 1;
                 only = Some(args.get(index).context("--fixture sans valeur")?.clone());
             }
+            "--manifest" => {
+                index += 1;
+                manifest = Some(PathBuf::from(
+                    args.get(index).context("--manifest sans valeur")?,
+                ));
+            }
             "--help" | "-h" => {
                 println!(
                     "Usage: a1_letterbox_spike [--corpus DIR] [--out DIR] \
-                     [--pre gray|chroma|both] [--edge-threshold N] [--runs N] [--fixture NAME]"
+                     [--pre gray|chroma|both] [--edge-threshold N] [--runs N] \
+                     [--fixture NAME] [--manifest FILE]"
                 );
                 return Ok(());
             }
@@ -433,6 +499,24 @@ fn main() -> Result<()> {
     let ffprobe = std::env::var("FFPROBE").unwrap_or_else(|_| "ffprobe".into());
     let ffmpeg = PathBuf::from(ffmpeg);
     let ffprobe = PathBuf::from(ffprobe);
+
+    if let Some(manifest_path) = manifest {
+        if only.is_some() {
+            bail!("--manifest et --fixture sont exclusifs");
+        }
+        if pre_modes.len() != 1 || pre_modes[0] != PreMode::Gray {
+            bail!("--manifest exige --pre gray (candidat A1)");
+        }
+        run_manifest(
+            &ffmpeg,
+            &ffprobe,
+            &manifest_path,
+            &out,
+            runs,
+            edge_threshold,
+        )?;
+        return Ok(());
+    }
 
     let selected: Vec<&Fixture> = FIXTURES
         .iter()
@@ -523,6 +607,189 @@ fn main() -> Result<()> {
     println!("\nRapport JSON : {}", json_path.display());
     println!("Rapport Markdown : {}", md_path.display());
     Ok(())
+}
+
+fn run_manifest(
+    ffmpeg: &Path,
+    ffprobe: &Path,
+    manifest: &Path,
+    out: &Path,
+    runs: usize,
+    edge_threshold: f32,
+) -> Result<()> {
+    let payload = fs::read_to_string(manifest)
+        .with_context(|| format!("lecture du manifeste {}", manifest.display()))?;
+    let entries: Vec<ManifestEntry> =
+        serde_json::from_str(&payload).context("manifeste JSON invalide")?;
+    if entries.is_empty() {
+        bail!("manifeste vide");
+    }
+    let mut dimensions: HashMap<PathBuf, (u32, u32)> = HashMap::new();
+    let mut reports = Vec::with_capacity(entries.len());
+    for (index, entry) in entries.iter().enumerate() {
+        let (width, height) = match dimensions.get(&entry.video) {
+            Some(dimension) => *dimension,
+            None => {
+                let specs = probe_video(ffprobe, &entry.video)?;
+                let dimension = (specs.width, specs.height);
+                dimensions.insert(entry.video.clone(), dimension);
+                dimension
+            }
+        };
+        if height != 1080 {
+            bail!(
+                "segment {} non 1080p ({}), le scale A1 n'est pas comparable",
+                entry.name,
+                height
+            );
+        }
+        let sample = SampleSpec {
+            start: entry.start,
+            duration: entry.duration,
+            fps: entry.fps,
+            width: width as usize,
+            height: height as usize,
+            mode: PreMode::Gray,
+            edge_threshold,
+        };
+        let (frames, timing) = measure_native(ffmpeg, &entry.video, &sample, runs)?;
+        let clusters = cluster_frames(&frames);
+        let dominant = clusters.first().cloned();
+        let native = decide_native(&dominant, frames.len(), height);
+        let (crops16, cd16_ms) =
+            measure_cropdetect(ffmpeg, &entry.video, entry.start, entry.duration, 16, runs)?;
+        let (crops2, cd2_ms) =
+            measure_cropdetect(ffmpeg, &entry.video, entry.start, entry.duration, 2, runs)?;
+        let cropdetect16 = summarize_cropdetect(&crops16, height);
+        let cropdetect2 = summarize_cropdetect(&crops2, height);
+        let timings = TimingJson {
+            native_decode_ms: round_to(timing.decode_ms, 1),
+            native_analysis_ms: round_to(timing.analysis_ms, 1),
+            native_total_ms: round_to(timing.total_ms, 1),
+            cropdetect16_ms: round_to(cd16_ms, 1),
+            cropdetect2_ms: round_to(cd2_ms, 1),
+            ratio_total_vs_cropdetect16: round_to(timing.total_ms / cd16_ms.max(0.001), 2),
+        };
+        let label: String = entry.name.chars().take(72).collect();
+        eprintln!(
+            "[{}/{}] {:<5} {:<72} -> {} ({} frames)",
+            index + 1,
+            entries.len(),
+            entry.kind,
+            label,
+            native.kind,
+            frames.len()
+        );
+        reports.push(SampleReport {
+            name: entry.name.clone(),
+            project: entry.project.clone(),
+            segment: entry.segment.clone(),
+            video: entry.video.display().to_string(),
+            start: round_to(entry.start, 3),
+            duration: round_to(entry.duration, 3),
+            fps: round_to(entry.fps, 3),
+            kind: entry.kind.clone(),
+            category: entry.category.clone(),
+            review_outcome: entry.review_outcome.clone(),
+            apply_acceptance: entry.apply_acceptance.clone(),
+            bars_present: entry.bars_present.clone(),
+            human_keyframes: entry.human_keyframes,
+            good_removed: entry.good_removed.clone(),
+            good_cleared: entry.good_cleared.clone(),
+            zoom_rel: entry.zoom_rel.clone(),
+            scale_target: entry.scale_target.clone(),
+            reason: entry.reason.clone(),
+            n_frames: frames.len(),
+            native,
+            dominant,
+            clusters,
+            cropdetect16,
+            cropdetect2,
+            timings,
+            frames,
+        });
+    }
+    let json_path = out.join("sample-report.json");
+    fs::write(&json_path, serde_json::to_string_pretty(&reports)?)
+        .with_context(|| format!("écriture de {}", json_path.display()))?;
+    let csv_path = out.join("sample-report.csv");
+    write_sample_csv(&csv_path, &reports)?;
+    println!("\n{} segments analysés", reports.len());
+    println!("JSON : {}", json_path.display());
+    println!("CSV  : {}", csv_path.display());
+    Ok(())
+}
+
+fn write_sample_csv(path: &Path, reports: &[SampleReport]) -> Result<()> {
+    let mut out = String::new();
+    writeln!(
+        out,
+        "name,project,segment,kind,category,review_outcome,apply_acceptance,\
+         bars_present,human_keyframes,good_removed,good_cleared,zoom_rel,\
+         scale_target,start,duration,fps,n_frames,native,cluster_count,\
+         cluster_fraction,top,bottom,cd16,cd16_top,cd16_bottom,cd2,cd2_top,\
+         cd2_bottom,native_scale,native_ms,cd16_ms,cd2_ms,reason"
+    )?;
+    for report in reports {
+        let (count, fraction, top, bottom) =
+            report.dominant.as_ref().map_or((0, 0.0, 0, 0), |cluster| {
+                (cluster.count, cluster.fraction, cluster.top, cluster.bottom)
+            });
+        let native_scale = report
+            .native
+            .scale
+            .map_or_else(String::new, |scale| format!("{scale:.1}"));
+        writeln!(
+            out,
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{:.3},{:.3},{:.3},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{:.1},{:.1},{:.1},{}",
+            csv_escape(&report.name),
+            csv_escape(&report.project),
+            csv_escape(&report.segment),
+            report.kind,
+            report.category,
+            report.review_outcome,
+            report.apply_acceptance,
+            report.bars_present,
+            report.human_keyframes,
+            report.good_removed,
+            report.good_cleared,
+            report.zoom_rel,
+            report.scale_target,
+            report.start,
+            report.duration,
+            report.fps,
+            report.n_frames,
+            report.native.kind,
+            count,
+            fraction,
+            top,
+            bottom,
+            report.cropdetect16.decision,
+            report.cropdetect16.top,
+            report.cropdetect16.bottom,
+            report.cropdetect2.decision,
+            report.cropdetect2.top,
+            report.cropdetect2.bottom,
+            native_scale,
+            report.timings.native_total_ms,
+            report.timings.cropdetect16_ms,
+            report.timings.cropdetect2_ms,
+            csv_escape(&report.reason)
+        )?;
+    }
+    fs::write(path, out).with_context(|| format!("écriture de {}", path.display()))?;
+    Ok(())
+}
+
+fn csv_escape(value: &str) -> String {
+    if value
+        .chars()
+        .any(|character| matches!(character, ',' | '"' | '\n' | '\r'))
+    {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
 }
 
 fn run_fixture(

@@ -45,6 +45,15 @@
   l'ExKirsch. Coût : analyse Rust 8–17 ms (`gray`), ratio médian 1,12×
   `cropdetect` ; `gray` est le candidat. Aucun code de production modifié ;
   sortie : `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
+- **Évaluation A1 natif sur 201 segments GOOD (D-058, proposition,
+  2026-11-09)** : 65 applies + 116 reviews + 20 noops. Natif seul :
+  0 faux apply (0/123), 32/56 faux négatifs (57,1 %), 0/13 faux vetos
+  résolus (0/7 asymétriques), 305 15/17, 68 6/7, 89 4/34. Le mode
+  **natif gardé** est proposé : `cropdetect` d'abord, natif seulement pour
+  raffiner un apply avec cluster ≥ 60 %, sinon fallback. Projection pixel
+  1,98/1,54 px vs 2,95/2,06 px, 53/63 à ≤ 2 px, coût +0,45 s/apply.
+  ADR : `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves :
+  `results/spike-good-sample.{md,csv}`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

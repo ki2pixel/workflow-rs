@@ -22,11 +22,32 @@ results/*.json        sorties analyze.py par segment
 results/synthetic.txt sorties des tests synthétiques
 results/cropdetect.txt sorties cropdetect 16 px et 2 px
 results/spike-rust.md sortie du spike Rust EWMA + Sobel Y + clustering
+results/spike-good-sample.md  matrice de confusion sur 201 segments GOOD
+results/spike-good-sample.csv décisions par segment (65 apply / 116 review / 20 noop)
+scripts/confusion.py  calcul de la matrice depuis le CSV du spike
 ```
 
 Le spike Rust est dans
 `crates/workflow-steps/examples/a1_letterbox_spike.rs` ; il est hors
-production et s'exécute avec `--out /tmp/...` uniquement.
+production et s'exécute avec `--out /tmp/...` uniquement. Le mode
+`--manifest` lit une liste de segments (JSON) et écrit
+`sample-report.{json,csv}`.
+
+## Évaluation à l'échelle (201 segments)
+
+L'échantillon GOOD complet a été exécuté en `gray` :
+
+| A1 \ natif | `apply` | `review` | `noop` |
+| --- | ---: | ---: | ---: |
+| `apply` (65) | 25 | 26 | 14 |
+| `review` (116) | 0 | 12 | 104 |
+| `noop` (20) | 0 | 1 | 19 |
+
+Le natif seul est haute précision (0 faux apply sur 123) mais bas rappel
+(32/56 applies clairs manqués, 0/7 revues asymétriques résolues). Le 89
+concentre l'échec (4/34) ; le 305 reste à 15/17 et le 68 à 6/7. D'où la
+proposition D-058 d'un **natif gardé** avec fallback `cropdetect`.
+Détail : [`results/spike-good-sample.md`](results/spike-good-sample.md).
 
 ## Méthode
 

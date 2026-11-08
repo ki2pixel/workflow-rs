@@ -183,6 +183,22 @@ D-034, D-035).
     tests), aucun code de production modifié ; sortie brute
     `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
 
+- [2026-11-09] **Évaluation A1 natif sur 201 segments GOOD (D-058, proposition)** :
+  - échantillon 65 `apply` + 116 `review` + 20 `noop` (20 vidéos), `gray`,
+    une passe ; matrice A1×natif : apply 25/26/14, review 0/12/104,
+    noop 0/1/19 ;
+  - natif seul : **0 faux apply** (0/123), **32/56 faux négatifs** (57,1 %),
+    **0/13 faux vetos résolus** (0/7 asymétriques), 25 applies à ≤ 2 px
+    (24/25 à ≤ 1 px) ; 305 15/17, 68 6/7, **89 4/34** ;
+  - cause principale : barres basses sombres/progressives du 89, couverture
+    Sobel 0,45–0,59 ou EWMA sans déclenchement ; 304 seg 34 reste `noop` ;
+  - proposition D-058 : mode **natif gardé** (cropdetect d'abord, natif
+    seulement pour raffiner un apply avec cluster ≥ 60 %, sinon fallback) ;
+    projection pixel 1,98/1,54 px vs 2,95/2,06 px, 53/63 à ≤ 2 px, coût
+    +0,45 s/apply ; ADR
+    `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves
+    `results/spike-good-sample.{md,csv}` ; aucun code de production modifié.
+
 - [2026-11-08] **Catalogue D-052 étendu (30/21/9)** :
   - 30ᵉ émission *Les Reines de la Route* (6ter, `bottom_left`, bbox
     `[99, 848, 315, 1022]`, crop `Les_Reines_de_la_Route/crop.png`,

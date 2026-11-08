@@ -904,6 +904,30 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`.
 
+## 2026-11-09 — D-058 (proposition) : A1 natif gardé, fallback cropdetect
+
+- **Contexte** : évaluation du spike D-057 sur l'échantillon GOOD complet
+  (65 `apply`, 116 `review`, 20 `noop`), en `gray`, une passe par segment.
+- **Constats** : le natif seul ne produit **aucun faux `apply`** (0/123) et
+  ses 25 applies sont à ≤ 2 px de `cropdetect=24:2:0` (24/25 à ≤ 1 px),
+  mais il rate **32/56 applies clairs (57,1 %)** et ne résout **aucune** des
+  7 revues asymétriques (0/7). Le 89 concentre l'échec (4/34 applies
+  natifs) ; le 305 reste à 15/17 et le 68 à 6/7.
+- **Proposition** : ne pas promouvoir le natif seul. Introduire
+  `a1_detector = "native"` en mode **gardé** : `cropdetect` d'abord ; le
+  natif ne raffine un `apply` que si `cropdetect` a conclu `apply` et que le
+  cluster natif est dominant (≥ 60 %) ; sinon fallback `cropdetect`. Aucun
+  nouvel `apply` sur `review`/`noop`.
+- **Projection** : 25 applies raffinés (305 15, 68 6, 89 4) ; erreur pixel
+  projetée 1,98/1,54 px contre 2,95/2,06 px pour `cropdetect=16 px` ;
+  53/63 applies à ≤ 2 px contre 37/63 ; coût +0,45 s par apply.
+- **Limites** : revues asymétriques non résolues (0/7) ; 89 dépend du
+  fallback ; 304 seg 34 en `noop` natif ; échantillon 201 segments, seuils
+  non calibrés.
+- **Statut** : proposition, non acceptée. ADR
+  `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves
+  `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample.{md,csv}`.
+
 ## 2026-11-08 — D-057 : détecteur de letterbox A1 natif opt-in
 
 - **Contexte** : étude du dépôt `Akatmks/vapoursynth-letterbox` (commit

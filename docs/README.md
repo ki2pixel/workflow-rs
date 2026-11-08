@@ -117,6 +117,7 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 | --- | --- | --- |
 | [`decisions/DECISION-ABANDON-TAURI.md`](decisions/DECISION-ABANDON-TAURI.md) | D-028 : abandon du client desktop Tauri, périmètre retiré et procédure de restauration. | Référence |
 | [`decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`](decisions/DECISION-A1-DETECTEUR-LETTERBOX.md) | D-057 : détecteur de letterbox A1 natif opt-in, pas d'intégration VapourSynth. | Référence |
+| [`decisions/DECISION-A1-NATIVE-GARDE-D058.md`](decisions/DECISION-A1-NATIVE-GARDE-D058.md) | D-058 : mode natif gardé (fallback `cropdetect`), le natif seul n'est pas promu. | Proposition |
 
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans

@@ -286,7 +286,7 @@ dossier = "Top_Chef"
 bbox = [87, 903, 387, 1028]
 aliases = ["M6 - Top Chef -", "Top Chef"]
 sources = ["M6 - Top Chef - Il lui manque 7 desserts en pleine finale.mp4", "M6 - Top Chef - Ses desserts craquent à la dernière minute... Viviana veut tout refaire.mp4"]
-notes = "Logo officiel Top Chef."
+notes = "Logo officiel Top Chef. Écarter les pads/clean feeds sans logo."
 
 [[emissions.variants]]
 crop = "Top_Chef/crop.png"
@@ -316,7 +316,7 @@ dossier = "Enquete_Exclusive"
 bbox = [61, 913, 389, 1021]
 aliases = ["Enquête Exclusive", "Enquete Exclusive"]
 sources = ["PASTEUR_TAT_M6.mp4"]
-notes = "Logo titre Enquête Exclusive."
+notes = "Logo titre Enquête Exclusive. Écarter MINES_TAT_M6 (sans logo)."
 
 [[emissions.variants]]
 crop = "Enquete_Exclusive/crop.png"
@@ -331,7 +331,7 @@ dossier = "E_M6"
 bbox = [70, 822, 305, 1061]
 aliases = ["M6 - EM6", "EM6_", "E=M6"]
 sources = ["EM6_Short douche_TAT_M6.mp4", "M6 - EM6 - Savez-vous vraiment ce qui se passe pendant votre sommeil .mp4"]
-notes = "Logo officiel E=M6."
+notes = "Logo officiel E=M6. Écarter Tom Simpson (sans logo)."
 
 [[emissions.variants]]
 crop = "E_M6/crop.png"
@@ -473,6 +473,21 @@ crop = "Norbert_commis_doffice/crop.png"
 bbox = [100, 898, 355, 1019]
 opaque_pixels = 30855
 
+[[emissions]]
+name = "Les Reines de la Route"
+channel = "6ter"
+position = "bottom_left"
+dossier = "Les_Reines_de_la_Route"
+bbox = [99, 848, 315, 1022]
+aliases = ["6ter - LRDLR -", "6ter - LRDLR", "LRDLR -", "LRDLR", "Les Reines de la Route"]
+sources = ["6ter - LRDLR - Au volant de son camion, elle s’engage sur une route interdite aux poids lourds .mp4"]
+notes = "Inscrit dans la safe area Bas-Gauche broadcast standard."
+
+[[emissions.variants]]
+crop = "Les_Reines_de_la_Route/crop.png"
+bbox = [99, 848, 315, 1022]
+opaque_pixels = 37584
+
 [[clean_feeds]]
 emission = "Body of Proof"
 channel = "6play / M6+"
@@ -482,6 +497,36 @@ video = "BODY OF PROOF EXTRAIT 1.mp4"
 emission = "Nanny McPhee"
 channel = "6play / M6+"
 video = "Nanny McPhee quitte la famille.mp4"
+
+[[clean_feeds]]
+emission = "Younger"
+channel = "6play / M6+"
+video = "M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+
+[[clean_feeds]]
+emission = "WANTED"
+channel = "6play / M6+"
+video = "WANTED - SOIREE EM5 rs1.mp4"
+
+[[clean_feeds]]
+emission = "WANTED"
+channel = "6play / M6+"
+video = "WANTED - EM3 RS EXTRAIT3.mp4"
+
+[[clean_feeds]]
+emission = "Pretty Little Liars"
+channel = "6play / M6+"
+video = "M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+
+[[clean_feeds]]
+emission = "Pretty Little Liars"
+channel = "6play / M6+"
+video = "M6+ - Pretty Little Liars - Extrait 6 - La mort de Maya.mp4"
+
+[[clean_feeds]]
+emission = "Le Seigneur des Anneaux : Les Anneaux de Pouvoir"
+channel = "M6"
+video = "M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
 
 [[clean_feeds]]
 emission = "Turbo"
@@ -572,3 +617,23 @@ dossier = "Turbo"
 name = "The Middle"
 channel = "Gulli"
 dossier = "The_Middle"
+
+[[no_logo_emissions]]
+name = "Le Seigneur des Anneaux : Les Anneaux de Pouvoir"
+channel = "M6"
+dossier = "Le_Seigneur_des_Anneaux_Les_Anneaux_de_Pouvoir"
+
+[[no_logo_emissions]]
+name = "Younger"
+channel = "6play / M6+"
+dossier = "Younger"
+
+[[no_logo_emissions]]
+name = "WANTED"
+channel = "6play / M6+"
+dossier = "WANTED"
+
+[[no_logo_emissions]]
+name = "Pretty Little Liars"
+channel = "6play / M6+"
+dossier = "Pretty_Little_Liars"

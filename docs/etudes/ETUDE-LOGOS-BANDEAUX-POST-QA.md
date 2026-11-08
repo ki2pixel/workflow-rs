@@ -976,7 +976,7 @@ d'un même cluster. Sorties sous
 ### 7.5 Phases A/B/C — registre spatial des logos source (2026-11-08)
 
 **Principe.** Le logo n'est pas recherché sur toute l'image : le client a
-documenté, pour 29 émissions, une position quasi déterministe dans le canvas
+documenté, pour 30 émissions, une position quasi déterministe dans le canvas
 source 1920×1080. Le pipeline répond d'abord à « où peut être le logo ? »
 (registre spatial), puis seulement ensuite à « est-il réellement là ? »
 (confirmation locale). La phase A annote cette position ; la phase B exclut
@@ -988,12 +988,14 @@ sur le recadrage : le pire cas est une revue.
 **Catalogue.** `assets/models/qa/source_logos.toml` est versionné et généré
 par `scripts/import-source-logos.py` depuis
 `SELECTION_VIDEOS_SOURCES_LOGOS.csv` et les crops RGBA du client. Il contient
-29 émissions (28 en bas-gauche, Piquantes ! en haut-gauche), leurs bboxes
-demi-ouvertes, leurs variantes, 15 clean feeds sans logo et 5 émissions sans
-logo à ignorer. Les crops restent hors dépôt ; le catalogue ne contient que
-des métadonnées auditables. `sources` reprend les noms de fichiers du CSV :
-il prime sur les alias, ce qui évite de classer « Kamila ne sait pas écrire
-Marseillais » comme Les Marseillais alors que c'est Le Cross.
+30 émissions (29 en bas-gauche, Piquantes ! en haut-gauche), leurs bboxes
+demi-ouvertes, leurs variantes, 21 clean feeds sans logo et 9 émissions sans
+logo à ignorer. La 30ᵉ, *Les Reines de la Route* (6ter), ajoutée le
+2026-11-08, porte la bbox `[99, 848, 315, 1022]`. Les crops restent hors
+dépôt ; le catalogue ne contient que des métadonnées auditables. `sources`
+reprend les noms de fichiers du CSV : il prime sur les alias, ce qui évite
+de classer « Kamila ne sait pas écrire Marseillais » comme Les Marseillais
+alors que c'est Le Cross.
 
 **Projection.** `Segment::project_bbox` reprend la formule A1/A5
 (`comp = position + parent_dx + (source - anchor) * scale / 100`) et
@@ -1180,7 +1182,7 @@ sans recadrage automatique.
 | 2 (fait) | Module `vision` sans changement de comportement | 447 tests + QA réel identique |
 | 3 (fait) | A2 v3 gate OCR, flag `a2_ocr=false` | `58` promu à 210,0 %, `54` inchangé à 200,8 %, `40` reviews enrichis, `sub_fast` veto ; audits `pass` |
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
-| 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions + zones, `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
+| 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions validées + zones (catalogue porté à 30 le 2026-11-08), `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
 | 6 (fait, phase B) | Exclusion OCR du logo source, veto logo seul | `54`/`58` inchangés, `40` confirmé sombre avec scale 218,2 %, `sub_fast` toujours vétoé ; opt-in et validation client avant activation |
 | 6 bis (fait) | A2 lit les overlays déclarés, veto logo seul neutralisé si le logo est caché | `54` de base inchangé ; avec habillage déclaré, `visible_in_comp=false` et 2/2 occurrences masquées |
 | 7 (fait, phase C) | Confirmation NCC/contours et stabilité des zones génériques | synthétique 66M/UJUD confirmé, négatif 0,05–0,07, 35 GOOD sans nouveau finding |

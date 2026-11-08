@@ -778,6 +778,20 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/a2.rs`,
   `crates/workflow-steps/src/post/overlay.rs`,
   `scripts/import-source-logos.py`.
+- **Révision 2026-11-08 — catalogue étendu à 30/21/9** : le CSV client
+  ajoute la 30ᵉ émission *Les Reines de la Route* (6ter, `bottom_left`, bbox
+  `[99, 848, 315, 1022]`, crop `Les_Reines_de_la_Route/crop.png`, source
+  exacte et alias `6ter - LRDLR -` / `LRDLR`), 6 clean feeds (Le Seigneur
+  des Anneaux, Younger, WANTED ×2, Pretty Little Liars ×2) et 4 émissions
+  sans logo. `scripts/import-source-logos.py` normalise le suffixe CSV
+  `(LRDLR)` vers le titre éditorial, la note de safe area, le titre complet
+  du clean feed Seigneur et les dossiers absents du CSV ; la régénération
+  rafraîchit aussi les notes Top Chef, Enquête Exclusive et E=M6. Aucun
+  changement de code A2/QA : le registre reste report-only, `clean_feeds`
+  porte l'exclusion runtime et les crops restent externes. Validation :
+  545 tests, `fmt` et `clippy -D warnings` verts ; sortie du générateur
+  identique au catalogue versionné ; bbox LRDLR contenue dans la zone
+  `bottom_left` existante.
 
 ## 2026-11-08 — D-053 : threads OCR A2 configurables et compatibilité EffectCraft 0.22.0
 

@@ -213,6 +213,11 @@ sous `paths.models/qa/`, ou renseignés en absolu.
 
 ### Registre spatial des logos source (D-052, phases A/B, 2026-11-08)
 
+Le catalogue versionné contient 30 émissions avec logo (29 en bas-gauche,
+Piquantes ! en haut-gauche), 21 clean feeds et 9 émissions sans logo ; la
+30ᵉ entrée est *Les Reines de la Route* (6ter, bbox `[99, 848, 315, 1022]`
+dans la zone `bottom_left`). Les crops RGBA restent externes.
+
 `a2_logo_prior = false` par défaut : sans flag, aucune lecture de catalogue
 et aucune clé JSON supplémentaire. Quand il est activé,
 `assets/models/qa/source_logos.toml` résout l'émission de la source (nom de

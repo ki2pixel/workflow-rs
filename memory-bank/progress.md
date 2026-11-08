@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- **543 tests unitaires**, sans matériel.
+- **545 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
   humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour
@@ -76,8 +76,9 @@
   `sub_fast` est vétoé (dominance 25 %). Projets assistés : diffs limitées
   à `Scale`, audits `pass`. Coût 15–25 s/projet à 2 threads, 13,2 s à 8.
 - **Registre spatial des logos source (D-052, phases A/B/C, 2026-11-08)** :
-  catalogue versionné de 29 émissions (28 bas-gauche, Piquantes ! haut-gauche),
-  15 clean feeds et 5 émissions sans logo ; crops RGBA externes. A2 annote
+  catalogue versionné de 30 émissions (29 bas-gauche, Piquantes ! haut-gauche),
+  21 clean feeds et 9 émissions sans logo ; la 30ᵉ est *Les Reines de la
+  Route* (6ter, bbox `[99, 848, 315, 1022]`) ; crops RGBA externes. A2 annote
   `details.source_logo` derrière `a2_logo_prior = false` et retire du groupe
   OCR dominant les textes du logo (`logo_texts`, `logo_only`), le QA ajoute
   le check `source_logo` (`pass`/`info`) derrière `--source-logo`. A2 lit

@@ -3,11 +3,13 @@
 ## Tâche en cours
 
 **Registre spatial des logos source — phases A/B/C (2026-11-08, D-052).** Le
-catalogue versionné `assets/models/qa/source_logos.toml` contient les 29
+catalogue versionné `assets/models/qa/source_logos.toml` contient les 30
 émissions documentées par le client (position, bbox d'enveloppe, variantes,
-sources exactes), 15 clean feeds et 5 émissions sans logo ; les crops RGBA
-restent externes. `vision/source_logo.rs` résout la source et projette la
-bbox par les transformations du `.ecproj` (keyframes compris). A2 ajoute
+sources exactes), 21 clean feeds et 9 émissions sans logo ; la 30ᵉ est
+*Les Reines de la Route* (6ter, `bottom_left`, bbox `[99, 848, 315, 1022]`).
+Les crops RGBA restent externes. `vision/source_logo.rs` résout la source
+et projette la bbox par les transformations du `.ecproj` (keyframes compris).
+A2 ajoute
 `details.source_logo` derrière `a2_logo_prior = false` et, quand un prior
 est actif, retire du groupe OCR dominant les détections majoritairement
 dans la bbox du logo (`details.ocr.logo_texts`, `logo_detections_total`,
@@ -140,6 +142,18 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-08] **Catalogue D-052 étendu (30/21/9)** :
+  - 30ᵉ émission *Les Reines de la Route* (6ter, `bottom_left`, bbox
+    `[99, 848, 315, 1022]`, crop `Les_Reines_de_la_Route/crop.png`,
+    source exacte et alias `6ter - LRDLR -` / `LRDLR`) ;
+  - 6 clean feeds (Le Seigneur des Anneaux, Younger, WANTED ×2, Pretty
+    Little Liars ×2) et 4 émissions sans logo (mêmes programmes) ;
+  - `import-source-logos.py` normalise le suffixe CSV `(LRDLR)`, la note et
+    les dossiers absents ; régénération complète, 3 notes existantes
+    rafraîchies (Top Chef, Enquête Exclusive, E=M6) ;
+  - tests 30/21/9 + résolution LRDLR + clean feed WANTED ; 545 tests,
+    `fmt` et `clippy` verts ; générateur reproductible.
 
 - [2026-11-08] **Étude corpus GOOD et D-056** :
   - 75 triplets `_9x16` / `_assist` / `_assist_GOOD`, 37 dossiers,
@@ -646,7 +660,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 505 tests unitaires ; pas de CI.
+- 545 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

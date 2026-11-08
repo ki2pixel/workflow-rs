@@ -67,6 +67,39 @@ ALIASES = {
     "Qui veut épouser mon fils ?": ["Qui veut épouser mon fils", "QVEMF"],
     "C'est la famille": ["C'est la famille", "Cest la famille"],
     "Le Maillon Faible": ["Maillon Faible"],
+    "Les Reines de la Route": [
+        "6ter - LRDLR -",
+        "6ter - LRDLR",
+        "LRDLR -",
+        "LRDLR",
+        "Les Reines de la Route",
+    ],
+}
+
+# Le CSV client suffixe parfois le sigle entre parenthèses ; le catalogue
+# versionné conserve le titre éditorial pour l'affichage et les tests.
+DISPLAY_NAMES = {
+    "Les Reines de la Route (LRDLR)": "Les Reines de la Route",
+}
+
+# Notes de catalogue à préférer au libellé brut du CSV.
+NOTES_OVERRIDES = {
+    "Les Reines de la Route": "Inscrit dans la safe area Bas-Gauche broadcast standard.",
+}
+
+# Le CSV peut regrouper un clean feed sous un titre abrégé.
+CLEAN_FEED_NAMES = {
+    "Les Anneaux de Pouvoir": "Le Seigneur des Anneaux : Les Anneaux de Pouvoir",
+}
+
+# Dossiers absents du CSV pour les émissions sans logo.
+NO_LOGO_DOSSIERS = {
+    "Le Seigneur des Anneaux : Les Anneaux de Pouvoir": (
+        "Le_Seigneur_des_Anneaux_Les_Anneaux_de_Pouvoir"
+    ),
+    "Younger": "Younger",
+    "WANTED": "WANTED",
+    "Pretty Little Liars": "Pretty_Little_Liars",
 }
 
 
@@ -185,6 +218,7 @@ def main() -> int:
         channel = row["chaine"].strip()
         if status in ("VALIDE_AVEC_LOGO", "VARIANTE_CROP_DETAIL"):
             if emission not in emissions:
+                display_name = DISPLAY_NAMES.get(emission, emission)
                 dossier = row["dossier_reference"].strip()
                 folder = args.references / dossier
                 crops = sorted(folder.glob("crop*.png"))
@@ -208,16 +242,18 @@ def main() -> int:
                 if not variants:
                     raise SystemExit(f"aucun pixel alpha pour {emission}")
                 emissions[emission] = {
-                    "name": emission,
+                    "name": display_name,
                     "channel": channel,
                     "position": "top_left"
                     if row["position_ecran"].startswith("Haut")
                     else "bottom_left",
                     "dossier": dossier,
                     "bbox": list(union_bbox(boxes)),
-                    "aliases": ALIASES.get(emission, []),
+                    "aliases": ALIASES.get(display_name, []),
                     "sources": [],
-                    "notes": row["notes"].strip(),
+                    "notes": NOTES_OVERRIDES.get(
+                        display_name, row["notes"].strip()
+                    ),
                     "variants": variants,
                 }
             video = os.path.basename(row["chemin_relatif_video"].strip())
@@ -226,14 +262,19 @@ def main() -> int:
         elif status == "CLEAN_FEED_SANS_LOGO":
             video = os.path.basename(row["chemin_relatif_video"].strip())
             clean_feeds.append(
-                {"emission": emission, "channel": channel, "video": video}
+                {
+                    "emission": CLEAN_FEED_NAMES.get(emission, emission),
+                    "channel": channel,
+                    "video": video,
+                }
             )
         elif status == "EMISSION_SANS_LOGO_A_IGNORER":
             no_logo_emissions.append(
                 {
                     "name": emission,
                     "channel": channel,
-                    "dossier": row["dossier_reference"].strip(),
+                    "dossier": row["dossier_reference"].strip()
+                    or NO_LOGO_DOSSIERS.get(emission, ""),
                 }
             )
 

@@ -187,10 +187,11 @@ Le plafond de 220 px est propre au vérificateur : le contrôle texte garde
 
 `--source-logo` ajoute un check `source_logo`, sans finding. Il exige un
 `.ecproj` et le catalogue `assets/models/qa/source_logos.toml` (ou
-`--source-logo-catalog`). Le catalogue contient 29 émissions, 15 clean feeds,
-5 émissions sans logo et deux zones génériques ; les crops RGBA restent
-externes. La source est résolue par nom de fichier exact puis par alias, et
-un clean feed déclaré n'hérite jamais d'un prior. La bbox du logo est
+`--source-logo-catalog`). Le catalogue contient 30 émissions, 21 clean feeds,
+9 émissions sans logo et deux zones génériques ; les crops RGBA restent
+externes. La 30ᵉ émission est *Les Reines de la Route* (6ter, `bottom_left`).
+La source est résolue par nom de fichier exact puis par alias, et un clean
+feed déclaré n'hérite jamais d'un prior. La bbox du logo est
 projetée par les transformations du `.ecproj` (keyframes interpolés,
 rotation ou parent animé/redimensionné refusé).
 

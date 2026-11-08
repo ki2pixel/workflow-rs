@@ -559,15 +559,61 @@ channel = "M6"
         );
     }
 
-    #[test]
-    fn repository_catalog_is_valid_and_complete() {
+    fn repository_catalog() -> SourceLogoCatalog {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/models/qa/source_logos.toml");
-        let catalog = SourceLogoCatalog::load(&path).unwrap();
-        assert_eq!(catalog.emissions.len(), 29);
-        assert_eq!(catalog.clean_feeds.len(), 15);
-        assert_eq!(catalog.no_logo_emissions.len(), 5);
+        SourceLogoCatalog::load(&path).unwrap()
+    }
+
+    #[test]
+    fn repository_catalog_is_valid_and_complete() {
+        // Given: le catalogue versionné livré avec le dépôt.
+        let catalog = repository_catalog();
+
+        // When/Then: les comptes et les deux zones sont complets.
+        assert_eq!(catalog.emissions.len(), 30);
+        assert_eq!(catalog.clean_feeds.len(), 21);
+        assert_eq!(catalog.no_logo_emissions.len(), 9);
         assert!(catalog.zones.bottom_left.is_some());
         assert!(catalog.zones.top_left.is_some());
+    }
+
+    #[test]
+    fn resolves_new_lrdlr_source_with_bottom_left_prior() {
+        // Given: le catalogue versionné et le fichier source exact du CSV.
+        let catalog = repository_catalog();
+        let source = "6ter - LRDLR - Au volant de son camion, elle s’engage sur une route interdite aux poids lourds .mp4";
+
+        // When: la source est résolue puis projetée sur le canvas de référence.
+        let emission = catalog.resolve_source(source).unwrap();
+        let prior = catalog.prior_for_source(source, 1920, 1080).unwrap();
+
+        // Then: la source exacte prime et le prior reste en bas-gauche.
+        assert_eq!(emission.name, "Les Reines de la Route");
+        assert!(emission.sources.iter().any(|candidate| candidate == source));
+        assert_eq!(prior.name, "Les Reines de la Route");
+        assert_eq!(prior.channel, "6ter");
+        assert_eq!(prior.position, "bottom_left");
+        assert_eq!(prior.bbox, [99.0, 848.0, 315.0, 1022.0]);
+        assert_eq!(prior.variants.len(), 1);
+        assert_eq!(prior.variants[0].crop, "Les_Reines_de_la_Route/crop.png");
+        assert_eq!(prior.variants[0].reference_bbox, [99, 848, 315, 1022]);
+
+        let zone = catalog.zones.bottom_left.unwrap();
+        assert!(prior.bbox[0] >= zone[0] as f64);
+        assert!(prior.bbox[1] >= zone[1] as f64);
+        assert!(prior.bbox[2] <= zone[2] as f64);
+        assert!(prior.bbox[3] <= zone[3] as f64);
+    }
+
+    #[test]
+    fn new_wanted_clean_feed_has_no_prior() {
+        // Given: le catalogue versionné et un clean feed WANTED du CSV.
+        let catalog = repository_catalog();
+        let source = "WANTED - SOIREE EM5 rs1.mp4";
+
+        // When/Then: le clean feed est reconnu et n'hérite d'aucun prior.
+        assert!(catalog.is_clean_feed(source));
+        assert!(catalog.resolve_source(source).is_none());
     }
 }

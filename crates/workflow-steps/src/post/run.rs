@@ -48,7 +48,7 @@ pub struct PostOptions {
     pub a2_ocr_det: PathBuf,
     pub a2_ocr_rec: PathBuf,
     pub a2_ocr_onnxruntime: Option<PathBuf>,
-    /// Registre spatial des logos source (D-052), annotation seule.
+    /// Registre spatial des logos source (D-052), annotation et exclusion OCR.
     pub a2_logo_prior: bool,
     pub a2_logo_catalog: PathBuf,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.

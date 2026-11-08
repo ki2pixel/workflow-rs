@@ -220,7 +220,7 @@ a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
 # Bibliothèque ONNX Runtime explicite (décommenter si absent du système).
 # a2_ocr_onnxruntime = "/home/kidpixel/workflow_mediapipe/coral_env/lib/python3.11/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
-# Registre spatial des logos de programme (D-052), annotation seule.
+# Registre spatial des logos de programme (D-052), annotation et exclusion OCR.
 # Désactivé par défaut : A2 garde strictement sa décision actuelle.
 a2_logo_prior = false
 a2_logo_catalog = "qa/source_logos.toml"

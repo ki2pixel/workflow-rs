@@ -439,9 +439,13 @@ s'applique.
 Depuis D-052, `steps.step8.post.a2_logo_prior` (défaut `false`) ajoute
 `details.source_logo` au candidat A2 à partir du catalogue
 `a2_logo_catalog` (relatif à `paths.models`). La bbox du logo de programme
-est projetée par les transformations du `.ecproj` ; l'action A2 n'est jamais
-modifiée. Le QA expose le même registre en opt-in avec `qa run
---source-logo` (check `source_logo`, `pass`/`info`).
+est projetée par les transformations du `.ecproj`. Quand un prior est
+actif, les détections OCR majoritairement contenues dans cette bbox sont
+retirées du groupe dominant (`details.ocr.logo_texts`,
+`logo_detections_total`, `logo_only`) ; un logo seul ne peut jamais
+confirmer une bannière et part en `review`. Sans prior, ces clés restent
+absentes et l'action A2 est inchangée. Le QA expose le même registre en
+opt-in avec `qa run --source-logo` (check `source_logo`, `pass`/`info`).
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 

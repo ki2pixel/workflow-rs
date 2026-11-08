@@ -82,9 +82,10 @@ Linux et le panneau CEP continue d'appeler Python.
   ou oppose un veto aux sous-titres changeants ; la preuve est ajoutée sous
   `details.ocr`, sans changer le schéma `post.json`. Détail dans
   `docs/lots/LOT-9-POST-STEP8.md`. Depuis D-052, un registre spatial versionné
-  des logos de programme annote A2 (`a2_logo_prior = false`) et le QA
-  (`--source-logo`) sans jamais recadrer ni masquer ; 29 émissions, 15 clean
-  feeds et 5 émissions sans logo.
+  des logos de programme annote A2 (`a2_logo_prior = false`), retire le texte
+  du logo du groupe OCR dominant, et alimente le QA (`--source-logo`) sans
+  jamais recadrer ni masquer ; 29 émissions, 15 clean feeds et 5 émissions
+  sans logo.
 - Bypass direct : quand `steps.step8.post.direct = true`, les vidéos
   `M6 - SDM - ` et `W9 - LPHDF` au profil 1920×1080 25 fps sautent
   STEP2–STEP6 ; STEP7 synthétise un `_scenes.csv` mono-segment. SDM produit

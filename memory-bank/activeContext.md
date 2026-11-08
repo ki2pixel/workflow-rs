@@ -2,20 +2,26 @@
 
 ## Tâche en cours
 
-**Registre spatial des logos source — phase A (2026-11-08, D-052).** Le
+**Registre spatial des logos source — phases A/B (2026-11-08, D-052).** Le
 catalogue versionné `assets/models/qa/source_logos.toml` contient les 29
 émissions documentées par le client (position, bbox d'enveloppe, variantes,
 sources exactes), 15 clean feeds et 5 émissions sans logo ; les crops RGBA
 restent externes. `vision/source_logo.rs` résout la source et projette la
 bbox par les transformations du `.ecproj` (keyframes compris). A2 ajoute
-`details.source_logo` derrière `a2_logo_prior = false` ; le QA ajoute
-`source_logo` (`pass`/`info`) derrière `--source-logo`. Le catalogue est
-généré par `scripts/import-source-logos.py` depuis le CSV client. Rejeu
-réel : `54` et `58` inchangés (`apply` 200,8 % / 210,0 %), `40` inchangés en
-`review` mais enrichis (logo 66 Minutes à 72,6 % du candidat) ; QA sur 35
-exports GOOD avec `.ecproj` : 25 `pass`, 10 `info`, 0 nouveau finding. Phase
-B (confirmation visuelle NCC/contours, exclusion du groupe OCR dominant,
-veto logo seul) non implémentée.
+`details.source_logo` derrière `a2_logo_prior = false` et, quand un prior
+est actif, retire du groupe OCR dominant les détections majoritairement
+dans la bbox du logo (`details.ocr.logo_texts`, `logo_detections_total`,
+`logo_only`) ; un logo seul part en `review`. Sans prior, ces clés restent
+absentes. Le QA ajoute `source_logo` (`pass`/`info`) derrière
+`--source-logo`. Le catalogue est généré par
+`scripts/import-source-logos.py` depuis le CSV client. Rejeu réel :
+`54`/`58` inchangés (`apply` 200,8 % / 210,0 %) et `UNJOUR`/`UNDOC` déplacés
+dans `logo_texts` ; `40` reste `review` mais devient « bande sombre, texte
+persistant confirmé » avec la bannière réelle à 91,7 % et un scale proposé
+de 218,2 % ; `sub_fast` reste vétoé à 25 %. QA sur 35 exports GOOD avec
+`.ecproj` : 25 `pass`, 10 `info`, 0 nouveau finding. Phase C (confirmation
+visuelle NCC/contours, stabilité temporelle de la zone générique) non
+implémentée ; activation production toujours soumise à validation client.
 
 **QA 1.3.0 — clustering OCR (2026-11-07, D-051).** La phase 1 est
 implémentée : `qa/ocr.rs` regroupe les détections par **boîte stable** (le
@@ -559,7 +565,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 489 tests unitaires ; pas de CI.
+- 492 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

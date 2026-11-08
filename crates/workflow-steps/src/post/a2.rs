@@ -34,6 +34,9 @@ const GEOM_STD: f64 = 12.0;
 const A2_OCR_SAMPLES: usize = 12;
 const A2_OCR_MARGIN_PX: i64 = 16;
 const A2_OCR_MIN_CROP_HEIGHT: i64 = 30;
+/// Part minimale d'une détection contenue dans la bbox logo pour la retirer
+/// du groupe dominant.
+const A2_OCR_LOGO_OVERLAP: f64 = 0.60;
 const A2_OCR_MIN_FRAMES: usize = 6;
 const A2_OCR_MIN_SCORE: f64 = 0.55;
 const A2_OCR_MIN_TEXT_LEN: usize = 2;
@@ -79,6 +82,14 @@ struct A2OcrEvidence {
     dominant_text: String,
     dominant_bbox: [i64; 4],
     texts: Vec<A2OcrText>,
+    /// Textes lus dans la bbox du logo source, exclus du groupe dominant.
+    logo_texts: Vec<A2OcrText>,
+    logo_detections_total: usize,
+    /// Vrai si la seule preuve textuelle est le logo source.
+    logo_only: bool,
+    /// Faux quand aucun prior n'est fourni : les clés logo restent absentes
+    /// du JSON pour ne pas modifier la sortie OCR existante.
+    logo_tracking: bool,
     text_persistence: f64,
     dominant_ratio: f64,
     y_drift_px: f64,
@@ -125,6 +136,28 @@ impl A2OcrEvidence {
                     .collect(),
             ),
         );
+        if self.logo_tracking {
+            object.insert(
+                "logo_texts".into(),
+                Value::Array(
+                    self.logo_texts
+                        .iter()
+                        .map(|text| {
+                            json!({
+                                "text": text.text,
+                                "samples": text.samples,
+                                "coverage_x": text.coverage_x,
+                            })
+                        })
+                        .collect(),
+                ),
+            );
+            object.insert(
+                "logo_detections_total".into(),
+                json!(self.logo_detections_total),
+            );
+            object.insert("logo_only".into(), json!(self.logo_only));
+        }
         object.insert("timing_ms".into(), json!(self.timing_ms));
         Value::Object(object)
     }
@@ -141,6 +174,8 @@ enum OcrVerdict {
     Ambiguous,
     /// Texte absent ou trop rare : décision A2 actuelle, sans dégradation.
     Sparse,
+    /// Le seul texte lu appartient au logo source : jamais une bannière.
+    LogoOnly,
 }
 
 struct OcrGate<'a> {
@@ -148,6 +183,7 @@ struct OcrGate<'a> {
     ffmpeg: &'a Path,
     specs: &'a VideoSpecs,
     options: &'a A2OcrOptions,
+    logo_prior: Option<&'a SourceLogoPrior>,
 }
 
 trait OcrEvidenceSource {
@@ -156,7 +192,14 @@ trait OcrEvidenceSource {
 
 impl OcrEvidenceSource for OcrGate<'_> {
     fn evidence(&self, candidate: &BandCandidate) -> Option<A2OcrEvidence> {
-        match collect_ocr_evidence(self.video, self.ffmpeg, self.specs, candidate, self.options) {
+        match collect_ocr_evidence(
+            self.video,
+            self.ffmpeg,
+            self.specs,
+            candidate,
+            self.options,
+            self.logo_prior,
+        ) {
             Ok(evidence) => Some(evidence),
             Err(error) => {
                 tracing::warn!("A2 OCR ignoré pour {}: {error:#}", self.video.display());
@@ -229,11 +272,12 @@ pub fn decide_a2(
         None => None,
     };
     let gate = match (ocr, ocr_specs.as_ref()) {
-        (Some(options), Some(specs)) => Some(OcrGate {
+        (Some(ocr_options), Some(specs)) => Some(OcrGate {
             video,
             ffmpeg,
             specs,
-            options,
+            options: ocr_options,
+            logo_prior: options.logo_prior.as_ref(),
         }),
         _ => None,
     };
@@ -502,6 +546,15 @@ fn decide_impl(
         if let Some(evidence) = &evidence {
             details["ocr"] = evidence.to_json();
         }
+        if matches!(verdict, Some(OcrVerdict::LogoOnly)) {
+            return vec![Decision::review(
+                "A2",
+                "comp",
+                "zone basse étroite, texte du logo source uniquement : jamais recadré",
+                0.55,
+                details,
+            )];
+        }
         if matches!(verdict, Some(OcrVerdict::Changing)) {
             return vec![Decision::noop(
                 "A2",
@@ -588,6 +641,15 @@ fn decide_impl(
         details["ocr"] = evidence.to_json();
     }
     let ocr_confirmed = matches!(verdict, Some(OcrVerdict::Confirmed));
+    if matches!(verdict, Some(OcrVerdict::LogoOnly)) {
+        return vec![Decision::review(
+            "A2",
+            "comp",
+            "texte du logo source uniquement, pas une bannière ; pas de recadrage",
+            0.55,
+            details,
+        )];
+    }
     if matches!(verdict, Some(OcrVerdict::Changing)) {
         let dominance = evidence
             .as_ref()
@@ -748,6 +810,9 @@ fn ocr_verdict(
 }
 
 fn classify_ocr(evidence: &A2OcrEvidence, source_height: u32) -> OcrVerdict {
+    if evidence.logo_only {
+        return OcrVerdict::LogoOnly;
+    }
     if evidence.text_persistence < A2_OCR_TEXT_PERSISTENCE {
         return OcrVerdict::Sparse;
     }
@@ -856,12 +921,84 @@ fn group_coverage(group: &TextGroup, candidate_width: f64) -> f64 {
     (bbox[2] as f64 / candidate_width.max(1.0)).min(1.0)
 }
 
+fn group_samples(samples: &[Vec<SampleDetection>]) -> HashMap<String, TextGroup> {
+    let mut groups: HashMap<String, TextGroup> = HashMap::new();
+    for (index, detections) in samples.iter().enumerate() {
+        let mut seen: Vec<&str> = Vec::new();
+        for detection in detections {
+            if seen.contains(&detection.normalized.as_str()) {
+                continue;
+            }
+            seen.push(&detection.normalized);
+            let group = groups
+                .entry(detection.normalized.clone())
+                .or_insert_with(|| TextGroup {
+                    text: detection.text.clone(),
+                    samples: Vec::new(),
+                    count: 0,
+                    scores: Vec::new(),
+                    boxes: Vec::new(),
+                });
+            group.samples.push(index);
+            group.count += 1;
+            group.scores.push(detection.score);
+            group.boxes.push(detection.bbox);
+        }
+    }
+    groups
+}
+
+/// Tri déterministe : nombre d'échantillons, puis largeur couverte (un
+/// fragment fréquent ne doit pas masquer la ligne complète), puis texte.
+fn rank_groups(groups: &HashMap<String, TextGroup>, candidate_width: f64) -> Vec<&TextGroup> {
+    let mut ranked: Vec<&TextGroup> = groups.values().collect();
+    ranked.sort_by(|left, right| {
+        right
+            .samples
+            .len()
+            .cmp(&left.samples.len())
+            .then_with(|| {
+                group_coverage(right, candidate_width)
+                    .total_cmp(&group_coverage(left, candidate_width))
+            })
+            .then_with(|| left.text.cmp(&right.text))
+    });
+    ranked
+}
+
+fn top_texts(groups: &HashMap<String, TextGroup>, candidate_width: f64) -> Vec<A2OcrText> {
+    rank_groups(groups, candidate_width)
+        .iter()
+        .take(3)
+        .map(|group| A2OcrText {
+            text: group.text.clone(),
+            samples: group.samples.len(),
+            coverage_x: round_to(group_coverage(group, candidate_width), 4),
+        })
+        .collect()
+}
+
+/// Une détection est du logo source quand elle est majoritairement contenue
+/// dans la bbox du prior. Un texte de bannière qui chevauche partiellement le
+/// logo n'est donc pas retiré.
+fn detection_is_logo(bbox: [i64; 4], prior: &SourceLogoPrior) -> bool {
+    let [x, y, width, height] = bbox;
+    let x1 = x + width;
+    let y1 = y + height;
+    let intersection_width = x1.min(prior.bbox[2] as i64) - x.max(prior.bbox[0] as i64);
+    let intersection_height = y1.min(prior.bbox[3] as i64) - y.max(prior.bbox[1] as i64);
+    let intersection = (intersection_width.max(0) * intersection_height.max(0)) as f64;
+    let area = (width.max(1) * height.max(1)) as f64;
+    intersection / area >= A2_OCR_LOGO_OVERLAP
+}
+
 fn collect_ocr_evidence(
     video: &Path,
     ffmpeg: &Path,
     specs: &VideoSpecs,
     candidate: &BandCandidate,
     options: &A2OcrOptions,
+    logo_prior: Option<&SourceLogoPrior>,
 ) -> Result<A2OcrEvidence> {
     let started = Instant::now();
     let x0 = (candidate.x0_src - A2_OCR_MARGIN_PX).max(0);
@@ -967,35 +1104,31 @@ fn collect_ocr_evidence(
         );
     }
 
-    let mut groups: HashMap<String, TextGroup> = HashMap::new();
-    let mut samples_with_text = 0usize;
-    for (index, detections) in samples.iter().enumerate() {
-        if !detections.is_empty() {
-            samples_with_text += 1;
-        }
-        let mut seen: Vec<&str> = Vec::new();
+    let mut banner_samples: Vec<Vec<SampleDetection>> = Vec::with_capacity(samples.len());
+    let mut logo_samples: Vec<Vec<SampleDetection>> = Vec::with_capacity(samples.len());
+    let mut logo_detections_total = 0usize;
+    for detections in &samples {
+        let mut banner = Vec::new();
+        let mut logo = Vec::new();
         for detection in detections {
-            if seen.contains(&detection.normalized.as_str()) {
-                continue;
+            if logo_prior.is_some_and(|prior| detection_is_logo(detection.bbox, prior)) {
+                logo_detections_total += 1;
+                logo.push(detection.clone());
+            } else {
+                banner.push(detection.clone());
             }
-            seen.push(&detection.normalized);
-            let group = groups
-                .entry(detection.normalized.clone())
-                .or_insert_with(|| TextGroup {
-                    text: detection.text.clone(),
-                    samples: Vec::new(),
-                    count: 0,
-                    scores: Vec::new(),
-                    boxes: Vec::new(),
-                });
-            group.samples.push(index);
-            group.count += 1;
-            group.scores.push(detection.score);
-            group.boxes.push(detection.bbox);
         }
+        banner_samples.push(banner);
+        logo_samples.push(logo);
     }
     let total = samples.len();
+    let samples_with_text = banner_samples
+        .iter()
+        .filter(|detections| !detections.is_empty())
+        .count();
     let text_persistence = samples_with_text as f64 / total as f64;
+    let groups = group_samples(&banner_samples);
+    let logo_groups = group_samples(&logo_samples);
     for group in groups.values() {
         tracing::debug!(
             text = %group.text,
@@ -1005,29 +1138,10 @@ fn collect_ocr_evidence(
         );
     }
     let candidate_width = (candidate.x1_src - candidate.x0_src).max(1) as f64;
-    // Tri déterministe : nombre d'échantillons, puis largeur couverte (un
-    // fragment fréquent ne doit pas masquer la ligne complète), puis texte.
-    let mut ranked: Vec<&TextGroup> = groups.values().collect();
-    ranked.sort_by(|left, right| {
-        right
-            .samples
-            .len()
-            .cmp(&left.samples.len())
-            .then_with(|| {
-                group_coverage(right, candidate_width)
-                    .total_cmp(&group_coverage(left, candidate_width))
-            })
-            .then_with(|| left.text.cmp(&right.text))
-    });
-    let texts: Vec<A2OcrText> = ranked
-        .iter()
-        .take(3)
-        .map(|group| A2OcrText {
-            text: group.text.clone(),
-            samples: group.samples.len(),
-            coverage_x: round_to(group_coverage(group, candidate_width), 4),
-        })
-        .collect();
+    let ranked = rank_groups(&groups, candidate_width);
+    let texts = top_texts(&groups, candidate_width);
+    let logo_texts = top_texts(&logo_groups, candidate_width);
+    let logo_only = logo_detections_total > 0 && samples_with_text == 0;
     let dominant = ranked.first().copied();
     let (dominant_text, dominant_bbox, dominant_ratio, y_drift_px, score, overlap, coverage_x) =
         match dominant {
@@ -1067,6 +1181,10 @@ fn collect_ocr_evidence(
         dominant_text,
         dominant_bbox,
         texts,
+        logo_texts,
+        logo_detections_total,
+        logo_only,
+        logo_tracking: logo_prior.is_some(),
         text_persistence: round_to(text_persistence, 4),
         dominant_ratio: round_to(dominant_ratio, 4),
         y_drift_px: round_to(y_drift_px, 1),
@@ -1221,6 +1339,10 @@ mod tests {
                 samples: 12,
                 coverage_x: 0.8,
             }],
+            logo_texts: Vec::new(),
+            logo_detections_total: 0,
+            logo_only: false,
+            logo_tracking: false,
             text_persistence: 1.0,
             dominant_ratio: 1.0,
             y_drift_px: 2.0,
@@ -1289,6 +1411,34 @@ mod tests {
             .into_iter()
             .next()
             .unwrap()
+    }
+
+    #[test]
+    fn logo_only_evidence_is_reviewed_not_applied() {
+        let mut evidence = confirmed_evidence();
+        evidence.logo_tracking = true;
+        evidence.logo_only = true;
+        evidence.logo_detections_total = 12;
+        evidence.logo_texts = evidence.texts.clone();
+        evidence.texts.clear();
+        let decision = decide_with_evidence(candidate(), 1080, Some(evidence));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("logo source"));
+    }
+
+    #[test]
+    fn logo_keys_are_absent_without_a_prior() {
+        let evidence = confirmed_evidence().to_json();
+        assert!(evidence.get("logo_texts").is_none());
+        assert!(evidence.get("logo_detections_total").is_none());
+        assert!(evidence.get("logo_only").is_none());
+    }
+
+    #[test]
+    fn logo_text_must_be_mostly_inside_the_prior() {
+        let prior = source_logo_prior();
+        assert!(detection_is_logo([141, 899, 110, 57], &prior));
+        assert!(!detection_is_logo([313, 978, 900, 38], &prior));
     }
 
     fn meta() -> CompMeta {

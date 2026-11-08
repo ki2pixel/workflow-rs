@@ -155,7 +155,7 @@ OCR en échec → warning et retour à la décision A2 actuelle, sans échec du
 post. Les fichiers `PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx`
 doivent être copiés sous `paths.models/qa/`, ou renseignés en absolu.
 
-### Registre spatial des logos source (D-052, phase A, 2026-11-08)
+### Registre spatial des logos source (D-052, phases A/B, 2026-11-08)
 
 `a2_logo_prior = false` par défaut : sans flag, aucune lecture de catalogue
 et aucune clé JSON supplémentaire. Quand il est activé,
@@ -174,6 +174,18 @@ Rejeu OCR réel : `54` reste `apply` 200,8 %, `58` reste `apply` 210,0 %,
 documenté à 72,6 % du candidat ; les seules différences sont `source_logo`
 et les temps OCR. Les crops de référence restent hors dépôt ; le catalogue
 ne contient que des métadonnées.
+
+Phase B (même flag) : les détections dont la boîte est majoritairement dans
+la bbox du logo sont retirées du groupe OCR dominant. Les clés
+`details.ocr.logo_texts`, `logo_detections_total` et `logo_only`
+n'apparaissent que si un prior est actif ; sans prior, la sortie OCR est
+inchangée. Si le logo est la seule preuve textuelle, A2 répond `review` au
+lieu d'appliquer. Rejeu : `54`/`58` conservent leur action et leur scale
+(`UNJOUR`/`UNDOC` passent de `texts` à `logo_texts`), `40` reste `review`
+mais devient « bande sombre, texte persistant confirmé » avec la bannière
+réelle dominante (91,7 %) et `scale_target` 218,2 %, `sub_fast` reste vétoé
+à 25 %. La confirmation visuelle NCC/contours et la zone générique restent
+en phase C.
 
 ## A3/A4 — revue seulement
 

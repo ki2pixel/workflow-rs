@@ -49,8 +49,8 @@ détecteurs morphologiques OpenCV, mais de :
   module neutre `vision`, utilisé par `qa` et `post`, plutôt que faire
   dépendre `post` de `qa`.
 
-Les phases 1 à 3 et la phase A du registre logo (D-052) ont modifié le code
-de production. La suite de tests reste verte : **489 tests**, `fmt` et
+Les phases 1 à 3 et les phases A/B du registre logo (D-052) ont modifié le
+code de production. La suite de tests reste verte : **492 tests**, `fmt` et
 `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
@@ -969,14 +969,16 @@ quelques textes isolés du corpus restent sous le seuil de trois échantillons
 d'un même cluster. Sorties sous
 `/tmp/workflow_investigation/corpus35-qa13/`.
 
-### 7.5 Phase A — registre spatial des logos source (2026-11-08)
+### 7.5 Phases A/B — registre spatial des logos source (2026-11-08)
 
 **Principe.** Le logo n'est pas recherché sur toute l'image : le client a
 documenté, pour 29 émissions, une position quasi déterministe dans le canvas
 source 1920×1080. Le pipeline répond d'abord à « où peut être le logo ? »
 (registre spatial), puis seulement ensuite à « est-il réellement là ? »
-(confirmation locale). La phase A ne fait que la première partie et
-**n'agit jamais** sur le recadrage : elle annote A2 et le QA.
+(confirmation locale). La phase A annote cette position ; la phase B exclut
+le texte du logo du groupe OCR dominant et interdit qu'il confirme seul une
+bannière. Aucune des deux **n'agit jamais** sur le recadrage : le pire cas
+est une revue.
 
 **Catalogue.** `assets/models/qa/source_logos.toml` est versionné et généré
 par `scripts/import-source-logos.py` depuis
@@ -1011,7 +1013,7 @@ finding** ; `227` E=M6 est hors cadre, `270` GOAL est reconnu clean feed.
 Deux exports (`286`, `298`) conservent un écart de durée MP4/comp de 3 s déjà
 présent dans l'appariement projet/export, sans rapport avec le registre.
 
-**Limites de la phase A.** Aucun pixel n'est comparé : le check est
+**Limites des phases A/B.** Aucun pixel n'est comparé : le check est
 géométrique. Le QA écarte les observations couvertes par un overlay déclaré
 (le masque prime sur le prior), mais A2 ne consulte pas encore les overlays
 pour décider si le logo est caché. La zone générique n'est pas confirmée
@@ -1021,11 +1023,31 @@ projection non calculable : le QA répond alors `not_applicable` au lieu de
 conclure « hors cadre », et A2 omet `visible_in_comp` avec
 `projection = "unsupported"`.
 
-**Critère pour la phase B.** Passer à la confirmation locale (template
+**Phase B — exclusion OCR et veto logo seul (2026-11-08).** Quand le prior
+est disponible, les détections OCR dont la boîte est majoritairement
+(≥ 60 %) dans la bbox du logo sont retirées du groupe dominant. Les textes
+retirés sont exposés sous `details.ocr.logo_texts`, avec
+`logo_detections_total` et `logo_only` ; ces trois clés n'apparaissent que
+si un prior est actif, pour ne pas modifier la sortie OCR sans registre. Si
+la seule preuve textuelle est le logo (`logo_only`), A2 oppose un `review`
+« texte du logo source uniquement » au lieu d'appliquer. Le reste de la
+décision est inchangé : les garde-fous de géométrie, de largeur et de bande
+sombre continuent de primer.
+
+Rejeu réel : `54` et `58` restent `apply` 200,8 % / 210,0 %, mais
+`UNJOUR`/`UNDOC` passent de `texts` à `logo_texts` ; `40 ABHARTACH` et
+`40 FOOTBALLEUR` restent `review` et passent du motif « bande animée » au
+motif « bande sombre, texte persistant confirmé », avec la bannière réelle
+dominante (91,7 %) et `scale_target` 218,2 % ; `sub_fast` reste vétoé à
+25 %. Aucune action ni aucun scale de `54`/`58` ne change, les audits
+restent `pass`. Le flag reste désactivé par défaut ; l'activation en
+production attend la validation client. Le template matching NCC et la
+confirmation visuelle de la zone générique restent à faire (phase C).
+
+**Critère pour la phase C.** Ajouter la confirmation locale (template
 matching NCC + contours, ou stabilité temporelle pour la zone générique)
-seulement si les annotations A2/QA restent report-only sur le corpus GOOD et
-si le client valide que le logo source visible doit être exclu du groupe OCR
-dominant, sans jamais déclencher de recadrage automatique.
+seulement si le client valide le principe, et sans jamais déclencher de
+recadrage automatique sur cette base.
 
 ## 8. Risques et points ouverts
 
@@ -1090,6 +1112,8 @@ dominant, sans jamais déclencher de recadrage automatique.
 | 3 (fait) | A2 v3 gate OCR, flag `a2_ocr=false` | `58` promu à 210,0 %, `54` inchangé à 200,8 %, `40` reviews enrichis, `sub_fast` veto ; audits `pass` |
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
 | 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions + zones, `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
+| 6 (fait, phase B) | Exclusion OCR du logo source, veto logo seul | `54`/`58` inchangés, `40` confirmé sombre avec scale 218,2 %, `sub_fast` toujours vétoé ; opt-in et validation client avant activation |
+| 7 (option) | Template matching NCC/contours et zone générique confirmée | validation client + corpus dédié, toujours sans recadrage automatique |
 
 ### 9.3 Prochaines actions concrètes
 
@@ -1098,13 +1122,16 @@ dominant, sans jamais déclencher de recadrage automatique.
 - mesurer le coût du gate sur un lot complet (15–25 s par projet mesuré) et
   vérifier le timeout STEP8 ;
 - décider du niveau 2 des bandeaux sombres et du volet logo avec le client ;
-  la phase A du registre spatial est implémentée mais reste opt-in et
-  report-only ;
+  les phases A et B du registre spatial sont implémentées mais restent
+  opt-in (`a2_logo_prior = false`, `--source-logo`) ;
 - si le niveau 2 est retenu, constituer un corpus dédié de lower-thirds
   sombres et de logos bas, puis rouvrir une décision ;
-- pour la phase B logo, faire valider le principe d'exclure le logo source du
-  groupe OCR dominant et de ne jamais recadrer sur cette base ; mesurer
-  d'abord le gain sur `40` et l'absence de régression sur `54`/`58`/GOOD ;
+- faire valider par le client l'exclusion du logo source du groupe OCR
+  dominant et le veto logo seul, déjà mesurés sur `54`/`58`/`40`/`sub_fast` ;
+  aucune régression d'action ni de scale sur `54`/`58` ;
+- phase C : template matching NCC/contours et confirmation temporelle de la
+  zone générique, seulement après validation client et sans recadrage
+  automatique ;
 - conserver la parité QA : toute évolution du clustering ou des moteurs
   `vision` doit rejouer les 36 exports GOOD et les cas synthétiques.
 

@@ -655,7 +655,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/qa/logo.rs`,
   `crates/workflow-steps/src/qa/dino.rs`.
 
-## 2026-11-08 — D-052 : registre spatial des logos source, annotation seule (phase A)
+## 2026-11-08 — D-052 : registre spatial des logos source, annotation et exclusion OCR (phases A/B)
 
 - **Contexte** : le client a documenté 29 émissions avec un logo de programme
   quasi déterministe dans le canvas source 1920×1080 (28 en bas-gauche,
@@ -664,8 +664,9 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   coûteuse et moins fiable que ce prior spatial ; le logo doit rester
   distinct de la bannière éditoriale et du sous-titre.
 - **Décision** :
-  1. la phase A est **report-only** : le registre ne recadre, ne masque et ne
-     supprime jamais rien ; il annote A2 et le QA ;
+  1. les phases A/B restent **report-only** : le registre ne recadre, ne
+     masque et ne supprime jamais rien ; il annote A2 et le QA, et un logo
+     seul ne peut que déclencher une revue ;
   2. `assets/models/qa/source_logos.toml` est versionné (schéma 1, zones
      génériques, 29 émissions, 15 clean feeds, 5 émissions sans logo,
      variantes et provenance). Les crops restent hors dépôt ; le catalogue ne
@@ -684,7 +685,14 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      si le catalogue demandé n'a pas pu tourner ;
   6. la zone générique est exposée dans le catalogue et rappelée par le QA
      pour les sources inconnues, mais n'est pas encore confirmée ni utilisée
-     pour une revue.
+     pour une revue ;
+  7. phase B, même flag : les détections OCR majoritairement (≥ 60 %) dans
+     la bbox du logo sont retirées du groupe dominant et exposées sous
+     `details.ocr.logo_texts` (`logo_detections_total`, `logo_only`). Ces
+     clés n'existent que si un prior est actif. Un logo seul ne peut jamais
+     confirmer une bannière : A2 répond `review` au lieu d'appliquer. Les
+     garde-fous de géométrie, de largeur et de bande sombre gardent la
+     priorité.
 - **Alternatives rejetées** :
   - détection plein cadre ou YOLO : fermée au monde ouvert et sans le prior
     client ;
@@ -693,22 +701,28 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   - recadrage ou masquage automatique : changerait une politique validée
     sans mesure sur le corpus GOOD ;
   - copie des crops dans le dépôt : assets lourds et redondants.
-- **Validation** : catalogue généré (29/15/5), parseur et projection testés
-  (keyframes, parent animé, mise à l'échelle). Rejeu A2 avec OCR : `54`
-  inchangé `apply` 200,8 %, `58` inchangé `apply` 210,0 %, `40 ABHARTACH` et
-  `40 FOOTBALLEUR` inchangés `review` avec le logo 66 Minutes documenté
-  (72,6 % du candidat) ; seules les clés `source_logo` et les temps OCR
-  diffèrent. QA sur 35 exports GOOD avec `.ecproj` : 25 `pass`, 10 `info`,
-  0 nouveau finding ; `227` E=M6 hors cadre, `270` GOAL clean feed. 489
-  tests workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
-  `/mnt/cache`.
-- **Limites** : le check est géométrique, sans comparaison de pixels ; le QA
-  écarte les observations couvertes par un overlay déclaré, mais A2 ne
+- **Validation phase A** : catalogue généré (29/15/5), parseur et projection
+  testés (keyframes, parent animé, mise à l'échelle). Rejeu A2 avec OCR :
+  `54` inchangé `apply` 200,8 %, `58` inchangé `apply` 210,0 %,
+  `40 ABHARTACH` et `40 FOOTBALLEUR` inchangés `review` avec le logo
+  66 Minutes documenté (72,6 % du candidat) ; seules les clés `source_logo`
+  et les temps OCR diffèrent. QA sur 35 exports GOOD avec `.ecproj` :
+  25 `pass`, 10 `info`, 0 nouveau finding ; `227` E=M6 hors cadre, `270`
+  GOAL clean feed.
+- **Validation phase B** : `54` et `58` conservent `apply` 200,8 % / 210,0 %
+  et leur scale, mais `UNJOUR`/`UNDOC` passent de `texts` à `logo_texts` ;
+  `40 ABHARTACH` et `40 FOOTBALLEUR` restent `review` et passent de « bande
+  animée » à « bande sombre, texte persistant confirmé », avec la bannière
+  réelle dominante (91,7 %) et `scale_target` 218,2 % ; `sub_fast` reste
+  vétoé à 25 %. Les audits restent `pass`. 492 tests workspace, `fmt` et
+  `clippy -D warnings` verts ; aucune écriture dans `/mnt/cache`.
+- **Limites** : le check QA est géométrique, sans comparaison de pixels ; le
+  QA écarte les observations couvertes par un overlay déclaré, mais A2 ne
   consulte pas encore ce masque ; la zone générique n'est pas confirmée
-  temporellement ; les crops
-  de référence ne sont pas utilisés. La phase B (template matching NCC +
-  contours, stabilité temporelle, exclusion du groupe OCR dominant, veto
-  logo seul) est laissée à une décision ultérieure.
+  temporellement ; les crops de référence ne sont pas utilisés. La phase C
+  (template matching NCC + contours, stabilité temporelle de la zone
+  générique) reste à faire et devra être validée par le client avant
+  activation.
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md` (§7.5),
   `crates/workflow-steps/src/vision/source_logo.rs`,
   `crates/workflow-steps/src/qa/source_logo.rs`,

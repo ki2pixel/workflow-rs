@@ -1012,7 +1012,8 @@ pub struct PostConfig {
     /// Bibliothèque ONNX Runtime explicite ; vide = runtime système.
     pub a2_ocr_onnxruntime: Option<PathBuf>,
     /// Registre spatial des logos de programme (D-052). Désactivé par défaut :
-    /// la décision A2 reste strictement inchangée.
+    /// la décision A2 reste strictement inchangée. Activé, il annote le logo
+    /// et retire son texte du groupe OCR dominant.
     pub a2_logo_prior: bool,
     /// Catalogue TOML, relatif à `paths.models` ou absolu.
     pub a2_logo_catalog: PathBuf,

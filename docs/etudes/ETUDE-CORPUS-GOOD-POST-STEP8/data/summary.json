@@ -1,0 +1,1378 @@
+{
+  "corpus": {
+    "projects": 75,
+    "folders": 37,
+    "segments": 2609,
+    "exports": 71
+  },
+  "segments": {
+    "n": 2609,
+    "relationships": {
+      "same": 2447,
+      "duplicate": 27,
+      "extend": 35,
+      "split": 89,
+      "overlap": 2,
+      "trim": 8,
+      "mixed": 1
+    },
+    "a1_actions": {
+      "noop": 2425,
+      "review": 116,
+      "apply": 65,
+      "none": 3
+    },
+    "human_keyframes": {
+      "segments": 318,
+      "keys": 1365,
+      "distribution": {
+        "0": 2291,
+        "2": 122,
+        "3": 74,
+        "4": 29,
+        "6": 19,
+        "5": 17,
+        "9": 12,
+        "7": 11,
+        "8": 7,
+        "10": 7
+      }
+    },
+    "strong_static": 1294
+  },
+  "baseline": {
+    "projects": {
+      "1.0": 41,
+      "1.15": 19,
+      "1.2": 7,
+      "1.361": 1,
+      "0.469": 1,
+      "1.157": 1,
+      "1.116": 1,
+      "0.5": 1,
+      "1.8": 1,
+      "1.148": 1,
+      "1.35": 1
+    },
+    "median": 1.0
+  },
+  "a1": {
+    "counts": {
+      "apply": 65,
+      "review": 122,
+      "noop": 2425,
+      "review_segment": 116,
+      "review_comp": 6
+    },
+    "apply": {
+      "margin_median": 1.0125,
+      "margin_bins": {
+        "1.005-1.02": 32,
+        "<1.005": 21,
+        ">=1.05": 1,
+        "1.02-1.03": 1,
+        "1.03-1.05": 10
+      },
+      "scale_ratio_median": 0.9736,
+      "scale_ratio_bins": {
+        "0.90-0.98": 51,
+        ">1.02": 1,
+        "0.98-1.02": 11,
+        "<0.90": 2
+      },
+      "residual_le_8": 56,
+      "residual_8_16": 1,
+      "residual_gt_16": 8,
+      "human_keyframed": 18,
+      "projects": {
+        "89 Camille/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges": 34,
+        "305 Camille/6ter - LRDRLD -  Chauffeuse poids lourd et enceinte": 17,
+        "68 Camille/6ter - De l'autre côté du périph": 7,
+        "304 Camille/Cette voiture percute une maison !": 2,
+        "325 Camille/Cynthia et Greg se rapprochent un petit peu pendant que Maeva est ailleurs": 1,
+        "325 Camille/Greg a peur que Maeva se remettent avec Andy": 1,
+        "335 Camille/Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins": 1,
+        "356 Camille/M6+ - Pretty Little Liars - Extrait 6 - La mort de Maya": 1,
+        "8 Camille/Gulli - Totally Spies - Volley ball": 1
+      }
+    },
+    "review": {
+      "categories": {
+        "asym": 99,
+        "coverage": 11,
+        "crop_empty": 2,
+        "comp_y": 4
+      },
+      "outcomes": {
+        "asym": {
+          "veto_correct": 92,
+          "resolved": 7
+        },
+        "coverage": {
+          "persisted": 5,
+          "resolved": 6
+        },
+        "crop_empty": {
+          "no_defect": 2
+        },
+        "comp_y": {
+          "persisted": 4
+        }
+      }
+    },
+    "noop": {
+      "vertical_bars": 0,
+      "side_bars": 86
+    }
+  },
+  "a2": {
+    "counts": {
+      "apply": 5,
+      "review": 61,
+      "noop": 11
+    },
+    "applies": [
+      {
+        "project": "304 Camille/Il dément les propos de ce gendarme !",
+        "action": "apply",
+        "reason": "bannière 84 px, largeur 88% -> 202.4%, texte persistant confirmé par OCR",
+        "category": "banner",
+        "median_ratio": 1.0227,
+        "exact": 0,
+        "more": 2,
+        "less": 0,
+        "n": 12
+      },
+      {
+        "project": "40 Camille/66M - CITROUILLES",
+        "action": "apply",
+        "reason": "bannière 112 px, largeur 50% -> 208.3%, texte persistant confirmé par OCR",
+        "category": "banner",
+        "median_ratio": 1.0,
+        "exact": 37,
+        "more": 11,
+        "less": 0,
+        "n": 48
+      },
+      {
+        "project": "54 Camille/UJUD - CLIENT HOTEL",
+        "action": "apply",
+        "reason": "bannière 76 px, largeur 59% -> 200.8%, texte persistant confirmé par OCR",
+        "category": "banner",
+        "median_ratio": 1.0,
+        "exact": 43,
+        "more": 11,
+        "less": 0,
+        "n": 54
+      },
+      {
+        "project": "58 Camille/UJUD - CROUSTY",
+        "action": "apply",
+        "reason": "bannière 120 px, largeur 59% -> 210%, texte persistant confirmé par OCR",
+        "category": "banner",
+        "median_ratio": 1.0286,
+        "exact": 0,
+        "more": 4,
+        "less": 0,
+        "n": 20
+      },
+      {
+        "project": "81 Camille/Ils pensent que leur belle-mère n'est là que pour l'argent !",
+        "action": "apply",
+        "reason": "bannière 104 px, largeur 95% -> 206.6%, texte persistant confirmé par OCR",
+        "category": "banner",
+        "median_ratio": 1.0,
+        "exact": 23,
+        "more": 0,
+        "less": 0,
+        "n": 23
+      }
+    ],
+    "reviews": [
+      {
+        "project": "20 Camille/Saurez-vous trouver les 3 trompe-l'œil ",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (340 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 37,
+        "bbox": [
+          0,
+          740,
+          1916,
+          1076
+        ]
+      },
+      {
+        "project": "2 Camille/Cet humoriste revient sur ses 15 ans dans l’armée ",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (432 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 81,
+        "bbox": [
+          0,
+          320,
+          1916,
+          752
+        ]
+      },
+      {
+        "project": "304 Camille/Cette voiture percute une maison !",
+        "category": "partial_width",
+        "reason": "largeur 43% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 45,
+        "n_segments": 45,
+        "bbox": [
+          164,
+          928,
+          980,
+          1012
+        ]
+      },
+      {
+        "project": "304 Camille/Il klaxonne et agresse les gendarmes car il les trouve trop lents !",
+        "category": "top",
+        "reason": "bande haute 68 px, largeur 84%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 15,
+        "bbox": [
+          220,
+          4,
+          1828,
+          68
+        ]
+      },
+      {
+        "project": "304 Camille/Il klaxonne et agresse les gendarmes car il les trouve trop lents !",
+        "category": "top",
+        "reason": "bande haute 176 px, largeur 97%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 15,
+        "bbox": [
+          0,
+          68,
+          1856,
+          244
+        ]
+      },
+      {
+        "project": "304 Camille/À peine son permis retiré, il reprend le volant !",
+        "category": "partial_width",
+        "reason": "largeur 45% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 18,
+        "n_segments": 18,
+        "bbox": [
+          116,
+          928,
+          980,
+          1012
+        ]
+      },
+      {
+        "project": "305 Camille/6ter - LRDLR - Au volant de son camion, elle s’engage sur une route interdite aux poids lourds ",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±20 px, hauteur ±41 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 19,
+        "bbox": [
+          104,
+          676,
+          1844,
+          856
+        ]
+      },
+      {
+        "project": "305 Camille/6ter - LRDRLD -  Chauffeuse poids lourd et enceinte",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1068 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 35,
+        "bbox": [
+          112,
+          8,
+          1820,
+          1072
+        ]
+      },
+      {
+        "project": "305 Camille/E=M6 VRAI OU FAUX CHOCOLAT",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (232 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 19,
+        "bbox": [
+          20,
+          628,
+          1720,
+          860
+        ]
+      },
+      {
+        "project": "309 Camille/PP - La revue de presse - Karine Dubernet",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (992 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 105,
+        "bbox": [
+          0,
+          0,
+          1916,
+          988
+        ]
+      },
+      {
+        "project": "313 Camille/W9 - LAA9 - post-diff 1 EP38 – Les Gris perdent face à l’abandon d’Emi",
+        "category": "top",
+        "reason": "bande haute 124 px, largeur 99%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 101,
+        "bbox": [
+          0,
+          48,
+          1900,
+          168
+        ]
+      },
+      {
+        "project": "313 Camille/W9 - LAA9 - prédiff EP38 – Emi fait une crise de panique en pleine épreuve",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (876 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 71,
+        "bbox": [
+          0,
+          164,
+          1916,
+          1036
+        ]
+      },
+      {
+        "project": "313 Camille/WANTED - EM3 RS EXTRAIT3",
+        "category": "top",
+        "reason": "bande haute 176 px, largeur 35%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 18,
+        "n_segments": 33,
+        "bbox": [
+          1192,
+          72,
+          1864,
+          244
+        ]
+      },
+      {
+        "project": "322 Camille/Andy, Mélanie et Cynthia se sentent trahis pendant que Greg et Maeva avoue qu’ils s’aiment toujours",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (524 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 39,
+        "bbox": [
+          0,
+          556,
+          1916,
+          1076
+        ]
+      },
+      {
+        "project": "322 Camille/Giuseppa et Manon mettent les choses au clair entre elles",
+        "category": "logo",
+        "reason": "zone basse étroite, texte persistant : logo ou watermark fixe, jamais recadré",
+        "outcome": "veto_correct",
+        "n_removed": 25,
+        "n_segments": 26,
+        "bbox": [
+          160,
+          736,
+          384,
+          972
+        ]
+      },
+      {
+        "project": "322 Camille/La villa découvre que Greg a voulu embrasser Mélanie après son bisous avec Maeva",
+        "category": "top",
+        "reason": "bande haute 64 px, largeur 88%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 72,
+        "bbox": [
+          136,
+          0,
+          1828,
+          60
+        ]
+      },
+      {
+        "project": "322 Camille/La villa découvre que Greg a voulu embrasser Mélanie après son bisous avec Maeva",
+        "category": "top",
+        "reason": "bande haute 28 px, largeur 77%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 72,
+        "bbox": [
+          144,
+          80,
+          1624,
+          104
+        ]
+      },
+      {
+        "project": "322 Camille/Maeva avoue à Manon qu’elle avait envie d’embrasser Greg depuis le début",
+        "category": "logo",
+        "reason": "zone basse étroite, texte persistant : logo ou watermark fixe, jamais recadré",
+        "outcome": "veto_correct",
+        "n_removed": 16,
+        "n_segments": 23,
+        "bbox": [
+          160,
+          760,
+          600,
+          964
+        ]
+      },
+      {
+        "project": "322 Camille/Énorme bombe au réveil Greg et Maeva se sont embrassés pendant la nuit !",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (448 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 68,
+        "bbox": [
+          0,
+          632,
+          1916,
+          1076
+        ]
+      },
+      {
+        "project": "325 Camille/Cynthia et Greg se rapprochent un petit peu pendant que Maeva est ailleurs",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (252 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 1,
+        "n_segments": 32,
+        "bbox": [
+          160,
+          716,
+          1600,
+          964
+        ]
+      },
+      {
+        "project": "325 Camille/Greg a peur que Maeva se remettent avec Andy",
+        "category": "top",
+        "reason": "bande haute 100 px, largeur 55%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 36,
+        "bbox": [
+          584,
+          388,
+          1632,
+          484
+        ]
+      },
+      {
+        "project": "325 Camille/Maeva se livre sur ses sentiments pour Greg",
+        "category": "top",
+        "reason": "bande haute 164 px, largeur 83%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 66,
+        "bbox": [
+          0,
+          0,
+          1596,
+          160
+        ]
+      },
+      {
+        "project": "325 Camille/Océane découvre que Cédric a embrassé Charlotte sur le front et elle est très en colère contre lui",
+        "category": "logo",
+        "reason": "zone basse étroite, texte persistant : logo ou watermark fixe, jamais recadré",
+        "outcome": "veto_correct",
+        "n_removed": 60,
+        "n_segments": 63,
+        "bbox": [
+          96,
+          756,
+          388,
+          964
+        ]
+      },
+      {
+        "project": "328 Camille/Les filles se confient sur leur relation amoureuse",
+        "category": "changing_text",
+        "reason": "texte changeant (dominance 50%), sous-titres probables ; pas de recadrage destructif",
+        "outcome": "veto_correct",
+        "n_removed": 7,
+        "n_segments": 50,
+        "bbox": [
+          0,
+          816,
+          1916,
+          1008
+        ]
+      },
+      {
+        "project": "328 Camille/Marwa n’est pas insensible au charme de Greg",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (432 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 1,
+        "n_segments": 32,
+        "bbox": [
+          0,
+          572,
+          1692,
+          1000
+        ]
+      },
+      {
+        "project": "335 Camille/Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins",
+        "category": "logo",
+        "reason": "zone basse étroite, texte persistant : logo ou watermark fixe, jamais recadré",
+        "outcome": "veto_correct",
+        "n_removed": 66,
+        "n_segments": 67,
+        "bbox": [
+          112,
+          840,
+          276,
+          952
+        ]
+      },
+      {
+        "project": "335 Camille/Les Ch’tis font le shooting pour les flyers de leur soirée",
+        "category": "top",
+        "reason": "bande haute 100 px, largeur 100%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 49,
+        "bbox": [
+          4,
+          4,
+          1912,
+          100
+        ]
+      },
+      {
+        "project": "354 Camille/W9 - LAA9 - post-diff 1 EP41 – Les Noirs n’iront pas dans la vallée des perles Benoit cherche des occupations",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (352 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 1,
+        "n_segments": 35,
+        "bbox": [
+          100,
+          724,
+          1916,
+          1072
+        ]
+      },
+      {
+        "project": "357 Camille/1475633_TAT_M6",
+        "category": "changing_text",
+        "reason": "texte changeant (dominance 33%), sous-titres probables ; pas de recadrage destructif",
+        "outcome": "veto_correct",
+        "n_removed": 19,
+        "n_segments": 44,
+        "bbox": [
+          132,
+          864,
+          1144,
+          1016
+        ]
+      },
+      {
+        "project": "358 Camille/1475633_TAT_M6_1",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±10 px, hauteur ±18 px), géométrie non fiable",
+        "outcome": "resolved",
+        "n_removed": 37,
+        "n_segments": 37,
+        "bbox": [
+          136,
+          892,
+          1844,
+          1016
+        ]
+      },
+      {
+        "project": "359 Camille/UJUD - EQUIPEMENT",
+        "category": "partial_width",
+        "reason": "largeur 43% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 65,
+        "n_segments": 65,
+        "bbox": [
+          100,
+          956,
+          924,
+          1028
+        ]
+      },
+      {
+        "project": "359 Camille/UJUD - LYCEENS",
+        "category": "partial_width",
+        "reason": "largeur 43% < 50%, bannière partielle",
+        "outcome": "persisted",
+        "n_removed": 46,
+        "n_segments": 47,
+        "bbox": [
+          100,
+          928,
+          924,
+          1028
+        ]
+      },
+      {
+        "project": "359 Camille/UJUD - TERRASSE",
+        "category": "partial_width",
+        "reason": "largeur 43% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 37,
+        "n_segments": 37,
+        "bbox": [
+          100,
+          928,
+          924,
+          1028
+        ]
+      },
+      {
+        "project": "35 Camille/Gulli - La Grande Gulli Party - Partie de cache cache",
+        "category": "top",
+        "reason": "bande haute 60 px, largeur 70%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 33,
+        "bbox": [
+          200,
+          0,
+          1540,
+          56
+        ]
+      },
+      {
+        "project": "35 Camille/Gulli - La Grande Gulli Party - Partie de cache cache",
+        "category": "top",
+        "reason": "bande haute 140 px, largeur 57%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 1,
+        "n_segments": 33,
+        "bbox": [
+          96,
+          140,
+          1192,
+          276
+        ]
+      },
+      {
+        "project": "364 Camille/VIGNOBLE_TAT_M6",
+        "category": "changing_text",
+        "reason": "texte changeant (dominance 42%), sous-titres probables ; pas de recadrage destructif",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 19,
+        "bbox": [
+          144,
+          796,
+          1916,
+          960
+        ]
+      },
+      {
+        "project": "367 Camille/JUGE_TAT_M6",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (700 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 33,
+        "bbox": [
+          56,
+          376,
+          1352,
+          1072
+        ]
+      },
+      {
+        "project": "367 Camille/MMA_TAT_M6",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±16 px, hauteur ±32 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 28,
+        "bbox": [
+          76,
+          848,
+          1556,
+          1040
+        ]
+      },
+      {
+        "project": "40 Camille/66M - ABHARTACH",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±7 px, hauteur ±15 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 4,
+        "n_segments": 27,
+        "bbox": [
+          120,
+          856,
+          1084,
+          1008
+        ]
+      },
+      {
+        "project": "40 Camille/66M - CIMETIERE",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (540 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 19,
+        "bbox": [
+          0,
+          320,
+          1916,
+          860
+        ]
+      },
+      {
+        "project": "40 Camille/66M - FOOTBALLEUR ESCROC",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±10 px, hauteur ±23 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 6,
+        "n_segments": 42,
+        "bbox": [
+          120,
+          856,
+          1288,
+          1008
+        ]
+      },
+      {
+        "project": "40 Camille/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1072 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 9,
+        "bbox": [
+          4,
+          4,
+          1912,
+          1072
+        ]
+      },
+      {
+        "project": "42 Camille/Le lapsus d’Olivier Minne déclenche un fou rire sur le plateau",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (392 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 12,
+        "bbox": [
+          0,
+          684,
+          1916,
+          1072
+        ]
+      },
+      {
+        "project": "50 Camille/Cathy s'est fait courtiser par un agriculteur d'une autre saison !",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (296 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 39,
+        "bbox": [
+          572,
+          360,
+          1912,
+          652
+        ]
+      },
+      {
+        "project": "62 Camille/SHORT_E=M6 - EP NINO - V3",
+        "category": "top",
+        "reason": "bande haute 192 px, largeur 38%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 1,
+        "n_segments": 22,
+        "bbox": [
+          2224,
+          88,
+          3680,
+          272
+        ]
+      },
+      {
+        "project": "62 Camille/SHORT_oléagineux",
+        "category": "top",
+        "reason": "bande haute 88 px, largeur 82%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 17,
+        "bbox": [
+          187,
+          29,
+          1227,
+          115
+        ]
+      },
+      {
+        "project": "77 Camille/UJUD - CHAT HYPOALLERGENIQUE",
+        "category": "partial_width",
+        "reason": "largeur 39% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 43,
+        "n_segments": 43,
+        "bbox": [
+          100,
+          928,
+          852,
+          1024
+        ]
+      },
+      {
+        "project": "77 Camille/UJUD - HOTEL POUR CHATS",
+        "category": "partial_width",
+        "reason": "largeur 39% < 50%, bannière partielle",
+        "outcome": "persisted",
+        "n_removed": 33,
+        "n_segments": 34,
+        "bbox": [
+          100,
+          928,
+          852,
+          1024
+        ]
+      },
+      {
+        "project": "78 Camille/Gulli - MSL1 - Kondogbia co-animateur de « Ma Super Ligue 1 » ",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (356 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 9,
+        "bbox": [
+          68,
+          608,
+          1512,
+          960
+        ]
+      },
+      {
+        "project": "79 Camille/Gulli - MSL1 - Léo, 7 ans, interviewe Matthis Abline ",
+        "category": "top",
+        "reason": "bande haute 132 px, largeur 91%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 31,
+        "bbox": [
+          180,
+          0,
+          1916,
+          128
+        ]
+      },
+      {
+        "project": "80 Camille/Gulli - MSL1 - L’interview « Quand j’étais petit » d’Igor Paixão",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±12 px, hauteur ±29 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 18,
+        "bbox": [
+          140,
+          816,
+          1696,
+          988
+        ]
+      },
+      {
+        "project": "80 Camille/Leur belle-mère leur pourrit la vie !",
+        "category": "partial_width",
+        "reason": "largeur 37% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 23,
+        "n_segments": 23,
+        "bbox": [
+          100,
+          928,
+          812,
+          1024
+        ]
+      },
+      {
+        "project": "81 Camille/Elles refusent 500 000 euros d'héritage !",
+        "category": "partial_width",
+        "reason": "largeur 37% < 50%, bannière partielle",
+        "outcome": "resolved",
+        "n_removed": 14,
+        "n_segments": 14,
+        "bbox": [
+          100,
+          928,
+          812,
+          1028
+        ]
+      },
+      {
+        "project": "81 Camille/Sa fille l’accuse d’avoir un cancer à cause de lui !",
+        "category": "top",
+        "reason": "bande haute 56 px, largeur 41%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 7,
+        "n_segments": 14,
+        "bbox": [
+          0,
+          392,
+          788,
+          444
+        ]
+      },
+      {
+        "project": "82 Camille/Il tue cette femme car elle s’est mal garée !",
+        "category": "animated",
+        "reason": "bande basse très instable (centre ±16 px, hauteur ±33 px), scale non fiable malgré le texte OCR",
+        "outcome": "veto_correct",
+        "n_removed": 10,
+        "n_segments": 46,
+        "bbox": [
+          164,
+          920,
+          1584,
+          1000
+        ]
+      },
+      {
+        "project": "86 Camille/Extrait 4 - (Roman Rozier)  Il joue du piano comme un véritable virtuose",
+        "category": "animated",
+        "reason": "bande basse animée (centre ±21 px, hauteur ±44 px), géométrie non fiable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 34,
+        "bbox": [
+          40,
+          680,
+          1636,
+          848
+        ]
+      },
+      {
+        "project": "8 Camille/Gulli - Totally Spies - Sam est malade",
+        "category": "top",
+        "reason": "bande haute 112 px, largeur 35%, position à valider",
+        "outcome": "veto_correct",
+        "n_removed": 4,
+        "n_segments": 18,
+        "bbox": [
+          1248,
+          36,
+          1916,
+          144
+        ]
+      },
+      {
+        "project": "8 Camille/Gulli - Totally Spies - Volley ball",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1056 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 26,
+        "bbox": [
+          0,
+          24,
+          1916,
+          1076
+        ]
+      },
+      {
+        "project": "8 Camille/Reco - Gulli - UDPP 1",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1076 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 24,
+        "bbox": [
+          0,
+          0,
+          1916,
+          1072
+        ]
+      },
+      {
+        "project": "8 Camille/Reco - Gulli - UDPP 2",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1072 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 17,
+        "bbox": [
+          280,
+          4,
+          1916,
+          1072
+        ]
+      },
+      {
+        "project": "8 Camille/Reco - Gulli - UDPP 4",
+        "category": "tall_bottom",
+        "reason": "zone basse haute (1080 px), décor statique probable",
+        "outcome": "veto_correct",
+        "n_removed": 0,
+        "n_segments": 23,
+        "bbox": [
+          0,
+          0,
+          1916,
+          1076
+        ]
+      }
+    ],
+    "review_categories": {
+      "tall_bottom": {
+        "veto_correct": 21
+      },
+      "partial_width": {
+        "resolved": 7,
+        "persisted": 2
+      },
+      "top": {
+        "veto_correct": 16
+      },
+      "animated": {
+        "veto_correct": 7,
+        "resolved": 1
+      },
+      "logo": {
+        "veto_correct": 4
+      },
+      "changing_text": {
+        "veto_correct": 3
+      }
+    }
+  },
+  "a3": {
+    "counts": {
+      "review": 456,
+      "noop": 2150
+    },
+    "strict": {
+      "tp": 69,
+      "fp": 387,
+      "fn": 248,
+      "tn": 1902,
+      "precision": 15.1,
+      "recall": 21.8
+    },
+    "tolerant": {
+      "tp": 167,
+      "fp": 289,
+      "fn": 1218,
+      "tn": 932,
+      "precision": 36.6,
+      "recall": 12.1
+    },
+    "review_stats": {
+      "n": 456,
+      "keys": 69,
+      "static_strong": 96,
+      "structural": 2,
+      "none": 289,
+      "tolerant": 167,
+      "key_precision": 15.1,
+      "tolerant_precision": 36.6
+    },
+    "noop_stats": {
+      "n": 2150,
+      "keys": 248,
+      "static_strong": 949,
+      "structural": 21,
+      "none": 932,
+      "tolerant": 1218,
+      "key_precision": 11.5,
+      "tolerant_precision": 56.7
+    },
+    "amplitude_bins": {
+      "100-150": {
+        "static_reframe": 121,
+        "none": 43,
+        "structural": 2,
+        "tracking": 4,
+        "keyframe_other": 1
+      },
+      "150-250": {
+        "static_reframe": 82,
+        "none": 62,
+        "tracking": 16,
+        "keyframe_other": 4,
+        "structural": 1
+      },
+      "250-400": {
+        "tracking": 22,
+        "none": 29,
+        "static_reframe": 26,
+        "keyframe_other": 3
+      },
+      "400-700": {
+        "none": 12,
+        "tracking": 9,
+        "static_reframe": 7,
+        "keyframe_other": 3
+      },
+      "700+": {
+        "tracking": 7,
+        "static_reframe": 2
+      }
+    },
+    "candidate_bins": {
+      "2": {
+        "static_reframe": 163,
+        "none": 66,
+        "structural": 2,
+        "keyframe_other": 4,
+        "tracking": 6
+      },
+      "3": {
+        "static_reframe": 55,
+        "none": 49,
+        "keyframe_other": 3,
+        "tracking": 20,
+        "structural": 1
+      },
+      "4": {
+        "tracking": 17,
+        "none": 21,
+        "static_reframe": 11,
+        "keyframe_other": 2
+      },
+      "5": {
+        "none": 9,
+        "tracking": 3,
+        "static_reframe": 5,
+        "keyframe_other": 1
+      },
+      "6": {
+        "tracking": 12,
+        "static_reframe": 4,
+        "keyframe_other": 1,
+        "none": 1
+      }
+    },
+    "noop_reasons": {
+      "movement": {
+        "n": 2053,
+        "keys": 244
+      },
+      "short": {
+        "n": 97,
+        "keys": 4
+      }
+    },
+    "noop_amplitude": {
+      "<50": {
+        "n": 907,
+        "keys": 50
+      },
+      "200-400": {
+        "n": 167,
+        "keys": 71
+      },
+      "50-100": {
+        "n": 688,
+        "keys": 28
+      },
+      "100-200": {
+        "n": 339,
+        "keys": 69
+      },
+      "400+": {
+        "n": 49,
+        "keys": 30
+      }
+    },
+    "noop_gap": {
+      "50-70": {
+        "n": 169,
+        "keys": 50
+      },
+      "90-100": {
+        "n": 62,
+        "keys": 23
+      },
+      "<30": {
+        "n": 5,
+        "keys": 0
+      },
+      "70-90": {
+        "n": 181,
+        "keys": 63
+      },
+      "30-50": {
+        "n": 138,
+        "keys": 34
+      }
+    },
+    "correlation": {
+      "n": 69,
+      "median": 0.99,
+      "ge_06": 59
+    }
+  },
+  "a4": {
+    "n": 20,
+    "acted": 9,
+    "none": 11,
+    "strict_precision": 45.0,
+    "tolerant_precision": 80.0,
+    "veto_correct": 7,
+    "durations": {
+      "0.2-0.3": {
+        "none": 2,
+        "extend": 2
+      },
+      "<0.2": {
+        "extend": 2,
+        "none": 5
+      },
+      "0.4-0.5": {
+        "none": 3,
+        "split": 1,
+        "extend": 3
+      },
+      "0.3-0.4": {
+        "split": 1,
+        "none": 1
+      }
+    },
+    "events": {
+      "none": 11,
+      "extend": 7,
+      "split": 2
+    }
+  },
+  "a5_a6": {
+    "a5": {
+      "n": 17,
+      "covers": {
+        "true": 17
+      },
+      "projects": {
+        "62 Camille/SHORT_oléagineux": 17
+      }
+    },
+    "a6": {
+      "n": 1,
+      "actions": {
+        "apply": 1
+      },
+      "projects": {
+        "328 Camille/M6 - SDM - Leslie et Léo": 1
+      }
+    }
+  },
+  "timeline": {
+    "events": 177,
+    "types": {
+      "duplicate": 27,
+      "extend": 35,
+      "split": 89,
+      "overlap": 2,
+      "trim": 8,
+      "add": 15,
+      "mixed": 1
+    },
+    "projects_with_events": 47
+  },
+  "overlays": {
+    "projects_with_overlays": 55,
+    "layers": 72,
+    "types": {
+      "Footage": 71,
+      "Solid": 1
+    },
+    "covers_comp": 2,
+    "durations": {
+      "min": 3.0,
+      "max": 482.92
+    }
+  },
+  "exports": {
+    "n": 71,
+    "resolution": {
+      "1080x1920": 71
+    },
+    "fps": {
+      "25/1": 71
+    },
+    "barred_frac": {
+      "0.0": 67,
+      "0.013": 1,
+      "0.026": 1,
+      "0.164": 1,
+      "0.052": 1
+    },
+    "max_top": {
+      "0": 68,
+      "28": 1,
+      "2": 1,
+      "146": 1
+    },
+    "max_bottom": {
+      "0": 71
+    },
+    "max_left": {
+      "0": 69,
+      "82": 1,
+      "460": 1
+    },
+    "max_right": {
+      "0": 71
+    },
+    "top_anomalies": [
+      {
+        "project": "304 Camille/Il klaxonne et agresse les gendarmes car il les trouve trop lents !",
+        "max_top": "0",
+        "max_bottom": "0",
+        "max_left": "82",
+        "max_right": "0"
+      },
+      {
+        "project": "335 Camille/Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins",
+        "max_top": "28",
+        "max_bottom": "0",
+        "max_left": "0",
+        "max_right": "0"
+      },
+      {
+        "project": "335 Camille/Les Ch’tis font le shooting pour les flyers de leur soirée",
+        "max_top": "2",
+        "max_bottom": "0",
+        "max_left": "0",
+        "max_right": "0"
+      },
+      {
+        "project": "356 Camille/M6+ - Pretty Little Liars - Extrait 6 - La mort de Maya",
+        "max_top": "146",
+        "max_bottom": "0",
+        "max_left": "460",
+        "max_right": "0"
+      }
+    ]
+  }
+}

@@ -141,6 +141,22 @@ D-034, D-035).
 
 ## Dernière session
 
+- [2026-11-08] **Étude corpus GOOD et D-056** :
+  - 75 triplets `_9x16` / `_assist` / `_assist_GOOD`, 37 dossiers,
+    2 609 segments, 676 revues, 71 exports ; comparaison de la géométrie
+    projetée (chaîne de parents) et matching par source + intervalle, pas
+    par ID ;
+  - A1 : marge humaine médiane 1,0125, 51/65 ≤ 1,015, sur-zoom 1,04 de
+    2,7 % ; décision de passer la marge à 1,015 ;
+  - A2 : 5/5 apply conservés ; 9 bandes basses 37–45 % laissées en review,
+    bbox hors comp sur 324/326 segments ; seuil 0,50 → 0,35 avec OCR avant
+    le gate ;
+  - A3 : 69 TP keyframes sur 456 revues (15,1 %), 248 FN à gap ≥ 0,3 ;
+    reste review-only, tri par amplitude/clés, `gap < 0,7` en revue ;
+  - A4/A5/A6 inchangés (review/report-only, template SDM conservé) ;
+  - preuves et scripts dans `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/`,
+    rapport `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`.
+
 - [2026-11-07] **Gate OCR A2 (D-051, phase 3)** :
   - `PostConfig`/`PostOptions` : `a2_ocr` (défaut `false`), `a2_ocr_det`,
     `a2_ocr_rec`, `a2_ocr_onnxruntime` ; `A2Options` regroupe la marge et
@@ -632,6 +648,9 @@ D-034, D-035).
 - Post-traitement A5/A6 : exposer `review.json` en lecture seule dans l'UI,
   recalibrer A3/A4, traiter les références manquantes 179/287 (voir
   `docs/lots/LOT-9-POST-STEP8.md`).
+- Lot court D-056 : marge A1 1,015, seuil A2 0,35 avec OCR avant le gate,
+  tri A3 (amplitude/clés, `gap < 0,7` en revue) ; valider R2/R6 sur copies
+  avant toute activation.
 - Poursuivre les scénarios B/C décrits dans
   `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`, sans toucher à la production.
 - QA logos : faire relire et signer les 12 labels dev (`review_status = done`) ;

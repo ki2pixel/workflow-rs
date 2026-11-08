@@ -13,10 +13,16 @@
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
 - 505 tests unitaires, sans matériel.
+- **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
+  71 exports comparés en lecture seule. A1 : marge 1,04 → 1,015 (marge
+  humaine médiane 1,0125). A2 : seuil 0,50 → 0,35 avec OCR avant le gate
+  (9 bandes basses 37–45 % laissées en review). A3 : reste review-only,
+  trié par amplitude/clés (`gap < 0,7` en revue). A4/A5/A6 inchangés.
+  Preuves : `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
-  A1 reste séquentiel (~23,5 s). `a2_ocr` et `a2_logo_prior` restent
-  `false` jusqu'à validation humaine/client.
+  A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;
+  `a2_logo_prior` reste `false`.
 - **EffectCraft 0.22.0** : STEP8 réel sur copie temporaire de `54`
   (1/1 projet, `MS_BATCH_RESULT ok`), post STEP8 (`_assist`, audit `pass`)
   et ouverture du projet assisté par `effectcraft-cli --json info` validés.

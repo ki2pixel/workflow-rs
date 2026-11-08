@@ -128,6 +128,7 @@ Toute nouvelle décision durable suit la convention
 | [`etudes/ETUDE-STEP9-AGENTIQUE.md`](etudes/ETUDE-STEP9-AGENTIQUE.md) | Opportunité et faisabilité du post-STEP8 : recadrage 9:16, nettoyage, habillage, rendu, scénarios déterministe, QA agentique et co-monteur. | Référence |
 | [`etudes/SPIKE-STEP9-PROTOCOLE.md`](etudes/SPIKE-STEP9-PROTOCOLE.md) | Protocole de spike isolé, corpus, métriques, critères d'acceptation et d'arrêt. | Preuve |
 | [`etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`](etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md) | Benchmark des sept dépôts logos/sous-titres, diagnostic A2/QA sur le corpus Camille et architecture cible du gate OCR (D-051). | Référence |
+| [`etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`](etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md) | Étude comparative A1–A6 sur 75 triplets GOOD : matrices A3, validation export, règles de marge A1, seuil A2 et tri A3. | Référence |
 
 Ces documents ne décrivent pas la production courante : la décision D-029
 maintient la consolidation déterministe avant tout STEP9 agentique.

@@ -890,6 +890,61 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`.
 
+## 2026-11-08 — D-056 : réglage A1/A2/A3 issu du corpus GOOD
+
+- **Contexte** : 75 triplets `_9x16` / `_9x16_assist` / `_9x16_assist_GOOD`
+  (37 dossiers, 2 609 segments, 5 333 actions, 676 revues) comparés en
+  lecture seule, projet par projet, pour mesurer où le post-traitement A1–A6
+  converge avec le monteur et où il s'en écarte.
+- **Constats** :
+  1. A1 (65 `apply`) : la marge humaine médiane est **1,0125** ; **51/65**
+     segments sont ≤ 1,015 et **53/65** ≤ 1,02. La marge 1,04 sur-zoome donc
+     de **2,7 %** en médiane. **18/65** segments sont ensuite keyframés par
+     l'humain ; **56/65** ont un résidu géométrique ≤ 8 px et **68/71**
+     exports n'ont aucune barre haute. Sur le 305 (letterbox), le monteur
+     reste à 210 % quand A1 propose 218,9 %, sans bord noir dans les deux
+     cas (barre réelle 81 px, estimée 86).
+  2. A2 (5 `apply`) : les 5 sont conservés par le monteur. Les 9 revues
+     `partial_width` (37–45 %) correspondent à des bandeaux que l'humain
+     retire : bbox hors comp sur **324/326** segments. Le gate de largeur
+     0,50 s'exécute **avant** l'OCR.
+  3. A3 (456 revues) : **69 TP** keyframes, soit **15,1 %** de précision et
+     **21,8 %** de rappel (36,6 % / 12,1 % en lecture tolérante). Le suivi
+     proposé est bon (corrélation médiane 0,99, 59/69 ≥ 0,6) mais le gate
+     `gap < 0,3` rate **248 keyframes** ; 1 045 déplacements statiques forts
+     ne sont couverts qu'à 9,2 % et la recommandation STEP4 ne colle au
+     choix humain que dans 46 % des cas.
+  4. A4 : 20 revues, 9 actions, 11 `none` (80 % tolérant). A5 : 17/17
+     résolues par le recadrage humain. A6 : 1/1 template conservé.
+- **Décision** :
+  1. A1 : marge **1,015** (bornée 1,01–1,02), `coverage` et vetos conservés.
+     Différer A1 sur candidat A3 (≥ 4 clés ou amplitude ≥ 300 px avec
+     gap < 0,3) dans un second temps.
+  2. A2 : `BANNER_MIN_WIDTH` **0,35** pour les bandes basses persistantes,
+     avec OCR exécuté avant le gate ; conserver les vetos `tall_bottom`,
+     `top`, `logo` et `changing_text`.
+  3. A3 : reste **review-only** ; `noop` si amplitude < 250 px et ≤ 2 clés
+     candidates ; `gap < 0,7` en revue seulement pour une amplitude
+     ≥ 200 px ; pas de recadrage statique automatique.
+  4. A4 : review-only avec tag `flash probable` < 0,3 s ; A5 : report-only ;
+     A6 : inchangé.
+  5. Aucun code de production n'est modifié par cette étude : R1/R3/R5/R7/
+     R8/R9 forment un lot court, R2/R6 un lot de validation sur copies.
+- **Limites** : 4 exports manquants (305, 364, 86 extraits 3 et 4) ; le 305
+  est validé par rendu synthétique. Les hashes d'`audit.json` ne sont pas
+  exploitables (projets renommés/corrigés) : la validation est structurelle.
+  Le tracking `_ae.json` est incomplet (frames manquantes) et trois projets
+  présentent un écart review/post d'une unité (304, 322, 35), sans effet sur
+  les matrices.
+- **Validation** : `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md` et preuves
+  versionnées `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/` (21 images,
+  7 scripts, 3 jeux de données). Scan des 71 exports avec
+  `cropdetect=24:2:0` : 67/71 pleine frame, 4 anomalies ponctuelles
+  d'intro/transition.
+- **Références** : D-030, D-032, D-051, D-052, D-055 ;
+  `docs/lots/LOT-9-POST-STEP8.md` ;
+  `crates/workflow-steps/src/post/{a1,a2,a3,a4,a5,a6}.rs`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

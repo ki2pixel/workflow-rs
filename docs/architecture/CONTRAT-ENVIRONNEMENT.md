@@ -429,7 +429,9 @@ copié, STEP8 ignore la vidéo par son nom. Détail :
 Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
 opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes
 d'une même ligne, veto si le texte change et confirmation d'un bandeau
-stable. La preuve est ajoutée sous `details.ocr` dans `post.json` (champs
+stable. `a2_ocr_threads` règle les threads intra-op de chaque session
+(défaut 2, 8 dans `config/config.toml`) ; les deux sessions sont
+séquentielles. La preuve est ajoutée sous `details.ocr` dans `post.json` (champs
 additifs, schéma `post.json` inchangé) ; les bandeaux sombres restent en
 `review` avec `details.scale_target`. Les modèles sont configurables via
 `a2_ocr_det` et `a2_ocr_rec` (relatifs à `paths.models`), le runtime via

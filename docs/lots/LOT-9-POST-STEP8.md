@@ -103,12 +103,25 @@ bannière supprimée à 10/40/100 s. Les 11 cas synthétiques donnent 3 `apply`,
 Le gate est **opt-in** (`a2_ocr = false`) : sans flag, la décision A2 reste
 strictement géométrique et aucun modèle ONNX n'est ouvert. Quand il est
 activé, 12 timestamps uniformes sont lus sur le crop du candidat (marge de
-16 px sur les quatre côtés), PP-OCRv6 det/rec tourne en CPU (2 threads), et
-les boîtes d'une même ligne sont fusionnées avant l'agrégation. Le texte
-d'un seul caractère est ignoré.
+16 px sur les quatre côtés), PP-OCRv6 det/rec tourne en CPU avec
+`a2_ocr_threads` (défaut 2, config de production 8), et les boîtes d'une
+même ligne sont fusionnées avant l'agrégation. Le texte d'un seul caractère
+est ignoré. Mesure sur `54` (12 échantillons) : 23,6 s à 2 threads, 13,2 s
+à 8, 12,5 s à 12 ; A1 reste à ~23,5 s, donc 8 est le compromis retenu.
 
 Features : `text_persistence` (échantillons avec texte / total),
 `dominant_ratio`, `y_drift_px`, `score`, `overlap`, `coverage_x`.
+
+**Activation.** Ne pas activer `a2_ocr` et `a2_logo_prior` ensemble en
+production. `a2_ocr` attend la validation humaine des quatre cas
+(`54`, `58`, `40` ×2) et la présence des modèles sous `paths.models/qa/` ;
+sans eux, le gate journalise un avertissement et retombe sur la décision
+géométrique. Séquence retenue : staging avec `a2_ocr = true`,
+`a2_logo_prior = false`, `a2_ocr_threads = 8`, comparaison des `post.json`
+et des audits sur un lot représentatif, validation client, puis activation
+production. `a2_logo_prior` seul ne change pas la décision : il annote le
+logo et peut être activé en observation après validation des phases B/C,
+mais reste opt-in.
 
 Décision :
 
@@ -150,10 +163,11 @@ complet pour `54`/`58`) :
 - `sub_fast` synthétique (sous-titres changeants) : `review` « texte
   changeant (dominance 25 %) », aucun recadrage.
 
-Coût mesuré : 15–25 s par projet sur le Threadripper. Modèles absents ou
-OCR en échec → warning et retour à la décision A2 actuelle, sans échec du
-post. Les fichiers `PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx`
-doivent être copiés sous `paths.models/qa/`, ou renseignés en absolu.
+Coût mesuré : 15–25 s par projet avec 2 threads, 13,2 s avec 8 threads sur
+le Threadripper. Modèles absents ou OCR en échec → warning et retour à la
+décision A2 actuelle, sans échec du post. Les fichiers
+`PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx` doivent être copiés
+sous `paths.models/qa/`, ou renseignés en absolu.
 
 ### Registre spatial des logos source (D-052, phases A/B, 2026-11-08)
 
@@ -330,6 +344,7 @@ a2_margin = 1.05
 a2_ocr = false
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
+a2_ocr_threads = 8
 # a2_ocr_onnxruntime = "/chemin/vers/libonnxruntime.so"
 # Registre spatial des logos source (D-052), annotation seule.
 a2_logo_prior = false
@@ -422,7 +437,8 @@ GOOD sur trois, donc la comparaison y est partielle.
 - A3/A4 restent en revue ; aucun keyframe ni cut n'est appliqué.
 - A1 ne couvre pas les bords non noirs ni les recadrages sémantiques ; ces cas
   restent en `review`.
-- A2 OCR est **opt-in** (`a2_ocr = false`) et coûte 15–25 s par projet ; il
+- A2 OCR est **opt-in** (`a2_ocr = false`) et coûte 15–25 s par projet avec
+  2 threads, 13,2 s avec 8 ; il
   ne couvre que le texte, pas les logos purement visuels. Les bandeaux
   sombres restent en `review` (niveau 1) et les candidats étroits ne sont
   jamais recadrés.

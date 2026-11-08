@@ -759,9 +759,10 @@ Deux défauts ont été trouvés et corrigés pendant cette validation :
    (« UNDOC », 60 px contre 38 px) ne doit pas être fusionnée avec la
    bannière. La fusion exige un rapport de hauteur ≤ 1,35.
 
-Le coût mesuré est de 15–25 s par projet (12 frames, 2 threads), sans
-verrou matériel. Modèles absents ou OCR en échec : warning et décision A2
-actuelle, jamais d'échec du post. La phase 3 est couverte par 26 tests
+Le coût mesuré est de 15–25 s par projet avec 2 threads, 13,2 s avec 8
+et 12,5 s avec 12 sur `54` (12 frames), sans verrou matériel. Modèles
+absents ou OCR en échec : warning et décision A2 actuelle, jamais d'échec
+du post. La phase 3 est couverte par 26 tests
 `post::a2` (features, seuils, veto, garde-fous, fusion de lignes).
 
 ### 6.4 QA v1.3 — clustering par détection
@@ -1189,8 +1190,8 @@ sans recadrage automatique.
 
 - faire valider humainement les quatre cas du corpus (54, 58, 40 ×2) avant
   d'activer `a2_ocr` en production ; le flag reste `false` par défaut ;
-- mesurer le coût du gate sur un lot complet (15–25 s par projet mesuré) et
-  vérifier le timeout STEP8 ;
+- mesurer le coût du gate sur un lot complet (15–25 s par projet à 2
+  threads, 13,2 s à 8) et vérifier le timeout STEP8 ;
 - décider du niveau 2 des bandeaux sombres et du volet logo avec le client ;
   les phases A, B et C du registre spatial sont implémentées mais restent
   opt-in (`a2_logo_prior = false`, `--source-logo`, `--source-logo-visual`) ;

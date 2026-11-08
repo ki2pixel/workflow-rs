@@ -779,6 +779,46 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/overlay.rs`,
   `scripts/import-source-logos.py`.
 
+## 2026-11-08 — D-053 : threads OCR A2 configurables et compatibilité EffectCraft 0.22.0
+
+- **Contexte** : le gate A2 était figé à deux threads intra-op alors que la
+  station dispose de 24 threads logiques (Ryzen Threadripper 1920X,
+  12 cœurs). A1 reste séquentiel et devient le principal coût du post sur
+  `54`. EffectCraft 0.22.0 est installé et doit rester compatible avec le
+  driver STEP8.
+- **Décision** :
+  1. `steps.step8.post.a2_ocr_threads` borne chaque session PP-OCRv6
+     det/rec (défaut 2, `config/config.toml` = 8). Les deux sessions sont
+     séquentielles, contrairement au mode lot QA qui ouvre deux sessions
+     par worker.
+  2. Mesure sur `54` (12 échantillons) : 2 threads → OCR 23,6 s / post
+     55,0 s ; 8 threads → 13,2 s / 44,1 s ; 12 threads → 12,5 s / 43,6 s.
+     8 est retenu : 12 n'apporte que ~5 % et réduit la marge pour
+     ffmpeg/A1 et le serveur.
+  3. Aucune parallélisation de A1 n'est activée : `cropdetect` reste
+     séquentiel par segment (~23,5 s sur `54`). Un pool borné est une piste
+     mesurable, pas une décision.
+  4. `a2_ocr` et `a2_logo_prior` restent à `false` : activation après
+     validation humaine/client. `a2_logo_prior` seul annote sans changer la
+     décision.
+- **Validation EffectCraft 0.22.0** : `effectcraft-cli --version` renvoie
+  `0.22.0` ; le contrat `prefs.set` + `file.runScript` et la forme JSON
+  `[{"command":...,"result":...}]` sont inchangés. STEP8 réel sur une copie
+  temporaire de `54` : 1/1 projet, `MS_BATCH_RESULT ok`, projet enregistré ;
+  post STEP8 : `_assist.ecproj` produit, `audit = pass` ;
+  `effectcraft-cli --project ..._assist.ecproj --json info` charge la
+  composition 1080×1920 (57 calques). Aucun changement STEP8 nécessaire.
+- **Limites** : les PP-OCRv6 ne sont pas présents sous
+  `assets/models/qa/` sur cette machine ; la validation a utilisé
+  `/media/kidpixel/WORK/qa-poc/models`. `a2_ocr = true` sans modèles
+  journalise un avertissement et retombe sur la décision géométrique. Le
+  post reste séquentiel par projet ; seul le QA batch expose
+  `--workers`/`--intra-threads`.
+- **Références** : `crates/workflow-steps/src/post/a2.rs`,
+  `crates/workflow-steps/src/post/run.rs`,
+  `crates/workflow-core/src/config.rs`, `config/config.toml`,
+  `docs/lots/LOT-9-POST-STEP8.md`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

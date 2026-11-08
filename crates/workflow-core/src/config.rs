@@ -1011,6 +1011,9 @@ pub struct PostConfig {
     pub a2_ocr_rec: PathBuf,
     /// Bibliothèque ONNX Runtime explicite ; vide = runtime système.
     pub a2_ocr_onnxruntime: Option<PathBuf>,
+    /// Threads intra-op ONNX par session det/rec du gate A2. Les deux
+    /// sessions sont séquentielles ; cette valeur borne chacune d'elles.
+    pub a2_ocr_threads: usize,
     /// Registre spatial des logos de programme (D-052). Désactivé par défaut :
     /// la décision A2 reste strictement inchangée. Activé, il annote le logo
     /// et retire son texte du groupe OCR dominant.
@@ -1037,6 +1040,7 @@ impl Default for PostConfig {
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
             a2_ocr_onnxruntime: None,
+            a2_ocr_threads: 2,
             a2_logo_prior: false,
             a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
         }

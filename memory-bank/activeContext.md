@@ -42,6 +42,16 @@ final, où le logo social est ajouté manuellement en overlay. Activation
 production toujours soumise à validation client ; phase D optionnelle
 (DINOv2 résiduel, confirmation A2) non implémentée.
 
+**Threads OCR A2 et compatibilité EffectCraft (2026-11-08, D-053).**
+`steps.step8.post.a2_ocr_threads` borne chaque session PP-OCRv6 det/rec
+(défaut 2, `config/config.toml` = 8). Sur `54` : OCR 23,6 s à 2 threads,
+13,2 s à 8, 12,5 s à 12 ; A1 reste le goulot à ~23,5 s. `a2_ocr` et
+`a2_logo_prior` restent `false` jusqu'à validation humaine/client ; les
+modèles PP-OCRv6 ne sont pas présents sous `assets/models/qa/`. EffectCraft
+0.22.0 est compatible : STEP8 réel sur copie temporaire de `54` (1/1 projet,
+`MS_BATCH_RESULT ok`), post STEP8 (`_assist`, audit `pass`) et ouverture du
+projet assisté par `effectcraft-cli --json info`.
+
 **QA 1.3.0 — clustering OCR (2026-11-07, D-051).** La phase 1 est
 implémentée : `qa/ocr.rs` regroupe les détections par **boîte stable** (le
 texte normalisé sert à la dominance), ajoute `DefectType::FixedOverlay`, le
@@ -123,7 +133,8 @@ D-034, D-035).
   - `PostConfig`/`PostOptions` : `a2_ocr` (défaut `false`), `a2_ocr_det`,
     `a2_ocr_rec`, `a2_ocr_onnxruntime` ; `A2Options` regroupe la marge et
     l'OCR, `decide_a2` garde 7 arguments ;
-  - 12 frames, crop 16 px sur quatre côtés, PP-OCRv6 2 threads, fusion des
+  - 12 frames, crop 16 px sur quatre côtés, PP-OCRv6 avec
+    `a2_ocr_threads` (défaut 2, production 8), fusion des
     boîtes d'une même ligne (rapport de hauteur ≤ 1,35, écart borné), texte
     d'au moins deux caractères ;
   - arbre : garde-fous durs d'abord, texte trop rare → décision actuelle,

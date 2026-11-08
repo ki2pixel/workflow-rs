@@ -48,6 +48,8 @@ pub struct PostOptions {
     pub a2_ocr_det: PathBuf,
     pub a2_ocr_rec: PathBuf,
     pub a2_ocr_onnxruntime: Option<PathBuf>,
+    /// Threads intra-op ONNX par session OCR A2 (det et rec séparément).
+    pub a2_ocr_threads: usize,
     /// Registre spatial des logos source (D-052), annotation et exclusion OCR.
     pub a2_logo_prior: bool,
     pub a2_logo_catalog: PathBuf,
@@ -77,6 +79,7 @@ impl Default for PostOptions {
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
             a2_ocr_onnxruntime: None,
+            a2_ocr_threads: a2::A2_OCR_DEFAULT_THREADS,
             a2_logo_prior: false,
             a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
             report_only: false,
@@ -105,6 +108,7 @@ impl PostOptions {
             a2_ocr_det: resolve_models_path(&config.paths.models, &post.a2_ocr_det),
             a2_ocr_rec: resolve_models_path(&config.paths.models, &post.a2_ocr_rec),
             a2_ocr_onnxruntime: post.a2_ocr_onnxruntime.clone(),
+            a2_ocr_threads: post.a2_ocr_threads.max(1),
             a2_logo_prior: post.a2_logo_prior,
             a2_logo_catalog: resolve_models_path(&config.paths.models, &post.a2_logo_catalog),
             report_only: false,
@@ -537,6 +541,7 @@ pub fn run_post_project(
                 det_model: options.a2_ocr_det.clone(),
                 rec_model: options.a2_ocr_rec.clone(),
                 onnxruntime: options.a2_ocr_onnxruntime.clone(),
+                intra_threads: options.a2_ocr_threads.max(1),
             }),
             logo_prior: source_logo_prior,
             overlay: overlay_mask,

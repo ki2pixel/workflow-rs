@@ -54,7 +54,8 @@ const A2_OCR_Y_DRIFT_1080: f64 = 12.0;
 const A2_OCR_SCORE: f64 = 0.80;
 const A2_OCR_OVERLAP: f64 = 0.50;
 const A2_OCR_COVERAGE_X: f64 = 0.25;
-const A2_OCR_INTRA_THREADS: usize = 2;
+/// Nombre de threads intra-op par défaut si `a2_ocr_threads` n'est pas fourni.
+pub const A2_OCR_DEFAULT_THREADS: usize = 2;
 /// L'override OCR de la géométrie reste borné : au-delà de deux fois
 /// `GEOM_STD`, la hauteur du candidat n'est plus fiable pour la formule de
 /// scale, même si le texte est stable.
@@ -67,6 +68,9 @@ pub struct A2OcrOptions {
     pub det_model: PathBuf,
     pub rec_model: PathBuf,
     pub onnxruntime: Option<PathBuf>,
+    /// Threads intra-op par session det/rec. Les deux sessions tournent
+    /// séquentiellement, pas en parallèle.
+    pub intra_threads: usize,
 }
 
 /// Politique A2 : marge de scale et gate OCR optionnel.
@@ -1157,7 +1161,7 @@ fn collect_ocr_evidence(
     let mut det = DetEngine::load(
         &options.det_model,
         options.onnxruntime.as_deref(),
-        Some(A2_OCR_INTRA_THREADS),
+        Some(options.intra_threads.max(1)),
     )
     .with_context(|| {
         format!(
@@ -1168,7 +1172,7 @@ fn collect_ocr_evidence(
     let mut rec = RecEngine::load(
         &options.rec_model,
         options.onnxruntime.as_deref(),
-        Some(A2_OCR_INTRA_THREADS),
+        Some(options.intra_threads.max(1)),
     )
     .with_context(|| {
         format!(

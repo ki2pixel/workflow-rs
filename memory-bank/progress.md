@@ -13,6 +13,13 @@
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
 - 505 tests unitaires, sans matériel.
+- **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
+  production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
+  A1 reste séquentiel (~23,5 s). `a2_ocr` et `a2_logo_prior` restent
+  `false` jusqu'à validation humaine/client.
+- **EffectCraft 0.22.0** : STEP8 réel sur copie temporaire de `54`
+  (1/1 projet, `MS_BATCH_RESULT ok`), post STEP8 (`_assist`, audit `pass`)
+  et ouverture du projet assisté par `effectcraft-cli --json info` validés.
 - **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-048)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
@@ -56,7 +63,7 @@
   proposé, garde-fous durs inchangés. `54` reste `apply` 200,8 %, `58`
   passe à `apply` 210,0 %, `40` restent `review` avec `details.ocr`,
   `sub_fast` est vétoé (dominance 25 %). Projets assistés : diffs limitées
-  à `Scale`, audits `pass`. Coût 15–25 s/projet.
+  à `Scale`, audits `pass`. Coût 15–25 s/projet à 2 threads, 13,2 s à 8.
 - **Registre spatial des logos source (D-052, phases A/B/C, 2026-11-08)** :
   catalogue versionné de 29 émissions (28 bas-gauche, Piquantes ! haut-gauche),
   15 clean feeds et 5 émissions sans logo ; crops RGBA externes. A2 annote

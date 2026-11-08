@@ -143,6 +143,27 @@ D-034, D-035).
 
 ## Dernière session
 
+- [2026-11-08] **Étude `vapoursynth-letterbox` pour A1 et D-057** :
+  - dépôt `Akatmks/vapoursynth-letterbox` (commit `ac274fa`) analysé en
+    lecture seule : EWMA 5σ (`alpha = 0,05`, plancher 6,375 niveaux à
+    8 bits), masque ExKirsch 5×5, `dynamic_ref_thr = 2/3`, snap
+    `permanent` à ±1 px, `clean_letterbox` hors périmètre ;
+  - prototype Python dans `docs/etudes/ETUDE-VSLETTERBOX-A1/` : 305 seg 1
+    mesuré à 81/78 px (actif 921, scale 208,5 % ; 211,6 % avec 1,015)
+    contre 86/82 px (actif 912, 210,5 % ; 213,7 % avec 1,015) pour
+    `cropdetect=24:16:0`, choix humain 210,0 % ;
+  - 304 seg 9 : faux haut 642 px rejeté sur les frames à ciel lisse, mais
+    2/5 frames à 2 fps produisent un faux `top = 935` (bandeau bas) ; un
+    p10 naïf donnerait 68 px, d'où le clustering temporel ;
+  - 304 seg 34 : barre sombre non détectée (`top = 0`) alors qu'A1 applique
+    211,5 % ; A3 reste le filet ; 356 seg 2 : `noop` natif correct ;
+  - tests synthétiques : texte fragmenté rejeté jusqu'à 80 % de largeur,
+    aplat ≥ 70 % et nuage large acceptés à tort ;
+  - décision D-057 : pas d'intégration VapourSynth, spike natif Rust
+    opt-in (`a1_detector = "native"`), `cropdetect` par défaut, contrat A1
+    inchangé ; rapport `docs/etudes/ETUDE-VSLETTERBOX-A1.md`, ADR
+    `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`.
+
 - [2026-11-08] **Catalogue D-052 étendu (30/21/9)** :
   - 30ᵉ émission *Les Reines de la Route* (6ter, `bottom_left`, bbox
     `[99, 848, 315, 1022]`, crop `Les_Reines_de_la_Route/crop.png`,

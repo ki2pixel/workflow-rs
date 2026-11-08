@@ -87,6 +87,13 @@ Validation historique (marge 1,04, avant D-056) : 268 → 15 segments à
 mêmes hauteurs actives ; les compensations Y sont à remesurer lors du prochain
 run de validation. Les ancres restent identiques au brut.
 
+D-057 (2026-11-08) : l'étude du détecteur `vapoursynth-letterbox` conclut à
+un **spike natif opt-in** (`a1_detector = "native"`), pas à une intégration
+VapourSynth. `cropdetect` reste le détecteur par défaut et tous les vetos
+ci-dessus sont conservés. Le futur détecteur devra utiliser un clustering
+temporel, pas le p10 actuel, pour agréger ses mesures. Rapport :
+`docs/etudes/ETUDE-VSLETTERBOX-A1.md`.
+
 ## A2 — bannière basse
 
 - Médiane temporelle à 1 fps sur une miniature 480 px de large ; bandes

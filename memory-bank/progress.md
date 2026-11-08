@@ -24,6 +24,17 @@
   utiles, aucun `apply`). Les deux restent opt-in.
   Preuves : `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/` ;
   mise en œuvre : `docs/lots/LOT-9-POST-STEP8.md`.
+- **Étude `vapoursynth-letterbox` pour A1 (D-057, 2026-11-08)** : dépôt
+  `Akatmks/vapoursynth-letterbox` (commit `ac274fa`) analysé en lecture
+  seule. EWMA 5σ et validation de contour retenus pour un spike natif
+  opt-in ; 305 seg 1 mesuré à 81/78 px contre 86/82 px pour
+  `cropdetect=24:16:0` (211,6 % vs 213,7 % avec la marge 1,015, humain
+  210,0 %). Le masque Kirsch seul ne rejette ni un aplat large ni un ciel
+  nuageux ; le 304 seg 9 produit encore un faux `top=935` sur 2/5 frames.
+  Décision : pas d'intégration VapourSynth, `cropdetect` reste le défaut,
+  clustering temporel requis pour le natif. Rapport :
+  `docs/etudes/ETUDE-VSLETTERBOX-A1.md` ; ADR :
+  `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

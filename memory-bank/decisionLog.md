@@ -904,6 +904,63 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`.
 
+## 2026-11-08 — D-057 : détecteur de letterbox A1 natif opt-in
+
+- **Contexte** : étude du dépôt `Akatmks/vapoursynth-letterbox` (commit
+  `ac274fa`, 13 août 2026) pour remplacer ou compléter
+  `cropdetect=24:16:0` dans A1. Le dépôt combine un scan ligne à ligne, une
+  EWMA de Tony Finch (`alpha = 0,05`, seuil `μ + 5 × max(σ, 0,005)`) et une
+  validation par masque de contours ExKirsch 5×5 (`dynamic_ref_thr = 2/3`).
+- **Constats** :
+  1. L'EWMA rejette le faux ciel nocturne lent du 304 seg 9 (haut 642 px →
+     `top = 0` sur les frames à ciel lisse) ; le scan 1 px mesure 81/78 px
+     sur le 305 seg 1 contre 86/82 px pour `cropdetect=24:16:0`, soit 9 px
+     de hauteur active et ~2,1 points de scale. Avec la marge D-056, le 305
+     passe de 213,7 % (A1 actuel) à 211,6 % (natif), pour un choix humain à
+     210,0 %.
+  2. Le masque ExKirsch seul ne rejette ni un bandeau bas large ni un ciel
+     nuageux large : sur le 304 seg 9 à 2 fps, 2 frames sur 5 produisent un
+     faux `top = 935` (bandeau) ; les tests synthétiques montrent qu'un aplat
+     de ≥ ~70 % de largeur passe le seuil 2/3, alors qu'un texte fragmenté
+     est rejeté.
+  3. Le dépôt est par frame : pas d'agrégation, pas de symétrie, pas de
+     décision. Le magnétisme `permanent` impose une barre fournie par
+     l'utilisateur (détection au-dessus, tolérance 1 px vers le bas) ; ce
+     n'est pas un anti-jitter temporel.
+     `clean_letterbox`, le deringing, `fullblack_thr` et
+     `_VSLETTERBOX_AREA_MULTIPLIER` sont des garde-fous de nettoyage, hors
+     A1.
+  4. Le 304 seg 34 (barre sombre à bord faible) n'est pas détecté par le
+     prototype (`top = 0`) alors qu'A1 applique 211,5 % ; A3 doit rester le
+     filet pour les keyframes.
+- **Décision** :
+  1. Ne pas intégrer le plugin C++, le wrapper Python, `vs-jetpack`,
+     `vsmasktools` ni `clean_letterbox`.
+  2. Expérimenter un détecteur natif Rust **opt-in**
+     (`a1_detector = "native"`) : EWMA 5σ, Sobel Y 3×3 ciblé sur les lignes
+     candidates, couverture de colonnes et clustering temporel
+     (`top`, `bottom`) avec cluster dominant ≥ 60 %, sinon `review`.
+  3. Conserver `cropdetect` par défaut et tous les vetos A1 (keyframes,
+     asymétrie, `barred_frac`, `scale > 300 %`, `Position Y > 600`,
+     couverture, différé A3). Ne jamais passer les mesures natives brutes au
+     p10 actuel.
+  4. Préserver le contrat `apply`/`review`/`noop`, `scale`, `Position Y`,
+     `coverage`, `confidence` ; clés additives seulement, schéma `post.json`
+     inchangé.
+  5. Aucun code de production modifié par l'étude ; le spike est hors
+     production, en lecture seule sur le corpus.
+- **Validation** : `docs/etudes/ETUDE-VSLETTERBOX-A1.md`, scripts et
+  résultats `docs/etudes/ETUDE-VSLETTERBOX-A1/` ; ADR
+  `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`. Mesures 304 seg 9,
+  305 seg 1/9/17, 304 seg 34, 356 seg 2, tests synthétiques
+  texte/aplat/ciel/contraste.
+- **Limites** : prototype Python approximatif, pas une exécution
+  VapourSynth ; échantillon restreint ; images synthétiques non compressées ;
+  `cropdetect=24:2:0` est une référence à 2 px, pas une vérité manuelle.
+- **Références** : D-056, `docs/lots/LOT-9-POST-STEP8.md`,
+  `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`,
+  `crates/workflow-steps/src/post/{a1,detect}.rs`.
+
 ## 2026-11-08 — D-056 : réglage A1/A2/A3 issu du corpus GOOD
 
 - **Contexte** : 75 triplets `_9x16` / `_9x16_assist` / `_9x16_assist_GOOD`

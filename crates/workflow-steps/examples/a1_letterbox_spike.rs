@@ -51,6 +51,10 @@ const INTERMITTENT_DELTA: i64 = 24;
 const OUTLIER_FRAC: f64 = 0.10;
 const DEFAULT_EDGE_THRESHOLD: f32 = 32.0;
 const DEFAULT_RUNS: usize = 3;
+/// Seuil de couverture relaxé pour une barre très sombre (moyenne < 20/255).
+/// `REF_THR` désactive la relaxation.
+const DARK_COVERAGE: f64 = 0.45;
+const DARK_LUMA: f32 = 20.0;
 
 const V305: &str = "305 Camille/docs/6ter - LRDRLD -  Chauffeuse poids lourd et enceinte.mp4";
 const V304: &str = "304 Camille/docs/Cette voiture percute une maison !.mp4";
@@ -175,6 +179,15 @@ const FIXTURES: &[Fixture] = &[
     },
 ];
 
+#[derive(Debug, Clone, Copy)]
+struct NativeConfig {
+    edge_threshold: f32,
+    /// Seuil de couverture pour les barres très sombres ; `REF_THR` désactive.
+    dark_coverage: f64,
+    /// Luminance moyenne (0–255) sous laquelle une barre est « très sombre ».
+    dark_luma: f32,
+}
+
 #[derive(Debug, Clone)]
 struct SampleSpec {
     start: f64,
@@ -184,6 +197,10 @@ struct SampleSpec {
     height: usize,
     mode: PreMode,
     edge_threshold: f32,
+    /// Seuil de couverture pour les barres très sombres ; `REF_THR` désactive.
+    dark_coverage: f64,
+    /// Luminance moyenne (0–255) sous laquelle une barre est « très sombre ».
+    dark_luma: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -418,6 +435,8 @@ fn main() -> Result<()> {
     let mut out = PathBuf::from("/tmp/opencode/a1-letterbox-spike");
     let mut pre_modes = vec![PreMode::Gray, PreMode::Chroma];
     let mut edge_threshold = DEFAULT_EDGE_THRESHOLD;
+    let mut dark_coverage = REF_THR;
+    let mut dark_luma = DARK_LUMA;
     let mut runs = DEFAULT_RUNS;
     let mut only: Option<String> = None;
     let mut manifest: Option<PathBuf> = None;
@@ -450,6 +469,22 @@ fn main() -> Result<()> {
                     .parse()
                     .context("--edge-threshold invalide")?;
             }
+            "--dark-coverage" => {
+                index += 1;
+                dark_coverage = args
+                    .get(index)
+                    .context("--dark-coverage sans valeur")?
+                    .parse()
+                    .context("--dark-coverage invalide")?;
+            }
+            "--dark-luma" => {
+                index += 1;
+                dark_luma = args
+                    .get(index)
+                    .context("--dark-luma sans valeur")?
+                    .parse()
+                    .context("--dark-luma invalide")?;
+            }
             "--runs" => {
                 index += 1;
                 runs = args
@@ -472,7 +507,12 @@ fn main() -> Result<()> {
                 println!(
                     "Usage: a1_letterbox_spike [--corpus DIR] [--out DIR] \
                      [--pre gray|chroma|both] [--edge-threshold N] [--runs N] \
-                     [--fixture NAME] [--manifest FILE]"
+                     [--dark-coverage N] [--dark-luma N] \
+                     [--fixture NAME] [--manifest FILE]\n\
+                     --dark-coverage : seuil de couverture des barres sombres \
+                     (défaut désactivé ; candidat {DARK_COVERAGE})\n\
+                     --dark-luma : luminance moyenne 0–255 d'une barre sombre \
+                     (défaut {DARK_LUMA})"
                 );
                 return Ok(());
             }
@@ -493,7 +533,18 @@ fn main() -> Result<()> {
     if runs == 0 {
         bail!("--runs doit être ≥ 1");
     }
+    if !(0.0..=1.0).contains(&dark_coverage) {
+        bail!("--dark-coverage doit être dans [0, 1]");
+    }
+    if !(0.0..=255.0).contains(&dark_luma) {
+        bail!("--dark-luma doit être dans [0, 255]");
+    }
     fs::create_dir_all(&out).with_context(|| format!("création de {}", out.display()))?;
+    let native = NativeConfig {
+        edge_threshold,
+        dark_coverage,
+        dark_luma,
+    };
 
     let ffmpeg = std::env::var("FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
     let ffprobe = std::env::var("FFPROBE").unwrap_or_else(|_| "ffprobe".into());
@@ -507,14 +558,7 @@ fn main() -> Result<()> {
         if pre_modes.len() != 1 || pre_modes[0] != PreMode::Gray {
             bail!("--manifest exige --pre gray (candidat A1)");
         }
-        run_manifest(
-            &ffmpeg,
-            &ffprobe,
-            &manifest_path,
-            &out,
-            runs,
-            edge_threshold,
-        )?;
+        run_manifest(&ffmpeg, &ffprobe, &manifest_path, &out, runs, native)?;
         return Ok(());
     }
 
@@ -548,7 +592,9 @@ fn main() -> Result<()> {
                 width: specs.width as usize,
                 height: specs.height as usize,
                 mode: *mode,
-                edge_threshold,
+                edge_threshold: native.edge_threshold,
+                dark_coverage: native.dark_coverage,
+                dark_luma: native.dark_luma,
             };
             eprintln!(
                 "spike {} [{}] {}x{} @ {:.3} fps…",
@@ -589,7 +635,9 @@ fn main() -> Result<()> {
         "spike": "a1_letterbox_spike",
         "decision": "D-057",
         "corpus": corpus.display().to_string(),
-        "edge_threshold": edge_threshold,
+        "edge_threshold": native.edge_threshold,
+        "dark_coverage": native.dark_coverage,
+        "dark_luma": native.dark_luma,
         "min_coverage": REF_THR,
         "cluster_tol_px": CLUSTER_TOL,
         "cluster_min_frac": CLUSTER_MIN_FRAC,
@@ -600,7 +648,7 @@ fn main() -> Result<()> {
     fs::write(&json_path, serde_json::to_string_pretty(&report_json)?)
         .with_context(|| format!("écriture de {}", json_path.display()))?;
 
-    let markdown = render_markdown(&reports, edge_threshold, runs);
+    let markdown = render_markdown(&reports, native, runs);
     let md_path = out.join("report.md");
     fs::write(&md_path, markdown).with_context(|| format!("écriture de {}", md_path.display()))?;
 
@@ -615,7 +663,7 @@ fn run_manifest(
     manifest: &Path,
     out: &Path,
     runs: usize,
-    edge_threshold: f32,
+    native: NativeConfig,
 ) -> Result<()> {
     let payload = fs::read_to_string(manifest)
         .with_context(|| format!("lecture du manifeste {}", manifest.display()))?;
@@ -650,7 +698,9 @@ fn run_manifest(
             width: width as usize,
             height: height as usize,
             mode: PreMode::Gray,
-            edge_threshold,
+            edge_threshold: native.edge_threshold,
+            dark_coverage: native.dark_coverage,
+            dark_luma: native.dark_luma,
         };
         let (frames, timing) = measure_native(ffmpeg, &entry.video, &sample, runs)?;
         let clusters = cluster_frames(&frames);
@@ -1026,8 +1076,9 @@ fn scan_top(pre: &[f32], means: &[f64], sample: &SampleSpec) -> Boundary {
     let mut rejected = Vec::new();
     for (y, value) in means.iter().enumerate() {
         if let Some(mean) = stats.trigger(*value) {
+            let threshold = coverage_threshold(means, y, sample, true);
             let (coverage, longest_run) = edge_coverage(pre, sample, y, sample.edge_threshold);
-            if coverage >= REF_THR {
+            if coverage >= threshold {
                 return Boundary {
                     row: y as u32,
                     coverage,
@@ -1060,8 +1111,9 @@ fn scan_bottom(pre: &[f32], means: &[f64], sample: &SampleSpec) -> Boundary {
     for y in (0..means.len()).rev() {
         let value = means[y];
         if let Some(mean) = stats.trigger(value) {
+            let threshold = coverage_threshold(means, y, sample, false);
             let (coverage, longest_run) = edge_coverage(pre, sample, y, sample.edge_threshold);
-            if coverage >= REF_THR {
+            if coverage >= threshold {
                 return Boundary {
                     row: y as u32,
                     coverage,
@@ -1113,6 +1165,33 @@ fn edge_coverage(pre: &[f32], sample: &SampleSpec, y: usize, threshold: f32) -> 
         }
     }
     (hits as f64 / width as f64, longest_run)
+}
+
+/// Seuil de couverture applicable à la ligne `y`.
+///
+/// Une barre est considérée « très sombre » quand la moyenne des quatre lignes
+/// situées côté barre est inférieure à `dark_luma` (0–255). On relaxe alors la
+/// couverture à `dark_coverage` (candidat 0,45) au lieu de `REF_THR` (2/3).
+/// Le ciel nocturne du 304 seg 9 n'est pas un barreau uniforme : ses lignes
+/// restent au-dessus du seuil ou leur couverture reste sous 0,45.
+fn coverage_threshold(means: &[f64], y: usize, sample: &SampleSpec, top: bool) -> f64 {
+    if sample.dark_coverage >= REF_THR {
+        return REF_THR;
+    }
+    let (start, end) = if top {
+        (y.saturating_sub(4), y)
+    } else {
+        ((y + 1).min(means.len()), (y + 5).min(means.len()))
+    };
+    if start >= end {
+        return REF_THR;
+    }
+    let mean_luma = means[start..end].iter().sum::<f64>() / (end - start) as f64 * 255.0;
+    if mean_luma < sample.dark_luma as f64 {
+        sample.dark_coverage
+    } else {
+        REF_THR
+    }
 }
 
 fn cluster_frames(frames: &[FrameMeasure]) -> Vec<Cluster> {
@@ -1364,7 +1443,7 @@ fn median(values: &mut [f64]) -> f64 {
     values[values.len() / 2]
 }
 
-fn render_markdown(reports: &[FixtureReport], edge_threshold: f32, runs: usize) -> String {
+fn render_markdown(reports: &[FixtureReport], native: NativeConfig, runs: usize) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "# Spike A1 — détecteur natif (D-057)\n");
     let _ = writeln!(
@@ -1374,11 +1453,21 @@ fn render_markdown(reports: &[FixtureReport], edge_threshold: f32, runs: usize) 
          ≥ {:.3}, seuil de contour {:.0}/1020, clustering ±{} px avec cluster \
          dominant ≥ {:.0} %, sinon `review`. {} répétition(s) par mesure.\n",
         REF_THR,
-        edge_threshold,
+        native.edge_threshold,
         CLUSTER_TOL,
         CLUSTER_MIN_FRAC * 100.0,
         runs
     );
+    if native.dark_coverage < REF_THR {
+        let _ = writeln!(
+            out,
+            "Relaxation barres sombres : couverture ≥ {:.2} si la moyenne des \
+             quatre lignes côté barre est < {:.0}/255 ; sinon ≥ {:.3}.\n",
+            native.dark_coverage, native.dark_luma, REF_THR
+        );
+    } else {
+        let _ = writeln!(out, "Relaxation barres sombres : désactivée.\n");
+    }
 
     let _ = writeln!(out, "## Résultats par fixture\n");
     let _ = writeln!(
@@ -1627,6 +1716,8 @@ mod tests {
             height,
             mode: PreMode::Gray,
             edge_threshold: 32.0,
+            dark_coverage: REF_THR,
+            dark_luma: DARK_LUMA,
         };
         let (full_coverage, full_run) = edge_coverage(&full, &sample, 4, 32.0);
         assert!(full_coverage > 0.95);
@@ -1640,6 +1731,43 @@ mod tests {
         }
         let (text_coverage, _) = edge_coverage(&text, &sample, 4, 32.0);
         assert!(text_coverage < REF_THR);
+    }
+
+    #[test]
+    fn coverage_threshold_relaxes_dark_bar_only() {
+        let width = 64;
+        let height = 8;
+        let sample = SampleSpec {
+            start: 0.0,
+            duration: 1.0,
+            fps: 1.0,
+            width,
+            height,
+            mode: PreMode::Gray,
+            edge_threshold: 20.0,
+            dark_coverage: DARK_COVERAGE,
+            dark_luma: DARK_LUMA,
+        };
+        // Barre noire en haut (lignes 0-3), image claire à partir de 4.
+        let mut means = vec![0.0; height];
+        for value in means.iter_mut().skip(4) {
+            *value = 200.0 / 255.0;
+        }
+        assert_eq!(coverage_threshold(&means, 4, &sample, true), DARK_COVERAGE);
+        // Côté bas, la « barre » est claire : pas de relaxation.
+        assert_eq!(coverage_threshold(&means, 3, &sample, false), REF_THR);
+        // Ciel nocturne sombre mais non uniforme : moyenne > 20/255.
+        let mut sky = vec![40.0 / 255.0; height];
+        for value in sky.iter_mut().skip(4) {
+            *value = 200.0 / 255.0;
+        }
+        assert_eq!(coverage_threshold(&sky, 4, &sample, true), REF_THR);
+        // La relaxation est désactivée quand dark_coverage vaut REF_THR.
+        let disabled = SampleSpec {
+            dark_coverage: REF_THR,
+            ..sample
+        };
+        assert_eq!(coverage_threshold(&means, 4, &disabled, true), REF_THR);
     }
 
     #[test]

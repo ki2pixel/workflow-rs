@@ -931,6 +931,10 @@ sur les 63 applies comparables donne une erreur pixel de **1,98/1,54 px**
 contre **2,95/2,06 px** pour `cropdetect=16 px`, avec **53/63** segments à
 ≤ 2 px (contre 37/63), sans nouveau `apply` sur les `review`/`noop`.
 
+La calibration de la section 11 révise ce constat : le natif v2 récupère
+33/34 applies du 89, mais conserve 5 faux négatifs clairs et 0/7 revues
+asymétriques résolues.
+
 Le draft D-058 est dans
 [`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`](../decisions/DECISION-A1-NATIVE-GARDE-D058.md).
 La sortie complète est dans
@@ -938,7 +942,112 @@ La sortie complète est dans
 et le CSV par segment dans
 [`ETUDE-VSLETTERBOX-A1/results/spike-good-sample.csv`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample.csv).
 
+## 11. Calibration des barres sombres — natif v2
+
+La section 10 laissait le natif seul à 4/34 applies sur le 89. Un diagnostic
+ciblé et deux paramètres (Sobel 20 au lieu de 32, couverture 0,45 au lieu de
+2/3 pour les barres très sombres) changent la conclusion.
+
+### 11.1 Diagnostic des 30 échecs du 89
+
+Les 30 segments `apply` du 89 ratés par la référence ont été analysés frame
+par frame (±10 px autour de `cropdetect=24:2:0`), soit 113 frames et 226
+côtés :
+
+| Côté | frontière acceptée | couverture < 2/3 | EWMA sans déclenchement |
+| --- | ---: | ---: | ---: |
+| haut | 46 | **53** | 14 |
+| bas | 26 | **79** | 8 |
+| total | 72 (31,9 %) | **132 (58,4 %)** | 22 (9,7 %) |
+
+La couverture est le blocage principal, pas l'EWMA. Les côtés bloqués ont
+une couverture médiane de 0,385 (haut) et 0,418 (bas), avec un maximum de
+0,653/0,656 : les valeurs sont juste sous 2/3.
+
+### 11.2 Delta des paramètres
+
+| Variante | apply natif total | A1 apply → apply | 89 apply natif | FN clairs | apply sur A1 review | apply sur A1 noop/veto | revues couv. résolues |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Référence (32 px, 2/3) | 25 | 25/65 | 4/34 | 32/56 | 0 | 0/112 | 0/6 |
+| Sobel 20 seul | 42 | 40/65 | 17/34 | 19/56 | 2 | 0/112 | 2/6 |
+| Sombre 0,45 seul (< 20) | 34 | 32/65 | 9/34 | 25/56 | 2 | 0/112 | 2/6 |
+| **v2 (Sobel 20 + sombre 0,45 < 20)** | **65** | **56/65** | **33/34** | **5/56** | **9** | **0/112** | **4/6** |
+| v2 durci (sombre < 10) | 65 | 56/65 | 33/34 | 5/56 | 9 | 0/112 | 4/6 |
+
+Les deux paramètres sont **synergiques** : Sobel 20 seul récupère 17/34,
+la couverture sombre seule 9/34, les deux ensemble 33/34. Le coût est
+inchangé (analyse médiane 17,6 ms, total 445,6 ms, ratio 1,11×).
+
+### 11.3 Matrice v2
+
+| A1 \ natif | `apply` | `review` | `noop` |
+| --- | ---: | ---: | ---: |
+| `apply` (65) | **56** | 2 | 7 |
+| `review` (116) | **9** | 19 | 88 |
+| `noop` (20) | **0** | 1 | 19 |
+
+### 11.4 Le 89
+
+| Élément | Référence | v2 |
+| --- | ---: | ---: |
+| 89 `apply` (34) → natif `apply` | 4 | **33** |
+| 89 `review` (14) → natif `apply` | 0 | **9** |
+| 89 total (48) → natif `apply` | 4 | **42** |
+
+Les 30 échecs `apply` sont récupérés **29/30** ; le seul restant est le
+segment 22 (`review`, cluster 1/2 = 50 %, barres 137/137), un seuil de
+clustering sur 2 frames. La géométrie des 42 applies 89 est de **241,5 à
+242,4 %** (médiane 242,1) contre **243,0 %** pour le GOOD humain, soit 0,6 à
+1,5 point d'écart ; les scales A1 de ces segments étaient à 249,6–290,2 %.
+
+Les 9 applies natifs sur A1 `review` sont **tous des 89 recadrés par
+l'humain à 243,0 %** (segments 4, 5, 10, 14, 28, 37, 42, 43, 47). Pour les
+5 cas persistés, le `cropdetect` A1 était faux (haut 202/216/230, bas
+156/170), ce qui déclenchait les vetos couverture ou comp_y ; les 4 cas
+résolus avaient `cd16 = 140/140`, à 2 px près. Ce ne sont donc pas des faux
+`apply` : sur les 20 `noop` et les 92 `review` avec veto correct, le natif
+ne produit **aucun `apply` (0/112)**. Le 5/123 de la matrice est un artefact
+du label A1 `review` ; rapporté au GOOD humain, ces 5 cas sont des vrais
+positifs.
+
+### 11.5 Contrôle 304 seg 9
+
+Le ciel nocturne reste **`noop` 5/5**, cluster 0/0 à 100 %. Les faux
+candidats haut 935/936 (couverture 0,382–0,510) et bas 1002/1003
+(0,158–0,372) sont rejetés :
+
+- haut 935, frames 0/4 : lignes 931–934 à 12–18 (< 20), donc seuil 0,45,
+  mais couverture 0,390/0,382 < 0,45 ;
+- haut 936, frame 3 : couverture 0,510, mais lignes 932–935 à 35–46, donc
+  seuil 2/3 ;
+- bas 1002/1003 : côté barre clair (35–50), seuil 2/3, couverture ≤ 0,372.
+
+Le durcissement `--dark-luma 10` donne le même `noop` et les mêmes
+décisions d'`apply` sur les 201 segments ; il est plus conservateur sur les
+ciels sombres et supprime 5 revues 309 (veto correct).
+
+### 11.6 Limites et options
+
+Les 5 faux négatifs sur les 56 applies clairs sont 305 seg 17 (`review`
+4/8), 325 seg 15 (`noop`), 335 seg 55 (`noop`, barre < 8 px), 356 seg 8
+(`noop`) et 89 seg 22 (`review` 1/2). À quoi s'ajoutent 304 seg 34/36
+(bord faible, `noop` natif, humain 207,0), 0/7 revues asymétriques résolues
+et 6 segments 89 non appliqués (5 revues, dont 4 à barre unique, et le
+segment 22). Le 305 seg 1/9 conserve son
+scale 211,8 % contre 210,0 % humain (+1,8 point, marge D-056).
+
+| Option | Principe | Gain | Limite |
+| --- | --- | --- | --- |
+| **A — gardé** (draft D-058) | `cropdetect` d'abord ; natif raffine un `apply` déjà décidé | 89 apply 33/34 raffinés à 242,1 ; 305/68 précis ; 0 nouvel `apply` | ne récupère pas les 9 revues 89 |
+| **B — natif v2 seul** | natif primaire | 42/48 au 89 ; 0 `apply` sur noop/veto | 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques |
+| **C — v2 primaire + fallback `cropdetect`** | natif décide ; si `review`/`noop`, `cropdetect` décide avec les vetos A1 | 42/48 au 89 + fallback sur les 5 FN et 304 | promeut 9 revues A1 (toutes recadrées humain ici) ; vetos à réévaluer |
+
+Le détail, les tableaux par segment et les commandes sont dans
+[`ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md),
+avec le CSV [`spike-good-sample-v2.csv`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.csv).
+
 ---
 
 *Fin de l'étude. D-057 ouvre un spike opt-in ; D-058 propose un mode natif
-gardé. Aucune modification de production n'est incluse.*
+gardé, et la calibration v2 ouvre l'option d'un natif primaire avec fallback
+`cropdetect`. Aucune modification de production n'est incluse.*

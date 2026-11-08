@@ -54,6 +54,14 @@
   1,98/1,54 px vs 2,95/2,06 px, 53/63 à ≤ 2 px, coût +0,45 s/apply.
   ADR : `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves :
   `results/spike-good-sample.{md,csv}`.
+- **Calibration A1 natif v2 (D-058, 2026-11-09)** : diagnostic 89
+  (couverture 132/226 côtés vs EWMA 22/226), Sobel 20 + couverture 0,45
+  pour les barres < 20/255. 89 **33/34** applies, FN clairs **5/56**,
+  0 apply sur 20 noop + 92 vetos, 4/6 revues couverture résolues ; Sobel
+  seul 17/34, couverture seule 9/34. 304 seg 9 reste `noop` 5/5 ; scale 89
+  241,5–242,4 % contre 243,0 % humain. Arbitrage A gardé / B v2 seul /
+  C v2 + fallback. Preuves :
+  `results/spike-good-sample-v2.{md,csv,json}`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

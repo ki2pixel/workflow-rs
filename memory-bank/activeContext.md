@@ -183,6 +183,26 @@ D-034, D-035).
     tests), aucun code de production modifié ; sortie brute
     `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
 
+- [2026-11-09] **Calibration A1 natif v2 (D-058, arbitrage)** :
+  - diagnostic des 30 échecs du 89 : 132/226 côtés bloqués par la couverture
+    (58,4 %), 22/226 par l'EWMA (9,7 %) ; couverture médiane 0,385 haut,
+    0,418 bas ;
+  - Sobel 20 + couverture 0,45 pour les barres < 20/255 : 89 **33/34**
+    applies (contre 4/34), FN clairs **5/56** (contre 32/56), 0 `apply` sur
+    les 20 `noop` + 92 vetos, 4/6 revues couverture résolues ; Sobel seul
+    17/34, couverture seule 9/34 ;
+  - 89 : 42/48 segments en `apply`, scale natif 241,5–242,4 % contre
+    243,0 % humain ; les 9 applies sur A1 `review` sont des 89 recadrés
+    humain (5 cropdetect faux, 4 à 140/140), pas des faux positifs ;
+  - 304 seg 9 : `noop` 5/5, candidats 935/936 et 1002/1003 rejetés ;
+    `dark_luma 10` équivalent sur les applies et plus sûr ;
+  - limites : 5 FN clairs (305 seg 17, 325 seg 15, 335 seg 55, 356 seg 8,
+    89 seg 22), 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques ;
+  - arbitrage A gardé / B natif v2 seul / C v2 + fallback cropdetect ;
+    ADR `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves
+    `results/spike-good-sample-v2.{md,csv,json}` ; aucun code de production
+    modifié.
+
 - [2026-11-09] **Évaluation A1 natif sur 201 segments GOOD (D-058, proposition)** :
   - échantillon 65 `apply` + 116 `review` + 20 `noop` (20 vidéos), `gray`,
     une passe ; matrice A1×natif : apply 25/26/14, review 0/12/104,

@@ -10,7 +10,8 @@ exécutés en lecture seule sur le corpus.
 - **Corpus** : `/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2`
   (projets 304, 305, 356), lecture seule.
 - **Date** : 8 novembre 2026.
-- **Décision** : D-057 (spike natif opt-in, `cropdetect` reste le défaut).
+- **Décision** : D-057 (spike natif opt-in, `cropdetect` reste le défaut) ;
+  D-058 (proposition, arbitrage entre natif gardé et natif v2).
 
 ## Contenu
 
@@ -24,6 +25,9 @@ results/cropdetect.txt sorties cropdetect 16 px et 2 px
 results/spike-rust.md sortie du spike Rust EWMA + Sobel Y + clustering
 results/spike-good-sample.md  matrice de confusion sur 201 segments GOOD
 results/spike-good-sample.csv décisions par segment (65 apply / 116 review / 20 noop)
+results/spike-good-sample-v2.md  calibration v2 (Sobel 20 + barres sombres)
+results/spike-good-sample-v2.csv décisions par segment de la v2
+results/spike-good-sample-v2.json matrice et taux de la v2
 scripts/confusion.py  calcul de la matrice depuis le CSV du spike
 ```
 
@@ -49,6 +53,27 @@ concentre l'échec (4/34) ; le 305 reste à 15/17 et le 68 à 6/7. D'où la
 proposition D-058 d'un **natif gardé** avec fallback `cropdetect`.
 Détail : [`results/spike-good-sample.md`](results/spike-good-sample.md).
 
+### Calibration v2 (2026-11-09)
+
+Le diagnostic des 30 échecs du 89 montre que la couverture Sobel est le
+blocage principal (132/226 côtés, 58,4 %), pas l'EWMA (22/226, 9,7 %). En
+abaissant le seuil de contour à 20/1020 et la couverture à 0,45 pour les
+barres dont les quatre lignes côté barre sont < 20/255 :
+
+| Variante | apply natif total | 89 apply natif | FN clairs | apply sur A1 noop/veto |
+| --- | ---: | ---: | ---: | ---: |
+| Référence (32, 2/3) | 25 | 4/34 | 32/56 | 0/112 |
+| Sobel 20 seul | 42 | 17/34 | 19/56 | 0/112 |
+| Sombre 0,45 seul (< 20) | 34 | 9/34 | 25/56 | 0/112 |
+| **v2 (les deux)** | **65** | **33/34** | **5/56** | **0/112** |
+| v2 durci (sombre < 10) | 65 | 33/34 | 5/56 | 0/112 |
+
+La géométrie des 42 applies 89 est à 241,5–242,4 % contre 243,0 % pour le
+GOOD humain. Le contrôle 304 seg 9 reste `noop` 5/5 : les faux candidats
+935/936 et 1002/1003 sont rejetés. Les 9 applies natifs sur A1 `review`
+sont tous des 89 recadrés par l'humain (243,0 %), pas des faux positifs.
+Détail : [`results/spike-good-sample-v2.md`](results/spike-good-sample-v2.md).
+
 ## Méthode
 
 Le prototype reproduit le cœur de `vsletterbox` :
@@ -58,7 +83,8 @@ Le prototype reproduit le cœur de `vsletterbox` :
 3. ExKirsch 5×5, 8 orientations, maximum, diviseur 1, clamp 8 bits ;
 4. scan haut/bas avec EWMA `alpha = 0,05` et seuil
    `μ + 5 × max(σ, 0,005)` ;
-5. validation de la ligne par moyenne du masque `> 2/3` ;
+5. validation de la ligne par moyenne du masque `> 2/3` ; variante v2 :
+   `> 0,45` si les quatre lignes côté barre sont < 20/255 ;
 6. comparaison avec `cropdetect=24:16:0` et `24:2:0`.
 
 Le prototype n'est pas une exécution VapourSynth : le clamp 8 bits, la

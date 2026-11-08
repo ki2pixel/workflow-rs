@@ -904,6 +904,35 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`.
 
+## 2026-11-09 — D-058 (calibration v2) : barres sombres, Sobel 20
+
+- **Diagnostic 89** : sur les 30 échecs `apply`, 113 frames / 226 côtés ;
+  couverture < 2/3 sur **132 côtés (58,4 %)**, EWMA sans déclenchement sur
+  **22 (9,7 %)**, frontière acceptée sur 72 (31,9 %). Couverture médiane des
+  côtés bloqués : 0,385 (haut), 0,418 (bas).
+- **Calibration** : Sobel 20/1020 + couverture 0,45 pour les barres dont les
+  quatre lignes côté barre sont < 20/255. Delta sur 201 segments :
+  - Sobel 20 seul : 89 **17/34**, FN clairs 19/56 ;
+  - couverture sombre seule : 89 **9/34**, FN clairs 25/56 ;
+  - les deux : 89 **33/34**, FN clairs **5/56 (8,9 %)**, 0 `apply` sur les
+    20 `noop` + 92 vetos (0/112), 4/6 revues couverture résolues.
+- **89** : 42/48 segments en `apply` (33/34 applies + 9/14 revues), scale
+  natif **241,5–242,4 %** contre **243,0 %** humain. Les 9 applies sur A1
+  `review` sont tous des 89 recadrés humain ; pour les 5 persistés, le
+  cropdetect était faux (haut 202/216/230, bas 156/170), les 4 résolus
+  avaient `cd16 = 140/140`. Ce ne sont pas des faux positifs.
+- **304 seg 9** : `noop` 5/5, faux candidats 935/936 et 1002/1003 rejetés
+  (couverture 0,382–0,510 ; côté barre clair ou < 0,45). `dark_luma 10`
+  donne les mêmes décisions d'`apply` et est plus conservateur.
+- **Limites** : 5 FN clairs (305 seg 17, 325 seg 15, 335 seg 55, 356 seg 8,
+  89 seg 22), 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques,
+  305 seg 1/9 à +1,8 point (marge D-056).
+- **Arbitrage** : A gardé (sûr, 89 apply raffinés), B natif v2 seul (42/48
+  au 89 mais 5 FN), C v2 primaire + fallback `cropdetect` (89 + fallback,
+  promeut 9 revues). Statut : proposition, non acceptée. ADR
+  `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuves
+  `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.{md,csv,json}`.
+
 ## 2026-11-09 — D-058 (proposition) : A1 natif gardé, fallback cropdetect
 
 - **Contexte** : évaluation du spike D-057 sur l'échantillon GOOD complet

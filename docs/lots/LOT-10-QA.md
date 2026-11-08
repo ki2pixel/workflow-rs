@@ -218,12 +218,18 @@ pixels stables, contours persistants ≥ 0,8 % et densité ≥ 4 %) produit un
 
 Validation phase C : frame de référence 66 Minutes → NCC 0,97 (3/3) ;
 export 9:16 synthétique UJUD avec transformation réelle → NCC 0,96 (3/3) ;
-frame d'une autre émission → 0,05–0,07 (non confirmé) ; image statique
-inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les 35
-exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**, aucune
-zone générique stable sur les sources inconnues. Les 10 `info` restent non
-confirmés : ces exports ne contiennent pas le logo source à la position
-projetée, ce que la phase C rend désormais visible.
+quatre rendus H.264 1080×1920 construits depuis les rushes de production et
+les transformations réelles des projets (`54` à 148,68 s, `58` à 49,16 s,
+`40 ABHARTACH` à 8,36 s, `40 FOOTBALLEUR` à 45,64 s) → NCC 0,95 / 0,94 /
+0,64 / 0,58, 3/3 à chaque fois ; le même rendu UJUD évalué avec le prior
+66 Minutes reste non confirmé (0,07) ; image statique inconnue → zone
+générique stable à 100 % (contours 19,6 %). Sur les 35 exports GOOD
+appariés : 25 `pass`, 10 `info`, **0 nouveau finding**, aucune zone
+générique stable sur les sources inconnues. Un balayage exhaustif de six
+exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à 1 i/s ne trouve aucune
+frame au-dessus de 0,50 (meilleur 0,38 sur une bande de 24 px) : les 10
+`info` viennent de l'absence réelle du logo à la position projetée, pas de
+l'échantillonnage.
 
 Validation phase A/B : `54`/`58` inchangés (`apply` 200,8 % / 210,0 %),
 `40` reste `review` avec la bannière réelle à 91,7 % et un scale proposé de

@@ -13,6 +13,7 @@ pub mod detect;
 pub mod direct;
 pub mod ecproj;
 pub mod model;
+pub mod overlay;
 pub mod run;
 
 pub use model::{PostProjectOutcome, PostRunSummary, PostSummary};

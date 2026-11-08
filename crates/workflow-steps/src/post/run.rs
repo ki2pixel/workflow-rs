@@ -505,6 +505,14 @@ pub fn run_post_project(
         } else {
             None
         };
+        // Un logo caché par un habillage déclaré ne doit pas déclencher le
+        // veto « logo seul » d'A2. Le masque n'est lu que si le prior est
+        // actif : sans flag, aucun travail supplémentaire.
+        let overlay_mask = if options.a2_logo_prior {
+            crate::post::overlay::read_mask(project).ok()
+        } else {
+            None
+        };
         decisions.extend(coverage_reviews(
             &segments,
             &meta,
@@ -531,6 +539,7 @@ pub fn run_post_project(
                 onnxruntime: options.a2_ocr_onnxruntime.clone(),
             }),
             logo_prior: source_logo_prior,
+            overlay: overlay_mask,
         };
         decisions.extend(a2::decide_a2(
             &segments,

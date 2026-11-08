@@ -12,7 +12,12 @@ bbox par les transformations du `.ecproj` (keyframes compris). A2 ajoute
 est actif, retire du groupe OCR dominant les détections majoritairement
 dans la bbox du logo (`details.ocr.logo_texts`, `logo_detections_total`,
 `logo_only`) ; un logo seul part en `review`. Sans prior, ces clés restent
-absentes. Le QA ajoute `source_logo` (`pass`/`info`) derrière
+absentes. Quand un overlay déclaré couvre, aux douze instants du gate OCR, toutes
+les occurrences visibles du logo (≥ 90 %), `visible_in_comp` passe à `false`,
+`overlay_covered`/`hidden_by_overlay` sont ajoutés et le veto logo seul est
+remplacé par la décision géométrique ; rejeu `54` avec un habillage
+synthétique : `apply` 200,8 % inchangé, 2/2 occurrences masquées. Le QA
+ajoute `source_logo` (`pass`/`info`) derrière
 `--source-logo`. `--source-logo-visual` (ou `--source-logo-references`)
 confirme localement les pixels par NCC couleur + contours, ou la stabilité
 d'une zone générique ; aucun `review`, aucun recadrage. Le catalogue est
@@ -22,11 +27,15 @@ A2 : `54`/`58` inchangés (`apply` 200,8 % / 210,0 %) et
 devient « bande sombre, texte persistant confirmé » avec la bannière réelle
 à 91,7 % et un scale proposé de 218,2 % ; `sub_fast` reste vétoé à 25 %.
 Validation visuelle : références 66 Minutes → NCC 0,97 (3/3) ; export 9:16
-synthétique UJUD avec transformation réelle → NCC 0,96 (3/3) ; frame d'une
-autre émission → 0,05–0,07 ; zone générique statique → 100 % stable
-(contours 19,6 %). QA sur 35 exports GOOD avec `.ecproj` : 25 `pass`,
-10 `info`, 0 nouveau finding ; les 10 `info` restent non confirmés car le
-logo source n'est pas à la position projetée dans ces exports. Activation
+synthétique UJUD avec transformation réelle → NCC 0,96 (3/3) ; quatre
+rendus H.264 depuis les rushes et transformations réelles (`54`, `58`,
+`40 ABHARTACH`, `40 FOOTBALLEUR`) → 0,95 / 0,94 / 0,64 / 0,58, 3/3 ;
+rendu UJUD évalué avec le prior 66 Minutes → 0,07 ; zone générique
+statique → 100 % stable (contours 19,6 %). QA sur 35 exports GOOD avec
+`.ecproj` : 25 `pass`, 10 `info`, 0 nouveau finding ; un balayage
+exhaustif de six exports connus à 1 i/s ne dépasse jamais 0,50 (meilleur
+0,38 sur une bande de 24 px), donc les 10 `info` viennent de l'absence
+réelle du logo à la position projetée. Activation
 production toujours soumise à validation client ; phase D optionnelle
 (DINOv2 résiduel, confirmation A2) non implémentée.
 
@@ -160,7 +169,7 @@ D-034, D-035).
 
 - [2026-11-07] **Étude logos et bandeaux fixes (D-051)** :
   - audit de `post/a2.rs` et de `qa/ocr.rs`, `qa/logo.rs`, `qa/dino.rs`,
-    `qa/overlay.rs` ; benchmark des sept dépôts fournis (YOLOv7, YOLOv8 API,
+    `post/overlay.rs` ; benchmark des sept dépôts fournis (YOLOv7, YOLOv8 API,
     open-set YOLOv5, Logodetect, VideOCR, deux détecteurs morphologiques) ;
   - diagnostic en lecture seule de `40`, `54` et `58 Camille` : l'agrégation
     QA par moyenne de bloc manque trois bandeaux persistants sur quatre
@@ -230,7 +239,7 @@ D-034, D-035).
     §2.10–2.11, `assets/models/qa/`, D-048 et D-049.
 
 - [2026-11-01/02] **Stage 1 logos, masque overlays et galeries (D-041 à D-044)** :
-  - `qa/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
+  - `post/overlay.rs` : calques image du `.ecproj`, bbox alpha via `png`,
     transformations statiques, résolution `docs/`, canonicalisation des
     liens symboliques ;
   - `qa/logo.rs` : OCR bande haute 0–32 %, 12 frames, persistance ≥ 50 %,
@@ -572,7 +581,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 500 tests unitaires ; pas de CI.
+- 505 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

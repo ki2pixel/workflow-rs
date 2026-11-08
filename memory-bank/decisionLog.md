@@ -702,7 +702,15 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      composition abandonne la comparaison. Pour une source inconnue, la
      stabilité des zones génériques (écart-type ≤ 12/255, ≥ 5 % stables,
      contours persistants ≥ 0,8 %, densité ≥ 4 %) ne produit qu'un `info`.
-     Aucun `review`, aucun recadrage.
+     Aucun `review`, aucun recadrage ;
+  9. A2 lit le masque des overlays image déclarés dans le `.ecproj` via le
+     module partagé `post::overlay`. Si, aux douze instants du gate OCR,
+     toutes les occurrences visibles du logo projeté sont couvertes à
+     ≥ 90 %, `visible_in_comp` passe à
+     `false`, `overlay_covered` et `hidden_by_overlay` documentent la
+     couverture, et le veto « logo seul » est remplacé par la décision
+     géométrique A2. L'exclusion OCR du texte du logo reste inchangée :
+     elle porte sur la source, où l'overlay n'existe pas encore.
 - **Alternatives rejetées** :
   - détection plein cadre ou YOLO : fermée au monde ouvert et sans le prior
     client ;
@@ -727,25 +735,40 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   vétoé à 25 %. Les audits restent `pass`.
 - **Validation phase C** : frame de référence 66 Minutes → NCC 0,97 (3/3) ;
   export 9:16 synthétique UJUD avec la transformation réelle du projet →
-  NCC 0,96 (3/3) ; frame d'une autre émission → 0,05–0,07, non confirmé ;
-  image statique inconnue → zone générique stable à 100 % (contours 19,6 %).
-  Sur les 35 exports GOOD appariés : 25 `pass`, 10 `info`, 0 nouveau finding,
-  aucune zone générique stable sur les sources inconnues ; les 10 `info`
-  restent non confirmés car le logo source n'est pas à la position projetée
-  dans ces exports. 500 tests workspace, `fmt` et `clippy -D warnings`
-  verts ; aucune écriture dans `/mnt/cache`.
+  NCC 0,96 (3/3) ; quatre rendus H.264 1080×1920 construits depuis les
+  rushes de production et les transformations réelles (`54` à 148,68 s,
+  `58` à 49,16 s, `40 ABHARTACH` à 8,36 s, `40 FOOTBALLEUR` à 45,64 s) →
+  NCC 0,95 / 0,94 / 0,64 / 0,58, 3/3 à chaque fois ; le même rendu UJUD
+  évalué avec le prior 66 Minutes reste non confirmé (0,07) ; image
+  statique inconnue → zone générique stable à 100 % (contours 19,6 %). Sur
+  les 35 exports GOOD appariés : 25 `pass`, 10 `info`, 0 nouveau finding,
+  aucune zone générique stable sur les sources inconnues ; un balayage
+  exhaustif de six exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à
+  1 i/s ne trouve aucune frame au-dessus de 0,50 (meilleur 0,38 sur une
+  bande de 24 px), donc les 10 `info` viennent de l'absence réelle du logo.
+  505 tests workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture
+  dans `/mnt/cache` (lecture seule).
+- **Validation overlays A2** : sur `54` avec un habillage déclaré
+  synthétique couvrant le logo, `apply` 200,8 % inchangé,
+  `visible_in_comp=false`, `overlay_covered=1.0`, 2/2 occurrences visibles
+  masquées et `logo_hidden_by_overlay=true` ; sans habillage, la sortie
+  reste identique à la phase B. Le veto logo seul neutralisé est couvert par
+  un test unitaire (`logo_only_hidden_by_overlay_does_not_veto`).
 - **Limites** : la confirmation visuelle est une corrélation globale ; un
   logo animé, une variante non cataloguée ou un reflet peut rester non
   confirmé, et un fond statique peut déclencher la stabilité d'une zone
   générique. Les seuils sont calibrés sur les références, les cas
-  synthétiques et GOOD, pas sur un corpus d'exports réellement porteurs. A2
-  ne consulte ni les overlays ni la confirmation visuelle ; DINOv2 sur les
-  scores résiduels et une confirmation A2 restent optionnels (phase D).
+  synthétiques, quatre rendus H.264 construits depuis les rushes et les
+  transformations réelles, et les 35 GOOD ; ils ne sont pas encore
+  confrontés à des exports AE produits par l'opérateur. A2 lit les overlays
+  déclarés mais ne consulte pas la confirmation visuelle NCC ; DINOv2 sur
+  les scores résiduels et une confirmation A2 restent optionnels (phase D).
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md` (§7.5),
   `crates/workflow-steps/src/vision/source_logo.rs`,
   `crates/workflow-steps/src/qa/source_logo.rs`,
   `crates/workflow-steps/src/qa/source_logo_visual.rs`,
   `crates/workflow-steps/src/post/a2.rs`,
+  `crates/workflow-steps/src/post/overlay.rs`,
   `scripts/import-source-logos.py`.
 
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
@@ -890,7 +913,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   12/12 ; e=m6 à 0,5 récupéré (10/12). Lot 35 exports : 30 `pass`,
   3 `not_applicable` (179), 2 `review` (270), 4 findings, 264/386 détections
   masquées. Galerie texte : 60/60, 0/16 FP, 8/8 masqués.
-- **Références** : `crates/workflow-steps/src/qa/overlay.rs`,
+- **Références** : `crates/workflow-steps/src/post/overlay.rs`,
   `crates/workflow-steps/src/qa/logo.rs`,
   `crates/workflow-steps/src/qa/cache.rs`.
 
@@ -1046,7 +1069,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   dérivé du `.ecproj`. Sans lui, un OCR de bande haute ne distingue pas un
   logo résiduel d'un titre d'émission ou d'un sticker de template.
 - **Décision** :
-  1. `qa/overlay.rs` lit les calques image du `.ecproj` (`png`, `jpg`,
+  1. `post/overlay.rs` lit les calques image du `.ecproj` (`png`, `jpg`,
      `jpeg`, `webp`), décode le PNG (`png` 0.18) et réduit l'overlay à la
      boîte des pixels dont l'alpha dépasse 8. Les pixels alpha ≥ 200 sont
      comptés comme opaques.
@@ -1085,7 +1108,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `MSL1.mov`) mais reste un candidat `review` ; le masque ne couvre que les
   PNG déclarés, pas les habillages incrustés dans la source.
 - **Références** : `docs/lots/LOT-10-QA.md`,
-  `crates/workflow-steps/src/qa/overlay.rs`,
+  `crates/workflow-steps/src/post/overlay.rs`,
   `crates/workflow-steps/src/qa/logo.rs`.
 
 ## 2026-10-24 — Journal serveur Rust enrichi et sans ANSI

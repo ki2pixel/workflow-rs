@@ -22,12 +22,12 @@
 //! retenu que sur au moins trois des douze échantillons et s'il ne recoupe pas
 //! un finding texte.
 
+use crate::post::overlay::OverlayMask;
 use crate::qa::model::{
     DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence,
     Stage1LogoVisualEvidence,
 };
 use crate::qa::ocr::OcrOptions;
-use crate::qa::overlay::OverlayMask;
 use crate::vision::dino::{visual_geometry_ok, DinoEngine, DinoOptions, DINO_MIN_TIMES};
 use crate::vision::frame::{grab_frame, BgrFrame};
 use crate::vision::ocr::{DetBox, DetEngine, RecEngine};

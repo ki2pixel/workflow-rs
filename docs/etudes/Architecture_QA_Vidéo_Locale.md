@@ -564,14 +564,14 @@ Stage 2 — agrégation
 | `qa/model.rs` | Schémas `qa.json`, `Finding`, `Check`, `Status` | serde |
 | `qa/stage0.rs` | Specs, noir/figé, durée, template A6, cuts | `post::detect`, `post::a6` |
 | `qa/ocr.rs` | Orchestration OCR des sous-titres (tiers bas) | `vision/ocr`, `vision/frame` |
-| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque, agrégation visuelle | `vision/ocr`, `vision/dino`, `qa/overlay.rs` |
+| `qa/logo.rs` | OCR de la bande haute, persistance, filtrage par masque, agrégation visuelle | `vision/ocr`, `vision/dino`, `post::overlay` |
 | `vision/ocr.rs` | Moteurs PP-OCRv6 det/rec, CTC, filtres communs | `ort`, `vision/frame`, `vision/inference` |
 | `vision/dino.rs` | Vérificateur DINOv2 ViT-S/14 et probe logistique | `ort`, `vision/frame` |
 | `vision/frame.rs` | `BgrFrame`, extraction ffmpeg, resize | `ffmpeg` |
 | `vision/inference.rs` | Initialisation ONNX Runtime et sessions CPU | `ort` |
 | `vision/text.rs` | Normalisation, distance et similarité de boîtes | — |
 | `vision/hash.rs` | SHA-256 de fichiers | sha2 |
-| `qa/overlay.rs` | Masque alpha des overlays image du `.ecproj` | `png`, `post::ecproj` |
+| `post/overlay.rs` | Masque alpha des overlays image du `.ecproj`, partagé A2/QA | `png`, `post::ecproj` |
 | `qa/face.rs` | Visages YuNet, landmarks, padding, agrégation | `vision/frame`, `vision/inference` |
 | `qa/batch.rs` | Scan du dossier, workers, résumé de lot | — |
 | `qa/aggregate.rs` | Hystérésis, calibration, sévérité | règles |
@@ -580,7 +580,7 @@ Stage 2 — agrégation
 | `qa/report.rs` | `qa.json` (hash et chemins de preuves) | serde |
 | `qa/mod.rs` | API publique, options | — |
 
-État au 2026-11-02 : `model.rs`, `stage0.rs`, `ocr.rs`, `logo.rs`, `dino.rs`, `overlay.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0 ; `ocr` et `logo` partagent le même jeu de modèles et le même thread, `dino` est appelé dans la passe logos par défaut (`--no-logo-visual` pour l'opt-out), `face` tourne en parallèle. `overlay` lit les calques image du `.ecproj`, réduit chaque PNG à sa boîte alpha et applique les transformations statiques ; `logo` écarte les textes qui tombent dans ces zones. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP.
+État au 2026-11-02 : `model.rs`, `stage0.rs`, `ocr.rs`, `logo.rs`, `dino.rs`, `overlay.rs`, `face.rs`, `sample.rs`, `frame.rs`, `inference.rs`, `batch.rs`, `cache.rs`, `evidence.rs`, `aggregate.rs`, `report.rs` et `mod.rs` sont implémentés. `stage0` couvre le Stage 0 ; `ocr` et `logo` partagent le même jeu de modèles et le même thread, `dino` est appelé dans la passe logos par défaut (`--no-logo-visual` pour l'opt-out), `face` tourne en parallèle. `post::overlay` lit les calques image du `.ecproj`, réduit chaque PNG à sa boîte alpha et applique les transformations statiques ; `logo` écarte les textes qui tombent dans ces zones. `batch` scanne un dossier, répartit les exports sur plusieurs workers, réutilise les `qa.json` dont l'empreinte correspond et écrit `summary.json` ; `cache` calcule cette empreinte. `report` écrit `qa.json` avec le hash de l'export et les chemins de preuves WebP.
 
 Depuis le 2026-11-07 (D-051, phase 2), les moteurs `frame`, `inference`, `ocr`, `dino`, `text` et `hash` sont dans `crates/workflow-steps/src/vision/` ; `qa/ocr.rs` et `qa/logo.rs` ne portent plus que l'orchestration QA. Aucun comportement n'a changé : le rejeu QA de `54` produit des findings, checks et preuves identiques.
 

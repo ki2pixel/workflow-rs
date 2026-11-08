@@ -15,12 +15,12 @@
 //! `qa.json` à `report::write_report`.
 
 use crate::post::detect;
+use crate::post::overlay::OverlayMask;
 use crate::qa::logo;
 use crate::qa::model::{
     DefectType, ModelInfo, QaCheck, QaFinding, QaSpecs, Severity, Stage1LogoEvidence,
     Stage1LogoVisualEvidence, Stage1OcrEvidence,
 };
-use crate::qa::overlay::OverlayMask;
 use crate::qa::sample::{sample_times, SegmentSpan};
 use crate::vision::dino::DinoOptions;
 use crate::vision::frame::{grab_frame, BgrFrame};

@@ -3,8 +3,9 @@
 //! Un export 9:16 contient des habillages ajoutés par le monteur (logo de
 //! chaîne, sticker de template, titre d'émission). Ces PNG sont déclarés dans
 //! la composition : leur zone alpha visible donne une région à ignorer lors de
-//! la recherche de logos résiduels. Le masque ne modifie pas le projet ; il ne
-//! sert qu'au contrôle QA.
+//! la recherche de logos résiduels. Le masque ne modifie pas le projet ; il
+//! sert au contrôle QA et à A2, qui peut ainsi savoir si un logo source est
+//! caché par un habillage déclaré.
 //!
 //! Le cas courant est un PNG plein cadre presque transparent : seule la boîte
 //! des pixels opaques compte, sinon le masque couvrirait toute l'image. Les
@@ -12,8 +13,8 @@
 //! calque animé ou pivoté est ignoré et signalé dans `skipped`.
 
 use crate::post::ecproj;
-use crate::qa::model::OverlayRegion;
 use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use workflow_schema::round::round_to;
@@ -22,6 +23,20 @@ use workflow_schema::round::round_to;
 const ALPHA_BBOX_THRESHOLD: u8 = 8;
 /// Seuil alpha qui compte un pixel comme réellement opaque.
 const ALPHA_OPAQUE_THRESHOLD: u8 = 200;
+
+/// Overlay déclaré dans le `.ecproj`, réduit à sa zone alpha visible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlayRegion {
+    pub name: String,
+    pub layer_id: i64,
+    pub start_s: f64,
+    pub end_s: f64,
+    /// Boîte dans les coordonnées de la composition.
+    pub bbox_xywh: [f64; 4],
+    /// Pixels dont l'alpha est ≥ 200, pour distinguer un vrai logo d'un PNG
+    /// presque entièrement transparent.
+    pub opaque_pixels: usize,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct OverlayMask {
@@ -69,6 +84,40 @@ impl OverlayMask {
             })
             .fold(0.0, f64::max)
     }
+
+    /// Part de `bbox` (détection) couverte par un overlay actif. Contrairement
+    /// à `overlap_ratio`, le dénominateur est toujours la surface de la
+    /// détection : un petit habillage ne peut pas « couvrir » un grand logo.
+    /// Les régions sont évaluées séparément ; leur recouvrement mutuel n'est
+    /// pas fusionné.
+    pub fn coverage_ratio(
+        &self,
+        bbox: [f64; 4],
+        time_s: f64,
+        frame_width: u32,
+        frame_height: u32,
+    ) -> f64 {
+        if self.comp_width == 0 || self.comp_height == 0 {
+            return 0.0;
+        }
+        let scale_x = f64::from(frame_width) / f64::from(self.comp_width);
+        let scale_y = f64::from(frame_height) / f64::from(self.comp_height);
+        let detection_area = (bbox[2] * bbox[3]).max(1.0);
+        self.regions
+            .iter()
+            .filter(|region| time_s >= region.start_s && time_s <= region.end_s)
+            .map(|region| {
+                let region_bbox = [
+                    region.bbox_xywh[0] * scale_x,
+                    region.bbox_xywh[1] * scale_y,
+                    region.bbox_xywh[2] * scale_x,
+                    region.bbox_xywh[3] * scale_y,
+                ];
+                intersection(bbox, region_bbox) / detection_area
+            })
+            .fold(0.0, f64::max)
+            .min(1.0)
+    }
 }
 
 /// Lit les overlays image d'un projet. Une erreur de projet est remontée ;
@@ -77,10 +126,14 @@ pub fn read_mask(project: &Path) -> Result<OverlayMask> {
     // Un projet peut être un lien symbolique (corpus de validation, staging) :
     // les assets sont résolus depuis le dossier réel, pas depuis le lien.
     let resolved = std::fs::canonicalize(project).unwrap_or_else(|_| project.to_path_buf());
-    let project = resolved.as_path();
-    let doc = ecproj::load(project)?;
-    let meta = ecproj::comp_meta(&doc)?;
-    let comp = ecproj::comp(&doc)?;
+    let doc = ecproj::load(&resolved)?;
+    mask_from_doc(&doc, &resolved)
+}
+
+/// Variante pour les appelants qui ont déjà chargé le projet (A2).
+pub fn mask_from_doc(doc: &Value, project: &Path) -> Result<OverlayMask> {
+    let meta = ecproj::comp_meta(doc)?;
+    let comp = ecproj::comp(doc)?;
     let items = doc
         .get("items")
         .and_then(Value::as_object)
@@ -538,6 +591,35 @@ mod tests {
         // Détection à moitié dans l'overlay : ratio 0,5.
         let partial = mask.overlap_ratio([785.0, 341.0, 168.0, 87.0], 2.0, 1080, 1920);
         assert!((partial - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn coverage_ratio_uses_the_detection_area() {
+        let mask = OverlayMask {
+            comp_width: 1080,
+            comp_height: 1920,
+            regions: vec![OverlayRegion {
+                name: "habillage.png".into(),
+                layer_id: 42,
+                start_s: 1.0,
+                end_s: 3.0,
+                bbox_xywh: [100.0, 300.0, 50.0, 100.0],
+                opaque_pixels: 5000,
+            }],
+            skipped: Vec::new(),
+        };
+        // La détection fait 200x100 ; l'overlay n'en couvre que 50x100.
+        let coverage = mask.coverage_ratio([100.0, 300.0, 200.0, 100.0], 2.0, 1080, 1920);
+        assert!((coverage - 0.25).abs() < 1e-9);
+        // `overlap_ratio` répond 1,0 car l'overlay est plus petit que la
+        // détection : les deux mesures ne sont pas interchangeables.
+        let overlap = mask.overlap_ratio([100.0, 300.0, 200.0, 100.0], 2.0, 1080, 1920);
+        assert!((overlap - 1.0).abs() < 1e-9);
+        // Hors de la fenêtre temporelle de l'overlay.
+        assert_eq!(
+            mask.coverage_ratio([100.0, 300.0, 200.0, 100.0], 6.0, 1080, 1920),
+            0.0
+        );
     }
 
     #[cfg(unix)]

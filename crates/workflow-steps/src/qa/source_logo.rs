@@ -7,8 +7,8 @@
 //! un overlay déclaré peut écarter une observation.
 
 use crate::post::ecproj;
+use crate::post::overlay::{self, OverlayMask};
 use crate::qa::model::{QaCheck, QaStatus};
-use crate::qa::overlay::{self, OverlayMask};
 use crate::qa::source_logo_visual::{self, VisualOptions};
 use crate::vision::source_logo::{bbox_area, clip_bbox, SourceLogoCatalog};
 use anyhow::Result;

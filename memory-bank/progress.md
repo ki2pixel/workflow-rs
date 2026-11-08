@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 500 tests unitaires, sans matériel.
+- 505 tests unitaires, sans matériel.
 - **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-048)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
@@ -62,13 +62,20 @@
   15 clean feeds et 5 émissions sans logo ; crops RGBA externes. A2 annote
   `details.source_logo` derrière `a2_logo_prior = false` et retire du groupe
   OCR dominant les textes du logo (`logo_texts`, `logo_only`), le QA ajoute
-  le check `source_logo` (`pass`/`info`) derrière `--source-logo`.
+  le check `source_logo` (`pass`/`info`) derrière `--source-logo`. A2 lit
+  aussi les overlays déclarés : si, aux douze instants du gate OCR, toutes
+  les occurrences visibles du logo sont couvertes à ≥ 90 %, `visible_in_comp` passe à `false` et le veto logo
+  seul est neutralisé (rejeu `54` avec habillage synthétique : `apply`
+  200,8 % inchangé, 2/2 occurrences masquées).
   `--source-logo-visual` confirme localement par NCC/contours et mesure la
   stabilité des zones génériques, sans décision. Rejeu : `54`/`58`
   inchangés, `40` reste `review` mais gagne la bannière réelle (91,7 %,
   scale 218,2 %), `sub_fast` toujours vétoé ; 35 exports GOOD avec `.ecproj`
-  → 25 `pass`, 10 `info`, 0 nouveau finding ; 10 `info` non confirmés car le
-  logo n'est pas à la position projetée. Phase D optionnelle (DINOv2
+  → 25 `pass`, 10 `info`, 0 nouveau finding ; quatre rendus H.264 construits
+  depuis les rushes et transformations réelles (`54`, `58`, `40 ABHARTACH`,
+  `40 FOOTBALLEUR`) → NCC 0,95 / 0,94 / 0,64 / 0,58, 3/3 ; 10 `info` non
+  confirmés car le logo n'est pas à la position projetée (balayage
+  exhaustif à 1 i/s : maximum 0,38). Phase D optionnelle (DINOv2
   résiduel, confirmation A2) non implémentée.
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
   sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
@@ -112,7 +119,7 @@
 ## Étude logos et bandeaux fixes (2026-11-07)
 
 - **Périmètre** : audit de `post/a2.rs` et de `qa/ocr.rs`, `qa/logo.rs`,
-  `qa/dino.rs`, `qa/overlay.rs` ; benchmark de sept dépôts GitHub (YOLOv7,
+  `qa/dino.rs`, `post/overlay.rs` ; benchmark de sept dépôts GitHub (YOLOv7,
   YOLOv8 API, open-set YOLOv5, Logodetect, VideOCR, deux détecteurs
   morphologiques OpenCV) ; diagnostic en lecture seule sur `40`, `54` et
   `58 Camille`.

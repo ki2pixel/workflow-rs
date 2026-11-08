@@ -83,7 +83,8 @@ Linux et le panneau CEP continue d'appeler Python.
   `details.ocr`, sans changer le schéma `post.json`. Détail dans
   `docs/lots/LOT-9-POST-STEP8.md`. Depuis D-052, un registre spatial versionné
   des logos de programme annote A2 (`a2_logo_prior = false`), retire le texte
-  du logo du groupe OCR dominant, et alimente le QA (`--source-logo`) sans
+  du logo du groupe OCR dominant, neutralise le veto logo seul quand un
+  overlay déclaré cache le logo, et alimente le QA (`--source-logo`) sans
   jamais recadrer ni masquer. Le QA peut confirmer localement les pixels
   (`--source-logo-visual`, crops externes via `--source-logo-references`) ;
   29 émissions, 15 clean feeds et 5 émissions sans logo.

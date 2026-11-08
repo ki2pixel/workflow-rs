@@ -184,9 +184,21 @@ lieu d'appliquer. Rejeu : `54`/`58` conservent leur action et leur scale
 (`UNJOUR`/`UNDOC` passent de `texts` à `logo_texts`), `40` reste `review`
 mais devient « bande sombre, texte persistant confirmé » avec la bannière
 réelle dominante (91,7 %) et `scale_target` 218,2 %, `sub_fast` reste vétoé
-à 25 %. La confirmation visuelle NCC/contours et la stabilité de la zone
-générique sont implémentées côté QA (`--source-logo-visual`, LOT-10) ; A2 ne
-les consulte pas et garde ses garde-fous géométriques.
+à 25 %.
+
+Phase B — overlays déclarés (2026-11-08) : A2 lit le masque des overlays
+image du `.ecproj` via le module partagé `post::overlay`. Si, aux douze
+instants du gate OCR, toutes les occurrences visibles du logo projeté
+sont couvertes à ≥ 90 %,
+`visible_in_comp` passe à `false`, `overlay_covered` et
+`hidden_by_overlay` documentent la couverture, et le veto « logo seul » est
+remplacé par la décision géométrique A2. Rejeu sur `54` avec un habillage
+synthétique déclaré couvrant le logo : `apply` 200,8 % inchangé,
+`visible_in_comp=false`, `overlay_covered=1.0`, 2/2 occurrences visibles
+masquées ; sans habillage, la sortie reste identique à la phase B. La
+confirmation visuelle NCC/contours et la stabilité de la zone générique
+sont implémentées côté QA (`--source-logo-visual`, LOT-10) ; A2 ne les
+consulte pas et garde ses garde-fous géométriques.
 
 ## A3/A4 — revue seulement
 

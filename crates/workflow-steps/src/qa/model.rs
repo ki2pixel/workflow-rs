@@ -270,18 +270,9 @@ pub struct Stage1OcrEvidence {
 }
 
 /// Overlay déclaré dans le `.ecproj`, réduit à sa zone alpha visible.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OverlayRegion {
-    pub name: String,
-    pub layer_id: i64,
-    pub start_s: f64,
-    pub end_s: f64,
-    /// Boîte dans les coordonnées de la composition.
-    pub bbox_xywh: [f64; 4],
-    /// Pixels dont l'alpha est ≥ 200, pour distinguer un vrai logo d'un PNG
-    /// presque entièrement transparent.
-    pub opaque_pixels: usize,
-}
+///
+/// Le type vit dans `post::overlay` : A2 et le QA partagent le même masque.
+pub use crate::post::overlay::OverlayRegion;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stage1LogoEvidence {

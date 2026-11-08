@@ -24,13 +24,13 @@ pub mod face;
 pub mod logo;
 pub mod model;
 pub mod ocr;
-pub mod overlay;
 pub mod report;
 pub mod sample;
 pub mod source_logo;
 pub mod source_logo_visual;
 pub mod stage0;
 
+pub use crate::post::overlay::{read_mask, OverlayMask};
 pub use crate::vision::dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
 pub use batch::{discover_exports, run_folder, BatchOutcome, BatchSummary};
 pub use face::{FaceOptions, FACE_MODEL_FILENAME};
@@ -39,7 +39,6 @@ pub use model::{
     Stage1FaceEvidence, Stage1LogoEvidence, Stage1LogoVisualEvidence, Stage1OcrEvidence,
 };
 pub use ocr::{OcrOptions, OCR_DET_FILENAME, OCR_REC_FILENAME};
-pub use overlay::{read_mask, OverlayMask};
 pub use report::{read_report, report_path, write_report};
 pub use sample::SegmentSpan;
 pub use stage0::{run_stage0, Stage0Options, Stage0Result};
@@ -234,7 +233,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             "contrôle OCR désactivé ou modèles OCR absents",
         ));
     } else if let Some(project_path) = project {
-        match overlay::read_mask(project_path) {
+        match read_mask(project_path) {
             Ok(mask) if mask.regions.is_empty() && !mask.skipped.is_empty() => {
                 tracing::warn!(
                     skipped = mask.skipped.len(),

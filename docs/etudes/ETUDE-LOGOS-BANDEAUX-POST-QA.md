@@ -5,7 +5,7 @@
 | Type | Étude comparative et technique |
 | Statut | Référence (non normative) |
 | Date | 2026-11-07 |
-| Portée | `post/a2.rs`, `qa/ocr.rs`, `qa/logo.rs`, `vision/dino.rs`, `qa/overlay.rs` |
+| Portée | `post/a2.rs`, `qa/ocr.rs`, `qa/logo.rs`, `vision/dino.rs`, `post/overlay.rs` |
 | Décision associée | **D-051** |
 | Voir aussi | [`../lots/LOT-9-POST-STEP8.md`](../lots/LOT-9-POST-STEP8.md), [`../lots/LOT-10-QA.md`](../lots/LOT-10-QA.md), [`Architecture_QA_Vidéo_Locale.md`](Architecture_QA_Vidéo_Locale.md), D-032, D-049 |
 
@@ -50,7 +50,7 @@ détecteurs morphologiques OpenCV, mais de :
   dépendre `post` de `qa`.
 
 Les phases 1 à 3 et les phases A/B/C du registre logo (D-052) ont modifié
-le code de production. La suite de tests reste verte : **500 tests**, `fmt`
+le code de production. La suite de tests reste verte : **505 tests**, `fmt`
 et `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
@@ -62,7 +62,7 @@ Lecture intégrale de :
 - `crates/workflow-steps/src/post/a2.rs` et `post/detect.rs` pour la
   génération des candidats, les seuils et la formule de scale ;
 - `crates/workflow-steps/src/qa/ocr.rs`, `qa/logo.rs`,
-  `vision/dino.rs` (anciennement `qa/dino.rs`), `qa/overlay.rs`,
+  `vision/dino.rs` (anciennement `qa/dino.rs`), `post/overlay.rs`,
   `qa/mod.rs`, `qa/aggregate.rs`, `qa/model.rs`, `qa/cache.rs` pour les
   constantes, les tenseurs et l'agrégation ;
 - `crates/workflow-cli/src/main.rs` pour le câblage `qa run` ;
@@ -216,12 +216,14 @@ distance d'édition et similarité de boîte.
 - géométrie : hauteur 18–220 px, largeur ≥ 30, aspect ≥ 1,2 ;
 - persistance minimale **3/12**, déduplication avec les findings texte.
 
-`qa/overlay.rs` lit les calques image du `.ecproj`, réduit chaque PNG à sa
+`post/overlay.rs` lit les calques image du `.ecproj`, réduit chaque PNG à sa
 boîte alpha (seuil 8, pixels opaques > 200), applique les transformations
 statiques et ignore les calques animés ou pivotés. Une détection est
 masquée si **50 %** de la plus petite boîte est couverte par un overlay
 déclaré. C'est ce qui évite de signaler le sticker SDM, le logo M6+ ou un
-titre d'émission ajouté par le monteur.
+titre d'émission ajouté par le monteur. A2 utilise le même masque, avec un
+seuil de couverture de 90 %, pour neutraliser son veto « logo seul » quand
+le logo est caché.
 
 ### 3.4 Modèles et runtime
 
@@ -244,10 +246,11 @@ intra-op borné. Les modèles OCR viennent de RapidOCR 3.10.0
 ### 3.5 Graphe de dépendances actuel
 
 ```text
-post::detect  ◄── qa::dino, qa::stage0, qa::overlay, qa::cache
-post::ecproj  ◄── qa::overlay, post::run, post::a6
+post::detect  ◄── qa::dino, qa::stage0, qa::cache
+post::ecproj  ◄── post::overlay, post::run, post::a6
+post::overlay ◄── post::a2, qa::logo, qa::ocr, qa::source_logo
 qa::frame, qa::inference ◄── qa::ocr, qa::dino, qa::face
-post::a2     ──► post::detect uniquement
+post::a2     ──► post::detect, post::overlay
 ```
 
 `post/a2.rs` n'a aujourd'hui aucune dépendance à `qa`. Faire dépendre `post`
@@ -1017,11 +1020,13 @@ présent dans l'appariement projet/export, sans rapport avec le registre.
 **Limites des phases A/B/C.** La confirmation visuelle est une corrélation
 globale : un logo animé, une variante non cataloguée ou un reflet peuvent
 rester non confirmés, et un fond statique peut déclencher la stabilité d'une
-zone générique. Les seuils sont calibrés sur les frames de référence, les
-cas synthétiques et les 35 GOOD, pas encore sur un corpus d'exports
-réellement porteurs. A2 ne consulte ni les overlays ni la confirmation
-visuelle pour décider si le logo est caché ; la zone générique ne produit
-qu'un `info`, jamais une identité ou un `review`. Une rotation ou un parent
+zone générique. Les seuils sont calibrés sur les références, les cas
+synthétiques, quatre rendus H.264 construits depuis les rushes et les
+transformations réelles, et les 35 GOOD ; ils ne sont pas encore confrontés
+à des exports AE produits par l'opérateur. A2 lit désormais les overlays
+déclarés (veto logo seul neutralisé si le logo est caché) mais ne consulte
+pas la confirmation visuelle NCC ; DINOv2 sur les scores résiduels et une
+confirmation A2 restent optionnels (phase D). Une rotation ou un parent
 animé/redimensionné rend la projection non calculable : le QA répond alors
 `not_applicable` au lieu de conclure « hors cadre », et A2 omet
 `visible_in_comp` avec `projection = "unsupported"`.
@@ -1036,6 +1041,22 @@ la seule preuve textuelle est le logo (`logo_only`), A2 oppose un `review`
 « texte du logo source uniquement » au lieu d'appliquer. Le reste de la
 décision est inchangé : les garde-fous de géométrie, de largeur et de bande
 sombre continuent de primer.
+
+**Phase B — overlays déclarés (2026-11-08).** A2 lit le masque des overlays
+image déclarés dans le `.ecproj` via le module partagé `post::overlay` (le
+même que le QA). Si, aux douze instants du gate OCR, toutes les occurrences visibles du
+logo projeté sont couvertes à ≥ 90 % par un overlay actif, `details.source_logo` ajoute
+`overlay_covered` et `hidden_by_overlay`, passe `visible_in_comp` à `false`,
+et `details.ocr` expose `logo_visible_samples`, `logo_overlay_samples` et
+`logo_hidden_by_overlay`. Le veto `review` « logo seul » est alors remplacé
+par la décision géométrique A2 : un logo que l'habillage cache ne doit pas
+bloquer l'export. L'exclusion OCR du texte du logo reste inchangée — elle
+porte sur la source, où l'overlay n'existe pas encore.
+
+Rejeu sur `54` avec un habillage synthétique déclaré couvrant le logo :
+`apply` 200,8 % inchangé, `visible_in_comp=false`, `overlay_covered=1.0`,
+2/2 occurrences visibles masquées, `logo_hidden_by_overlay=true`. Sans
+habillage, la sortie est identique à la phase B, clés d'overlay en moins.
 
 Rejeu réel : `54` et `58` restent `apply` 200,8 % / 210,0 %, mais
 `UNJOUR`/`UNDOC` passent de `texts` à `logo_texts` ; `40 ABHARTACH` et
@@ -1065,12 +1086,18 @@ produit un `info` « logo possible non identifié », jamais une identité ou un
 
 Validation : frame de référence 66 Minutes → NCC 0,97 (3/3) ; export 9:16
 synthétique construit avec la transformation réelle du projet UJUD → NCC
-0,96 (3/3) ; frame d'une autre émission → 0,05–0,07, non confirmé ; image
-statique inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les
-35 exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**,
-aucune zone générique stable sur les sources inconnues. Les 10 `info` de
-émissions connues restent non confirmés : ces exports ne contiennent pas le
-logo source à la position projetée.
+0,96 (3/3) ; quatre rendus H.264 1080×1920 obtenus depuis les rushes de
+production et les transformations réelles des projets (`54` à 148,68 s,
+`58` à 49,16 s, `40 ABHARTACH` à 8,36 s, `40 FOOTBALLEUR` à 45,64 s) →
+NCC 0,95 / 0,94 / 0,64 / 0,58, 3/3 à chaque fois ; le même rendu UJUD
+évalué avec le prior 66 Minutes reste non confirmé à 0,07 ; image statique
+inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les 35
+exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**,
+aucune zone générique stable sur les sources inconnues. Un balayage
+exhaustif de six exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à
+1 i/s ne trouve aucune frame au-dessus de 0,50 (meilleur 0,38 sur une bande
+de 24 px) : les 10 `info` de la validation QA viennent de l'absence réelle
+du logo à la position projetée, pas de l'échantillonnage.
 
 **Critère pour la phase D.** Ajouter DINOv2 uniquement sur les scores
 résiduels (0,35–0,55) et une confirmation A2 avant exclusion OCR seulement
@@ -1141,6 +1168,7 @@ sans recadrage automatique.
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
 | 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions + zones, `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
 | 6 (fait, phase B) | Exclusion OCR du logo source, veto logo seul | `54`/`58` inchangés, `40` confirmé sombre avec scale 218,2 %, `sub_fast` toujours vétoé ; opt-in et validation client avant activation |
+| 6 bis (fait) | A2 lit les overlays déclarés, veto logo seul neutralisé si le logo est caché | `54` de base inchangé ; avec habillage déclaré, `visible_in_comp=false` et 2/2 occurrences masquées |
 | 7 (fait, phase C) | Confirmation NCC/contours et stabilité des zones génériques | synthétique 66M/UJUD confirmé, négatif 0,05–0,07, 35 GOOD sans nouveau finding |
 | 8 (option) | DINOv2 sur scores résiduels, confirmation A2 avant exclusion OCR | corpus d'exports réellement porteurs, validation client, toujours sans recadrage |
 
@@ -1158,9 +1186,10 @@ sans recadrage automatique.
 - faire valider par le client l'exclusion du logo source du groupe OCR
   dominant et le veto logo seul, déjà mesurés sur `54`/`58`/`40`/`sub_fast` ;
   aucune régression d'action ni de scale sur `54`/`58` ;
-- phase C : mesurer la confirmation visuelle sur un corpus d'exports
-  réellement porteurs du logo (les 35 GOOD actuels ne le contiennent pas à
-  la position projetée), puis ajuster les seuils si nécessaire ;
+- phase C : mesurer la confirmation visuelle sur des exports AE réellement
+  produits par l'opérateur (les rendus H.264 construits depuis les rushes
+  confirment déjà 0,58 à 0,95 ; les 35 GOOD ne contiennent pas le logo à la
+  position projetée), puis ajuster les seuils si nécessaire ;
 - phase D optionnelle : DINOv2 sur les scores résiduels et confirmation A2
   avant exclusion OCR, après validation client ;
 - conserver la parité QA : toute évolution du clustering ou des moteurs
@@ -1175,7 +1204,7 @@ sans recadrage automatique.
 - `crates/workflow-steps/src/post/run.rs`
 - `crates/workflow-steps/src/qa/ocr.rs`
 - `crates/workflow-steps/src/qa/logo.rs`
-- `crates/workflow-steps/src/qa/overlay.rs`
+- `crates/workflow-steps/src/post/overlay.rs`
 - `crates/workflow-steps/src/qa/aggregate.rs`
 - `crates/workflow-steps/src/qa/model.rs`
 - `crates/workflow-steps/src/qa/cache.rs`

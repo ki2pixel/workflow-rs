@@ -6,11 +6,14 @@
 //! optionnel (`a2_ocr`) peut confirmer un texte persistant et suppléer une
 //! géométrie modérément instable, dans une amplitude bornée ; il ne
 //! contourne jamais les garde-fous durs et oppose un veto aux textes
-//! changeants.
+//! changeants. Le prior de logo source documente le candidat sans recadrer ;
+//! quand un overlay déclaré cache ce logo, son veto « logo seul » est
+//! neutralisé.
 
 use crate::post::detect::{band_candidates, probe_video, BandCandidate, VideoSpecs};
 use crate::post::ecproj::{CompMeta, Segment};
 use crate::post::model::Decision;
+use crate::post::overlay::OverlayMask;
 use crate::vision::frame::grab_frame;
 use crate::vision::ocr::{DetEngine, RecEngine};
 use crate::vision::source_logo::{bbox_area, bbox_intersection_area, clip_bbox, SourceLogoPrior};
@@ -37,6 +40,10 @@ const A2_OCR_MIN_CROP_HEIGHT: i64 = 30;
 /// Part minimale d'une détection contenue dans la bbox logo pour la retirer
 /// du groupe dominant.
 const A2_OCR_LOGO_OVERLAP: f64 = 0.60;
+/// Part minimale du logo projeté couverte par un overlay déclaré pour le
+/// considérer comme caché dans la composition. Plus stricte que le masque QA :
+/// un logo à moitié visible peut encore porter du texte.
+const A2_LOGO_OVERLAY_HIDDEN: f64 = 0.90;
 const A2_OCR_MIN_FRAMES: usize = 6;
 const A2_OCR_MIN_SCORE: f64 = 0.55;
 const A2_OCR_MIN_TEXT_LEN: usize = 2;
@@ -68,9 +75,13 @@ pub struct A2Options {
     pub margin: f64,
     pub ocr: Option<A2OcrOptions>,
     /// Prior spatial du logo de programme, déjà remis à l'échelle source.
-    /// Il ne change pas la décision : il documente le candidat et permet de
-    /// savoir si le logo sera visible dans la composition.
+    /// Il documente le candidat, retire le texte du logo du groupe OCR
+    /// dominant et peut déclencher un `review` « logo seul » ; il ne recadre
+    /// jamais.
     pub logo_prior: Option<SourceLogoPrior>,
+    /// Masque des overlays déclarés dans le `.ecproj`. Un logo caché par un
+    /// habillage ne doit pas déclencher le veto « logo seul ».
+    pub overlay: Option<OverlayMask>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +98,12 @@ struct A2OcrEvidence {
     logo_detections_total: usize,
     /// Vrai si la seule preuve textuelle est le logo source.
     logo_only: bool,
+    /// Échantillons (sur 12) où le logo projeté est visible dans le cadre.
+    logo_visible_samples: usize,
+    /// Échantillons où le logo visible est presque entièrement couvert par un
+    /// overlay déclaré.
+    logo_overlay_samples: usize,
+    logo_hidden_by_overlay: bool,
     /// Faux quand aucun prior n'est fourni : les clés logo restent absentes
     /// du JSON pour ne pas modifier la sortie OCR existante.
     logo_tracking: bool,
@@ -157,6 +174,18 @@ impl A2OcrEvidence {
                 json!(self.logo_detections_total),
             );
             object.insert("logo_only".into(), json!(self.logo_only));
+            object.insert(
+                "logo_visible_samples".into(),
+                json!(self.logo_visible_samples),
+            );
+            object.insert(
+                "logo_overlay_samples".into(),
+                json!(self.logo_overlay_samples),
+            );
+            object.insert(
+                "logo_hidden_by_overlay".into(),
+                json!(self.logo_hidden_by_overlay),
+            );
         }
         object.insert("timing_ms".into(), json!(self.timing_ms));
         Value::Object(object)
@@ -184,6 +213,7 @@ struct OcrGate<'a> {
     specs: &'a VideoSpecs,
     options: &'a A2OcrOptions,
     logo_prior: Option<&'a SourceLogoPrior>,
+    logo_coverage: LogoOverlayCoverage,
 }
 
 trait OcrEvidenceSource {
@@ -199,6 +229,7 @@ impl OcrEvidenceSource for OcrGate<'_> {
             candidate,
             self.options,
             self.logo_prior,
+            self.logo_coverage,
         ) {
             Ok(evidence) => Some(evidence),
             Err(error) => {
@@ -278,6 +309,16 @@ pub fn decide_a2(
             specs,
             options: ocr_options,
             logo_prior: options.logo_prior.as_ref(),
+            logo_coverage: match options.logo_prior.as_ref() {
+                Some(prior) => logo_overlay_coverage(
+                    prior,
+                    segments,
+                    meta,
+                    options.overlay.as_ref(),
+                    specs.duration_s,
+                ),
+                None => LogoOverlayCoverage::default(),
+            },
         }),
         _ => None,
     };
@@ -290,7 +331,13 @@ pub fn decide_a2(
         gate.as_ref().map(|gate| gate as &dyn OcrEvidenceSource),
     );
     if let Some(prior) = options.logo_prior.as_ref() {
-        annotate_source_logo(&mut decisions, prior, segments, meta);
+        annotate_source_logo(
+            &mut decisions,
+            prior,
+            segments,
+            meta,
+            options.overlay.as_ref(),
+        );
     }
     decisions
 }
@@ -320,6 +367,7 @@ fn annotate_source_logo(
     prior: &SourceLogoPrior,
     segments: &[Segment],
     meta: &CompMeta,
+    overlay: Option<&OverlayMask>,
 ) {
     for decision in decisions {
         if decision.code != "A2" {
@@ -328,7 +376,7 @@ fn annotate_source_logo(
         let Some(candidate) = bbox_from_details(&decision.details) else {
             continue;
         };
-        if let Some(details) = source_logo_details(prior, candidate, segments, meta) {
+        if let Some(details) = source_logo_details(prior, candidate, segments, meta, overlay) {
             if let Value::Object(object) = &mut decision.details {
                 object.insert("source_logo".into(), details);
             }
@@ -354,15 +402,19 @@ fn source_logo_details(
     candidate: [f64; 4],
     segments: &[Segment],
     meta: &CompMeta,
+    overlay: Option<&OverlayMask>,
 ) -> Option<Value> {
     let overlap = bbox_intersection_area(prior.bbox, candidate);
     if overlap <= 0.0 {
         return None;
     }
+    let overlay = overlay.filter(|mask| !mask.is_empty());
     let logo_area = bbox_area(prior.bbox).max(1.0);
     let candidate_area = bbox_area(candidate).max(1.0);
     let mut best_ratio = 0.0f64;
+    let mut best_uncovered = 0.0f64;
     let mut best_bbox = None;
+    let mut best_coverage = 0.0f64;
     let mut projected_any = false;
     for segment in segments {
         let middle = segment.start + segment.duration() / 2.0;
@@ -376,9 +428,16 @@ fn source_logo_details(
             };
             let projected_area = bbox_area(projected).max(1.0);
             let ratio = bbox_area(clipped) / projected_area;
+            let covered = overlay
+                .map(|mask| {
+                    mask.coverage_ratio(xyxy_to_xywh(clipped), time, meta.width, meta.height)
+                })
+                .unwrap_or(0.0);
+            best_uncovered = best_uncovered.max(ratio * (1.0 - covered));
             if ratio > best_ratio {
                 best_ratio = ratio;
                 best_bbox = Some(clipped);
+                best_coverage = covered;
             }
         }
     }
@@ -404,11 +463,20 @@ fn source_logo_details(
         json!(round_to((overlap / candidate_area).min(1.0), 3)),
     );
     if projected_any {
-        object.insert("visible_in_comp".into(), json!(best_ratio >= 0.10));
+        object.insert("visible_in_comp".into(), json!(best_uncovered >= 0.10));
         object.insert(
             "visible_ratio".into(),
             json!(round_to(best_ratio.min(1.0), 3)),
         );
+        if overlay.is_some() && best_coverage > 0.0 {
+            object.insert(
+                "overlay_covered".into(),
+                json!(round_to(best_coverage.min(1.0), 3)),
+            );
+            if best_ratio >= 0.10 && best_uncovered < 0.10 {
+                object.insert("hidden_by_overlay".into(), json!(true));
+            }
+        }
     } else {
         object.insert("projection".into(), json!("unsupported"));
     }
@@ -424,6 +492,73 @@ fn source_logo_details(
         );
     }
     Some(Value::Object(object))
+}
+
+/// Couverture du logo projeté par les overlays déclarés, aux instants du gate
+/// OCR. Un logo n'est « caché » que si toutes ses occurrences visibles sont
+/// presque entièrement couvertes.
+#[derive(Debug, Clone, Copy, Default)]
+struct LogoOverlayCoverage {
+    visible: usize,
+    hidden: usize,
+}
+
+impl LogoOverlayCoverage {
+    fn is_hidden(self) -> bool {
+        self.visible > 0 && self.hidden == self.visible
+    }
+}
+
+fn logo_overlay_coverage(
+    prior: &SourceLogoPrior,
+    segments: &[Segment],
+    meta: &CompMeta,
+    overlay: Option<&OverlayMask>,
+    duration: f64,
+) -> LogoOverlayCoverage {
+    let mut coverage = LogoOverlayCoverage::default();
+    if duration <= 0.0 {
+        return coverage;
+    }
+    for index in 0..A2_OCR_SAMPLES {
+        let time = duration * (index as f64 + 0.5) / A2_OCR_SAMPLES as f64;
+        let Some(segment) = segments
+            .iter()
+            .find(|segment| time >= segment.start && time <= segment.end)
+        else {
+            continue;
+        };
+        let Some(projected) = segment.project_bbox(prior.bbox, time) else {
+            continue;
+        };
+        let Some(clipped) = clip_bbox(projected, meta.width, meta.height) else {
+            continue;
+        };
+        let ratio = bbox_area(clipped) / bbox_area(projected).max(1.0);
+        if ratio < 0.10 {
+            continue;
+        }
+        coverage.visible += 1;
+        let covered = overlay
+            .map(|mask| mask.coverage_ratio(xyxy_to_xywh(clipped), time, meta.width, meta.height))
+            .unwrap_or(0.0);
+        if covered >= A2_LOGO_OVERLAY_HIDDEN {
+            coverage.hidden += 1;
+        }
+    }
+    coverage
+}
+
+/// `OverlayMask::overlap_ratio`/`coverage_ratio` attendent
+/// `[x, y, largeur, hauteur]` ; les projections du projet sont en
+/// `[x0, y0, x1, y1]`.
+fn xyxy_to_xywh(bbox: [f64; 4]) -> [f64; 4] {
+    [
+        bbox[0],
+        bbox[1],
+        (bbox[2] - bbox[0]).max(0.0),
+        (bbox[3] - bbox[1]).max(0.0),
+    ]
 }
 
 fn decide_impl(
@@ -811,7 +946,13 @@ fn ocr_verdict(
 
 fn classify_ocr(evidence: &A2OcrEvidence, source_height: u32) -> OcrVerdict {
     if evidence.logo_only {
-        return OcrVerdict::LogoOnly;
+        // Un logo caché par un habillage déclaré n'est pas visible dans
+        // l'export : le veto « logo seul » serait un faux positif.
+        return if evidence.logo_hidden_by_overlay {
+            OcrVerdict::Sparse
+        } else {
+            OcrVerdict::LogoOnly
+        };
     }
     if evidence.text_persistence < A2_OCR_TEXT_PERSISTENCE {
         return OcrVerdict::Sparse;
@@ -999,6 +1140,7 @@ fn collect_ocr_evidence(
     candidate: &BandCandidate,
     options: &A2OcrOptions,
     logo_prior: Option<&SourceLogoPrior>,
+    logo_coverage: LogoOverlayCoverage,
 ) -> Result<A2OcrEvidence> {
     let started = Instant::now();
     let x0 = (candidate.x0_src - A2_OCR_MARGIN_PX).max(0);
@@ -1184,6 +1326,9 @@ fn collect_ocr_evidence(
         logo_texts,
         logo_detections_total,
         logo_only,
+        logo_visible_samples: logo_coverage.visible,
+        logo_overlay_samples: logo_coverage.hidden,
+        logo_hidden_by_overlay: logo_coverage.is_hidden(),
         logo_tracking: logo_prior.is_some(),
         text_persistence: round_to(text_persistence, 4),
         dominant_ratio: round_to(dominant_ratio, 4),
@@ -1342,6 +1487,9 @@ mod tests {
             logo_texts: Vec::new(),
             logo_detections_total: 0,
             logo_only: false,
+            logo_visible_samples: 0,
+            logo_overlay_samples: 0,
+            logo_hidden_by_overlay: false,
             logo_tracking: false,
             text_persistence: 1.0,
             dominant_ratio: 1.0,
@@ -1427,11 +1575,94 @@ mod tests {
     }
 
     #[test]
+    fn logo_only_hidden_by_overlay_does_not_veto() {
+        let mut evidence = confirmed_evidence();
+        evidence.logo_tracking = true;
+        evidence.logo_only = true;
+        evidence.logo_hidden_by_overlay = true;
+        evidence.logo_visible_samples = 12;
+        evidence.logo_overlay_samples = 12;
+        evidence.logo_detections_total = 12;
+        evidence.logo_texts = evidence.texts.clone();
+        evidence.texts.clear();
+        let decision = decide_with_evidence(candidate(), 1080, Some(evidence));
+        assert_eq!(decision.action, crate::post::model::Action::Apply);
+    }
+
+    #[test]
     fn logo_keys_are_absent_without_a_prior() {
         let evidence = confirmed_evidence().to_json();
         assert!(evidence.get("logo_texts").is_none());
         assert!(evidence.get("logo_detections_total").is_none());
         assert!(evidence.get("logo_only").is_none());
+        assert!(evidence.get("logo_visible_samples").is_none());
+        assert!(evidence.get("logo_overlay_samples").is_none());
+        assert!(evidence.get("logo_hidden_by_overlay").is_none());
+    }
+
+    #[test]
+    fn logo_overlay_hides_the_logo_in_the_composition() {
+        use crate::post::overlay::OverlayRegion;
+        let prior = source_logo_prior();
+        let segment = logo_segment();
+        let mask = OverlayMask {
+            comp_width: 1080,
+            comp_height: 1920,
+            regions: vec![OverlayRegion {
+                name: "habillage.png".into(),
+                layer_id: 42,
+                start_s: 0.0,
+                end_s: 10.0,
+                bbox_xywh: [160.0, 1520.0, 380.0, 330.0],
+                opaque_pixels: 1000,
+            }],
+            skipped: Vec::new(),
+        };
+        let details = source_logo_details(
+            &prior,
+            [120.0, 856.0, 1204.0, 1008.0],
+            &[segment],
+            &meta(),
+            Some(&mask),
+        )
+        .unwrap();
+        assert_eq!(details["visible_in_comp"], json!(false));
+        assert_eq!(details["hidden_by_overlay"], json!(true));
+        assert!((details["overlay_covered"].as_f64().unwrap() - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn logo_hidden_by_overlay_requires_all_visible_samples() {
+        use crate::post::overlay::OverlayRegion;
+        let prior = source_logo_prior();
+        let segment = logo_segment();
+        let mask = OverlayMask {
+            comp_width: 1080,
+            comp_height: 1920,
+            regions: vec![OverlayRegion {
+                name: "habillage.png".into(),
+                layer_id: 42,
+                start_s: 0.0,
+                end_s: 10.0,
+                bbox_xywh: [160.0, 1520.0, 380.0, 330.0],
+                opaque_pixels: 1000,
+            }],
+            skipped: Vec::new(),
+        };
+        let coverage = logo_overlay_coverage(&prior, &[segment], &meta(), Some(&mask), 10.0);
+        assert_eq!(coverage.visible, A2_OCR_SAMPLES);
+        assert_eq!(coverage.hidden, A2_OCR_SAMPLES);
+        assert!(coverage.is_hidden());
+    }
+
+    #[test]
+    fn logo_visible_samples_do_not_imply_hidden_without_overlay() {
+        let prior = source_logo_prior();
+        let segment = logo_segment();
+        let coverage = logo_overlay_coverage(&prior, &[segment], &meta(), None, 10.0);
+        assert_eq!(coverage.visible, A2_OCR_SAMPLES);
+        assert_eq!(coverage.hidden, 0);
+        assert!(!coverage.is_hidden());
     }
 
     #[test]
@@ -1439,6 +1670,12 @@ mod tests {
         let prior = source_logo_prior();
         assert!(detection_is_logo([141, 899, 110, 57], &prior));
         assert!(!detection_is_logo([313, 978, 900, 38], &prior));
+    }
+
+    fn logo_segment() -> Segment {
+        let mut segment = segment(180.0);
+        segment.anchor = [300.0, 0.0, 0.0];
+        segment
     }
 
     fn meta() -> CompMeta {
@@ -1471,6 +1708,7 @@ mod tests {
             [120.0, 856.0, 1204.0, 1008.0],
             &[segment(180.0)],
             &meta(),
+            None,
         )
         .unwrap();
         assert_eq!(details["name"], "66 Minutes");
@@ -1484,7 +1722,7 @@ mod tests {
             0.9,
             json!({"bbox": [120, 856, 1204, 1008]}),
         )];
-        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta());
+        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta(), None);
         assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
         assert_eq!(decisions[0].details["source_logo"]["name"], "66 Minutes");
     }
@@ -1500,6 +1738,7 @@ mod tests {
             [120.0, 856.0, 1204.0, 1008.0],
             &[segment],
             &meta(),
+            None,
         )
         .unwrap();
         assert_eq!(details["visible_in_comp"], true);
@@ -1516,6 +1755,7 @@ mod tests {
             [120.0, 856.0, 1204.0, 1008.0],
             &[segment],
             &meta(),
+            None,
         )
         .unwrap();
         assert_eq!(details["projection"], "unsupported");
@@ -1532,7 +1772,7 @@ mod tests {
             0.9,
             json!({"bbox": [600, 900, 1200, 1000]}),
         )];
-        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta());
+        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta(), None);
         assert!(decisions[0].details.get("source_logo").is_none());
     }
 

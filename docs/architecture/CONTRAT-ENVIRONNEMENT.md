@@ -444,8 +444,20 @@ actif, les détections OCR majoritairement contenues dans cette bbox sont
 retirées du groupe dominant (`details.ocr.logo_texts`,
 `logo_detections_total`, `logo_only`) ; un logo seul ne peut jamais
 confirmer une bannière et part en `review`. Sans prior, ces clés restent
-absentes et l'action A2 est inchangée. Le QA expose le même registre en
-opt-in avec `qa run --source-logo` (check `source_logo`, `pass`/`info`).
+absentes et l'action A2 est inchangée.
+
+Quand le prior est actif, A2 lit aussi le masque des overlays image
+déclarés dans le `.ecproj` (module partagé `post::overlay`, le même que le
+QA). Si, aux douze instants du gate OCR, toutes les occurrences visibles du
+logo projeté sont couvertes à ≥ 90 % par un overlay actif, `details.source_logo` ajoute
+`overlay_covered` et `hidden_by_overlay`, passe `visible_in_comp` à
+`false`, et `details.ocr` expose `logo_visible_samples`,
+`logo_overlay_samples` et `logo_hidden_by_overlay`. Un logo ainsi caché ne
+déclenche plus le veto `review` « logo seul » : la décision géométrique A2
+reste. Les clés n'apparaissent que si le prior est actif ; sans overlay,
+`logo_hidden_by_overlay` vaut `false` et la sortie A2 est identique à la
+phase B. Le QA expose le même registre en opt-in avec
+`qa run --source-logo` (check `source_logo`, `pass`/`info`).
 `--source-logo-visual` ajoute la confirmation NCC/contours et la stabilité
 des zones génériques ; `--source-logo-references` fournit la racine externe
 des crops RGBA et implique le mode visuel. Sans références, le check reste

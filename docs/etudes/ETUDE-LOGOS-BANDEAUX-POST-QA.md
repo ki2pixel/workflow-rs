@@ -49,9 +49,9 @@ détecteurs morphologiques OpenCV, mais de :
   module neutre `vision`, utilisé par `qa` et `post`, plutôt que faire
   dépendre `post` de `qa`.
 
-Les phases 1 à 3 et les phases A/B du registre logo (D-052) ont modifié le
-code de production. La suite de tests reste verte : **492 tests**, `fmt` et
-`clippy -D warnings` OK.
+Les phases 1 à 3 et les phases A/B/C du registre logo (D-052) ont modifié
+le code de production. La suite de tests reste verte : **500 tests**, `fmt`
+et `clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
 
@@ -969,7 +969,7 @@ quelques textes isolés du corpus restent sous le seuil de trois échantillons
 d'un même cluster. Sorties sous
 `/tmp/workflow_investigation/corpus35-qa13/`.
 
-### 7.5 Phases A/B — registre spatial des logos source (2026-11-08)
+### 7.5 Phases A/B/C — registre spatial des logos source (2026-11-08)
 
 **Principe.** Le logo n'est pas recherché sur toute l'image : le client a
 documenté, pour 29 émissions, une position quasi déterministe dans le canvas
@@ -977,8 +977,9 @@ source 1920×1080. Le pipeline répond d'abord à « où peut être le logo ? »
 (registre spatial), puis seulement ensuite à « est-il réellement là ? »
 (confirmation locale). La phase A annote cette position ; la phase B exclut
 le texte du logo du groupe OCR dominant et interdit qu'il confirme seul une
-bannière. Aucune des deux **n'agit jamais** sur le recadrage : le pire cas
-est une revue.
+bannière ; la phase C compare les pixels de l'export au crop de référence et
+mesure la stabilité des zones génériques. Aucune des trois **n'agit jamais**
+sur le recadrage : le pire cas est une revue.
 
 **Catalogue.** `assets/models/qa/source_logos.toml` est versionné et généré
 par `scripts/import-source-logos.py` depuis
@@ -1013,15 +1014,17 @@ finding** ; `227` E=M6 est hors cadre, `270` GOAL est reconnu clean feed.
 Deux exports (`286`, `298`) conservent un écart de durée MP4/comp de 3 s déjà
 présent dans l'appariement projet/export, sans rapport avec le registre.
 
-**Limites des phases A/B.** Aucun pixel n'est comparé : le check est
-géométrique. Le QA écarte les observations couvertes par un overlay déclaré
-(le masque prime sur le prior), mais A2 ne consulte pas encore les overlays
-pour décider si le logo est caché. La zone générique n'est pas confirmée
-temporellement et ne produit aucune revue. Les crops de référence ne sont
-pas utilisés. Une rotation ou un parent animé/redimensionné rend la
-projection non calculable : le QA répond alors `not_applicable` au lieu de
-conclure « hors cadre », et A2 omet `visible_in_comp` avec
-`projection = "unsupported"`.
+**Limites des phases A/B/C.** La confirmation visuelle est une corrélation
+globale : un logo animé, une variante non cataloguée ou un reflet peuvent
+rester non confirmés, et un fond statique peut déclencher la stabilité d'une
+zone générique. Les seuils sont calibrés sur les frames de référence, les
+cas synthétiques et les 35 GOOD, pas encore sur un corpus d'exports
+réellement porteurs. A2 ne consulte ni les overlays ni la confirmation
+visuelle pour décider si le logo est caché ; la zone générique ne produit
+qu'un `info`, jamais une identité ou un `review`. Une rotation ou un parent
+animé/redimensionné rend la projection non calculable : le QA répond alors
+`not_applicable` au lieu de conclure « hors cadre », et A2 omet
+`visible_in_comp` avec `projection = "unsupported"`.
 
 **Phase B — exclusion OCR et veto logo seul (2026-11-08).** Quand le prior
 est disponible, les détections OCR dont la boîte est majoritairement
@@ -1041,13 +1044,38 @@ motif « bande sombre, texte persistant confirmé », avec la bannière réelle
 dominante (91,7 %) et `scale_target` 218,2 % ; `sub_fast` reste vétoé à
 25 %. Aucune action ni aucun scale de `54`/`58` ne change, les audits
 restent `pass`. Le flag reste désactivé par défaut ; l'activation en
-production attend la validation client. Le template matching NCC et la
-confirmation visuelle de la zone générique restent à faire (phase C).
+production attend la validation client.
 
-**Critère pour la phase C.** Ajouter la confirmation locale (template
-matching NCC + contours, ou stabilité temporelle pour la zone générique)
-seulement si le client valide le principe, et sans jamais déclencher de
-recadrage automatique sur cette base.
+**Phase C — confirmation locale (2026-11-08).** `--source-logo-visual`
+(impliqué par `--source-logo-references`) compare jusqu'à six instants de
+l'export au crop RGBA de référence, toutes variantes confondues. Le score
+combine un NCC couleur calculé sur le masque alpha (65 %) et un NCC des
+contours (35 %) ; un échantillon est fort si couleur ≥ 0,45, contours
+≥ 0,10 et score ≥ 0,50, et il faut au moins deux échantillons forts pour
+parler de logo confirmé. Les crops restent externes ; le chemin fourni peut
+être le dossier `emissions` ou son parent `references_logos`. Si le format
+de l'export diffère de la composition (rush 16:9 évalué avec une comp 9:16),
+la comparaison est abandonnée avec une raison explicite.
+
+Pour une source inconnue, le QA projette les zones génériques et mesure leur
+stabilité temporelle : écart-type ≤ 12/255, au moins 5 % de pixels stables,
+contours persistants ≥ 0,8 % et densité de contours ≥ 4 %. Une zone stable
+produit un `info` « logo possible non identifié », jamais une identité ou un
+`review`.
+
+Validation : frame de référence 66 Minutes → NCC 0,97 (3/3) ; export 9:16
+synthétique construit avec la transformation réelle du projet UJUD → NCC
+0,96 (3/3) ; frame d'une autre émission → 0,05–0,07, non confirmé ; image
+statique inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les
+35 exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**,
+aucune zone générique stable sur les sources inconnues. Les 10 `info` de
+émissions connues restent non confirmés : ces exports ne contiennent pas le
+logo source à la position projetée.
+
+**Critère pour la phase D.** Ajouter DINOv2 uniquement sur les scores
+résiduels (0,35–0,55) et une confirmation A2 avant exclusion OCR seulement
+si un corpus d'exports réellement porteurs du logo le justifie. Toujours
+sans recadrage automatique.
 
 ## 8. Risques et points ouverts
 
@@ -1113,7 +1141,8 @@ recadrage automatique sur cette base.
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
 | 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions + zones, `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
 | 6 (fait, phase B) | Exclusion OCR du logo source, veto logo seul | `54`/`58` inchangés, `40` confirmé sombre avec scale 218,2 %, `sub_fast` toujours vétoé ; opt-in et validation client avant activation |
-| 7 (option) | Template matching NCC/contours et zone générique confirmée | validation client + corpus dédié, toujours sans recadrage automatique |
+| 7 (fait, phase C) | Confirmation NCC/contours et stabilité des zones génériques | synthétique 66M/UJUD confirmé, négatif 0,05–0,07, 35 GOOD sans nouveau finding |
+| 8 (option) | DINOv2 sur scores résiduels, confirmation A2 avant exclusion OCR | corpus d'exports réellement porteurs, validation client, toujours sans recadrage |
 
 ### 9.3 Prochaines actions concrètes
 
@@ -1122,16 +1151,18 @@ recadrage automatique sur cette base.
 - mesurer le coût du gate sur un lot complet (15–25 s par projet mesuré) et
   vérifier le timeout STEP8 ;
 - décider du niveau 2 des bandeaux sombres et du volet logo avec le client ;
-  les phases A et B du registre spatial sont implémentées mais restent
-  opt-in (`a2_logo_prior = false`, `--source-logo`) ;
+  les phases A, B et C du registre spatial sont implémentées mais restent
+  opt-in (`a2_logo_prior = false`, `--source-logo`, `--source-logo-visual`) ;
 - si le niveau 2 est retenu, constituer un corpus dédié de lower-thirds
   sombres et de logos bas, puis rouvrir une décision ;
 - faire valider par le client l'exclusion du logo source du groupe OCR
   dominant et le veto logo seul, déjà mesurés sur `54`/`58`/`40`/`sub_fast` ;
   aucune régression d'action ni de scale sur `54`/`58` ;
-- phase C : template matching NCC/contours et confirmation temporelle de la
-  zone générique, seulement après validation client et sans recadrage
-  automatique ;
+- phase C : mesurer la confirmation visuelle sur un corpus d'exports
+  réellement porteurs du logo (les 35 GOOD actuels ne le contiennent pas à
+  la position projetée), puis ajuster les seuils si nécessaire ;
+- phase D optionnelle : DINOv2 sur les scores résiduels et confirmation A2
+  avant exclusion OCR, après validation client ;
 - conserver la parité QA : toute évolution du clustering ou des moteurs
   `vision` doit rejouer les 36 exports GOOD et les cas synthétiques.
 

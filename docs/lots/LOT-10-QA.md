@@ -183,33 +183,54 @@ Le plafond de 220 px est propre au vérificateur : le contrôle texte garde
 18–180 px, mais le logo Les 100 à l'échelle 1,0 produit une boîte OCR de
 204 px de haut. Les boîtes pleine frame (613 px) restent exclues.
 
-### Registre spatial des logos source (D-052, phase A, 2026-11-08)
+### Registre spatial des logos source (D-052, phases A/B/C, 2026-11-08)
 
-`--source-logo` ajoute un check `source_logo` purement géométrique, sans
-analyse de pixels et sans finding. Il exige un `.ecproj` et le catalogue
-`assets/models/qa/source_logos.toml` (ou `--source-logo-catalog`). Le
-catalogue contient 29 émissions, 15 clean feeds, 5 émissions sans logo et
-deux zones génériques ; les crops RGBA restent externes. La source est
-résolue par nom de fichier exact puis par alias, et un clean feed déclaré
-n'hérite jamais d'un prior. La bbox du logo est projetée par les
-transformations du `.ecproj` (keyframes interpolés, rotation ou parent
-animé/redimensionné refusé).
+`--source-logo` ajoute un check `source_logo`, sans finding. Il exige un
+`.ecproj` et le catalogue `assets/models/qa/source_logos.toml` (ou
+`--source-logo-catalog`). Le catalogue contient 29 émissions, 15 clean feeds,
+5 émissions sans logo et deux zones génériques ; les crops RGBA restent
+externes. La source est résolue par nom de fichier exact puis par alias, et
+un clean feed déclaré n'hérite jamais d'un prior. La bbox du logo est
+projetée par les transformations du `.ecproj` (keyframes interpolés,
+rotation ou parent animé/redimensionné refusé).
 
-Statuts : `pass` si le logo est hors cadre ou si la source est inconnue
-(les zones génériques sont rappelées sans être confirmées) ; `info` si une
-partie ≥ 15 % et ≥ 400 px² du logo projeté reste dans la composition. Une
-observation couverte par un overlay déclaré est écartée avant ce calcul : le
-masque prime sur le prior. Un catalogue demandé mais introuvable donne
-`not_applicable` et interdit l'auto-approbation, comme un modèle requis
-absent. Le cache passe en version 8 et inclut le hash du catalogue quand le
-flag est actif.
+Statuts : `pass` si le logo est hors cadre ou si la source est inconnue ;
+`info` si une partie ≥ 15 % et ≥ 400 px² du logo projeté reste dans la
+composition. Une observation couverte par un overlay déclaré est écartée
+avant ce calcul : le masque prime sur le prior. Un catalogue demandé mais
+introuvable donne `not_applicable` et interdit l'auto-approbation, comme un
+modèle requis absent. Le cache passe en version **9** et inclut le hash du
+catalogue, le flag visuel et le contenu des crops référencés quand la
+confirmation visuelle est active.
 
-Validation : 35 exports GOOD appariés à leur `.ecproj` → 25 `pass`,
-10 `info`, **0 nouveau finding** ; `227` E=M6 hors cadre, `270` GOAL
-reconnu clean feed. Deux exports (`286`, `298`) conservent un écart de durée
-MP4/comp de 3 s lié à l'appariement projet/export, sans rapport avec le
-registre. Le check ne remplace pas le contrôle logos de bande haute : il
-documente le logo de programme dans la source.
+**Phase C — confirmation locale.** `--source-logo-visual` (impliqué par
+`--source-logo-references`) compare jusqu'à 6 instants de l'export au crop
+RGBA de référence : NCC couleur sur le masque alpha + NCC des contours, avec
+toutes les variantes de l'émission. Un échantillon est fort si couleur
+≥ 0,45, contours ≥ 0,10 et score combiné ≥ 0,50 ; il faut au moins deux
+échantillons forts pour « confirmé ». `--source-logo-references` accepte le
+dossier `emissions` ou son parent `references_logos`. Si le format de
+l'export diffère de la composition (rush 16:9 contre comp 9:16), la
+comparaison est explicitement abandonnée. Pour une source inconnue, la
+stabilité temporelle des zones génériques (écart-type ≤ 12/255, ≥ 5 % de
+pixels stables, contours persistants ≥ 0,8 % et densité ≥ 4 %) produit un
+`info` « logo possible non identifié ». Aucun `review`, aucun recadrage.
+
+Validation phase C : frame de référence 66 Minutes → NCC 0,97 (3/3) ;
+export 9:16 synthétique UJUD avec transformation réelle → NCC 0,96 (3/3) ;
+frame d'une autre émission → 0,05–0,07 (non confirmé) ; image statique
+inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les 35
+exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**, aucune
+zone générique stable sur les sources inconnues. Les 10 `info` restent non
+confirmés : ces exports ne contiennent pas le logo source à la position
+projetée, ce que la phase C rend désormais visible.
+
+Validation phase A/B : `54`/`58` inchangés (`apply` 200,8 % / 210,0 %),
+`40` reste `review` avec la bannière réelle à 91,7 % et un scale proposé de
+218,2 %, `sub_fast` toujours vétoé. Deux exports GOOD (`286`, `298`)
+conservent un écart de durée MP4/comp de 3 s lié à l'appariement, sans
+rapport avec le registre. Le check ne remplace pas le contrôle logos de
+bande haute : il documente le logo de programme dans la source.
 
 ## Stage 1 visage
 
@@ -261,7 +282,9 @@ puisque DINOv2 est actif par défaut. `--source-logo` active l'annotation du
 registre spatial des logos source (D-052) : check `source_logo` `pass`/`info`,
 projet `.ecproj` et catalogue requis ; `--source-logo-catalog` fixe un
 catalogue explicite, sinon `<models>/qa/source_logos.toml` est utilisé.
-`--per-segment` accepte 1 ou 3.
+`--source-logo-visual` ajoute la confirmation NCC/contours et la stabilité
+des zones génériques ; `--source-logo-references` fixe la racine externe des
+crops et implique le mode visuel. `--per-segment` accepte 1 ou 3.
 `--no-evidence` n'écrit pas les
 frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration

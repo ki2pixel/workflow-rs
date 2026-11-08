@@ -2,7 +2,7 @@
 
 ## Tâche en cours
 
-**Registre spatial des logos source — phases A/B (2026-11-08, D-052).** Le
+**Registre spatial des logos source — phases A/B/C (2026-11-08, D-052).** Le
 catalogue versionné `assets/models/qa/source_logos.toml` contient les 29
 émissions documentées par le client (position, bbox d'enveloppe, variantes,
 sources exactes), 15 clean feeds et 5 émissions sans logo ; les crops RGBA
@@ -13,15 +13,22 @@ est actif, retire du groupe OCR dominant les détections majoritairement
 dans la bbox du logo (`details.ocr.logo_texts`, `logo_detections_total`,
 `logo_only`) ; un logo seul part en `review`. Sans prior, ces clés restent
 absentes. Le QA ajoute `source_logo` (`pass`/`info`) derrière
-`--source-logo`. Le catalogue est généré par
-`scripts/import-source-logos.py` depuis le CSV client. Rejeu réel :
-`54`/`58` inchangés (`apply` 200,8 % / 210,0 %) et `UNJOUR`/`UNDOC` déplacés
-dans `logo_texts` ; `40` reste `review` mais devient « bande sombre, texte
-persistant confirmé » avec la bannière réelle à 91,7 % et un scale proposé
-de 218,2 % ; `sub_fast` reste vétoé à 25 %. QA sur 35 exports GOOD avec
-`.ecproj` : 25 `pass`, 10 `info`, 0 nouveau finding. Phase C (confirmation
-visuelle NCC/contours, stabilité temporelle de la zone générique) non
-implémentée ; activation production toujours soumise à validation client.
+`--source-logo`. `--source-logo-visual` (ou `--source-logo-references`)
+confirme localement les pixels par NCC couleur + contours, ou la stabilité
+d'une zone générique ; aucun `review`, aucun recadrage. Le catalogue est
+généré par `scripts/import-source-logos.py` depuis le CSV client. Rejeu
+A2 : `54`/`58` inchangés (`apply` 200,8 % / 210,0 %) et
+`UNJOUR`/`UNDOC` déplacés dans `logo_texts` ; `40` reste `review` mais
+devient « bande sombre, texte persistant confirmé » avec la bannière réelle
+à 91,7 % et un scale proposé de 218,2 % ; `sub_fast` reste vétoé à 25 %.
+Validation visuelle : références 66 Minutes → NCC 0,97 (3/3) ; export 9:16
+synthétique UJUD avec transformation réelle → NCC 0,96 (3/3) ; frame d'une
+autre émission → 0,05–0,07 ; zone générique statique → 100 % stable
+(contours 19,6 %). QA sur 35 exports GOOD avec `.ecproj` : 25 `pass`,
+10 `info`, 0 nouveau finding ; les 10 `info` restent non confirmés car le
+logo source n'est pas à la position projetée dans ces exports. Activation
+production toujours soumise à validation client ; phase D optionnelle
+(DINOv2 résiduel, confirmation A2) non implémentée.
 
 **QA 1.3.0 — clustering OCR (2026-11-07, D-051).** La phase 1 est
 implémentée : `qa/ocr.rs` regroupe les détections par **boîte stable** (le
@@ -565,7 +572,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 492 tests unitaires ; pas de CI.
+- 500 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

@@ -10,8 +10,11 @@
 //! déclarés ; sans projet il reste `not_applicable`. DINOv2 est actif par
 //! défaut (`--no-logo-visual` pour l'opt-out). `--source-logo` ajoute, en
 //! opt-in, l'annotation du registre spatial des logos source (D-052) : le
-//! check `source_logo` est `pass` ou `info`, jamais bloquant. `auto_approve_eligible`
-//! n'est vrai que sur un `pass` complet, avec les contrôles requis exécutés.
+//! check `source_logo` est `pass` ou `info`, jamais bloquant.
+//! `--source-logo-visual` (ou `--source-logo-references`) ajoute la
+//! confirmation locale NCC/contours et la stabilité temporelle des zones
+//! génériques, toujours sans décision. `auto_approve_eligible` n'est vrai que
+//! sur un `pass` complet, avec les contrôles requis exécutés.
 
 pub mod aggregate;
 pub mod batch;
@@ -25,6 +28,7 @@ pub mod overlay;
 pub mod report;
 pub mod sample;
 pub mod source_logo;
+pub mod source_logo_visual;
 pub mod stage0;
 
 pub use crate::vision::dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
@@ -67,11 +71,17 @@ pub struct QaOptions {
     pub logo_visual_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
-    /// Active l'annotation du logo source (registre spatial D-052). Opt-in
-    /// Phase A : aucune décision, seulement un check `pass`/`info`.
+    /// Active l'annotation du logo source (registre spatial D-052). Opt-in :
+    /// aucune décision, seulement un check `pass`/`info`.
     pub source_logo_enabled: bool,
+    /// Active la confirmation visuelle locale (NCC/contours et stabilité des
+    /// zones génériques). Les références restent externes.
+    pub source_logo_visual: bool,
     /// Catalogue TOML explicite ; sinon `<models>/qa/source_logos.toml`.
     pub source_logo_catalog: Option<PathBuf>,
+    /// Racine des crops RGBA de référence ; sinon `reference_root` du
+    /// catalogue.
+    pub source_logo_references: Option<PathBuf>,
     /// Écrit une frame WebP par finding sous `<out>/evidence/`.
     pub evidence_enabled: bool,
     /// 1 ou 3 échantillons par segment.
@@ -96,7 +106,9 @@ impl Default for QaOptions {
             logo_visual_enabled: true,
             face_enabled: true,
             source_logo_enabled: false,
+            source_logo_visual: false,
             source_logo_catalog: None,
+            source_logo_references: None,
             evidence_enabled: true,
             per_segment: 1,
             video_id: None,
@@ -168,7 +180,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         .collect::<Vec<_>>();
 
     if options.source_logo_enabled {
-        checks.push(source_logo_check(project, options));
+        checks.push(source_logo_check(video, project, &stage0.specs, options));
     }
 
     let mut ocr_options = if !options.ocr_enabled {
@@ -466,7 +478,12 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
 
 /// Résout et exécute l'annotation du logo source. Le contrôle est opt-in :
 /// sans catalogue, il est explicitement `not_applicable` plutôt que bloquant.
-fn source_logo_check(project: Option<&Path>, options: &QaOptions) -> QaCheck {
+fn source_logo_check(
+    video: &Path,
+    project: Option<&Path>,
+    specs: &crate::qa::model::QaSpecs,
+    options: &QaOptions,
+) -> QaCheck {
     let Some(project) = project else {
         return QaCheck::not_applicable(
             "source_logo",
@@ -491,7 +508,16 @@ fn source_logo_check(project: Option<&Path>, options: &QaOptions) -> QaCheck {
             format!("catalogue introuvable: {}", catalog.display()),
         );
     }
-    match source_logo::run_geometry(project, &catalog) {
+    let visual = options
+        .source_logo_visual
+        .then(|| source_logo_visual::VisualOptions {
+            video,
+            ffmpeg: &options.ffmpeg,
+            frame_width: specs.width,
+            frame_height: specs.height,
+            references: options.source_logo_references.as_deref(),
+        });
+    match source_logo::run(project, &catalog, visual.as_ref()) {
         Ok(check) => check,
         Err(error) => {
             tracing::warn!(
@@ -543,15 +569,31 @@ mod tests {
             source_logo_enabled: true,
             ..QaOptions::default()
         };
+        let specs = crate::qa::model::QaSpecs {
+            width: 1080,
+            height: 1920,
+            fps: 25.0,
+            video_codec: "h264".into(),
+            audio_codec: "aac".into(),
+            duration_s: 10.0,
+            bit_rate: 1_000_000,
+            size_bytes: 1_000_000,
+        };
         assert_eq!(
-            source_logo_check(None, &options).status,
+            source_logo_check(Path::new("/tmp/export.mp4"), None, &specs, &options).status,
             QaStatus::NotApplicable
         );
 
         options.source_logo_catalog = Some(PathBuf::from("/nonexistent/source_logos.toml"));
         let project = Path::new("/tmp/projet.ecproj");
         assert_eq!(
-            source_logo_check(Some(project), &options).status,
+            source_logo_check(
+                Path::new("/tmp/export.mp4"),
+                Some(project),
+                &specs,
+                &options
+            )
+            .status,
             QaStatus::NotApplicable
         );
     }

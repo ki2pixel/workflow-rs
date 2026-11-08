@@ -446,6 +446,12 @@ retirées du groupe dominant (`details.ocr.logo_texts`,
 confirmer une bannière et part en `review`. Sans prior, ces clés restent
 absentes et l'action A2 est inchangée. Le QA expose le même registre en
 opt-in avec `qa run --source-logo` (check `source_logo`, `pass`/`info`).
+`--source-logo-visual` ajoute la confirmation NCC/contours et la stabilité
+des zones génériques ; `--source-logo-references` fournit la racine externe
+des crops RGBA et implique le mode visuel. Sans références, le check reste
+géométrique. Le mode visuel ne crée ni finding ni décision ; il enrichit le
+détail du check et ne compare pas un export dont le format diffère de la
+composition.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 

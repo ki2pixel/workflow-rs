@@ -729,13 +729,21 @@ enum QaCommand {
         #[arg(long)]
         no_face: bool,
         /// Active l'annotation du logo source (registre spatial D-052).
-        /// Phase A : check `pass`/`info`, aucune décision.
+        /// Check `pass`/`info`, aucune décision.
         #[arg(long)]
         source_logo: bool,
+        /// Active la confirmation visuelle locale (NCC/contours, stabilité
+        /// temporelle des zones génériques). Nécessite `--source-logo`.
+        #[arg(long, requires = "source_logo")]
+        source_logo_visual: bool,
         /// Catalogue TOML du registre des logos source
         /// (défaut : `<models>/qa/source_logos.toml`).
         #[arg(long, requires = "source_logo")]
         source_logo_catalog: Option<PathBuf>,
+        /// Racine externe des crops RGBA de référence. Implique
+        /// `--source-logo-visual`.
+        #[arg(long, requires = "source_logo")]
+        source_logo_references: Option<PathBuf>,
         /// Désactive le contrôle logos de la bande haute.
         #[arg(long)]
         no_logo: bool,
@@ -1625,7 +1633,9 @@ fn run() -> Result<()> {
                 logo_visual,
                 no_face,
                 source_logo,
+                source_logo_visual,
                 source_logo_catalog,
+                source_logo_references,
                 no_evidence,
                 per_segment,
                 video_id,
@@ -1638,6 +1648,7 @@ fn run() -> Result<()> {
                 if !matches!(per_segment, 1 | 3) {
                     anyhow::bail!("--per-segment doit valoir 1 ou 3");
                 }
+                let source_logo_visual = source_logo_visual || source_logo_references.is_some();
                 let options = QaOptions {
                     ffmpeg: ffmpeg.unwrap_or_else(|| config.steps.step8.post.ffmpeg.clone()),
                     ffprobe: ffprobe.unwrap_or_else(|| config.steps.step8.post.ffprobe.clone()),
@@ -1651,7 +1662,9 @@ fn run() -> Result<()> {
                     logo_visual_enabled: !no_logo_visual || logo_visual,
                     face_enabled: !no_face,
                     source_logo_enabled: source_logo,
+                    source_logo_visual,
                     source_logo_catalog,
+                    source_logo_references,
                     evidence_enabled: !no_evidence,
                     per_segment,
                     video_id,

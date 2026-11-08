@@ -11,7 +11,7 @@
 use crate::vision::text::normalize_text;
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub const CATALOG_FILENAME: &str = "source_logos.toml";
 
@@ -100,7 +100,19 @@ pub struct SourceLogoPrior {
     pub channel: String,
     pub position: String,
     pub bbox: [f64; 4],
-    pub variants: Vec<[f64; 4]>,
+    pub variants: Vec<SourceLogoVariantPrior>,
+}
+
+/// Variante visuelle d'un logo : bbox source et crop RGBA associé, relatif à
+/// la racine de références fournie par l'appelant.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SourceLogoVariantPrior {
+    pub crop: String,
+    /// Bbox mise à l'échelle de la source réelle, utilisée pour la projection.
+    pub bbox: [f64; 4],
+    /// Bbox dans le canvas de référence 1920×1080, utilisée pour recadrer le
+    /// PNG de référence.
+    pub reference_bbox: [i64; 4],
 }
 
 impl SourceLogoCatalog {
@@ -211,9 +223,29 @@ impl SourceLogoCatalog {
         ))
     }
 
+    /// Racine des crops de référence. Le chemin explicite de l'appelant
+    /// prime sur `reference_root` du catalogue ; un catalogue versionné ne
+    /// doit pas dépendre d'un chemin machine.
+    pub fn reference_root(&self, override_root: Option<&Path>) -> Option<PathBuf> {
+        override_root.map(Path::to_path_buf).or_else(|| {
+            let root = self.reference_root.trim();
+            (!root.is_empty()).then(|| PathBuf::from(root))
+        })
+    }
+
+    /// Fichiers de crops référencés par le catalogue, dans l'ordre stable du
+    /// fichier. Sert à l'empreinte de cache et à la validation des assets.
+    pub fn reference_crops(&self, root: &Path) -> Vec<PathBuf> {
+        self.emissions
+            .iter()
+            .flat_map(|emission| emission.variants.iter())
+            .map(|variant| resolve_reference_path(root, &variant.crop))
+            .collect()
+    }
+
     /// Zones génériques utilisables quand aucune émission n'est reconnue.
-    /// Phase A : elles ne produisent aucune décision, seulement un repère
-    /// auditable pour la confirmation temporelle ultérieure.
+    /// Elles ne produisent aucune décision, seulement un repère auditable
+    /// pour la confirmation temporelle.
     pub fn generic_zones(
         &self,
         source_width: u32,
@@ -252,7 +284,11 @@ impl SourceLogoPrior {
             variants: emission
                 .variants
                 .iter()
-                .map(|variant| scale_bbox(variant.bbox))
+                .map(|variant| SourceLogoVariantPrior {
+                    crop: variant.crop.clone(),
+                    bbox: scale_bbox(variant.bbox),
+                    reference_bbox: variant.bbox,
+                })
                 .collect(),
         }
     }
@@ -273,6 +309,22 @@ fn scale_bbox(
         bbox[2] as f64 * scale_x,
         bbox[3] as f64 * scale_y,
     ]
+}
+
+/// Résout un crop relatif. Le chemin explicite peut pointer sur le dossier
+/// `emissions` ou sur son parent `references_logos` : les deux formes sont
+/// acceptées sans dupliquer la configuration.
+pub fn resolve_reference_path(root: &Path, crop: &str) -> PathBuf {
+    let direct = root.join(crop);
+    if direct.is_file() {
+        return direct;
+    }
+    let nested = root.join("emissions").join(crop);
+    if nested.is_file() {
+        nested
+    } else {
+        direct
+    }
 }
 
 pub fn bbox_area(bbox: [f64; 4]) -> f64 {
@@ -423,6 +475,8 @@ channel = "M6"
         assert!((prior.bbox[0] - 91.0 * 1280.0 / 1920.0).abs() < 1e-9);
         assert!((prior.bbox[3] - 1026.0 * 720.0 / 1080.0).abs() < 1e-9);
         assert_eq!(prior.variants.len(), 1);
+        assert_eq!(prior.variants[0].crop, "66_Minutes/crop.png");
+        assert_eq!(prior.variants[0].reference_bbox, [91, 846, 298, 1026]);
     }
 
     #[test]
@@ -465,6 +519,22 @@ channel = "M6"
                 .unwrap()
                 .name,
             "Les Marseillais"
+        );
+    }
+
+    #[test]
+    fn reference_path_accepts_the_parent_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let crop = dir
+            .path()
+            .join("emissions")
+            .join("66_Minutes")
+            .join("crop.png");
+        std::fs::create_dir_all(crop.parent().unwrap()).unwrap();
+        std::fs::write(&crop, b"png").unwrap();
+        assert_eq!(
+            resolve_reference_path(dir.path(), "66_Minutes/crop.png"),
+            crop
         );
     }
 

@@ -655,7 +655,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/qa/logo.rs`,
   `crates/workflow-steps/src/qa/dino.rs`.
 
-## 2026-11-08 — D-052 : registre spatial des logos source, annotation et exclusion OCR (phases A/B)
+## 2026-11-08 — D-052 : registre spatial des logos source, annotation, exclusion OCR et confirmation visuelle (phases A/B/C)
 
 - **Contexte** : le client a documenté 29 émissions avec un logo de programme
   quasi déterministe dans le canvas source 1920×1080 (28 en bas-gauche,
@@ -664,7 +664,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   coûteuse et moins fiable que ce prior spatial ; le logo doit rester
   distinct de la bannière éditoriale et du sous-titre.
 - **Décision** :
-  1. les phases A/B restent **report-only** : le registre ne recadre, ne
+  1. les phases A/B/C restent **report-only** : le registre ne recadre, ne
      masque et ne supprime jamais rien ; il annote A2 et le QA, et un logo
      seul ne peut que déclencher une revue ;
   2. `assets/models/qa/source_logos.toml` est versionné (schéma 1, zones
@@ -683,16 +683,26 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
      désactivé par défaut) ; le QA ajoute le check `source_logo` derrière
      `--source-logo`, `pass`/`info` uniquement, et refuse l'auto-approbation
      si le catalogue demandé n'a pas pu tourner ;
-  6. la zone générique est exposée dans le catalogue et rappelée par le QA
-     pour les sources inconnues, mais n'est pas encore confirmée ni utilisée
-     pour une revue ;
+  6. la zone générique est exposée dans le catalogue ; la phase C mesure sa
+     stabilité temporelle pour les sources inconnues et produit un `info`
+     « logo possible non identifié », sans identité ni revue ;
   7. phase B, même flag : les détections OCR majoritairement (≥ 60 %) dans
      la bbox du logo sont retirées du groupe dominant et exposées sous
      `details.ocr.logo_texts` (`logo_detections_total`, `logo_only`). Ces
      clés n'existent que si un prior est actif. Un logo seul ne peut jamais
      confirmer une bannière : A2 répond `review` au lieu d'appliquer. Les
      garde-fous de géométrie, de largeur et de bande sombre gardent la
-     priorité.
+     priorité ;
+  8. phase C : `--source-logo-visual` (impliqué par
+     `--source-logo-references`) confirme localement le logo par NCC couleur
+     sur masque alpha + NCC des contours, sur six instants et toutes les
+     variantes. Seuils : couleur ≥ 0,45, contours ≥ 0,10, score ≥ 0,50, deux
+     échantillons forts. Les crops restent externes et le chemin accepte
+     `emissions` ou son parent. Un format d'export différent de la
+     composition abandonne la comparaison. Pour une source inconnue, la
+     stabilité des zones génériques (écart-type ≤ 12/255, ≥ 5 % stables,
+     contours persistants ≥ 0,8 %, densité ≥ 4 %) ne produit qu'un `info`.
+     Aucun `review`, aucun recadrage.
 - **Alternatives rejetées** :
   - détection plein cadre ou YOLO : fermée au monde ouvert et sans le prior
     client ;
@@ -714,18 +724,27 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `40 ABHARTACH` et `40 FOOTBALLEUR` restent `review` et passent de « bande
   animée » à « bande sombre, texte persistant confirmé », avec la bannière
   réelle dominante (91,7 %) et `scale_target` 218,2 % ; `sub_fast` reste
-  vétoé à 25 %. Les audits restent `pass`. 492 tests workspace, `fmt` et
-  `clippy -D warnings` verts ; aucune écriture dans `/mnt/cache`.
-- **Limites** : le check QA est géométrique, sans comparaison de pixels ; le
-  QA écarte les observations couvertes par un overlay déclaré, mais A2 ne
-  consulte pas encore ce masque ; la zone générique n'est pas confirmée
-  temporellement ; les crops de référence ne sont pas utilisés. La phase C
-  (template matching NCC + contours, stabilité temporelle de la zone
-  générique) reste à faire et devra être validée par le client avant
-  activation.
+  vétoé à 25 %. Les audits restent `pass`.
+- **Validation phase C** : frame de référence 66 Minutes → NCC 0,97 (3/3) ;
+  export 9:16 synthétique UJUD avec la transformation réelle du projet →
+  NCC 0,96 (3/3) ; frame d'une autre émission → 0,05–0,07, non confirmé ;
+  image statique inconnue → zone générique stable à 100 % (contours 19,6 %).
+  Sur les 35 exports GOOD appariés : 25 `pass`, 10 `info`, 0 nouveau finding,
+  aucune zone générique stable sur les sources inconnues ; les 10 `info`
+  restent non confirmés car le logo source n'est pas à la position projetée
+  dans ces exports. 500 tests workspace, `fmt` et `clippy -D warnings`
+  verts ; aucune écriture dans `/mnt/cache`.
+- **Limites** : la confirmation visuelle est une corrélation globale ; un
+  logo animé, une variante non cataloguée ou un reflet peut rester non
+  confirmé, et un fond statique peut déclencher la stabilité d'une zone
+  générique. Les seuils sont calibrés sur les références, les cas
+  synthétiques et GOOD, pas sur un corpus d'exports réellement porteurs. A2
+  ne consulte ni les overlays ni la confirmation visuelle ; DINOv2 sur les
+  scores résiduels et une confirmation A2 restent optionnels (phase D).
 - **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md` (§7.5),
   `crates/workflow-steps/src/vision/source_logo.rs`,
   `crates/workflow-steps/src/qa/source_logo.rs`,
+  `crates/workflow-steps/src/qa/source_logo_visual.rs`,
   `crates/workflow-steps/src/post/a2.rs`,
   `scripts/import-source-logos.py`.
 

@@ -184,8 +184,9 @@ lieu d'appliquer. Rejeu : `54`/`58` conservent leur action et leur scale
 (`UNJOUR`/`UNDOC` passent de `texts` à `logo_texts`), `40` reste `review`
 mais devient « bande sombre, texte persistant confirmé » avec la bannière
 réelle dominante (91,7 %) et `scale_target` 218,2 %, `sub_fast` reste vétoé
-à 25 %. La confirmation visuelle NCC/contours et la zone générique restent
-en phase C.
+à 25 %. La confirmation visuelle NCC/contours et la stabilité de la zone
+générique sont implémentées côté QA (`--source-logo-visual`, LOT-10) ; A2 ne
+les consulte pas et garde ses garde-fous géométriques.
 
 ## A3/A4 — revue seulement
 

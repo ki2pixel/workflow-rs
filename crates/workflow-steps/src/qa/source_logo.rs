@@ -1,14 +1,15 @@
-//! Contrôle géométrique des logos source dans l'export final (D-052).
+//! Contrôle des logos source dans l'export final (D-052).
 //!
-//! Phase A : le registre spatial ne fait qu'annoter la visibilité du logo de
-//! programme à travers les transformations du `.ecproj`. Aucun pixel n'est
-//! analysé et aucune décision n'est prise : le check est `pass` ou `info`.
-//! La confirmation visuelle et le passage en `review` viendront dans un lot
-//! ultérieur, après comparaison avec le corpus GOOD.
+//! La phase A annote la visibilité géométrique du logo de programme à travers
+//! les transformations du `.ecproj`. La phase C peut confirmer localement les
+//! pixels (NCC/contours) ou la stabilité d'une zone générique. Le check reste
+//! `pass` ou `info` : aucune décision, aucun recadrage, aucun masquage. Seul
+//! un overlay déclaré peut écarter une observation.
 
 use crate::post::ecproj;
-use crate::qa::model::QaCheck;
+use crate::qa::model::{QaCheck, QaStatus};
 use crate::qa::overlay::{self, OverlayMask};
+use crate::qa::source_logo_visual::{self, VisualOptions};
 use crate::vision::source_logo::{bbox_area, clip_bbox, SourceLogoCatalog};
 use anyhow::Result;
 use serde_json::Value;
@@ -19,13 +20,48 @@ const MIN_VISIBILITY: f64 = 0.15;
 /// Surface minimale visible dans la composition (pixels).
 const MIN_VISIBLE_AREA: f64 = 400.0;
 
-pub fn run_geometry(project: &Path, catalog_path: &Path) -> Result<QaCheck> {
+pub fn run(
+    project: &Path,
+    catalog_path: &Path,
+    visual: Option<&VisualOptions<'_>>,
+) -> Result<QaCheck> {
     let catalog = SourceLogoCatalog::load(catalog_path)?;
     let doc = ecproj::load(project)?;
     // Le masque d'overlay déclaré prime sur le prior : un logo de programme
     // remplacé par un habillage intentionnel ne doit pas être signalé.
     let mask = overlay::read_mask(project).ok();
-    Ok(check_doc(&doc, &catalog, mask.as_ref()))
+    let mut check = check_doc(&doc, &catalog, mask.as_ref());
+    match visual {
+        Some(visual) => {
+            if let Some(suffix) = source_logo_visual::summarize(&doc, &catalog, visual) {
+                append_suffix(&mut check, &suffix);
+            } else if check.status == QaStatus::Info {
+                append_suffix(&mut check, "confirmation visuelle non exécutée");
+            } else if is_generic_detail(&check) {
+                append_suffix(&mut check, "non confirmée(s)");
+            }
+        }
+        None if check.status == QaStatus::Info => {
+            append_suffix(&mut check, "confirmation visuelle non activée");
+        }
+        None if is_generic_detail(&check) => {
+            append_suffix(
+                &mut check,
+                "non confirmée(s), confirmation visuelle non activée",
+            );
+        }
+        None => {}
+    }
+    Ok(check)
+}
+
+fn is_generic_detail(check: &QaCheck) -> bool {
+    check.detail.contains("zone(s) générique(s)")
+}
+
+fn append_suffix(check: &mut QaCheck, suffix: &str) {
+    let detail = check.detail.trim_end_matches([' ', ';']).trim_end();
+    check.detail = format!("{detail} ; {suffix}");
 }
 
 fn check_doc(doc: &Value, catalog: &SourceLogoCatalog, mask: Option<&OverlayMask>) -> QaCheck {
@@ -69,9 +105,7 @@ fn check_doc(doc: &Value, catalog: &SourceLogoCatalog, mask: Option<&OverlayMask
             if zones.is_empty() {
                 format!("aucun logo source connu pour {source_name}")
             } else {
-                format!(
-                    "aucun logo source connu pour {source_name}; zone(s) générique(s) {zones} non confirmée(s)"
-                )
+                format!("aucun logo source connu pour {source_name}; zone(s) générique(s) {zones}")
             }
         };
         return QaCheck::pass("source_logo", detail);
@@ -208,7 +242,7 @@ fn check_doc(doc: &Value, catalog: &SourceLogoCatalog, mask: Option<&OverlayMask
         "source_logo",
         format!(
             "logo {} ({}) projeté dans {} segment(s) du cadre, de {:.1} à {:.1} s, \
-             visibilité max {:.0} %, bbox {}{masked}{unsupported} ; confirmation visuelle non activée",
+             visibilité max {:.0} %, bbox {}{masked}{unsupported}",
             prior.name,
             prior.channel,
             visible_segments,
@@ -220,7 +254,7 @@ fn check_doc(doc: &Value, catalog: &SourceLogoCatalog, mask: Option<&OverlayMask
     )
 }
 
-fn source_size(doc: &Value, name: &str) -> Option<(u32, u32)> {
+pub(crate) fn source_size(doc: &Value, name: &str) -> Option<(u32, u32)> {
     let items = doc.get("items")?.as_object()?;
     items.values().find_map(|item| {
         if item.get("name").and_then(Value::as_str) != Some(name) {
@@ -310,7 +344,7 @@ aliases = ["66M -"]
         let check = check_doc(&doc(0.0, 0.0, false), &catalog(), None);
         assert_eq!(check.status, crate::qa::model::QaStatus::Info);
         assert!(check.detail.contains("66 Minutes"));
-        assert!(check.detail.contains("confirmation visuelle non activée"));
+        assert!(check.detail.contains("visibilité max"));
     }
 
     #[test]

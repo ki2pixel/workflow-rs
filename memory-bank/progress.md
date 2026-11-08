@@ -86,6 +86,14 @@
   manuelle des rushes UJUD/66M : logo présent sur toute la durée ; balayage
   exhaustif à 1 i/s : maximum 0,38). Phase D optionnelle (DINOv2
   résiduel, confirmation A2) non implémentée.
+- **Staging OCR A2 (D-054, 2026-11-08)** : PP-OCRv6 det/rec installés sous
+  `assets/models/qa/` (hashes du manifeste), runtime ONNX local dans
+  `vendor/`, `a2_ocr_threads = 8`. Copies de `40`, `54`, `58` : `54` reste
+  `apply` 200,8 % (confiance 0,90 → 0,95), `58` passe `review` → `apply`
+  210,0 %, `40` restent `review` avec OCR mais `coverage_x` 0,09–0,11 ; audits
+  `pass`, lot 87,3 s → 130,7 s. `a2_ocr` et `a2_logo_prior` restent `false`
+  jusqu'à validation client ; `a2_logo_prior` seul confirme la phase B sur
+  `40` (`scale_target` 218,2, dominance 0,9167).
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
   sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
   aucun `.ecproj` (validé sur 295, 340, 341 et lots mixtes).

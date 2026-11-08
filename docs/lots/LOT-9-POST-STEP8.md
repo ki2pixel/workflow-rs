@@ -114,14 +114,28 @@ Features : `text_persistence` (échantillons avec texte / total),
 
 **Activation.** Ne pas activer `a2_ocr` et `a2_logo_prior` ensemble en
 production. `a2_ocr` attend la validation humaine des quatre cas
-(`54`, `58`, `40` ×2) et la présence des modèles sous `paths.models/qa/` ;
-sans eux, le gate journalise un avertissement et retombe sur la décision
-géométrique. Séquence retenue : staging avec `a2_ocr = true`,
-`a2_logo_prior = false`, `a2_ocr_threads = 8`, comparaison des `post.json`
-et des audits sur un lot représentatif, validation client, puis activation
-production. `a2_logo_prior` seul ne change pas la décision : il annote le
+(`54`, `58`, `40` ×2) ; les modèles PP-OCRv6 sont désormais installés sous
+`paths.models/qa/` et le runtime pointe vers
+`vendor/libonnxruntime.so.1.23.2`. Sans modèles, le gate journalise un
+avertissement et retombe sur la décision géométrique. Séquence retenue :
+staging avec `a2_ocr = true`, `a2_logo_prior = false`,
+`a2_ocr_threads = 8`, comparaison des `post.json` et des audits sur un lot
+représentatif, validation client, puis activation production. `a2_logo_prior` seul ne change pas la décision : il annote le
 logo et peut être activé en observation après validation des phases B/C,
 mais reste opt-in.
+
+**Validation staging (2026-11-08).** Comparaison sur copies de `40`, `54`
+et `58`, sans écriture dans `/mnt/cache` : baseline `a2_ocr = false` contre
+staging `a2_ocr = true`, `a2_logo_prior = false`, `a2_ocr_threads = 8`.
+`54` reste `apply` 200,8 % (confiance 0,90 → 0,95), `58` passe de `review`
+à `apply` 210,0 %, `40 ABHARTACH` et `40 FOOTBALLEUR` restent `review` avec
+les preuves OCR mais sans scale proposé : le texte dominant est encore
+`66`/`MINUTES` (`coverage_x` 0,09–0,11 < 0,25). Tous les audits sont `pass`.
+Le même run avec `a2_logo_prior = true` confirme le comportement de la
+phase B sur `40` : `review` « bande basse sombre, texte persistant
+confirmé », `scale_target` 218,2, dominance 0,9167, `logo_texts`
+`66`/`MINUTES`. Coût du lot : 87,3 s en baseline, 130,7 s en staging
+(+50 %), soit 9–13 s d'OCR par projet à 8 threads.
 
 Décision :
 

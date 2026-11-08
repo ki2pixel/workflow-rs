@@ -218,8 +218,8 @@ a2_ocr = false
 # Modèles PP-OCRv6, relatifs à paths.models ou absolus.
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
-# Bibliothèque ONNX Runtime explicite (décommenter si absent du système).
-# a2_ocr_onnxruntime = "/home/kidpixel/workflow_mediapipe/coral_env/lib/python3.11/site-packages/onnxruntime/capi/libonnxruntime.so.1.23.2"
+# Bibliothèque ONNX Runtime locale (copiée depuis le paquet Python legacy).
+a2_ocr_onnxruntime = "/home/kidpixel/workflow-rs/vendor/libonnxruntime.so.1.23.2"
 # Threads intra-op par session PP-OCRv6 det/rec (les deux sessions sont
 # séquentielles). Mesuré sur le Ryzen 1920X (24 threads) : 2 threads = 23,6 s,
 # 8 = 13,2 s, 12 = 12,5 s pour les 12 échantillons A2 de `54`. 8 est retenu :

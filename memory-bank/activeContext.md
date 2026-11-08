@@ -42,15 +42,22 @@ final, où le logo social est ajouté manuellement en overlay. Activation
 production toujours soumise à validation client ; phase D optionnelle
 (DINOv2 résiduel, confirmation A2) non implémentée.
 
-**Threads OCR A2 et compatibilité EffectCraft (2026-11-08, D-053).**
+**Threads OCR A2, staging et compatibilité EffectCraft (2026-11-08, D-053/D-054).**
 `steps.step8.post.a2_ocr_threads` borne chaque session PP-OCRv6 det/rec
 (défaut 2, `config/config.toml` = 8). Sur `54` : OCR 23,6 s à 2 threads,
-13,2 s à 8, 12,5 s à 12 ; A1 reste le goulot à ~23,5 s. `a2_ocr` et
-`a2_logo_prior` restent `false` jusqu'à validation humaine/client ; les
-modèles PP-OCRv6 ne sont pas présents sous `assets/models/qa/`. EffectCraft
-0.22.0 est compatible : STEP8 réel sur copie temporaire de `54` (1/1 projet,
-`MS_BATCH_RESULT ok`), post STEP8 (`_assist`, audit `pass`) et ouverture du
-projet assisté par `effectcraft-cli --json info`.
+13,2 s à 8, 12,5 s à 12 ; A1 reste le goulot à ~23,5 s. Les PP-OCRv6 sont
+installés sous `assets/models/qa/` (SHA-256 du manifeste) et le runtime
+pointe vers `vendor/libonnxruntime.so.1.23.2`. Staging sur copies de `40`,
+`54` et `58` : `54` reste `apply` 200,8 % (confiance 0,90 → 0,95), `58`
+passe `review` → `apply` 210,0 %, les deux `40` restent `review` avec les
+preuves OCR mais sans scale proposé (`coverage_x` 0,09–0,11 < 0,25) ; audits
+`pass`, lot 87,3 s → 130,7 s. `a2_logo_prior = true` sur `40` confirme la
+phase B : review bande sombre, `scale_target` 218,2, dominance 0,9167,
+`logo_texts` `66`/`MINUTES`. `a2_ocr` et `a2_logo_prior` restent `false`
+en production jusqu'à validation client. EffectCraft 0.22.0 est compatible :
+STEP8 réel sur copie temporaire de `54` (1/1 projet, `MS_BATCH_RESULT ok`),
+post STEP8 (`_assist`, audit `pass`) et ouverture du projet assisté par
+`effectcraft-cli --json info`.
 
 **QA 1.3.0 — clustering OCR (2026-11-07, D-051).** La phase 1 est
 implémentée : `qa/ocr.rs` regroupe les détections par **boîte stable** (le

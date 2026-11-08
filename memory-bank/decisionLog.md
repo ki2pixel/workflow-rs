@@ -819,6 +819,43 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-core/src/config.rs`, `config/config.toml`,
   `docs/lots/LOT-9-POST-STEP8.md`.
 
+## 2026-11-08 — D-054 : installation des modèles OCR et validation staging A2
+
+- **Contexte** : suite de D-053. Les flags restaient désactivés et les
+  PP-OCRv6 étaient absents de `assets/models/qa/` ; la séquence recommandée
+  demandait d'installer les modèles, de rejouer un lot représentatif en
+  staging, puis de soumettre les écarts à validation avant toute activation
+  en production.
+- **Décision** :
+  1. `PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx` sont copiés sous
+     `assets/models/qa/` ; leurs SHA-256 correspondent au manifeste. Les
+     binaires restent gitignorés. `vendor/libonnxruntime.so.1.23.2` est copié
+     depuis le paquet Python legacy et `steps.step8.post.a2_ocr_onnxruntime`
+     pointe dessus.
+  2. Staging sur copies de `40`, `54` et `58`, sans écriture dans
+     `/mnt/cache` : baseline `a2_ocr = false` contre staging
+     `a2_ocr = true`, `a2_logo_prior = false`, `a2_ocr_threads = 8`.
+     `54` reste `apply` 200,8 % (confiance 0,90 → 0,95) ; `58` passe de
+     `review` à `apply` 210,0 % ; `40 ABHARTACH` et `40 FOOTBALLEUR`
+     restent `review` avec les preuves OCR mais sans `scale_target`
+     (dominance `66`/`MINUTES`, `coverage_x` 0,09–0,11 < 0,25). Tous les audits
+     sont `pass`. Coût du lot : 87,3 s en baseline, 130,7 s en staging.
+  3. Le même lot avec `a2_logo_prior = true` confirme la phase B sur `40` :
+     `review` « bande basse sombre, texte persistant confirmé »,
+     `scale_target` 218,2, dominance 0,9167, `logo_texts` `66`/`MINUTES`.
+  4. `a2_ocr` et `a2_logo_prior` restent `false` dans
+     `config/config.toml` jusqu'à validation client. Après validation,
+     activer `a2_ocr` seul d'abord, puis `a2_logo_prior` après validation
+     des phases B/C.
+- **Limites** : le staging couvre trois dossiers et quatre projets, pas un
+  lot complet. Les écarts `58` (`review` → `apply`) et la confiance `54`
+  (0,90 → 0,95) doivent être validés par le client. Le coût OCR reste
+  séquentiel par projet.
+- **Références** : `config/config.toml`, `docs/lots/LOT-9-POST-STEP8.md`,
+  `crates/workflow-steps/src/post/a2.rs`,
+  `crates/workflow-steps/src/post/run.rs`,
+  `crates/workflow-core/src/config.rs`, `assets/models/qa/manifest.toml`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

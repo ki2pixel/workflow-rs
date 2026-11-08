@@ -100,7 +100,8 @@ bannière supprimée à 10/40/100 s. Les 11 cas synthétiques donnent 3 `apply`,
 
 ### Gate OCR A2 v3 (D-051, 2026-11-07)
 
-Le gate est **opt-in** (`a2_ocr = false`) : sans flag, la décision A2 reste
+Le gate est **opt-in** (`a2_ocr = false` par défaut) ; la production
+l'active depuis le 2026-11-08 (D-055). Sans flag, la décision A2 reste
 strictement géométrique et aucun modèle ONNX n'est ouvert. Quand il est
 activé, 12 timestamps uniformes sont lus sur le crop du candidat (marge de
 16 px sur les quatre côtés), PP-OCRv6 det/rec tourne en CPU avec
@@ -112,17 +113,15 @@ est ignoré. Mesure sur `54` (12 échantillons) : 23,6 s à 2 threads, 13,2 s
 Features : `text_persistence` (échantillons avec texte / total),
 `dominant_ratio`, `y_drift_px`, `score`, `overlap`, `coverage_x`.
 
-**Activation.** Ne pas activer `a2_ocr` et `a2_logo_prior` ensemble en
-production. `a2_ocr` attend la validation humaine des quatre cas
-(`54`, `58`, `40` ×2) ; les modèles PP-OCRv6 sont désormais installés sous
-`paths.models/qa/` et le runtime pointe vers
-`vendor/libonnxruntime.so.1.23.2`. Sans modèles, le gate journalise un
-avertissement et retombe sur la décision géométrique. Séquence retenue :
-staging avec `a2_ocr = true`, `a2_logo_prior = false`,
-`a2_ocr_threads = 8`, comparaison des `post.json` et des audits sur un lot
-représentatif, validation client, puis activation production. `a2_logo_prior` seul ne change pas la décision : il annote le
-logo et peut être activé en observation après validation des phases B/C,
-mais reste opt-in.
+**Activation (2026-11-08, D-055).** `a2_ocr = true` est actif en
+production, avec `a2_logo_prior = false`, `a2_ocr_threads = 8`, les modèles
+sous `paths.models/qa/` et le runtime
+`vendor/libonnxruntime.so.1.23.2`. La séquence suivie a été : staging sur
+copies de `40`, `54` et `58`, validation humaine, puis activation de
+`a2_ocr` seul. Ne pas activer les deux flags ensemble : `a2_logo_prior`
+reste en observation et sera évalué après une période de runs réels. Sans
+modèles, le gate journalise un avertissement et retombe sur la décision
+géométrique.
 
 **Validation staging (2026-11-08).** Comparaison sur copies de `40`, `54`
 et `58`, sans écriture dans `/mnt/cache` : baseline `a2_ocr = false` contre
@@ -131,11 +130,22 @@ staging `a2_ocr = true`, `a2_logo_prior = false`, `a2_ocr_threads = 8`.
 à `apply` 210,0 %, `40 ABHARTACH` et `40 FOOTBALLEUR` restent `review` avec
 les preuves OCR mais sans scale proposé : le texte dominant est encore
 `66`/`MINUTES` (`coverage_x` 0,09–0,11 < 0,25). Tous les audits sont `pass`.
-Le même run avec `a2_logo_prior = true` confirme le comportement de la
-phase B sur `40` : `review` « bande basse sombre, texte persistant
-confirmé », `scale_target` 218,2, dominance 0,9167, `logo_texts`
-`66`/`MINUTES`. Coût du lot : 87,3 s en baseline, 130,7 s en staging
-(+50 %), soit 9–13 s d'OCR par projet à 8 threads.
+Coût du lot : 87,3 s en baseline, 130,7 s en staging (+50 %), soit 9–13 s
+d'OCR par projet à 8 threads. Vérification avec la configuration de
+production sur une copie de `54` : `apply` 200,8 %, OCR 13,0 s, post
+43,9 s, audit `pass`, aucune erreur de chargement ONNX.
+
+**Observation `a2_logo_prior` (2026-11-08).** Sur copies de `54` et `58`,
+le flag ne change pas l'action : `apply` 200,8 % / 210,0 %, mêmes
+`scale_target`. Il retire `UNJOUR`/`UNDOC` de `texts` et les place dans
+`logo_texts` (`source_logo` visible, `logo_in_candidate` 0,65 / 0,93). Sur
+`40 ABHARTACH` et `40 FOOTBALLEUR`, il ne change pas l'action (`review`)
+mais remplace « bande basse animée, géométrie non fiable » (confiance 0,4,
+sans scale) par « bande basse sombre, texte persistant confirmé »
+(confiance 0,55, `scale_target` 218,2, dominance 0,9167). C'est un
+changement de rapport réel, pas une simple annotation : le flag reste
+`false` en production tant que ces nouveaux motifs n'ont pas été acceptés
+par les opérateurs.
 
 Décision :
 
@@ -354,8 +364,8 @@ ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 a1_margin = 1.04
 a2_margin = 1.05
-# Gate OCR A2 (D-051), désactivé par défaut.
-a2_ocr = false
+# Gate OCR A2 (D-051), activé en production le 2026-11-08 (D-055).
+a2_ocr = true
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
 a2_ocr_threads = 8
@@ -451,9 +461,10 @@ GOOD sur trois, donc la comparaison y est partielle.
 - A3/A4 restent en revue ; aucun keyframe ni cut n'est appliqué.
 - A1 ne couvre pas les bords non noirs ni les recadrages sémantiques ; ces cas
   restent en `review`.
-- A2 OCR est **opt-in** (`a2_ocr = false`) et coûte 15–25 s par projet avec
-  2 threads, 13,2 s avec 8 ; il
-  ne couvre que le texte, pas les logos purement visuels. Les bandeaux
+- A2 OCR est **activé explicitement** (`a2_ocr = true` en production depuis
+  D-055 ; défaut du code `false`) et coûte 15–25 s par projet avec 2
+  threads, 13,2 s avec 8 ; il ne couvre que le texte, pas les logos
+  purement visuels. Les bandeaux
   sombres restent en `review` (niveau 1) et les candidats étroits ne sont
   jamais recadrés.
 - A6 est un template SDM mesuré ; un projet multi-segment ou keyframé part en

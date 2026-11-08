@@ -53,8 +53,13 @@ passe `review` → `apply` 210,0 %, les deux `40` restent `review` avec les
 preuves OCR mais sans scale proposé (`coverage_x` 0,09–0,11 < 0,25) ; audits
 `pass`, lot 87,3 s → 130,7 s. `a2_logo_prior = true` sur `40` confirme la
 phase B : review bande sombre, `scale_target` 218,2, dominance 0,9167,
-`logo_texts` `66`/`MINUTES`. `a2_ocr` et `a2_logo_prior` restent `false`
-en production jusqu'à validation client. EffectCraft 0.22.0 est compatible :
+`logo_texts` `66`/`MINUTES`. Validation humaine du 2026-11-08 : `a2_ocr`
+est activé seul en production (D-055), `a2_logo_prior` reste `false` ; sur
+`54`/`58` le prior ne change que `texts`/`logo_texts`, mais sur `40` il
+modifie le motif, la confiance et le `scale_target`, donc il attend une
+période d'observation. Vérification avec la configuration de production
+sur une copie de `54` : `apply` 200,8 %, OCR 13,0 s, post 43,9 s, audit
+`pass`. EffectCraft 0.22.0 est compatible :
 STEP8 réel sur copie temporaire de `54` (1/1 projet, `MS_BATCH_RESULT ok`),
 post STEP8 (`_assist`, audit `pass`) et ouverture du projet assisté par
 `effectcraft-cli --json info`.

@@ -856,6 +856,40 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`, `assets/models/qa/manifest.toml`.
 
+## 2026-11-08 — D-055 : activation de `a2_ocr` en production, `a2_logo_prior` différé
+
+- **Contexte** : le staging D-054 a été validé le 2026-11-08. `a2_ocr`
+  apporte une preuve OCR réelle (`54` confiance 0,90 → 0,95, `58` `review`
+  → `apply` 210,0 %) mais `a2_logo_prior` modifie aussi le rapport A2 sur
+  les bandeaux sombres et dépend du catalogue de logos.
+- **Décision** :
+  1. `steps.step8.post.a2_ocr = true` dans `config/config.toml`, avec
+     `a2_ocr_threads = 8`, les modèles sous `assets/models/qa/` et le
+     runtime `vendor/libonnxruntime.so.1.23.2`.
+  2. `a2_logo_prior` reste `false` : l'activer seul permet d'isoler l'effet
+     OCR et de valider les nouveaux motifs en production. Il sera évalué
+     après une période de runs réels, ou sur un lot de copies.
+  3. Vérification avec la configuration de production sur une copie de
+     `54` : `apply` 200,8 %, OCR 13,0 s, post 43,9 s, audit `pass`, aucune
+     erreur de chargement ONNX.
+  4. Le prior ne change pas l'action dans les cas testés, mais il n'est pas
+     purement cosmétique : sur `54`/`58` il déplace `UNJOUR`/`UNDOC` de
+     `texts` vers `logo_texts` ; sur `40 ABHARTACH`/`40 FOOTBALLEUR` il
+     remplace « bande basse animée, géométrie non fiable » (confiance 0,4,
+     sans scale) par « bande basse sombre, texte persistant confirmé »
+     (confiance 0,55, `scale_target` 218,2, dominance 0,9167). Les
+     opérateurs doivent accepter ces motifs avant l'activation.
+- **Rollback** : repasser `a2_ocr = false` ; aucune migration de données,
+  `post.json` reste schéma 1 et les clés OCR disparaissent.
+- **Validation** : `config check`, `post run` réel sur copie de `54`,
+  505 tests, `fmt` et `clippy -D warnings` verts. Aucune écriture dans
+  `/mnt/cache`.
+- **Références** : `config/config.toml`,
+  `docs/lots/LOT-9-POST-STEP8.md`,
+  `crates/workflow-steps/src/post/a2.rs`,
+  `crates/workflow-steps/src/post/run.rs`,
+  `crates/workflow-core/src/config.rs`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

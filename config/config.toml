@@ -213,8 +213,9 @@ ffprobe = "ffprobe"
 a1_margin = 1.04
 a2_margin = 1.05
 # Gate OCR A2 (D-051) : confirme un bandeau clair par texte persistant et
-# oppose un veto si le texte change. Désactivé par défaut.
-a2_ocr = false
+# oppose un veto si le texte change. Activé en production le 2026-11-08
+# après staging (D-055) ; le défaut du code reste false.
+a2_ocr = true
 # Modèles PP-OCRv6, relatifs à paths.models ou absolus.
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"

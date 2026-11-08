@@ -19,6 +19,7 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 use serde_json::{json, Map, Serializer, Value};
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,7 +43,11 @@ pub struct PostOptions {
     pub template_prefix: String,
     pub archive_only_prefixes: Vec<String>,
     pub a1_margin: f64,
+    /// R2 : diffère A1 en revue sur candidat A3 fort. Désactivé par défaut.
+    pub a1_defer_on_a3: bool,
     pub a2_margin: f64,
+    /// R6 : autorise `gap < 0,7` en revue A3. Désactivé par défaut.
+    pub a3_relaxed_gap: bool,
     /// Gate OCR A2 : désactivé, aucune session ONNX n'est ouverte.
     pub a2_ocr: bool,
     pub a2_ocr_det: PathBuf,
@@ -73,8 +78,10 @@ impl Default for PostOptions {
             artifacts_subfolder: "post".into(),
             template_prefix: a6::DEFAULT_PREFIX.into(),
             archive_only_prefixes: Vec::new(),
-            a1_margin: 1.04,
+            a1_margin: 1.015,
+            a1_defer_on_a3: false,
             a2_margin: 1.05,
+            a3_relaxed_gap: false,
             a2_ocr: false,
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
@@ -103,7 +110,9 @@ impl PostOptions {
             template_prefix: post.template_prefix.clone(),
             archive_only_prefixes: post.archive_only_prefixes.clone(),
             a1_margin: post.a1_margin,
+            a1_defer_on_a3: post.a1_defer_on_a3,
             a2_margin: post.a2_margin,
+            a3_relaxed_gap: post.a3_relaxed_gap,
             a2_ocr: post.a2_ocr,
             a2_ocr_det: resolve_models_path(&config.paths.models, &post.a2_ocr_det),
             a2_ocr_rec: resolve_models_path(&config.paths.models, &post.a2_ocr_rec),
@@ -517,6 +526,15 @@ pub fn run_post_project(
         } else {
             None
         };
+        // R2 : A3 doit être connu avant A1 pour différer un apply statique sur
+        // un segment où un keyframing humain est probable. L'ordre des
+        // décisions publiées reste A5, A1, A2, A3, A4, A6.
+        let mut a3_decisions = Vec::new();
+        if options.a1_defer_on_a3 {
+            let start = Instant::now();
+            a3_decisions = a3::decide_a3(&segments, ae.as_deref(), fps, options.a3_relaxed_gap);
+            a3_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
         decisions.extend(coverage_reviews(
             &segments,
             &meta,
@@ -524,6 +542,14 @@ pub fn run_post_project(
             source_height,
         ));
         let start = Instant::now();
+        let a1_options = a1::A1Options {
+            margin: options.a1_margin,
+            defer_targets: if options.a1_defer_on_a3 {
+                strong_a3_targets(&a3_decisions)
+            } else {
+                HashSet::new()
+            },
+        };
         decisions.extend(a1::decide_a1(
             &segments,
             video.as_deref(),
@@ -531,7 +557,7 @@ pub fn run_post_project(
             &meta,
             source_width,
             source_height,
-            options.a1_margin,
+            &a1_options,
         ));
         a1_ms = start.elapsed().as_secs_f64() * 1000.0;
         let start = Instant::now();
@@ -556,9 +582,12 @@ pub fn run_post_project(
             &a2_options,
         ));
         a2_ms = start.elapsed().as_secs_f64() * 1000.0;
-        let start = Instant::now();
-        decisions.extend(a3::decide_a3(&segments, ae.as_deref(), fps));
-        a3_ms = start.elapsed().as_secs_f64() * 1000.0;
+        if !options.a1_defer_on_a3 {
+            let start = Instant::now();
+            a3_decisions = a3::decide_a3(&segments, ae.as_deref(), fps, options.a3_relaxed_gap);
+            a3_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+        decisions.extend(a3_decisions);
         let start = Instant::now();
         let rows = csv.as_deref().map(a4::parse_csv).unwrap_or_default();
         decisions.extend(a4::decide_a4(&segments, &rows, fps));
@@ -935,11 +964,28 @@ fn apply_a2(doc: &mut Value, decisions: &[Decision]) -> Result<()> {
     Ok(())
 }
 
+/// Cibles A1 à différer : A3 y a marqué un candidat fort (`strong_candidate`).
+fn strong_a3_targets(decisions: &[Decision]) -> HashSet<String> {
+    decisions
+        .iter()
+        .filter(|decision| decision.code == "A3" && decision.action == Action::Review)
+        .filter(|decision| {
+            decision
+                .details
+                .get("strong_candidate")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .map(|decision| decision.target.clone())
+        .collect()
+}
+
 /// Contrôle structurel de la couverture source.
 ///
 /// Le panel borne l'ancre pour que la source couvre la composition. Un projet
 /// édité à la main peut sortir de cette plage : A5 émet alors une revue au
-/// lieu de laisser un vide dans le rendu.
+/// lieu de laisser un vide dans le rendu. Ces revues sont report-only et
+/// résolues par le monteur (D-056) ; elles ne déclenchent aucun recadrage.
 fn coverage_reviews(
     segments: &[Segment],
     meta: &CompMeta,
@@ -980,7 +1026,9 @@ fn coverage_reviews(
                         "right": round_to(meta.width as f64 - right, 1),
                         "top": round_to(top, 1),
                         "bottom": round_to(meta.height as f64 - bottom, 1)
-                    }
+                    },
+                    "resolution": "resolved",
+                    "report_only": true
                 }),
             ));
         }
@@ -1134,9 +1182,25 @@ fn audit_checks(
                 .count()
         ),
     ));
+    let a3_high = decisions
+        .iter()
+        .filter(|decision| {
+            decision.code == "A3"
+                && decision.action == Action::Review
+                && decision
+                    .details
+                    .get("high_confidence")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        })
+        .count();
     checks.push(AuditCheck::pass(
         "a3_disabled",
-        "A3 en review uniquement (D-030)",
+        if a3_high == 0 {
+            "A3 en review uniquement (D-030)".to_string()
+        } else {
+            format!("A3 en review uniquement (D-030/D-056), {a3_high} haute(s) confiance")
+        },
     ));
     let coverage_reviews = decisions
         .iter()
@@ -1150,7 +1214,26 @@ fn audit_checks(
     } else {
         checks.push(AuditCheck::warn(
             "source_coverage",
-            format!("{coverage_reviews} segment(s) hors couverture, en review"),
+            format!(
+                "{coverage_reviews} segment(s) hors couverture, résolus par le monteur (report-only)"
+            ),
+        ));
+    }
+    let a1_deferred = decisions
+        .iter()
+        .filter(|decision| {
+            decision.code == "A1"
+                && decision
+                    .details
+                    .get("a1_deferred_on_a3")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        })
+        .count();
+    if a1_deferred > 0 {
+        checks.push(AuditCheck::pass(
+            "a1_deferred_on_a3",
+            format!("{a1_deferred} segment(s) A1 différés sur candidat A3"),
         ));
     }
     if !template.matched {
@@ -1522,6 +1605,52 @@ mod tests {
         assert_eq!(gap[0].code, "A5");
         assert_eq!(gap[0].action, Action::Review);
         assert!(gap[0].reason.contains("ne couvre pas"));
+        assert_eq!(gap[0].details["resolution"], "resolved");
+        assert_eq!(gap[0].details["report_only"], true);
+    }
+
+    #[test]
+    fn strong_a3_targets_only_keep_reviewed_strong_candidates() {
+        let decisions = vec![
+            Decision::review(
+                "A3",
+                "Segment 1",
+                "fort",
+                0.35,
+                json!({"strong_candidate": true}),
+            ),
+            Decision::review("A3", "Segment 2", "faible", 0.35, json!({})),
+            Decision::noop(
+                "A3",
+                "Segment 3",
+                "noop",
+                0.6,
+                json!({"strong_candidate": true}),
+            ),
+            Decision::review(
+                "A4",
+                "Segment 4",
+                "autre étage",
+                0.5,
+                json!({"strong_candidate": true}),
+            ),
+        ];
+        let targets = strong_a3_targets(&decisions);
+        assert_eq!(targets.len(), 1);
+        assert!(targets.contains("Segment 1"));
+    }
+
+    #[test]
+    fn post_defaults_follow_d056() {
+        let options = PostOptions::default();
+        assert_eq!(options.a1_margin, 1.015);
+        assert_eq!(options.a1_margin, a1::A1Options::default().margin);
+        assert_eq!(
+            options.a1_margin,
+            workflow_core::config::PostConfig::default().a1_margin
+        );
+        assert!(!options.a1_defer_on_a3);
+        assert!(!options.a3_relaxed_gap);
     }
 
     #[test]

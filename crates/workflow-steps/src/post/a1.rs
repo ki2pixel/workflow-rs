@@ -1,13 +1,16 @@
 //! A1 — letterbox noir et compensation de Position Y.
 //!
 //! A1 ne modifie jamais l'Ancre ni les keyframes. Le scale est calculé sur le
-//! 10e percentile des hauteurs actives du segment ; la couverture de tous les
-//! crops est vérifiée après scale et compensation avant toute application.
+//! 10e percentile des hauteurs actives du segment avec la marge 1,015 de D-056 ;
+//! la couverture de tous les crops est vérifiée après scale et compensation
+//! avant toute application. Un candidat A3 fort peut différer le `apply` en
+//! revue (R2, `a1_defer_on_a3`).
 
 use crate::post::detect::{cropdetect, Crop};
 use crate::post::ecproj::{CompMeta, Segment};
 use crate::post::model::Decision;
 use serde_json::{json, Map, Value};
+use std::collections::HashSet;
 use std::path::Path;
 use workflow_schema::round::round_to;
 
@@ -15,6 +18,26 @@ const ACTIVE_NOOP: u32 = 1072;
 const INTERMITTENT_DELTA: i64 = 24;
 const OUTLIER_FRAC: f64 = 0.10;
 const COVERAGE_TOL: f64 = 0.5;
+/// Marge A1 validée par D-056 (médiane humaine 1,0125).
+const DEFAULT_A1_MARGIN: f64 = 1.015;
+
+/// Politique A1 : marge de scale et cibles différées sur candidat A3 (R2).
+#[derive(Debug, Clone)]
+pub struct A1Options {
+    pub margin: f64,
+    /// Segments dont le `apply` A1 doit être transformé en revue : A3 y a
+    /// détecté un candidat fort, donc un keyframing humain probable.
+    pub defer_targets: HashSet<String>,
+}
+
+impl Default for A1Options {
+    fn default() -> Self {
+        Self {
+            margin: DEFAULT_A1_MARGIN,
+            defer_targets: HashSet::new(),
+        }
+    }
+}
 
 pub fn decide_a1(
     segments: &[Segment],
@@ -23,7 +46,7 @@ pub fn decide_a1(
     meta: &CompMeta,
     source_width: u32,
     source_height: u32,
-    margin: f64,
+    options: &A1Options,
 ) -> Vec<Decision> {
     let Some(video) = video else {
         return vec![Decision::review(
@@ -64,7 +87,7 @@ pub fn decide_a1(
             }
         };
         let (decision, delta) =
-            decide_segment(segment, &crops, meta, source_width, source_height, margin);
+            decide_segment(segment, &crops, meta, source_width, source_height, options);
         if let Some(delta) = delta {
             position_deltas.push(delta);
         }
@@ -98,7 +121,7 @@ fn decide_segment(
     meta: &CompMeta,
     source_width: u32,
     source_height: u32,
-    margin: f64,
+    options: &A1Options,
 ) -> (Decision, Option<f64>) {
     if crops.is_empty() {
         return (
@@ -255,7 +278,10 @@ fn decide_segment(
         );
     }
 
-    let scale = round_to(meta.height as f64 / active as f64 * 100.0 * margin, 1);
+    let scale = round_to(
+        meta.height as f64 / active as f64 * 100.0 * options.margin,
+        1,
+    );
     let active_center = crop.y as f64 + crop.h as f64 / 2.0;
     let scale_factor = scale / 100.0;
     let comp_y_target =
@@ -350,6 +376,21 @@ fn decide_segment(
                 segment.name.clone(),
                 format!("scale déjà à {:.1}% et position Y stable", segment.scale),
                 0.8,
+                details,
+            ),
+            None,
+        );
+    }
+    if options.defer_targets.contains(&segment.name) {
+        let mut details = details;
+        details["a1_deferred_on_a3"] = json!(true);
+        details["defer_reason"] = json!("keyframes probables détectées par A3");
+        return (
+            Decision::review(
+                "A1",
+                segment.name.clone(),
+                "compensation Y différée : keyframes probables détectées par A3",
+                0.45,
                 details,
             ),
             None,
@@ -462,32 +503,93 @@ mod tests {
         }
     }
 
+    fn letterbox_crops() -> Vec<Crop> {
+        vec![
+            Crop {
+                w: 1920,
+                h: 800,
+                x: 0,
+                y: 140,
+            },
+            Crop {
+                w: 1920,
+                h: 800,
+                x: 0,
+                y: 140,
+            },
+            Crop {
+                w: 1920,
+                h: 800,
+                x: 0,
+                y: 140,
+            },
+        ]
+    }
+
     #[test]
-    fn computes_scale_and_y_compensation_for_black_letterbox() {
-        let crops = vec![
-            Crop {
-                w: 1920,
-                h: 800,
-                x: 0,
-                y: 140,
-            },
-            Crop {
-                w: 1920,
-                h: 800,
-                x: 0,
-                y: 140,
-            },
-            Crop {
-                w: 1920,
-                h: 800,
-                x: 0,
-                y: 140,
-            },
-        ];
-        let (decision, delta) = decide_segment(&segment(), &crops, &meta(), 1920, 1080, 1.04);
+    fn default_margin_matches_d056() {
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &letterbox_crops(),
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, crate::post::model::Action::Apply);
+        assert_eq!(decision.details["scale_target"], 243.6);
+        assert!(delta.unwrap().abs() > 100.0);
+    }
+
+    #[test]
+    fn explicit_margin_is_honoured() {
+        let options = A1Options {
+            margin: 1.04,
+            ..A1Options::default()
+        };
+        let (decision, _) = decide_segment(
+            &segment(),
+            &letterbox_crops(),
+            &meta(),
+            1920,
+            1080,
+            &options,
+        );
         assert_eq!(decision.action, crate::post::model::Action::Apply);
         assert_eq!(decision.details["scale_target"], 249.6);
-        assert!(delta.unwrap().abs() > 100.0);
+    }
+
+    #[test]
+    fn a3_candidate_defers_a1_apply_to_review() {
+        let mut options = A1Options::default();
+        options.defer_targets.insert("Segment 1".into());
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &letterbox_crops(),
+            &meta(),
+            1920,
+            1080,
+            &options,
+        );
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert_eq!(decision.details["a1_deferred_on_a3"], true);
+        assert!(decision.reason.contains("keyframes probables"));
+        assert!(delta.is_none());
+    }
+
+    #[test]
+    fn no_a3_candidate_keeps_a1_apply() {
+        let mut options = A1Options::default();
+        options.defer_targets.insert("Segment 2".into());
+        let (decision, _) = decide_segment(
+            &segment(),
+            &letterbox_crops(),
+            &meta(),
+            1920,
+            1080,
+            &options,
+        );
+        assert_eq!(decision.action, crate::post::model::Action::Apply);
     }
 
     #[test]
@@ -503,7 +605,8 @@ mod tests {
             x: 0,
             y: 140,
         }];
-        let (decision, delta) = decide_segment(&segment, &crops, &meta(), 1920, 1080, 1.04);
+        let (decision, delta) =
+            decide_segment(&segment, &crops, &meta(), 1920, 1080, &A1Options::default());
         assert_eq!(decision.action, crate::post::model::Action::Review);
         assert!(delta.is_none());
     }
@@ -516,7 +619,14 @@ mod tests {
             x: 0,
             y: 0,
         }];
-        let (decision, delta) = decide_segment(&segment(), &crops, &meta(), 1280, 720, 1.04);
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1280,
+            720,
+            &A1Options::default(),
+        );
         assert_eq!(decision.action, crate::post::model::Action::Noop);
         assert!(delta.is_none());
     }
@@ -529,7 +639,14 @@ mod tests {
             x: 0,
             y: 0,
         }];
-        let (decision, delta) = decide_segment(&segment(), &crops, &meta(), 1920, 1080, 1.04);
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
         assert_eq!(decision.action, crate::post::model::Action::Review);
         assert!(delta.is_none());
     }

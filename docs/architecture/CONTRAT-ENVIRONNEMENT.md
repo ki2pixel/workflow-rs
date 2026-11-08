@@ -411,9 +411,9 @@ décision ne s'applique). Trois artefacts additifs sont écrits sous
 `<docs>/post/<projet_assisté>/` : `post.json` (décisions, timings, specs,
 template), `review.json` (abstentions) et `audit.json` (contrôles, SHA-256 du
 brut et du projet assisté, hash échantillonné de la vidéo). A1/A2 ne déplacent
-jamais l'Anchor Point ; A3/A4 restent en revue ; A6 applique le template SDM
-si le préfixe configuré correspond et si la structure est mono-segment sans
-keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
+jamais l'Anchor Point ; A3/A4 restent en revue et A5 en rapport ; A6 applique
+le template SDM si le préfixe configuré correspond et si la structure est
+mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
 avec `workflow-cli post run`. Sa progression (`POST_*`) prolonge la barre
 STEP8 et publie `progress_phase = "post"`. Depuis D-034,
@@ -466,6 +466,21 @@ des crops RGBA et implique le mode visuel. Sans références, le check reste
 géométrique. Le mode visuel ne crée ni finding ni décision ; il enrichit le
 détail du check et ne compare pas un export dont le format diffère de la
 composition.
+
+Depuis D-056, `steps.step8.post.a1_margin` vaut **1,015** (marge humaine
+médiane 1,0125 sur le corpus GOOD) et A2 exécute l'OCR avant le gate de
+largeur : une bande basse persistante de 35–50 % peut être appliquée si le
+texte est `Confirmed` et la géométrie strictement stable, sans changer les
+vetos `tall_bottom`, `top`, `logo` et `changing_text`. A3 filtre les revues
+sous 250 px / 2 clés, marque `high_confidence` à partir de 700 px ou 6 clés
+et reste review-only ; A4 tague `flash_probable` les segments < 0,3 s sans
+continuité de source des deux côtés ; A5 reste report-only avec
+`resolution = "resolved"`. Deux flags P2 sont disponibles mais désactivés par
+défaut : `a1_defer_on_a3` (R2, différer A1 sur candidat A3 fort) et
+`a3_relaxed_gap` (R6, `gap < 0,7` en revue pour une amplitude ≥ 200 px).
+Ils ont été validés sur copies le 2026-11-08 (68/54/356) et restent
+désactivés par défaut. Le schéma des artefacts reste `schema = 1` ; toutes
+les nouvelles clés sont additives.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 

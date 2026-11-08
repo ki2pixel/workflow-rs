@@ -1,7 +1,9 @@
 //! A4 — fusions/splits mécaniques, en `review` uniquement.
 //!
 //! La détection expérimentale des cuts durs intra-segment reste hors
-//! production (trop de faux positifs sur les mouvements rapides).
+//! production (trop de faux positifs sur les mouvements rapides). Les segments
+//! de moins de 0,3 s sans continuité de source des deux côtés sont tagués
+//! `flash_probable` (D-056), sans changer l'action.
 
 use crate::post::ecproj::Segment;
 use crate::post::model::Decision;
@@ -9,6 +11,8 @@ use std::path::Path;
 use workflow_schema::round::round_to;
 
 const SHORT_SEGMENT: f64 = 0.5;
+const FLASH_MAX_DURATION: f64 = 0.3;
+const SOURCE_CONTINUITY_TOL_S: f64 = 0.002;
 
 #[derive(Debug, Clone)]
 pub struct CsvRow {
@@ -63,13 +67,23 @@ pub fn decide_a4(segments: &[Segment], rows: &[CsvRow], fps: f64) -> Vec<Decisio
         )];
     }
     let mut decisions = Vec::new();
-    for segment in segments {
+    for (index, segment) in segments.iter().enumerate() {
         let f0 = round_to(segment.start * fps, 0) as i64 + 1;
         let f1 = round_to(segment.end * fps, 0) as i64;
-        let details = serde_json::json!({
+        let (previous_continuity, next_continuity) = source_continuity(segments, index);
+        let mut details = serde_json::json!({
             "start": round_to(segment.start, 3),
             "end": round_to(segment.end, 3)
         });
+        if segment.duration() < FLASH_MAX_DURATION {
+            details["source_continuity"] = serde_json::json!({
+                "previous": previous_continuity,
+                "next": next_continuity
+            });
+            if !(previous_continuity && next_continuity) {
+                details["flash_probable"] = serde_json::json!(true);
+            }
+        }
         if segment.duration() < SHORT_SEGMENT {
             decisions.push(Decision::review(
                 "A4",
@@ -118,6 +132,43 @@ pub fn decide_a4(segments: &[Segment], rows: &[CsvRow], fps: f64) -> Vec<Decisio
     decisions
 }
 
+/// Voisinage temporel de source, indépendant de l'ordre des calques.
+///
+/// Un flash est un segment court qui n'est pas encadré par deux segments de
+/// même source : dans le corpus GOOD, les 7 `none` < 0,3 s sont des segments de
+/// bord, alors que les 4 `extend` sont intérieurs et continus des deux côtés.
+/// Les voisins sont cherchés par bornes temporelles, pas par index, car
+/// `ecproj::segments` suit l'ordre des calques de la composition.
+fn source_continuity(segments: &[Segment], index: usize) -> (bool, bool) {
+    let segment = &segments[index];
+    let previous = segments
+        .iter()
+        .enumerate()
+        .any(|(candidate_index, candidate)| {
+            candidate_index != index
+                && same_source(candidate, segment)
+                && candidate.start < segment.start
+                && (candidate.end - segment.start).abs() <= SOURCE_CONTINUITY_TOL_S
+        });
+    let next = segments
+        .iter()
+        .enumerate()
+        .any(|(candidate_index, candidate)| {
+            candidate_index != index
+                && same_source(segment, candidate)
+                && candidate.start > segment.start
+                && (segment.end - candidate.start).abs() <= SOURCE_CONTINUITY_TOL_S
+        });
+    (previous, next)
+}
+
+fn same_source(left: &Segment, right: &Segment) -> bool {
+    matches!(
+        (left.source.as_deref(), right.source.as_deref()),
+        (Some(left), Some(right)) if left == right
+    )
+}
+
 fn split_csv_line(line: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut current = String::new();
@@ -161,5 +212,150 @@ mod tests {
         let decisions = decide_a4(&[], &[], 25.0);
         assert_eq!(decisions.len(), 1);
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
+    }
+
+    fn segment(name: &str, start: f64, end: f64, source: Option<&str>) -> Segment {
+        Segment {
+            name: name.into(),
+            layer_id: 11,
+            parent: None,
+            start,
+            end,
+            source: source.map(str::to_string),
+            anchor: [960.0, 0.0, 0.0],
+            scale: 180.0,
+            position: [540.0, 0.0, 0.0],
+            position_keys: Vec::new(),
+            scale_keys: Vec::new(),
+            anchor_keys: Vec::new(),
+            comp_x: 540.0,
+            parent_dy: 0.0,
+            null_parent: false,
+            parent_keyframed: false,
+            rotated: false,
+        }
+    }
+
+    fn covering_rows() -> Vec<CsvRow> {
+        vec![CsvRow {
+            frame_in: 1.0,
+            frame_out: 10_000.0,
+        }]
+    }
+
+    #[test]
+    fn first_short_segment_is_a_flash_probable() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 0.12, Some("clip.mp4")),
+            segment("Segment 2", 0.12, 1.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(decisions[0].action, crate::post::model::Action::Review);
+        assert_eq!(decisions[0].details["flash_probable"], true);
+        assert_eq!(
+            decisions[0].details["source_continuity"],
+            serde_json::json!({"previous": false, "next": true})
+        );
+    }
+
+    #[test]
+    fn interior_short_segment_with_continuity_is_not_a_flash() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 1.0, Some("clip.mp4")),
+            segment("Segment 2", 1.0, 1.16, Some("clip.mp4")),
+            segment("Segment 3", 1.16, 2.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(
+            decisions[1].details["flash_probable"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
+            decisions[1].details["source_continuity"],
+            serde_json::json!({"previous": true, "next": true})
+        );
+    }
+
+    #[test]
+    fn continuity_does_not_depend_on_layer_order() {
+        // Given: les mêmes segments que le cas intérieur, calques désordonnés.
+        // When:  A4 calcule la continuité du segment court.
+        // Then:  les voisins sont retrouvés par leurs bornes temporelles.
+        let segments = vec![
+            segment("Segment 3", 1.16, 2.0, Some("clip.mp4")),
+            segment("Segment 2", 1.0, 1.16, Some("clip.mp4")),
+            segment("Segment 1", 0.0, 1.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(
+            decisions[1].details["flash_probable"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
+            decisions[1].details["source_continuity"],
+            serde_json::json!({"previous": true, "next": true})
+        );
+    }
+
+    #[test]
+    fn different_source_on_one_side_is_a_flash() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 1.0, Some("clip.mp4")),
+            segment("Segment 2", 1.0, 1.16, Some("other.mp4")),
+            segment("Segment 3", 1.16, 2.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(decisions[1].details["flash_probable"], true);
+    }
+
+    #[test]
+    fn flash_threshold_is_strictly_below_030() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 0.3, Some("clip.mp4")),
+            segment("Segment 2", 0.3, 1.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(
+            decisions[0].details["flash_probable"],
+            serde_json::Value::Null
+        );
+    }
+
+    #[test]
+    fn missing_source_is_a_flash() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 0.2, None),
+            segment("Segment 2", 0.2, 1.0, None),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(decisions[0].details["flash_probable"], true);
+    }
+
+    #[test]
+    fn source_gap_is_a_flash() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 1.0, Some("clip.mp4")),
+            segment("Segment 2", 1.04, 1.2, Some("clip.mp4")),
+            segment("Segment 3", 1.2, 2.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(decisions[1].details["flash_probable"], true);
+    }
+
+    #[test]
+    fn long_segment_has_no_flash_metadata() {
+        let segments = vec![
+            segment("Segment 1", 0.0, 0.5, Some("clip.mp4")),
+            segment("Segment 2", 0.5, 1.0, Some("clip.mp4")),
+        ];
+        let decisions = decide_a4(&segments, &covering_rows(), 25.0);
+        assert_eq!(
+            decisions[0].details["source_continuity"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
+            decisions[0].details["flash_probable"],
+            serde_json::Value::Null
+        );
     }
 }

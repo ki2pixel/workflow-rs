@@ -210,7 +210,8 @@ template_prefix = "M6 - SDM - "
 archive_only_prefixes = ["W9 - LPHDF"]
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
-a1_margin = 1.04
+# Marge A1 D-056 : médiane humaine 1,0125, 51/65 cas <= 1,015.
+a1_margin = 1.015
 a2_margin = 1.05
 # Gate OCR A2 (D-051) : confirme un bandeau clair par texte persistant et
 # oppose un veto si le texte change. Activé en production le 2026-11-08

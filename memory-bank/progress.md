@@ -12,13 +12,18 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 505 tests unitaires, sans matériel.
+- **543 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
-  71 exports comparés en lecture seule. A1 : marge 1,04 → 1,015 (marge
-  humaine médiane 1,0125). A2 : seuil 0,50 → 0,35 avec OCR avant le gate
-  (9 bandes basses 37–45 % laissées en review). A3 : reste review-only,
-  trié par amplitude/clés (`gap < 0,7` en revue). A4/A5/A6 inchangés.
-  Preuves : `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/`.
+  71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
+  humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour
+  les bandes basses persistantes (9 bandes 37–45 %). A3 : review-only, trié
+  par amplitude/clés, `high_confidence` et `gap < 0,7` opt-in. A4 :
+  `flash_probable` < 0,3 s sans continuité des deux côtés. A5 :
+  `resolution = "resolved"`. A6 inchangé. R2 validé sur 68 (18 keyframes
+  GOOD sur le Segment 7) ; R6 validé sur 54/356 (12 revues ajoutées, 6
+  utiles, aucun `apply`). Les deux restent opt-in.
+  Preuves : `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/` ;
+  mise en œuvre : `docs/lots/LOT-9-POST-STEP8.md`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

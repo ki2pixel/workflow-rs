@@ -157,6 +157,29 @@ D-034, D-035).
   - preuves et scripts dans `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8/`,
     rapport `docs/etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`.
 
+- [2026-11-08] **Mise en œuvre D-056 dans le post-traitement** :
+  - A1 : marge par défaut et `config/config.toml` à **1,015** ; `A1Options`
+    porte la marge et les cibles différées R2 ;
+  - A2 : OCR avant le gate de largeur, bande basse 35–50 % applicable si
+    `Confirmed` + géométrie strictement stable ; formule de scale inchangée
+    (`scale_basis = "band_height"`) ;
+  - A3 : `noop` sous 250 px / 2 clés, `high_confidence` à ≥ 700 px ou 6 clés,
+    `strong_candidate` pour R2, `gap_relaxed` opt-in ; toujours review-only ;
+  - A4 : `flash_probable` sur les segments < 0,3 s sans continuité de source
+    des deux côtés ; A5 : `resolution = "resolved"` et `report_only = true` ;
+  - R2 (`a1_defer_on_a3`) et R6 (`a3_relaxed_gap`) restent opt-in, défaut
+    `false`, validés sur copies le 2026-11-08 ;
+  - 120 tests post, 543 tests workspace, `fmt` et `clippy -D warnings` verts.
+
+- [2026-11-08] **Validation R2/R6 sur copies** : 68 (R2), 54 et 356 (R6),
+  configs identiques hors flags. 68 passe de 7 à 6 `apply` et conserve le
+  transform brut du Segment 7 ; 54 passe de 15 à 24 `review` (9
+  `gap_relaxed`) ; 356 passe de 9 à 12 `review` (3 `gap_relaxed`). Aucun
+  `apply` A3, assist identique pour 54/356, audits `pass`. La référence GOOD
+  de 68 porte 18 keyframes Position sur le Segment 7 (R2 confirmé) ; sur les
+  12 nouvelles revues R6, 5 sont keyframées GOOD et 1 a un repositionnement
+  statique (6/12 utiles), 6 sans changement. Les flags restent opt-in.
+
 - [2026-11-07] **Gate OCR A2 (D-051, phase 3)** :
   - `PostConfig`/`PostOptions` : `a2_ocr` (défaut `false`), `a2_ocr_det`,
     `a2_ocr_rec`, `a2_ocr_onnxruntime` ; `A2Options` regroupe la marge et
@@ -648,9 +671,10 @@ D-034, D-035).
 - Post-traitement A5/A6 : exposer `review.json` en lecture seule dans l'UI,
   recalibrer A3/A4, traiter les références manquantes 179/287 (voir
   `docs/lots/LOT-9-POST-STEP8.md`).
-- Lot court D-056 : marge A1 1,015, seuil A2 0,35 avec OCR avant le gate,
-  tri A3 (amplitude/clés, `gap < 0,7` en revue) ; valider R2/R6 sur copies
-  avant toute activation.
+- D-056 P1 est implémenté (marge A1 1,015, A2 0,35 avec OCR avant le gate,
+  tri A3, flash A4, A5 résolu). R2 (`a1_defer_on_a3`) et R6
+  (`a3_relaxed_gap`) sont validés sur copies (68/54/356) ; décider de leur
+  activation ou les laisser opt-in.
 - Poursuivre les scénarios B/C décrits dans
   `docs/etudes/ETUDE-STEP9-AGENTIQUE.md`, sans toucher à la production.
 - QA logos : faire relire et signer les 12 labels dev (`review_status = done`) ;

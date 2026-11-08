@@ -1001,8 +1001,15 @@ pub struct PostConfig {
     pub archive_only_prefixes: Vec<String>,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
+    /// Marge de sécurité A1 (D-056) : 1,015, plage recommandée 1,01–1,02.
     pub a1_margin: f64,
+    /// Diffère A1 en `review` lorsqu'un candidat A3 fort est détecté
+    /// (R2, validation sur copies). Désactivé par défaut.
+    pub a1_defer_on_a3: bool,
     pub a2_margin: f64,
+    /// Autorise `gap < 0,70` en revue A3 pour une amplitude ≥ 200 px
+    /// (R6, validation sur copies). Désactivé par défaut.
+    pub a3_relaxed_gap: bool,
     /// Gate OCR du candidat A2 (D-051). Désactivé par défaut : sans flag,
     /// la décision géométrie/luminance reste strictement identique.
     pub a2_ocr: bool,
@@ -1034,8 +1041,10 @@ impl Default for PostConfig {
             archive_only_prefixes: Vec::new(),
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
-            a1_margin: 1.04,
+            a1_margin: 1.015,
+            a1_defer_on_a3: false,
             a2_margin: 1.05,
+            a3_relaxed_gap: false,
             a2_ocr: false,
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
@@ -1124,6 +1133,30 @@ mod tests {
     fn defaults_are_valid() {
         let config = Config::default();
         config.validate_common().expect("defaults valides");
+    }
+
+    #[test]
+    fn post_defaults_follow_d056() {
+        // Given: la configuration par défaut du post-traitement.
+        // When:  les valeurs sont lues.
+        // Then:  la marge A1 vaut 1,015 et les règles P2 restent opt-in.
+        let post = PostConfig::default();
+        assert_eq!(post.a1_margin, 1.015);
+        assert!(!post.a1_defer_on_a3);
+        assert!(!post.a3_relaxed_gap);
+    }
+
+    #[test]
+    fn post_p2_flags_are_typed() {
+        // Given: un TOML explicite avec les deux flags P2.
+        // When:  la configuration est chargée.
+        // Then:  les booléens sont acceptés par deny_unknown_fields.
+        let config =
+            Config::from_toml("[steps.step8.post]\na1_defer_on_a3 = true\na3_relaxed_gap = true\n")
+                .unwrap();
+        assert!(config.steps.step8.post.a1_defer_on_a3);
+        assert!(config.steps.step8.post.a3_relaxed_gap);
+        assert_eq!(config.steps.step8.post.a1_margin, 1.015);
     }
 
     #[test]

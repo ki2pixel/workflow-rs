@@ -1,11 +1,28 @@
-//! A3 — candidats de keyframes, jamais appliqués (D-030).
+//! A3 — candidats de keyframes, jamais appliqués (D-030/D-056).
+//!
+//! Les revues sont triées par amplitude et nombre de clés : sous 250 px avec
+//! au plus deux clés, la décision devient `noop` (R5). La confiance est
+//! signalée dans `high_confidence` (R5). Le trou de suivi peut être assoupli
+//! en revue seulement via `a3_relaxed_gap` (R6). Aucun chemin ne produit
+//! `Action::Apply` (R7).
 
 use crate::post::ecproj::Segment;
 use crate::post::model::Decision;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
 use workflow_schema::round::round_to;
+
+const A3_MIN_AMPLITUDE: f64 = 100.0;
+const A3_NOOP_AMPLITUDE: f64 = 250.0;
+const A3_NOOP_MAX_KEYS: i64 = 2;
+const A3_RELAXED_GAP_AMPLITUDE: f64 = 200.0;
+const A3_STRICT_GAP: f64 = 0.30;
+const A3_RELAXED_GAP: f64 = 0.70;
+const A3_HIGH_AMPLITUDE: f64 = 700.0;
+const A3_HIGH_KEYS: i64 = 6;
+const A3_STRONG_AMPLITUDE: f64 = 300.0;
+const A3_STRONG_KEYS: i64 = 4;
 
 #[derive(Debug, Clone)]
 struct Recommendation {
@@ -20,7 +37,12 @@ struct TrackedObject {
     centroid_x: f64,
 }
 
-pub fn decide_a3(segments: &[Segment], ae_path: Option<&Path>, fps: f64) -> Vec<Decision> {
+pub fn decide_a3(
+    segments: &[Segment],
+    ae_path: Option<&Path>,
+    fps: f64,
+    relaxed_gap: bool,
+) -> Vec<Decision> {
     let Some(ae_path) = ae_path else {
         return vec![Decision::review(
             "A3",
@@ -112,47 +134,91 @@ pub fn decide_a3(segments: &[Segment], ae_path: Option<&Path>, fps: f64) -> Vec<
             "frames": xs.len(),
             "total": total
         });
-        if segment.keyframed() {
-            decisions.push(Decision::noop(
-                "A3",
-                segment.name.clone(),
-                "segment déjà keyframé dans le brut",
-                0.8,
-                details,
-            ));
-        } else if segment.duration() < 1.0 {
-            decisions.push(Decision::noop(
-                "A3",
-                segment.name.clone(),
-                "segment < 1 s",
-                0.7,
-                details,
-            ));
-        } else if amplitude > 100.0 && gap < 0.3 {
-            let count = (round_to(amplitude / 120.0, 0) as i64 + 1).clamp(2, 6);
-            let mut details = details;
-            details["candidate_keys"] = serde_json::json!(count);
-            decisions.push(Decision::review(
-                "A3",
-                segment.name.clone(),
-                format!("candidat {count} clés (amplitude {amplitude:.0} px), A3 désactivé"),
-                0.35,
-                details,
-            ));
-        } else {
-            decisions.push(Decision::noop(
-                "A3",
-                segment.name.clone(),
-                format!(
-                    "mouvement faible/instable (amp {amplitude:.0} px, trou {:.0}%)",
-                    gap * 100.0
-                ),
-                0.6,
-                details,
-            ));
-        }
+        decisions.push(classify_tracking(
+            segment,
+            amplitude,
+            gap,
+            details,
+            relaxed_gap,
+        ));
     }
     decisions
+}
+
+fn candidate_keys(amplitude: f64) -> i64 {
+    (round_to(amplitude / 120.0, 0) as i64 + 1).clamp(2, 6)
+}
+
+fn classify_tracking(
+    segment: &Segment,
+    amplitude: f64,
+    gap: f64,
+    details: Value,
+    relaxed_gap: bool,
+) -> Decision {
+    if segment.keyframed() {
+        return Decision::noop(
+            "A3",
+            segment.name.clone(),
+            "segment déjà keyframé dans le brut",
+            0.8,
+            details,
+        );
+    }
+    if segment.duration() < 1.0 {
+        return Decision::noop("A3", segment.name.clone(), "segment < 1 s", 0.7, details);
+    }
+
+    let keys = candidate_keys(amplitude);
+    let strict_gap = gap < A3_STRICT_GAP;
+    let relaxed = relaxed_gap && amplitude >= A3_RELAXED_GAP_AMPLITUDE && gap < A3_RELAXED_GAP;
+    let gap_ok = strict_gap || relaxed;
+    if amplitude <= A3_MIN_AMPLITUDE || !gap_ok {
+        return Decision::noop(
+            "A3",
+            segment.name.clone(),
+            format!(
+                "mouvement faible/instable (amp {amplitude:.0} px, trou {:.0}%)",
+                gap * 100.0
+            ),
+            0.6,
+            details,
+        );
+    }
+
+    // R5 : sous 250 px avec au plus deux clés candidates, la revue est du
+    // bruit pour les keyframes (4,1 % de vrais positifs dans le corpus GOOD).
+    let mut details = details;
+    details["candidate_keys"] = json!(keys);
+    if amplitude < A3_NOOP_AMPLITUDE && keys <= A3_NOOP_MAX_KEYS {
+        return Decision::noop(
+            "A3",
+            segment.name.clone(),
+            "mouvement faible ou nombre de clés insuffisant (< 250 px, <= 2 clés)",
+            0.6,
+            details,
+        );
+    }
+
+    if relaxed && !strict_gap {
+        details["gap_relaxed"] = json!(true);
+    }
+    let high_confidence = amplitude >= A3_HIGH_AMPLITUDE || keys == A3_HIGH_KEYS;
+    if high_confidence {
+        details["high_confidence"] = json!(true);
+    }
+    // Signal réutilisé par R2 dans run.rs : clés nombreuses ou mouvement
+    // ample et continu, sans seuil supplémentaire côté A1.
+    if keys >= A3_STRONG_KEYS || (amplitude >= A3_STRONG_AMPLITUDE && gap < A3_STRICT_GAP) {
+        details["strong_candidate"] = json!(true);
+    }
+    let reason = if high_confidence {
+        format!("candidat {keys} clés haute confiance (amplitude {amplitude:.0} px), A3 désactivé")
+    } else {
+        format!("candidat {keys} clés (amplitude {amplitude:.0} px), A3 désactivé")
+    };
+    let confidence = if high_confidence { 0.55 } else { 0.35 };
+    Decision::review("A3", segment.name.clone(), reason, confidence, details)
 }
 
 fn parse_frames(value: Option<&Value>) -> BTreeMap<i64, Vec<TrackedObject>> {
@@ -249,5 +315,129 @@ mod tests {
                 .and_then(|recommendation| recommendation.object_id.as_deref()),
             Some("obj_2")
         );
+    }
+
+    fn tracking_segment(duration: f64) -> Segment {
+        Segment {
+            name: "Segment 1".into(),
+            layer_id: 11,
+            parent: None,
+            start: 0.0,
+            end: duration,
+            source: Some("clip.mp4".into()),
+            anchor: [960.0, 0.0, 0.0],
+            scale: 180.0,
+            position: [540.0, 0.0, 0.0],
+            position_keys: Vec::new(),
+            scale_keys: Vec::new(),
+            anchor_keys: Vec::new(),
+            comp_x: 540.0,
+            parent_dy: 0.0,
+            null_parent: false,
+            parent_keyframed: false,
+            rotated: false,
+        }
+    }
+
+    fn tracking_decision(amplitude: f64, gap: f64, relaxed_gap: bool) -> Decision {
+        classify_tracking(
+            &tracking_segment(4.0),
+            amplitude,
+            gap,
+            json!({"start": 0.0, "end": 4.0}),
+            relaxed_gap,
+        )
+    }
+
+    #[test]
+    fn low_signal_below_250px_and_two_keys_is_noop() {
+        // Given: un mouvement de 120 px avec deux clés candidates.
+        // When:  A3 classe le segment.
+        // Then:  la revue est filtrée en noop explicite.
+        let decision = tracking_decision(120.0, 0.1, false);
+        assert_eq!(decision.action, crate::post::model::Action::Noop);
+        assert!(decision.reason.contains("< 250 px"));
+        assert_eq!(decision.details["candidate_keys"], 2);
+    }
+
+    #[test]
+    fn three_keys_below_250px_stay_reviewed() {
+        let decision = tracking_decision(200.0, 0.1, false);
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert_eq!(decision.details["candidate_keys"], 3);
+    }
+
+    #[test]
+    fn amplitude_700px_is_high_confidence() {
+        let decision = tracking_decision(700.0, 0.1, false);
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert_eq!(decision.details["high_confidence"], true);
+        assert!(decision.reason.contains("haute confiance"));
+    }
+
+    #[test]
+    fn six_candidate_keys_are_high_confidence() {
+        let decision = tracking_decision(620.0, 0.1, false);
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert_eq!(decision.details["candidate_keys"], 6);
+        assert_eq!(decision.details["high_confidence"], true);
+    }
+
+    #[test]
+    fn strong_candidate_is_exposed_for_r2() {
+        let decision = tracking_decision(320.0, 0.1, false);
+        assert_eq!(decision.details["strong_candidate"], true);
+        let weak = tracking_decision(160.0, 0.1, false);
+        assert_eq!(weak.details["strong_candidate"], Value::Null);
+    }
+
+    #[test]
+    fn relaxed_gap_is_opt_in() {
+        let strict = tracking_decision(250.0, 0.5, false);
+        assert_eq!(strict.action, crate::post::model::Action::Noop);
+        let relaxed = tracking_decision(250.0, 0.5, true);
+        assert_eq!(relaxed.action, crate::post::model::Action::Review);
+        assert_eq!(relaxed.details["gap_relaxed"], true);
+    }
+
+    #[test]
+    fn relaxed_gap_requires_200px() {
+        let decision = tracking_decision(150.0, 0.5, true);
+        assert_eq!(decision.action, crate::post::model::Action::Noop);
+        assert_eq!(decision.details["gap_relaxed"], Value::Null);
+    }
+
+    #[test]
+    fn relaxed_gap_still_requires_070() {
+        let decision = tracking_decision(300.0, 0.75, true);
+        assert_eq!(decision.action, crate::post::model::Action::Noop);
+    }
+
+    #[test]
+    fn keyframed_and_short_segments_are_noop() {
+        let mut keyframed = tracking_segment(4.0);
+        keyframed.position_keys.push(crate::post::ecproj::Keyframe {
+            t: 1.0,
+            v: [0.0, 0.0, 0.0],
+        });
+        let decision = classify_tracking(&keyframed, 800.0, 0.0, json!({}), true);
+        assert_eq!(decision.action, crate::post::model::Action::Noop);
+        assert!(decision.reason.contains("keyframé"));
+
+        let decision = classify_tracking(&tracking_segment(0.5), 800.0, 0.0, json!({}), true);
+        assert_eq!(decision.action, crate::post::model::Action::Noop);
+        assert!(decision.reason.contains("< 1 s"));
+    }
+
+    #[test]
+    fn a3_never_returns_apply() {
+        for amplitude in [0.0, 120.0, 250.0, 320.0, 620.0, 800.0] {
+            for gap in [0.0, 0.1, 0.5, 0.75] {
+                for relaxed in [false, true] {
+                    let decision = tracking_decision(amplitude, gap, relaxed);
+                    assert_ne!(decision.action, crate::post::model::Action::Apply);
+                }
+            }
+        }
     }
 }

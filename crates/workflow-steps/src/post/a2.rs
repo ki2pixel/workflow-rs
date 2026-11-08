@@ -2,11 +2,13 @@
 //!
 //! Une bande haute, un logo, une bande partielle, un décor ou une bande dont
 //! la géométrie bouge partent en `review`. Seule une bannière basse large,
-//! persistante, claire et géométriquement stable est appliquée. Le gate OCR
-//! optionnel (`a2_ocr`) peut confirmer un texte persistant et suppléer une
-//! géométrie modérément instable, dans une amplitude bornée ; il ne
-//! contourne jamais les garde-fous durs et oppose un veto aux textes
-//! changeants. Le prior de logo source documente le candidat sans recadrer ;
+//! persistante, claire et géométriquement stable est appliquée. Depuis D-056,
+//! une bande basse partielle de 35–50 % peut aussi être appliquée si l'OCR
+//! confirme un texte persistant et que sa géométrie reste strictement stable ;
+//! l'OCR précède alors le gate de largeur. Le gate OCR optionnel (`a2_ocr`)
+//! peut confirmer un texte persistant et suppléer une géométrie modérément
+//! instable, dans une amplitude bornée ; il ne contourne jamais les
+//! garde-fous durs et oppose un veto aux textes changeants. Le prior de logo source documente le candidat sans recadrer ;
 //! quand un overlay déclaré cache ce logo, son veto « logo seul » est
 //! neutralisé.
 
@@ -26,6 +28,10 @@ use std::time::Instant;
 use workflow_schema::round::round_to;
 
 const BANNER_MIN_WIDTH: f64 = 0.50;
+/// Seuil abaissé pour les bandes basses partielles confirmées par OCR (R3).
+/// Il coïncide avec `LOGO_MAX_WIDTH` : en dessous, le candidat reste un logo.
+const BANNER_MIN_WIDTH_OCR: f64 = 0.35;
+const BANNER_MIN_PERSISTENCE: f64 = 0.60;
 const LOGO_MAX_WIDTH: f64 = 0.35;
 const BANNER_MAX_HEIGHT: i64 = 200;
 const BANNER_MIN_HEIGHT: i64 = 24;
@@ -749,7 +755,7 @@ fn decide_impl(
             details,
         )];
     }
-    if selected.persistence < 0.6 {
+    if selected.persistence < BANNER_MIN_PERSISTENCE {
         return vec![Decision::review(
             "A2",
             "comp",
@@ -761,20 +767,10 @@ fn decide_impl(
             details,
         )];
     }
-    if selected.width_frac < BANNER_MIN_WIDTH {
-        return vec![Decision::review(
-            "A2",
-            "comp",
-            format!(
-                "largeur {:.0}% < {:.0}%, bannière partielle",
-                selected.width_frac * 100.0,
-                BANNER_MIN_WIDTH * 100.0
-            ),
-            0.5,
-            details,
-        )];
-    }
 
+    // R3 : l'OCR doit précéder le gate de largeur pour pouvoir confirmer une
+    // bande basse partielle (35–50 %). Sans OCR ou sans texte confirmé, le
+    // rejet « bannière partielle » reste identique.
     let (evidence, verdict) = ocr_verdict(ocr, selected, source_height);
     if let Some(evidence) = &evidence {
         details["ocr"] = evidence.to_json();
@@ -805,10 +801,43 @@ fn decide_impl(
             details,
         )];
     }
+    let partial_width = selected.width_frac < BANNER_MIN_WIDTH;
+    if partial_width && !(ocr_confirmed && selected.width_frac >= BANNER_MIN_WIDTH_OCR) {
+        let ocr_note = match verdict {
+            Some(OcrVerdict::Ambiguous) => "OCR ambigu",
+            Some(OcrVerdict::Confirmed) => "OCR confirmé",
+            Some(OcrVerdict::Changing) | Some(OcrVerdict::LogoOnly) => "veto OCR",
+            Some(OcrVerdict::Sparse) | None => "OCR non confirmé",
+        };
+        return vec![Decision::review(
+            "A2",
+            "comp",
+            format!(
+                "largeur {:.0}% < {:.0}%, bannière partielle ({ocr_note})",
+                selected.width_frac * 100.0,
+                BANNER_MIN_WIDTH * 100.0
+            ),
+            0.5,
+            details,
+        )];
+    }
     let geometry_unstable = selected.center_y_std > geom_std || selected.height_std > geom_std;
     let geometry_cap = geom_std * OCR_GEOM_OVERRIDE_FACTOR;
     let geometry_capped =
         selected.center_y_std > geometry_cap || selected.height_std > geometry_cap;
+    if partial_width && geometry_unstable {
+        return vec![Decision::review(
+            "A2",
+            "comp",
+            format!(
+                "bande basse partielle animée (centre ±{:.0} px, hauteur ±{:.0} px), \
+                 géométrie non fiable",
+                selected.center_y_std, selected.height_std
+            ),
+            0.4,
+            details,
+        )];
+    }
     if geometry_unstable && !(ocr_confirmed && !geometry_capped) {
         let reason = if ocr_confirmed {
             format!(
@@ -895,6 +924,12 @@ fn decide_impl(
         )];
     }
     details["scale_target"] = json!(scale);
+    if partial_width {
+        // R4 : la bbox OCR ne sert jamais au scale ; le padding de la bande
+        // reste préservé par la formule historique.
+        details["partial_width_ocr"] = json!(true);
+        details["scale_basis"] = json!("band_height");
+    }
     if matches!(verdict, Some(OcrVerdict::Ambiguous)) {
         return vec![Decision::review(
             "A2",
@@ -1377,7 +1412,7 @@ fn box_overlap(detection: [i64; 4], candidate: &BandCandidate) -> f64 {
 fn plausible(candidate: &BandCandidate, min_height: i64, max_height: i64) -> bool {
     (min_height..=max_height).contains(&candidate.height_src)
         && candidate.width_frac >= LOGO_MAX_WIDTH
-        && candidate.persistence >= 0.6
+        && candidate.persistence >= BANNER_MIN_PERSISTENCE
         && candidate.aspect >= 3.0
 }
 
@@ -1923,12 +1958,138 @@ mod tests {
     }
 
     #[test]
-    fn confirmed_text_does_not_override_partial_width() {
+    fn confirmed_text_applies_partial_width() {
+        // Given: une bande basse de 40 % et un texte persistant confirmé.
+        // When:  A2 évalue le candidat.
+        // Then:  l'apply est autorisé et la formule reste basée sur la bande.
         let mut candidate = candidate();
         candidate.width_frac = 0.4;
         let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Apply);
+        assert_eq!(decision.details["partial_width_ocr"], true);
+        assert_eq!(decision.details["scale_basis"], "band_height");
+        assert_eq!(decision.details["scale_target"], 206.6);
+    }
+
+    #[test]
+    fn partial_width_without_ocr_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        let decision = decide_with_evidence(candidate, 1080, None);
         assert_eq!(decision.action, crate::post::model::Action::Review);
         assert!(decision.reason.contains("partielle"));
+        assert!(decision.details.get("ocr").is_none());
+    }
+
+    #[test]
+    fn partial_width_sparse_text_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        let mut evidence = confirmed_evidence();
+        evidence.text_persistence = 0.4;
+        evidence.dominant_ratio = 0.2;
+        let decision = decide_with_evidence(candidate, 1080, Some(evidence));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("OCR non confirmé"));
+    }
+
+    #[test]
+    fn partial_width_changing_text_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        let mut evidence = confirmed_evidence();
+        evidence.text_persistence = 0.9;
+        evidence.dominant_ratio = 0.3;
+        let decision = decide_with_evidence(candidate, 1080, Some(evidence));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("texte changeant"));
+    }
+
+    #[test]
+    fn partial_width_logo_only_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        let mut evidence = confirmed_evidence();
+        evidence.logo_tracking = true;
+        evidence.logo_only = true;
+        evidence.logo_detections_total = 12;
+        evidence.logo_texts = evidence.texts.clone();
+        evidence.texts.clear();
+        let decision = decide_with_evidence(candidate, 1080, Some(evidence));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("logo source"));
+    }
+
+    #[test]
+    fn partial_width_below_ocr_threshold_stays_logo_review() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.34;
+        let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("logo"));
+    }
+
+    #[test]
+    fn partial_width_non_persistent_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        candidate.persistence = 0.5;
+        let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("non persistante"));
+    }
+
+    #[test]
+    fn partial_width_unstable_geometry_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        candidate.center_y_std = 15.0;
+        let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("partielle animée"));
+    }
+
+    #[test]
+    fn partial_width_dark_banner_is_reviewed_with_scale() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        candidate.median_brightness = 37.0;
+        let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("sombre"));
+        assert_eq!(decision.details["scale_target"], 206.6);
+    }
+
+    #[test]
+    fn partial_width_temporal_animation_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        candidate.temporal_std = 60.0;
+        let decision = decide_with_evidence(candidate, 1080, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("écart temporel"));
+    }
+
+    #[test]
+    fn partial_width_excessive_scale_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.width_frac = 0.4;
+        candidate.height_src = 100;
+        let decision = decide_with_evidence(candidate, 720, Some(confirmed_evidence()));
+        assert_eq!(decision.action, crate::post::model::Action::Review);
+        assert!(decision.reason.contains("zoom excessif"));
+    }
+
+    #[test]
+    fn top_partial_width_is_reviewed() {
+        let mut candidate = candidate();
+        candidate.zone = "top";
+        candidate.width_frac = 0.4;
+        candidate.y0_src = 40;
+        candidate.y1_src = 144;
+        let decisions = decide_from_candidates(&[], &[candidate], 1080, 1920.0, 1.05);
+        assert_eq!(decisions[0].action, crate::post::model::Action::Review);
+        assert!(decisions[0].reason.contains("bande haute"));
     }
 
     #[test]

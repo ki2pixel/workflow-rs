@@ -71,28 +71,46 @@ au milieu et à la fin, plus taille et offsets).
 - `review` si segment keyframé, barres intermittentes (≥ 10 % des crops),
   barres asymétriques (haut/bas ou gauche/droite), scale > 300 %, compensation
   Y > 600 px, ou couverture insuffisante (> 10 % des crops).
-- `apply` sinon : `scale = 1920 / active × 100 × 1,04`, puis compensation
-  `Position Y` pour centrer la zone active. La couverture mathématique de tous
-  les crops est vérifiée après scale et compensation (tolérance 0,5 px).
+- `apply` sinon : `scale = 1920 / active × 100 × 1,015` (D-056), puis
+  compensation `Position Y` pour centrer la zone active. La couverture
+  mathématique de tous les crops est vérifiée après scale et compensation
+  (tolérance 0,5 px).
+- R2 (P2, `a1_defer_on_a3 = false` par défaut) : si A3 a marqué un candidat
+  fort (`strong_candidate`), l'`apply` A1 du segment devient une `review`
+  « compensation Y différée : keyframes probables détectées par A3 ». Aucun
+  scale partiel n'est appliqué.
 
-Validation : 268 → 15 segments à **231,1 %** et Y **−287,9 px** ; 191 → 37
-segments à **249,6 %** et Y **−367,8 px** (cible enfant), soit −417,8 px en
-coordonnées composition. Les ancres restent identiques au brut.
+Validation historique (marge 1,04, avant D-056) : 268 → 15 segments à
+**231,1 %** et Y **−287,9 px** ; 191 → 37 segments à **249,6 %** et Y
+**−367,8 px** (cible enfant), soit −417,8 px en coordonnées composition. Avec
+1,015, les cibles nominales deviennent **225,5 %** et **243,6 %** pour les
+mêmes hauteurs actives ; les compensations Y sont à remesurer lors du prochain
+run de validation. Les ancres restent identiques au brut.
 
-## A2 — bannière basse pleine largeur
+## A2 — bannière basse
 
 - Médiane temporelle à 1 fps sur une miniature 480 px de large ; bandes
   claires et paires de bords sombres.
 - Une bande **haute** plausible, un logo (< 35 % de largeur), une bande
-  partielle (35–50 %), un décor (> 200 px), une bande sombre (médiane < 60)
-  ou une bande dont la géométrie bouge (centre/hauteur > 12 px) partent en
-  `review`.
+  partielle (35–50 %) non confirmée par OCR, un décor (> 200 px), une bande
+  sombre (médiane < 60) ou une bande dont la géométrie bouge
+  (centre/hauteur > 12 px) partent en `review`.
 - Une bannière qui change seulement de texte ou de luminosité reste
   applicable si sa géométrie est stable.
-- `apply` seulement si largeur ≥ 50 %, hauteur 24–200 px (seuils ramenés à
-  la hauteur source), persistance ≥ 60 %, aspect ≥ 3, géométrie stable et
+- Depuis D-056, une bande **basse** partielle de 35–50 % peut être appliquée
+  si l'OCR est exécuté **avant** le gate de largeur et renvoie un verdict
+  `Confirmed`, avec persistance ≥ 60 %, géométrie strictement stable
+  (centre/hauteur ≤ 12 px), luminance ≥ 60, `temporal_std` ≤ 35 et scale
+  ≤ 300 %. Les vetos `tall_bottom`, `top`, `logo` et `changing_text` restent
+  prioritaires.
+- `apply` si largeur ≥ 50 %, ou largeur ≥ 35 % pour une bande basse
+  persistante confirmée par OCR, hauteur 24–200 px (seuils ramenés à la
+  hauteur source), persistance ≥ 60 %, aspect ≥ 3, géométrie stable et
   scale ≤ 300 % :
   `scale = hauteur_comp / (hauteur_source − hauteur_bande) × 100 × 1,05`.
+- R4 : la formule de scale reste basée sur la hauteur de bande, jamais sur la
+  bbox OCR. Les applies partiels exposent `partial_width_ocr = true` et
+  `scale_basis = "band_height"`.
 
 Validation : 187 DISNEYWORLD et ECOLE → **206,6 %** (bannière de 104 px),
 bannière supprimée à 10/40/100 s. Les 11 cas synthétiques donnent 3 `apply`,
@@ -161,8 +179,8 @@ Décision :
 - preuve ambiguë → décision A2 actuelle, mais un `apply` est dégradé en
   `review` ;
 - garde-fous durs inchangés : keyframes, échelles hétérogènes, bande
-  haute, largeur < 50 %, hauteur hors 24–200, persistance < 60 %,
-  `temporal_std` > 35 et scale > 300 % ;
+  haute, largeur < 50 % sauf bande basse confirmée par OCR (D-056), hauteur
+  hors 24–200, persistance < 60 %, `temporal_std` > 35 et scale > 300 % ;
 - candidat étroit : texte persistant → `review` logo, texte changeant →
   `noop` sous-titre, sinon `review`.
 
@@ -238,14 +256,46 @@ confirmation visuelle NCC/contours et la stabilité de la zone générique
 sont implémentées côté QA (`--source-logo-visual`, LOT-10) ; A2 ne les
 consulte pas et garde ses garde-fous géométriques.
 
-## A3/A4 — revue seulement
+## A3/A4/A5 — revue et rapport seulement
+
+### A3 — candidats de keyframes
 
 - A3 lit `_ae.json` et `segment_recommendations`, calcule l'amplitude et le
   trou de suivi, et signale des candidats de keyframes en `review`. Jamais
-  d'application.
+  d'application (R7).
+- R5 (D-056) : `noop` si `amplitude < 250 px` **et** `candidate_keys <= 2`,
+  avec le motif « mouvement faible ou nombre de clés insuffisant ». Dans le
+  corpus GOOD, ce filtre retire 171 revues (37,5 %) pour 4 vrais positifs.
+- `high_confidence = true` si `amplitude >= 700 px` ou
+  `candidate_keys == 6` ; la raison contient « haute confiance » et
+  `review.json` passe la sévérité à `high`.
+- R6 (P2, `a3_relaxed_gap = false` par défaut) : en revue seulement,
+  `gap < 0,70` est accepté si `amplitude >= 200 px`. Le détail
+  `gap_relaxed = true` documente le recours au seuil assoupli.
+- `strong_candidate = true` si `candidate_keys >= 4` ou
+  (`amplitude >= 300 px` et `gap < 0,30`) ; ce marqueur alimente R2.
+- Aucun recadrage statique automatique : la recommandation STEP4 ne
+  correspond au choix humain que dans 46 % des cas.
+
+### A4 — segments courts
+
 - A4 signale les segments courts, les fusions CSV et les bornes non alignées
   en `review`. La détection de cuts durs intra-segment reste désactivée
   (trop de faux positifs).
+- R8 (D-056) : un segment de durée `< 0,3 s` sans continuité de source des
+  deux côtés est tagué `flash_probable = true`. La continuité exige le même
+  `source` et des intervalles qui se touchent à 2 ms près ; le détail
+  `source_continuity` expose les deux côtés. Sur le corpus, les 7 `none`
+  < 0,3 s sont des segments de bord, alors que les 4 `extend` sont intérieurs
+  et continus. Aucune fusion automatique.
+
+### A5 — couverture source
+
+- A5 reste report-only : chaque revue de couverture porte
+  `resolution = "resolved"` et `report_only = true`.
+- Le contrôle d'audit `source_coverage` indique « résolus par le monteur
+  (report-only) ». Les 17 revues du corpus sont toutes résolues par le
+  recadrage humain ; elles ne sont pas comptées comme faux positifs.
 
 ## A6 — template SDM
 
@@ -362,8 +412,13 @@ template_prefix = "M6 - SDM - "
 archive_only_prefixes = ["W9 - LPHDF"]
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
-a1_margin = 1.04
+# Marge A1 D-056 : médiane humaine 1,0125, 51/65 cas <= 1,015.
+a1_margin = 1.015
+# P2 validé sur copies (2026-11-08) : différer A1 sur candidat A3 fort (R2).
+a1_defer_on_a3 = false
 a2_margin = 1.05
+# P2 validé sur copies (2026-11-08) : gap < 0,7 en revue pour amplitude >= 200 px (R6).
+a3_relaxed_gap = false
 # Gate OCR A2 (D-051), activé en production le 2026-11-08 (D-055).
 a2_ocr = true
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
@@ -432,14 +487,17 @@ POST_DONE: N - <échecs>
 
 ## Validation de production
 
+Les lignes 268 et 191 ont été mesurées avec la marge A1 historique de 1,04,
+avant D-056 ; elles restent la référence de parité comportementale.
+
 | Cas | Résultat |
 | --- | --- |
 | 295 SDM | 1 `apply` A6, audit `pass`, assist identique à la référence, rendu 0/255 |
 | 295 keyframé | 0 `apply`, 3 `review`, assist copie exacte |
-| 268 | 15 A1 à 231,1 %, 9 `review`, 53 `noop`, audit `pass` |
+| 268 | 15 A1 à 231,1 %, 9 `review`, 53 `noop`, audit `pass` (marge 1,04) |
 | 187 DISNEYWORLD | 1 A2 à 206,6 %, 14 `review`, audit `pass` |
 | 187 ECOLE | 1 A2 à 206,6 %, 2 `review`, audit `pass` |
-| 191 | 37 A1 à 249,6 %, 12 `review`, audit `pass` |
+| 191 | 37 A1 à 249,6 %, 12 `review`, audit `pass` (marge 1,04) |
 | 181 Concierge | 0 `apply`, 20 `review`, assist octet pour octet identique |
 | 270 / 276 / 286 / 287 | 0 `apply`, 7 projets, assist identiques au brut, audit `pass` |
 | 295 direct | CSV STEP7 = STEP2, rendu 0/10/30/50 s identique au pixel à la référence Rust |
@@ -450,23 +508,78 @@ POST_DONE: N - <échecs>
 | A2 v3 OCR (40) | 2 `review` conservés, `details.ocr` et `texts` enrichis |
 | A2 v3 OCR (sub_fast) | sous-titres changeants → `review` « texte changeant », aucun recadrage |
 | A2 registre logos (D-052) | `54`/`58` actions et scales identiques, `40` enrichis sans changement d'action, audits `pass` |
+| D-056 A1 | marge 1,015 : `243,6 %` sur la fixture 800 px ; marge explicite 1,04 : `249,6 %` |
+| D-056 A2 | bande basse 40 % + OCR `Confirmed` → `apply` 206,6 % ; sans OCR, Sparse, Changing ou LogoOnly → `review` |
+| D-056 A3 | `noop` sous 250 px / 2 clés ; `high_confidence` à ≥ 700 px ou 6 clés ; `gap_relaxed` opt-in ; jamais `apply` |
+| D-056 A4 | 7 flashes de bord < 0,3 s tagués, 4 `extend` intérieurs continus non tagués |
+| D-056 A5 | revues de couverture `resolution = "resolved"`, `report_only = true` |
 
-Les décisions A1/A2/A3/A4 de 268, 187 DISNEYWORLD, 187 ECOLE, 191 et 181 sont
-**identiques au prototype Python** (code, action, cible, raison et détails).
-Les GOOD 270/276/286 ne changent aucune échelle ; 287 n'a qu'une référence
-GOOD sur trois, donc la comparaison y est partielle.
+Avant D-056, les décisions A1/A2/A3/A4 de 268, 187 DISNEYWORLD, 187 ECOLE,
+191 et 181 étaient **identiques au prototype Python** (code, action, cible,
+raison et détails). Cette parité et les lignes 268/191 ont été mesurées avec
+la marge 1,04 ; D-056 change les scales A1 et filtre certaines revues A3,
+sans toucher aux invariants A6. Les GOOD 270/276/286 ne changent aucune
+échelle ; 287 n'a qu'une référence GOOD sur trois, donc la comparaison y est
+partielle.
+
+### Validation R2/R6 sur copies (2026-11-08)
+
+Trois projets du corpus ont été copiés sous `/tmp/opencode/r2r6` puis rejoués
+avec deux configurations identiques (`a1_margin = 1.015`, `a2_ocr = false`,
+`direct = false`), seule la paire `a1_defer_on_a3`/`a3_relaxed_gap` change.
+L'OCR A2 est désactivé pour isoler R2/R6 ; les décisions A2 restent
+identiques entre baseline et variante. Aucune écriture sous `/mnt/cache`,
+`runtime/` ou le corpus.
+
+- **68 — `6ter - De l'autre côté du périph` (R2)** : 7 `apply` / 2 `review` /
+  7 `noop` en baseline, 6 / 3 / 7 en variante. Le Segment 7
+  (25,72–38,88 s), seul `apply` A1 partagé avec un candidat A3 fort
+  (317 px, gap 0,261, 4 clés), passe en `review` avec
+  `a1_deferred_on_a3 = true`. Les six autres `apply` A1 restent identiques ;
+  l'assist variante conserve le transform brut du Segment 7 (scale 180 %,
+  position Y 50) au lieu de 243,6 % / −305,4 px. Le diff de l'assist se limite
+  à ces deux valeurs.
+- **54 — `UJUD - CLIENT HOTEL` (R6)** : 1 `apply` / 15 `review` / 97 `noop`
+  en baseline, 1 / 24 / 88 en variante. Neuf A3 `noop` passent en `review`
+  avec `gap_relaxed = true` : Segments 2 (262 px, 0,585), 5 (491, 0,508),
+  14 (235, 0,490), 17 (480, 0,625), 19 (207, 0,456), 23 (763, 0,602,
+  `high_confidence`), 31 (371, 0,545), 40 (306, 0,457) et 49 (262, 0,316).
+  Les Segments 3 (197 px) et 29 (348 px, gap 0,785) restent `noop`. Aucun
+  `apply` A3 ; l'assist est identique octet pour octet.
+- **356 — `Pretty Little Liars - Extrait 6` (R6 et non-régression R2)** :
+  1 / 9 / 21 en baseline, 1 / 12 / 18 en variante. Les Segments 9 (327 px,
+  0,362), 11 (295 px, 0,585) et 13 (485 px, 0,440) passent en `review` ;
+  l'`apply` A1 du Segment 8 (196,5 %) n'est pas différé car le candidat A3
+  fort est sur le Segment 2. L'assist est identique octet pour octet.
+- **Haute confiance** : dans la variante 54, `review.json` porte
+  `severity = "high"` pour les Segments 10, 23 et 27 (6 clés / amplitude
+  ≥ 700 px), et l'audit `a3_disabled` indique « 3 haute(s) confiance ».
+- **Qualité sur les GOOD** : le Segment 7 de 68 porte 18 keyframes de
+  Position dans la référence humaine (scale statique 249,6 %), ce qui
+  confirme le candidat A3 et le report R2. Sur les 12 nouvelles revues R6,
+  5 segments sont keyframés dans les GOOD (54 : 5, 17, 23, 49 ; 356 : 9) et
+  54/19 a un repositionnement statique humain, soit 6/12 revues utiles ;
+  6 sont sans changement humain (54 : 2, 14, 31, 40 ; 356 : 11, 13). R6
+  reste review-only : il ajoute du bruit de revue sans modifier les projets.
+- **Portée** : sur les 75 `post.json` du corpus, le projet 68 est le seul où
+  un `apply` A1 et un candidat A3 fort visent le même segment. R2 est donc
+  rare mais son unique déclenchement est confirmé par les keyframes GOOD ;
+  R6 ajoute des revues sans jamais produire d'`apply`. Les deux flags restent
+  opt-in jusqu'à décision d'activation.
 
 ## Limites
 
-- A3/A4 restent en revue ; aucun keyframe ni cut n'est appliqué.
+- A3/A4 restent en revue, A5 en rapport ; aucun keyframe, cut ou recadrage
+  statique n'est appliqué. R2 et R6 sont validés sur copies (68/54/356,
+  2026-11-08) mais restent opt-in jusqu'à activation en production.
 - A1 ne couvre pas les bords non noirs ni les recadrages sémantiques ; ces cas
   restent en `review`.
 - A2 OCR est **activé explicitement** (`a2_ocr = true` en production depuis
   D-055 ; défaut du code `false`) et coûte 15–25 s par projet avec 2
   threads, 13,2 s avec 8 ; il ne couvre que le texte, pas les logos
-  purement visuels. Les bandeaux
-  sombres restent en `review` (niveau 1) et les candidats étroits ne sont
-  jamais recadrés.
+  purement visuels. Les bandeaux sombres restent en `review` (niveau 1), les
+  logos (< 35 %) ne sont jamais recadrés et les bandes partielles 35–50 % ne
+  sont appliquées que si l'OCR confirme un texte persistant et stable.
 - A6 est un template SDM mesuré ; un projet multi-segment ou keyframé part en
   `review`. Le profil est volontairement figé.
 - Les artefacts ne sont pas encore exposés dans l'interface web ou le panneau

@@ -92,14 +92,21 @@ impl Decision {
 
     pub fn to_review_json(&self) -> Value {
         let mut object = Map::new();
+        let high_confidence = self
+            .details
+            .get("high_confidence")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         object.insert("code".into(), json!(self.code));
         object.insert(
             "severity".into(),
-            json!(if matches!(self.code, "A1" | "A2" | "A6") {
-                "high"
-            } else {
-                "medium"
-            }),
+            json!(
+                if matches!(self.code, "A1" | "A2" | "A6") || high_confidence {
+                    "high"
+                } else {
+                    "medium"
+                }
+            ),
         );
         object.insert("target".into(), json!(self.target));
         object.insert("reason".into(), json!(self.reason));
@@ -242,4 +249,27 @@ pub fn verdict(checks: &[AuditCheck]) -> &'static str {
 
 pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn high_confidence_review_gets_high_severity() {
+        let decision = Decision::review(
+            "A3",
+            "Segment 1",
+            "candidat haute confiance",
+            0.55,
+            json!({"high_confidence": true}),
+        );
+        assert_eq!(decision.to_review_json()["severity"], "high");
+    }
+
+    #[test]
+    fn normal_a3_review_stays_medium() {
+        let decision = Decision::review("A3", "Segment 1", "candidat", 0.35, json!({}));
+        assert_eq!(decision.to_review_json()["severity"], "medium");
+    }
 }

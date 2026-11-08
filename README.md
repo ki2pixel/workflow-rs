@@ -88,6 +88,12 @@ Linux et le panneau CEP continue d'appeler Python.
   jamais recadrer ni masquer. Le QA peut confirmer localement les pixels
   (`--source-logo-visual`, crops externes via `--source-logo-references`) ;
   29 émissions, 15 clean feeds et 5 émissions sans logo.
+- Depuis D-056, A1 vise une marge de 1,015, A2 peut appliquer une bande basse
+  partielle de 35–50 % confirmée par OCR, A3 filtre les revues sous 250 px /
+  2 clés et signale la haute confiance, A4 tague les flashes probables et A5
+  classe les revues de couverture comme résolues. R2 (`a1_defer_on_a3`) et R6
+  (`a3_relaxed_gap`) restent opt-in, désactivés par défaut ; ils ont été
+  validés sur copies (68/54/356) le 2026-11-08.
 - Bypass direct : quand `steps.step8.post.direct = true`, les vidéos
   `M6 - SDM - ` et `W9 - LPHDF` au profil 1920×1080 25 fps sautent
   STEP2–STEP6 ; STEP7 synthétise un `_scenes.csv` mono-segment. SDM produit

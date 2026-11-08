@@ -943,7 +943,47 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   d'intro/transition.
 - **Références** : D-030, D-032, D-051, D-052, D-055 ;
   `docs/lots/LOT-9-POST-STEP8.md` ;
-  `crates/workflow-steps/src/post/{a1,a2,a3,a4,a5,a6}.rs`.
+  `crates/workflow-steps/src/post/{a1,a2,a3,a4,a6}.rs` et `run.rs` (A5).
+
+### Mise en œuvre de D-056 (2026-11-08)
+
+- **Règles actives** : R1 (`a1_margin = 1,015`, défaut code et
+  `config/config.toml`), R3/R4 (bande basse 35–50 % avec OCR exécuté avant le
+  gate de largeur, formule de scale inchangée), R5 (`noop` sous 250 px et
+  2 clés, `high_confidence` à ≥ 700 px ou 6 clés), R7 (A3 review-only), R8
+  (`flash_probable` < 0,3 s sans continuité de source des deux côtés), R9
+  (A5 `resolution = "resolved"`, report-only).
+- **Règles P2 opt-in** : `a1_defer_on_a3` (R2, défaut `false`) diffère A1 en
+  revue sur `strong_candidate` A3, sans appliquer de scale partiel ;
+  `a3_relaxed_gap` (R6, défaut `false`) autorise `gap < 0,7` en revue pour
+  une amplitude ≥ 200 px.
+- **Artefacts** : schéma `post.json`/`review.json`/`audit.json` inchangé
+  (`schema = 1`) ; clés additives `partial_width_ocr`, `scale_basis`,
+  `high_confidence`, `strong_candidate`, `gap_relaxed`, `flash_probable`,
+  `source_continuity`, `a1_deferred_on_a3`, `resolution`, `report_only`.
+  `review.json` passe A3 haute confiance en sévérité `high`.
+- **Validation code** : `cargo test -p workflow-steps --lib post` (120 tests),
+  `cargo test --workspace` (543 tests), `fmt` et `clippy -D warnings` verts,
+  `config check` valide ; aucun accès `/mnt/cache`, `runtime/` ou dépôt
+  Python.
+- **Validation R2/R6 sur copies (2026-11-08)** : copies de 68, 54 et 356
+  sous `/tmp/opencode/r2r6`, configs identiques (`a1_margin = 1,015`,
+  `a2_ocr = false`, `direct = false`) et flags opposés. 68 : le seul `apply`
+  A1 partagé avec un candidat A3 fort (Segment 7, 317 px, gap 0,261) passe
+  en `review` avec `a1_deferred_on_a3` et l'assist conserve le transform
+  brut ; 54 : 9 A3 `noop` → `review` avec `gap_relaxed`, aucun `apply` A3,
+  assist identique ; 356 : 3 A3 `noop` → `review`, l'`apply` A1 du Segment 8
+  reste inchangé, assist identique. Audits `pass`, 3 hautes confiances en
+  sévérité `high` sur 54. La référence GOOD de 68 porte 18 keyframes Position
+  sur le Segment 7, ce qui confirme R2 ; sur les 12 nouvelles revues R6,
+  5 segments sont keyframés GOOD et 1 a un repositionnement statique
+  (6/12 utiles), 6 sans changement humain. R6 reste review-only. Les deux
+  flags restent opt-in.
+- **Références** : `docs/lots/LOT-9-POST-STEP8.md`,
+  `docs/architecture/CONTRAT-ENVIRONNEMENT.md`,
+  `crates/workflow-steps/src/post/{a1,a2,a3,a4,model,run}.rs`,
+  `crates/workflow-core/src/config.rs`, `config/config.toml`,
+  `config/env.map.toml`.
 
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 

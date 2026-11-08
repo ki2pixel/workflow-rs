@@ -8,8 +8,10 @@
 //! noir/gel), Stage 1 OCR sous-titres et logos (PP-OCRv6) et visage (YuNet),
 //! agrégation. Le contrôle logos exige un `.ecproj` pour masquer les overlays
 //! déclarés ; sans projet il reste `not_applicable`. DINOv2 est actif par
-//! défaut (`--no-logo-visual` pour l'opt-out). `auto_approve_eligible` n'est
-//! vrai que sur un `pass` complet, avec les contrôles requis exécutés.
+//! défaut (`--no-logo-visual` pour l'opt-out). `--source-logo` ajoute, en
+//! opt-in, l'annotation du registre spatial des logos source (D-052) : le
+//! check `source_logo` est `pass` ou `info`, jamais bloquant. `auto_approve_eligible`
+//! n'est vrai que sur un `pass` complet, avec les contrôles requis exécutés.
 
 pub mod aggregate;
 pub mod batch;
@@ -22,6 +24,7 @@ pub mod ocr;
 pub mod overlay;
 pub mod report;
 pub mod sample;
+pub mod source_logo;
 pub mod stage0;
 
 pub use crate::vision::dino::{DinoOptions, DINO_MODEL_FILENAME, DINO_PROBE_FILENAME};
@@ -64,6 +67,11 @@ pub struct QaOptions {
     pub logo_visual_enabled: bool,
     /// Active le contrôle visage YuNet.
     pub face_enabled: bool,
+    /// Active l'annotation du logo source (registre spatial D-052). Opt-in
+    /// Phase A : aucune décision, seulement un check `pass`/`info`.
+    pub source_logo_enabled: bool,
+    /// Catalogue TOML explicite ; sinon `<models>/qa/source_logos.toml`.
+    pub source_logo_catalog: Option<PathBuf>,
     /// Écrit une frame WebP par finding sous `<out>/evidence/`.
     pub evidence_enabled: bool,
     /// 1 ou 3 échantillons par segment.
@@ -87,6 +95,8 @@ impl Default for QaOptions {
             logo_enabled: true,
             logo_visual_enabled: true,
             face_enabled: true,
+            source_logo_enabled: false,
+            source_logo_catalog: None,
             evidence_enabled: true,
             per_segment: 1,
             video_id: None,
@@ -156,6 +166,10 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             end: segment.end,
         })
         .collect::<Vec<_>>();
+
+    if options.source_logo_enabled {
+        checks.push(source_logo_check(project, options));
+    }
 
     let mut ocr_options = if !options.ocr_enabled {
         checks.push(QaCheck::not_applicable(
@@ -450,6 +464,50 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     Ok(QaOutcome { report, qa_path })
 }
 
+/// Résout et exécute l'annotation du logo source. Le contrôle est opt-in :
+/// sans catalogue, il est explicitement `not_applicable` plutôt que bloquant.
+fn source_logo_check(project: Option<&Path>, options: &QaOptions) -> QaCheck {
+    let Some(project) = project else {
+        return QaCheck::not_applicable(
+            "source_logo",
+            "projet .ecproj requis pour projeter le logo source",
+        );
+    };
+    let catalog = options.source_logo_catalog.clone().or_else(|| {
+        options
+            .models_dir
+            .as_ref()
+            .map(|directory| directory.join(crate::vision::source_logo::CATALOG_FILENAME))
+    });
+    let Some(catalog) = catalog else {
+        return QaCheck::not_applicable(
+            "source_logo",
+            "catalogue non fourni (--models ou --source-logo-catalog)",
+        );
+    };
+    if !catalog.is_file() {
+        return QaCheck::not_applicable(
+            "source_logo",
+            format!("catalogue introuvable: {}", catalog.display()),
+        );
+    }
+    match source_logo::run_geometry(project, &catalog) {
+        Ok(check) => check,
+        Err(error) => {
+            tracing::warn!(
+                project = %project.display(),
+                catalog = %catalog.display(),
+                error = %error,
+                "contrôle du logo source ignoré"
+            );
+            QaCheck::not_applicable(
+                "source_logo",
+                format!("registre de logos en échec: {error:#}"),
+            )
+        }
+    }
+}
+
 /// Transforme le résultat d'un `JoinHandle` de Stage 1 en erreur applicative.
 /// Un panic dans un worker ne doit pas laisser un `qa.json` partiel.
 fn join_stage<T>(result: std::thread::Result<anyhow::Result<T>>, stage: &str) -> Result<T> {
@@ -476,6 +534,25 @@ mod tests {
         assert_eq!(
             video_id_from_path(Path::new("/tmp/UJUD - JOSEPH_9x16.mp4")),
             "UJUD - JOSEPH_9x16"
+        );
+    }
+
+    #[test]
+    fn source_logo_check_requires_a_project_and_a_catalog() {
+        let mut options = QaOptions {
+            source_logo_enabled: true,
+            ..QaOptions::default()
+        };
+        assert_eq!(
+            source_logo_check(None, &options).status,
+            QaStatus::NotApplicable
+        );
+
+        options.source_logo_catalog = Some(PathBuf::from("/nonexistent/source_logos.toml"));
+        let project = Path::new("/tmp/projet.ecproj");
+        assert_eq!(
+            source_logo_check(Some(project), &options).status,
+            QaStatus::NotApplicable
         );
     }
 }

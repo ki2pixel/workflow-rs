@@ -13,6 +13,7 @@ pub mod frame;
 pub mod hash;
 pub mod inference;
 pub mod ocr;
+pub mod source_logo;
 pub mod text;
 
 /// Modèle ONNX et provenance publiée dans les rapports.

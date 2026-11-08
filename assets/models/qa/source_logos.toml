@@ -1,0 +1,574 @@
+# Registre spatial des logos de programme (D-052).
+# Les bboxes sont demi-ouvertes, en pixels du canvas source 1920x1080.
+# Les crops de référence restent hors dépôt ; ce fichier ne
+# contient que des métadonnées auditables.
+
+schema = 1
+generated_at = "2026-11-08"
+source = "SELECTION_VIDEOS_SOURCES_LOGOS.csv"
+source_resolution = [1920, 1080]
+reference_root = ""
+
+[zones]
+bottom_left = [61, 719, 497, 1061]
+top_left = [87, 48, 445, 112]
+
+[[emissions]]
+name = "Les Marseillais"
+channel = "W9"
+position = "bottom_left"
+dossier = "Les_Marseillais"
+bbox = [97, 719, 437, 1021]
+aliases = ["Marseillais"]
+sources = ["Les Marseillais s’envolent sur une bouée.mp4", "Les Marseillais accueille Maddy et Benjy après leur fiançailles.mp4", "Les Marseillais font un shooting photo avec une araignée sur eux.mp4", "Les Marseillais profitent des fonds marins !.mp4"]
+notes = "Plusieurs déclinaisons du logo (Dubaï, Caraïbes, etc.) au même emplacement. Attention : certaines vidéos avec le mot Marseillais sont en réalité Le Cross."
+
+[[emissions.variants]]
+crop = "Les_Marseillais/crop1.png"
+bbox = [136, 774, 418, 979]
+opaque_pixels = 57810
+
+[[emissions.variants]]
+crop = "Les_Marseillais/crop2.png"
+bbox = [132, 777, 417, 1015]
+opaque_pixels = 67830
+
+[[emissions.variants]]
+crop = "Les_Marseillais/crop3.png"
+bbox = [97, 764, 437, 1021]
+opaque_pixels = 87380
+
+[[emissions.variants]]
+crop = "Les_Marseillais/crop4.png"
+bbox = [126, 719, 411, 1021]
+opaque_pixels = 86070
+
+[[emissions]]
+name = "Les Apprentis Aventuriers"
+channel = "W9"
+position = "bottom_left"
+dossier = "Les_Apprentis_Aventuriers"
+bbox = [82, 906, 360, 1044]
+aliases = ["Apprentis Aventuriers", "LAA9", "LAA"]
+sources = ["Les Rose sont en guerre contre le reste des Aventuriers !.mp4", "prédiff – Les Apprentis découvrent que leur briquet a pris l’eau.mp4"]
+notes = "Logo titre cartouche en début / jingle séquence."
+
+[[emissions.variants]]
+crop = "Les_Apprentis_Aventuriers/crop.png"
+bbox = [82, 906, 360, 1044]
+opaque_pixels = 38364
+
+[[emissions]]
+name = "Le Reste du Monde"
+channel = "W9"
+position = "bottom_left"
+dossier = "Le_Reste_du_Monde"
+bbox = [122, 811, 345, 1024]
+aliases = ["Reste du Monde", "RDM"]
+sources = ["Jean pleure car Tyler doit partir de l’aventure pour une opportunité professionnelle.mp4", "Adixia et Simon se remettent officiellement ensemble.mp4", "Marwa avoue qu’elle est jalouse que Théo parle d’Adixia.mp4"]
+notes = "Logo titre officiel Le RDM en début."
+
+[[emissions.variants]]
+crop = "Le_Reste_du_Monde/crop.png"
+bbox = [122, 811, 345, 1024]
+opaque_pixels = 47499
+
+[[emissions]]
+name = "Le Cross"
+channel = "W9"
+position = "bottom_left"
+dossier = "Le_Cross"
+bbox = [106, 845, 435, 1039]
+aliases = ["Le Cross"]
+sources = ["Christopher se prend un râteau !.mp4", "Kamila ne sait pas écrire Marseillais !.mp4", "Le RDM remporte cette saison du cross !.mp4"]
+notes = "Titre officiel Le Cross (Les Marseillais vs Le Reste du Monde vs Les Motivés)."
+
+[[emissions.variants]]
+crop = "Le_Cross/crop1.png"
+bbox = [106, 853, 425, 1039]
+opaque_pixels = 59334
+
+[[emissions.variants]]
+crop = "Le_Cross/crop2.png"
+bbox = [108, 845, 435, 1005]
+opaque_pixels = 52320
+
+[[emissions]]
+name = "Enquête d'action"
+channel = "W9"
+position = "bottom_left"
+dossier = "Enquete_daction"
+bbox = [101, 918, 282, 1021]
+aliases = ["Enquête d'action", "Enquete d'action"]
+sources = ["Post diff 1 Course-poursuite dans sa fuite il manque de renverser des piétons.mp4", "prediff 2 - Ces gendarmes maritimes découvrent des stupéfiants en pleine mer.mp4"]
+notes = "Synthé et cartouche titre Enquête d'Action."
+
+[[emissions.variants]]
+crop = "Enquete_daction/crop.png"
+bbox = [101, 918, 282, 1021]
+opaque_pixels = 18643
+
+[[emissions]]
+name = "L'Île de la tentation"
+channel = "W9"
+position = "bottom_left"
+dossier = "L_Ile_de_la_tentation"
+bbox = [96, 924, 416, 1028]
+aliases = ["Île de la tentation", "Ile de la tentation"]
+sources = ["Il cède à la tentation dans les toilettes.mp4", "La tentatrice pense qu’il peut céder à la tentation.mp4"]
+notes = "Logo animé intro / titre Tentation."
+
+[[emissions.variants]]
+crop = "L_Ile_de_la_tentation/crop.png"
+bbox = [96, 924, 416, 1028]
+opaque_pixels = 33280
+
+[[emissions]]
+name = "Les Ch'tis"
+channel = "W9"
+position = "bottom_left"
+dossier = "Les_Chtis"
+bbox = [95, 787, 306, 994]
+aliases = ["Ch'tis", "Chtis"]
+sources = ["Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins.mp4", "Bilal s’énerve et insulte Vanessa ce qui dégoûte toute les filles.mp4"]
+notes = "Logo titre Les Ch'tis à Las Vegas / Marbella / etc."
+
+[[emissions.variants]]
+crop = "Les_Chtis/crop.png"
+bbox = [95, 787, 306, 994]
+opaque_pixels = 43677
+
+[[emissions]]
+name = "Cougar Island"
+channel = "W9"
+position = "bottom_left"
+dossier = "Cougar_Island"
+bbox = [97, 903, 396, 1021]
+aliases = ["Cougar Island"]
+sources = ["postdiff - Ca clash entre les jeunes et les vieux ! EM4.mp4", "prédiff - Benoit et Estefania se tournent autour en cachette EM4.mp4"]
+notes = "Logo titre Cougar Island en début."
+
+[[emissions.variants]]
+crop = "Cougar_Island/crop.png"
+bbox = [97, 903, 396, 1021]
+opaque_pixels = 35282
+
+[[emissions]]
+name = "Qui veut épouser mon fils ?"
+channel = "W9"
+position = "bottom_left"
+dossier = "Qui_veut_epouser_mon_fils"
+bbox = [86, 893, 342, 1041]
+aliases = ["Qui veut épouser mon fils", "QVEMF"]
+sources = ["Extrait 1 Sa mère est du côté de ses prétendantes.mp4", "Il est impressionné par la poitrine de sa prétendante !.mp4"]
+notes = "Logo officiel QVEMF."
+
+[[emissions.variants]]
+crop = "Qui_veut_epouser_mon_fils/crop.png"
+bbox = [86, 893, 342, 1041]
+opaque_pixels = 37888
+
+[[emissions]]
+name = "C'est la famille"
+channel = "6play / W9"
+position = "bottom_left"
+dossier = "Cest_la_famille"
+bbox = [98, 912, 418, 1025]
+aliases = ["C'est la famille", "Cest la famille"]
+sources = ["Extrait 1 Manon est contente des compliments que lui fait Julien.mp4", "Julien demande à Manon de résonner Jessica.mp4"]
+notes = "Logo officiel incrusté C'est la famille."
+
+[[emissions.variants]]
+crop = "Cest_la_famille/crop.png"
+bbox = [98, 912, 418, 1025]
+opaque_pixels = 36160
+
+[[emissions]]
+name = "Cauchemar en cuisine"
+channel = "M6"
+position = "bottom_left"
+dossier = "Cauchemar_en_cuisine"
+bbox = [101, 938, 370, 1017]
+aliases = ["M6 - CEC -", "M6 -CEC -", "Cauchemar en cuisine"]
+sources = ["M6 - CEC - Cette restauratrice explose et craque face au chef Etchebest.mp4", "M6 -CEC - Ce restaurateur utilise une porte de frigo comme... plan de travail !.mp4"]
+notes = "Logo titre Cauchemar en Cuisine."
+
+[[emissions.variants]]
+crop = "Cauchemar_en_cuisine/crop.png"
+bbox = [101, 938, 370, 1017]
+opaque_pixels = 21251
+
+[[emissions]]
+name = "Un Jour Un Doc"
+channel = "M6"
+position = "bottom_left"
+dossier = "Un_Jour_Un_Doc"
+bbox = [92, 925, 296, 1031]
+aliases = ["UJUD -", "UJUD-", "Un Jour Un Doc"]
+sources = ["UJUD - PIZZA.mp4", "UJUD - YACHT.mp4"]
+notes = "Logo titre Un Jour Un Doc."
+
+[[emissions.variants]]
+crop = "Un_Jour_Un_Doc/crop.png"
+bbox = [92, 925, 296, 1031]
+opaque_pixels = 21624
+
+[[emissions]]
+name = "66 Minutes"
+channel = "M6"
+position = "bottom_left"
+dossier = "66_Minutes"
+bbox = [91, 846, 298, 1026]
+aliases = ["66M -", "66M-", "66 minutes"]
+sources = ["66M - VENTES.mp4", "66M - SURNOM.mp4"]
+notes = "Logo horloge / titre 66 Minutes."
+
+[[emissions.variants]]
+crop = "66_Minutes/crop.png"
+bbox = [91, 846, 298, 1026]
+opaque_pixels = 37260
+
+[[emissions]]
+name = "L'amour est dans le pré"
+channel = "M6"
+position = "bottom_left"
+dossier = "L_amour_est_dans_le_pre"
+bbox = [93, 905, 352, 1032]
+aliases = ["M6 - ADP -", "ADP -", "L'amour est dans le pré"]
+sources = ["Jean-Louis et la géographie, ça fait deux.mp4", "M6 - ADP - Ils ne veulent pas mettre fin au speed-dating.mp4"]
+notes = "Logo officiel L'amour est dans le pré (2 variantes de cartouches)."
+
+[[emissions.variants]]
+crop = "L_amour_est_dans_le_pre/crop1.png"
+bbox = [93, 905, 349, 1032]
+opaque_pixels = 32512
+
+[[emissions.variants]]
+crop = "L_amour_est_dans_le_pre/crop2.png"
+bbox = [94, 923, 352, 1031]
+opaque_pixels = 27864
+
+[[emissions]]
+name = "Capital"
+channel = "M6"
+position = "bottom_left"
+dossier = "Capital"
+bbox = [80, 914, 452, 1005]
+aliases = ["Capital"]
+sources = ["APPARTEMENT 100 RECUP_TAT_M6.mp4", "VIS A VIS_TAT_M6.mp4"]
+notes = "Logo titre Capital."
+
+[[emissions.variants]]
+crop = "Capital/crop.png"
+bbox = [80, 914, 452, 1005]
+opaque_pixels = 33850
+
+[[emissions]]
+name = "Pékin Express"
+channel = "M6"
+position = "bottom_left"
+dossier = "Pekin_Express"
+bbox = [62, 870, 497, 1022]
+aliases = ["M6 - Pékin Express -", "Pékin Express", "Pekin Express"]
+sources = ["M6 - Pékin Express - Embrouille couple story.mp4", "M6 - Pékin Express - Ils font un karaoké avec des locaux.mp4"]
+notes = "Logo titre Pékin Express."
+
+[[emissions.variants]]
+crop = "Pekin_Express/crop.png"
+bbox = [62, 870, 497, 1022]
+opaque_pixels = 66120
+
+[[emissions]]
+name = "Top Chef"
+channel = "M6"
+position = "bottom_left"
+dossier = "Top_Chef"
+bbox = [87, 903, 387, 1028]
+aliases = ["M6 - Top Chef -", "Top Chef"]
+sources = ["M6 - Top Chef - Il lui manque 7 desserts en pleine finale.mp4", "M6 - Top Chef - Ses desserts craquent à la dernière minute... Viviana veut tout refaire.mp4"]
+notes = "Logo officiel Top Chef."
+
+[[emissions.variants]]
+crop = "Top_Chef/crop.png"
+bbox = [87, 903, 387, 1028]
+opaque_pixels = 37500
+
+[[emissions]]
+name = "Zone Interdite"
+channel = "M6"
+position = "bottom_left"
+dossier = "Zone_Interdite"
+bbox = [116, 927, 357, 1001]
+aliases = ["Zone Interdite"]
+sources = ["SALLE DE BAINS_TAT_M6.mp4", "CANCER_TAT_M6.mp4"]
+notes = "Logo officiel Zone Interdite."
+
+[[emissions.variants]]
+crop = "Zone_Interdite/crop.png"
+bbox = [116, 927, 357, 1001]
+opaque_pixels = 17834
+
+[[emissions]]
+name = "Enquête Exclusive"
+channel = "M6"
+position = "bottom_left"
+dossier = "Enquete_Exclusive"
+bbox = [61, 913, 389, 1021]
+aliases = ["Enquête Exclusive", "Enquete Exclusive"]
+sources = ["PASTEUR_TAT_M6.mp4"]
+notes = "Logo titre Enquête Exclusive."
+
+[[emissions.variants]]
+crop = "Enquete_Exclusive/crop.png"
+bbox = [61, 913, 389, 1021]
+opaque_pixels = 35424
+
+[[emissions]]
+name = "E=M6"
+channel = "M6"
+position = "bottom_left"
+dossier = "E_M6"
+bbox = [70, 822, 305, 1061]
+aliases = ["M6 - EM6", "EM6_", "E=M6"]
+sources = ["EM6_Short douche_TAT_M6.mp4", "M6 - EM6 - Savez-vous vraiment ce qui se passe pendant votre sommeil .mp4"]
+notes = "Logo officiel E=M6."
+
+[[emissions.variants]]
+crop = "E_M6/crop.png"
+bbox = [70, 822, 305, 1061]
+opaque_pixels = 56163
+
+[[emissions]]
+name = "Les Traîtres"
+channel = "M6"
+position = "bottom_left"
+dossier = "Les_Traitres"
+bbox = [83, 923, 389, 1022]
+aliases = ["M6 - TRAITRES -", "TRAITRES -", "Les Traîtres"]
+sources = ["M6 - TRAITRES - Axel Huet avoue avoir peur de Victoria Abril.mp4", "M6 - TRAITRES - Victoria Abril n’arrive pas à aller aux toilettes.mp4"]
+notes = "Logo titre Les Traîtres."
+
+[[emissions.variants]]
+crop = "Les_Traitres/crop.png"
+bbox = [83, 923, 389, 1022]
+opaque_pixels = 30294
+
+[[emissions]]
+name = "Mariés au premier regard"
+channel = "M6"
+position = "bottom_left"
+dossier = "Maries_au_premier_regard"
+bbox = [86, 889, 392, 1010]
+aliases = ["M6 - MAPR -", "MAPR -", "Mariés au premier regard"]
+sources = ["M6 - MAPR - Alex invite Lucile à vivre chez lui.mp4", "MAPR - Elle est émue par le discours de son père.mp4"]
+notes = "Logo titre Mariés au premier regard."
+
+[[emissions.variants]]
+crop = "Maries_au_premier_regard/crop.png"
+bbox = [86, 889, 392, 1010]
+opaque_pixels = 37026
+
+[[emissions]]
+name = "Le Maillon Faible"
+channel = "M6"
+position = "bottom_left"
+dossier = "Le_Maillon_Faible"
+bbox = [156, 832, 380, 1007]
+aliases = ["Maillon Faible"]
+sources = ["Extrait 2.mp4"]
+notes = "Logo officiel Le Maillon Faible incrusté."
+
+[[emissions.variants]]
+crop = "Le_Maillon_Faible/crop.png"
+bbox = [156, 832, 380, 1007]
+opaque_pixels = 39200
+
+[[emissions]]
+name = "Le Meilleur Combat des Régions (LMCR)"
+channel = "M6"
+position = "bottom_left"
+dossier = "Le_Meilleur_Combat_des_Regions"
+bbox = [96, 857, 290, 1032]
+aliases = []
+sources = ["M6 - LMCR - La potée lorraine.mp4", "M6 - LMCR - Ce cadreur est écoeuré après avoir gouté ce plat .mp4", "M6 - LMCR - Elle n’arrête pas de couper la parole à Yoann Conte.mp4"]
+notes = "Identifié dans l'archive sous le sigle LMCR / LMCR2 / LMCR3."
+
+[[emissions.variants]]
+crop = "Le_Meilleur_Combat_des_Regions/crop.png"
+bbox = [96, 857, 290, 1032]
+opaque_pixels = 33950
+
+[[emissions]]
+name = "Ma Super Ligue 1"
+channel = "Gulli"
+position = "bottom_left"
+dossier = "Ma_Super_Ligue_1"
+bbox = [131, 870, 310, 1011]
+aliases = ["Gulli - Ma Super Ligue 1", "Ma Super Ligue 1", "MSL1"]
+sources = ["Gulli - Ma Super Ligue 1 - L'itv quand j'étais petit de Christ Tapé.mp4"]
+notes = "Logo titre officiel Ligue 1 / MSL1."
+
+[[emissions.variants]]
+crop = "Ma_Super_Ligue_1/crop.png"
+bbox = [131, 870, 310, 1011]
+opaque_pixels = 25239
+
+[[emissions]]
+name = "Piquantes !"
+channel = "Téva"
+position = "top_left"
+dossier = "Piquantes"
+bbox = [87, 48, 445, 112]
+aliases = ["Piquantes", "TEVA_Piquantes"]
+sources = ["TEVA_Piquantes EM12_prédiff.mp4", "PP - Piquantes - Les odeurs du sexe.mp4"]
+notes = "Logo titre Piquantes ! (seul logo positionné en Haut-Gauche)."
+
+[[emissions.variants]]
+crop = "Piquantes/crop.png"
+bbox = [87, 48, 445, 112]
+opaque_pixels = 22912
+
+[[emissions]]
+name = "Les Grosses Têtes"
+channel = "Paris Première"
+position = "bottom_left"
+dossier = "Les_Grosses_Tetes"
+bbox = [137, 900, 348, 1018]
+aliases = ["PP - Les grosses têtes", "Les Grosses Têtes", "Les Grosses Tetes"]
+sources = ["PP - Les grosses têtes - Blague Fabrice.mp4", "PP - Les grosses têtes - Sylvie Tellier.mp4"]
+notes = "Logo titre Les Grosses Têtes."
+
+[[emissions.variants]]
+crop = "Les_Grosses_Tetes/crop.png"
+bbox = [137, 900, 348, 1018]
+opaque_pixels = 24898
+
+[[emissions]]
+name = "Les Mamans"
+channel = "6ter"
+position = "bottom_left"
+dossier = "Les_Mamans"
+bbox = [82, 897, 424, 1033]
+aliases = ["6ter - Les mamans", "Les Mamans"]
+sources = ["6ter - Les mamans - pregen _TAT_6ter.mp4", "6ter - les mamans - Tiziana se confie sur sa sleeve .mp4"]
+notes = "Logo titre officiel Les Mamans."
+
+[[emissions.variants]]
+crop = "Les_Mamans/crop.png"
+bbox = [82, 897, 424, 1033]
+opaque_pixels = 46512
+
+[[emissions]]
+name = "Norbert commis d'office"
+channel = "6ter"
+position = "bottom_left"
+dossier = "Norbert_commis_doffice"
+bbox = [100, 898, 355, 1019]
+aliases = ["6TER_norbert", "Norbert commis"]
+sources = ["6TER_norbert commis d'office_Ce plat risque de vous dégoûter.mp4", "6TER_Norbert commis d'office_Il cuisine des moules au chocolat.mp4"]
+notes = "Logo officiel Norbert commis d'office."
+
+[[emissions.variants]]
+crop = "Norbert_commis_doffice/crop.png"
+bbox = [100, 898, 355, 1019]
+opaque_pixels = 30855
+
+[[clean_feeds]]
+emission = "Body of Proof"
+channel = "6play / M6+"
+video = "BODY OF PROOF EXTRAIT 1.mp4"
+
+[[clean_feeds]]
+emission = "Nanny McPhee"
+channel = "6play / M6+"
+video = "Nanny McPhee quitte la famille.mp4"
+
+[[clean_feeds]]
+emission = "Turbo"
+channel = "M6"
+video = "TURBO 2026 10 04 pastille VFL.mp4"
+
+[[clean_feeds]]
+emission = "Turbo"
+channel = "M6"
+video = "TURBO 2026 03 22 - PASTILLE BMW.mp4"
+
+[[clean_feeds]]
+emission = "Top Chef"
+channel = "M6"
+video = "M6 - Top Chef - Ce candidat est obligé d’abandonner Top Chef.mp4"
+
+[[clean_feeds]]
+emission = "Enquête Exclusive"
+channel = "M6"
+video = "MINES_TAT_M6.mp4"
+
+[[clean_feeds]]
+emission = "E=M6"
+channel = "M6"
+video = "EM6_Tom Simpson.mp4"
+
+[[clean_feeds]]
+emission = "LFAUIT"
+channel = "M6"
+video = "2 IMAGES TEMPLATE - LFAUIT_TAT_M6.mp4"
+
+[[clean_feeds]]
+emission = "LFAUIT"
+channel = "M6"
+video = "M6 - LFAUIT - collégien 13 ans danse .mp4"
+
+[[clean_feeds]]
+emission = "Ma Super Ligue 1"
+channel = "Gulli"
+video = "Gulli - Ma Super Ligue 1 - GOAL.mp4"
+
+[[clean_feeds]]
+emission = "The Middle"
+channel = "Gulli"
+video = "Gulli - The Middle - Sue piège Axl.mp4"
+
+[[clean_feeds]]
+emission = "The Middle"
+channel = "Gulli"
+video = "Gulli - The Middle - La vengance d'Axl.mp4"
+
+[[clean_feeds]]
+emission = "Vous les femmes"
+channel = "Téva"
+video = "TEVA_Vous les femmes_Clonage.mp4"
+
+[[clean_feeds]]
+emission = "La revue de presse"
+channel = "Paris Première"
+video = "PP - la revue de presse - Stephane Rose .mp4"
+
+[[clean_feeds]]
+emission = "La revue de presse"
+channel = "Paris Première"
+video = "PP - la revue de presse - Bernard Mabille.mp4"
+
+[[no_logo_emissions]]
+name = "La France a un incroyable talent (LFAUIT)"
+channel = "M6"
+dossier = "La_France_a_un_incroyable_talent"
+
+[[no_logo_emissions]]
+name = "La revue de presse"
+channel = "Paris Première"
+dossier = "La_Revue_de_Presse"
+
+[[no_logo_emissions]]
+name = "Vous les femmes"
+channel = "Téva"
+dossier = "Vous_les_femmes"
+
+[[no_logo_emissions]]
+name = "Turbo"
+channel = "M6"
+dossier = "Turbo"
+
+[[no_logo_emissions]]
+name = "The Middle"
+channel = "Gulli"
+dossier = "The_Middle"

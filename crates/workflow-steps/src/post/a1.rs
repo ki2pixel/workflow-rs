@@ -458,6 +458,7 @@ mod tests {
             parent_dy: 0.0,
             null_parent: false,
             parent_keyframed: false,
+            rotated: false,
         }
     }
 

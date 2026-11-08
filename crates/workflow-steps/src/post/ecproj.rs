@@ -50,6 +50,7 @@ pub struct Segment {
     pub parent_dy: f64,
     pub null_parent: bool,
     pub parent_keyframed: bool,
+    pub rotated: bool,
 }
 
 impl Segment {
@@ -62,6 +63,93 @@ impl Segment {
             || !self.scale_keys.is_empty()
             || !self.anchor_keys.is_empty()
     }
+
+    /// Une projection axis-aligned n'est fiable que sans rotation ni parent
+    /// animé. Les appelants distinguent ainsi « hors cadre » de « non
+    /// calculable ».
+    pub fn projectable(&self) -> bool {
+        !self.parent_keyframed && !self.rotated && self.scale.is_finite() && self.scale > 0.0
+    }
+
+    /// Projette une bbox source (pixels, demi-ouverte) dans la composition.
+    ///
+    /// La formule reprend celle de A1/A5 :
+    /// `comp = position + parent_offset + (source - anchor) * scale / 100`.
+    /// Un parent animé n'est pas interpolé : on retourne `None` plutôt que de
+    /// produire une visibilité fausse.
+    pub fn project_bbox(&self, bbox: [f64; 4], time: f64) -> Option<[f64; 4]> {
+        if !self.projectable() {
+            return None;
+        }
+        let position = interpolate_keys(&self.position_keys, self.position, time);
+        let anchor = interpolate_keys(&self.anchor_keys, self.anchor, time);
+        let scale =
+            interpolate_keys(&self.scale_keys, [self.scale, self.scale, 0.0], time)[0] / 100.0;
+        if !scale.is_finite() || scale <= 0.0 {
+            return None;
+        }
+        let parent_dx = self.comp_x - self.position[0];
+        let comp_x = position[0] + parent_dx;
+        let comp_y = position[1] + self.parent_dy;
+        let points = [
+            (bbox[0], bbox[1]),
+            (bbox[2], bbox[1]),
+            (bbox[2], bbox[3]),
+            (bbox[0], bbox[3]),
+        ]
+        .map(|(x, y)| {
+            (
+                comp_x + (x - anchor[0]) * scale,
+                comp_y + (y - anchor[1]) * scale,
+            )
+        });
+        let mut x0 = f64::INFINITY;
+        let mut y0 = f64::INFINITY;
+        let mut x1 = f64::NEG_INFINITY;
+        let mut y1 = f64::NEG_INFINITY;
+        for (x, y) in points {
+            if !x.is_finite() || !y.is_finite() {
+                return None;
+            }
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x);
+            y1 = y1.max(y);
+        }
+        Some([x0, y0, x1, y1])
+    }
+}
+
+/// Interpolation linéaire des clés d'une propriété de transformation.
+fn interpolate_keys(keys: &[Keyframe], base: [f64; 3], time: f64) -> [f64; 3] {
+    if keys.is_empty() {
+        return base;
+    }
+    let mut sorted = keys.to_vec();
+    sorted.sort_by(|left, right| left.t.total_cmp(&right.t));
+    if time <= sorted[0].t {
+        return sorted[0].v;
+    }
+    if time >= sorted[sorted.len() - 1].t {
+        return sorted[sorted.len() - 1].v;
+    }
+    for pair in sorted.windows(2) {
+        let (left, right) = (&pair[0], &pair[1]);
+        if time < left.t || time > right.t {
+            continue;
+        }
+        let span = right.t - left.t;
+        if span <= 0.0 {
+            return right.v;
+        }
+        let ratio = (time - left.t) / span;
+        return [
+            left.v[0] + (right.v[0] - left.v[0]) * ratio,
+            left.v[1] + (right.v[1] - left.v[1]) * ratio,
+            left.v[2] + (right.v[2] - left.v[2]) * ratio,
+        ];
+    }
+    base
 }
 
 pub fn load(path: &Path) -> Result<Value> {
@@ -224,6 +312,7 @@ pub fn segments(doc: &Value) -> Result<Vec<Segment>> {
         let anchor_keys = transform_prop(layer, "Anchor Point")
             .map(keys)
             .unwrap_or_default();
+        let rotated = transform_prop(layer, "Rotation").is_some_and(rotation_is_active);
         out.push(Segment {
             name: name.to_string(),
             layer_id: layer.get("id").and_then(as_i64).unwrap_or(0),
@@ -241,6 +330,7 @@ pub fn segments(doc: &Value) -> Result<Vec<Segment>> {
             parent_dy: parent.dy,
             null_parent: parent.null_parent,
             parent_keyframed: parent.keyframed,
+            rotated,
         });
     }
     out.sort_by(|a, b| {
@@ -306,15 +396,19 @@ fn parent_info(comp: &Value, layer: &Value) -> ParentInfo {
         .and_then(vec3)
         .map(|value| value[0] / 100.0)
         .unwrap_or(1.0);
-    let keyframed = transform_prop(parent, "Position")
-        .map(|prop| !keys(prop).is_empty())
-        .unwrap_or(false)
+    let mut keyframed = (scale - 1.0).abs() > 1e-6
+        || transform_prop(parent, "Position")
+            .map(|prop| !keys(prop).is_empty())
+            .unwrap_or(false)
         || transform_prop(parent, "Scale")
             .map(|prop| !keys(prop).is_empty())
             .unwrap_or(false)
         || transform_prop(parent, "Anchor Point")
             .map(|prop| !keys(prop).is_empty())
             .unwrap_or(false);
+    if let Some(prop) = transform_prop(parent, "Rotation") {
+        keyframed |= rotation_is_active(prop);
+    }
     ParentInfo {
         dx: (position[0] - anchor[0]) * scale,
         dy: (position[1] - anchor[1]) * scale,
@@ -459,6 +553,29 @@ pub fn keys(prop: &Value) -> Vec<Keyframe> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Une rotation AE est un scalaire, pas un vecteur : elle doit être lue
+/// avant `vec3` pour ne pas être confondue avec une rotation nulle.
+fn rotation_is_active(prop: &Value) -> bool {
+    if prop
+        .get("keys")
+        .and_then(Value::as_array)
+        .is_some_and(|keys| !keys.is_empty())
+    {
+        return true;
+    }
+    let Some(vector) = prop.get("value").and_then(|value| value.get("v")) else {
+        return false;
+    };
+    if let Some(scalar) = vector.as_f64() {
+        return scalar.abs() > 1e-6;
+    }
+    vector
+        .as_array()
+        .and_then(|array| array.first())
+        .and_then(Value::as_f64)
+        .is_some_and(|angle| angle.abs() > 1e-6)
 }
 
 pub fn vec3(prop: &Value) -> Option<[f64; 3]> {
@@ -638,6 +755,78 @@ mod tests {
         assert!(segments[0].null_parent);
         assert_eq!(segments[0].comp_x, 1030.0);
         assert_eq!(segments[0].parent_dy, -50.0);
+    }
+
+    #[test]
+    fn project_bbox_uses_parent_offset_and_scale() {
+        let doc = project();
+        let segments = segments(&doc).unwrap();
+        let bbox = segments[0]
+            .project_bbox([900.0, 0.0, 1020.0, 100.0], 0.0)
+            .unwrap();
+        assert!((bbox[0] - 922.0).abs() < 1e-9);
+        assert!((bbox[1] + 50.0).abs() < 1e-9);
+        assert!((bbox[2] - 1138.0).abs() < 1e-9);
+        assert!((bbox[3] - 130.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn project_bbox_interpolates_position_keys() {
+        let doc = project();
+        let mut segment = segments(&doc).unwrap().remove(0);
+        segment.position_keys = vec![
+            Keyframe {
+                t: 0.0,
+                v: [540.0, 0.0, 0.0],
+            },
+            Keyframe {
+                t: 10.0,
+                v: [900.0, 0.0, 0.0],
+            },
+        ];
+        let middle = segment.project_bbox([960.0, 0.0, 960.0, 1.0], 5.0).unwrap();
+        assert!((middle[0] - 1210.0).abs() < 1e-9);
+        let end = segment
+            .project_bbox([960.0, 0.0, 960.0, 1.0], 10.0)
+            .unwrap();
+        assert!((end[0] - 1390.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn project_bbox_refuses_an_animated_parent() {
+        let doc = project();
+        let mut segment = segments(&doc).unwrap().remove(0);
+        segment.parent_keyframed = true;
+        assert!(segment
+            .project_bbox([0.0, 0.0, 100.0, 100.0], 0.0)
+            .is_none());
+    }
+
+    #[test]
+    fn scalar_rotation_is_detected_and_refused() {
+        let mut doc = project();
+        let layers = doc["items"]["2"]["kind"]["layers"].as_array_mut().unwrap();
+        let segment = layers
+            .iter_mut()
+            .find(|layer| {
+                layer["name"]
+                    .as_str()
+                    .is_some_and(|name| name.starts_with("Segment"))
+            })
+            .unwrap();
+        for child in segment["props"]["children"].as_array_mut().unwrap() {
+            if child["name"] == "Transform" {
+                child["children"].as_array_mut().unwrap().push(json!({
+                    "name": "Rotation",
+                    "value": {"t": "Scalar", "v": 45.0}
+                }));
+            }
+        }
+        let segment = segments(&doc).unwrap().remove(0);
+        assert!(segment.rotated);
+        assert!(segment
+            .project_bbox([0.0, 0.0, 100.0, 100.0], 0.0)
+            .is_none());
     }
 
     #[test]

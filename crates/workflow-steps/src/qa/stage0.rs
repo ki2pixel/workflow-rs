@@ -861,6 +861,7 @@ mod tests {
             parent_dy: 0.0,
             null_parent: false,
             parent_keyframed: false,
+            rotated: false,
         }];
         let (checks, findings) = check_segments(&segments, 10.0, &Stage0Thresholds::default());
         assert!(checks

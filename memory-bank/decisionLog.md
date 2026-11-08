@@ -655,6 +655,66 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/qa/logo.rs`,
   `crates/workflow-steps/src/qa/dino.rs`.
 
+## 2026-11-08 — D-052 : registre spatial des logos source, annotation seule (phase A)
+
+- **Contexte** : le client a documenté 29 émissions avec un logo de programme
+  quasi déterministe dans le canvas source 1920×1080 (28 en bas-gauche,
+  Piquantes ! en haut-gauche) et fourni les crops RGBA, une liste de clean
+  feeds et cinq émissions sans logo. Une détection plein cadre serait plus
+  coûteuse et moins fiable que ce prior spatial ; le logo doit rester
+  distinct de la bannière éditoriale et du sous-titre.
+- **Décision** :
+  1. la phase A est **report-only** : le registre ne recadre, ne masque et ne
+     supprime jamais rien ; il annote A2 et le QA ;
+  2. `assets/models/qa/source_logos.toml` est versionné (schéma 1, zones
+     génériques, 29 émissions, 15 clean feeds, 5 émissions sans logo,
+     variantes et provenance). Les crops restent hors dépôt ; le catalogue ne
+     contient que des bboxes et des métadonnées ;
+  3. les noms de fichiers explicitement rattachés par le CSV priment sur les
+     alias, pour ne jamais confondre « Kamila ne sait pas écrire
+     Marseillais » (Le Cross) avec Les Marseillais ; un clean feed déclaré
+     n'hérite jamais d'un prior ;
+  4. la projection utilise la formule A1/A5
+     (`position + parent_dx + (source - anchor) * scale / 100`), interpole
+     Position/Anchor/Scale et refuse un parent animé ; la visibilité est la
+     part de la bbox **projetée** restant dans la composition ;
+  5. A2 ajoute `details.source_logo` derrière `a2_logo_prior = false` (flag
+     désactivé par défaut) ; le QA ajoute le check `source_logo` derrière
+     `--source-logo`, `pass`/`info` uniquement, et refuse l'auto-approbation
+     si le catalogue demandé n'a pas pu tourner ;
+  6. la zone générique est exposée dans le catalogue et rappelée par le QA
+     pour les sources inconnues, mais n'est pas encore confirmée ni utilisée
+     pour une revue.
+- **Alternatives rejetées** :
+  - détection plein cadre ou YOLO : fermée au monde ouvert et sans le prior
+    client ;
+  - identification par le seul nom de fichier : le corpus contient des
+    ambiguïtés documentées (Marseillais/Le Cross, 266/66 Minutes) ;
+  - recadrage ou masquage automatique : changerait une politique validée
+    sans mesure sur le corpus GOOD ;
+  - copie des crops dans le dépôt : assets lourds et redondants.
+- **Validation** : catalogue généré (29/15/5), parseur et projection testés
+  (keyframes, parent animé, mise à l'échelle). Rejeu A2 avec OCR : `54`
+  inchangé `apply` 200,8 %, `58` inchangé `apply` 210,0 %, `40 ABHARTACH` et
+  `40 FOOTBALLEUR` inchangés `review` avec le logo 66 Minutes documenté
+  (72,6 % du candidat) ; seules les clés `source_logo` et les temps OCR
+  diffèrent. QA sur 35 exports GOOD avec `.ecproj` : 25 `pass`, 10 `info`,
+  0 nouveau finding ; `227` E=M6 hors cadre, `270` GOAL clean feed. 489
+  tests workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture dans
+  `/mnt/cache`.
+- **Limites** : le check est géométrique, sans comparaison de pixels ; le QA
+  écarte les observations couvertes par un overlay déclaré, mais A2 ne
+  consulte pas encore ce masque ; la zone générique n'est pas confirmée
+  temporellement ; les crops
+  de référence ne sont pas utilisés. La phase B (template matching NCC +
+  contours, stabilité temporelle, exclusion du groupe OCR dominant, veto
+  logo seul) est laissée à une décision ultérieure.
+- **Références** : `docs/etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md` (§7.5),
+  `crates/workflow-steps/src/vision/source_logo.rs`,
+  `crates/workflow-steps/src/qa/source_logo.rs`,
+  `crates/workflow-steps/src/post/a2.rs`,
+  `scripts/import-source-logos.py`.
+
 ## 2026-11-02 — D-050 : progression du post-traitement A5/A6 dans STEP8
 
 - **Contexte** : la barre STEP8 suivait EffectCraft puis restait à 100 %

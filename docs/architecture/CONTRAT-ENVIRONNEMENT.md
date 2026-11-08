@@ -436,6 +436,13 @@ additifs, schéma `post.json` inchangé) ; les bandeaux sombres restent en
 `a2_ocr_onnxruntime`. Sans flag ou sans modèle, la décision A2 actuelle
 s'applique.
 
+Depuis D-052, `steps.step8.post.a2_logo_prior` (défaut `false`) ajoute
+`details.source_logo` au candidat A2 à partir du catalogue
+`a2_logo_catalog` (relatif à `paths.models`). La bbox du logo de programme
+est projetée par les transformations du `.ecproj` ; l'action A2 n'est jamais
+modifiée. Le QA expose le même registre en opt-in avec `qa run
+--source-logo` (check `source_logo`, `pass`/`info`).
+
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée

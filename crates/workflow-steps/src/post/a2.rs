@@ -13,6 +13,7 @@ use crate::post::ecproj::{CompMeta, Segment};
 use crate::post::model::Decision;
 use crate::vision::frame::grab_frame;
 use crate::vision::ocr::{DetEngine, RecEngine};
+use crate::vision::source_logo::{bbox_area, bbox_intersection_area, clip_bbox, SourceLogoPrior};
 use crate::vision::text::normalize_text;
 use anyhow::{Context, Result};
 use serde_json::{json, Map, Value};
@@ -63,6 +64,10 @@ pub struct A2OcrOptions {
 pub struct A2Options {
     pub margin: f64,
     pub ocr: Option<A2OcrOptions>,
+    /// Prior spatial du logo de programme, déjà remis à l'échelle source.
+    /// Il ne change pas la décision : il documente le candidat et permet de
+    /// savoir si le logo sera visible dans la composition.
+    pub logo_prior: Option<SourceLogoPrior>,
 }
 
 #[derive(Debug, Clone)]
@@ -232,14 +237,18 @@ pub fn decide_a2(
         }),
         _ => None,
     };
-    decide_impl(
+    let mut decisions = decide_impl(
         segments,
         &candidates,
         source_height,
         meta.height as f64,
         margin,
         gate.as_ref().map(|gate| gate as &dyn OcrEvidenceSource),
-    )
+    );
+    if let Some(prior) = options.logo_prior.as_ref() {
+        annotate_source_logo(&mut decisions, prior, segments, meta);
+    }
+    decisions
 }
 
 pub fn decide_from_candidates(
@@ -257,6 +266,120 @@ pub fn decide_from_candidates(
         margin,
         None,
     )
+}
+
+/// Annote les décisions A2 avec le prior spatial du logo, sans changer leur
+/// action. La visibilité dans la composition est calculée avec les
+/// transformations du projet (keyframes de Position comprises).
+fn annotate_source_logo(
+    decisions: &mut [Decision],
+    prior: &SourceLogoPrior,
+    segments: &[Segment],
+    meta: &CompMeta,
+) {
+    for decision in decisions {
+        if decision.code != "A2" {
+            continue;
+        }
+        let Some(candidate) = bbox_from_details(&decision.details) else {
+            continue;
+        };
+        if let Some(details) = source_logo_details(prior, candidate, segments, meta) {
+            if let Value::Object(object) = &mut decision.details {
+                object.insert("source_logo".into(), details);
+            }
+        }
+    }
+}
+
+fn bbox_from_details(details: &Value) -> Option<[f64; 4]> {
+    let values = details.get("bbox")?.as_array()?;
+    if values.len() != 4 {
+        return None;
+    }
+    Some([
+        values[0].as_f64()?,
+        values[1].as_f64()?,
+        values[2].as_f64()?,
+        values[3].as_f64()?,
+    ])
+}
+
+fn source_logo_details(
+    prior: &SourceLogoPrior,
+    candidate: [f64; 4],
+    segments: &[Segment],
+    meta: &CompMeta,
+) -> Option<Value> {
+    let overlap = bbox_intersection_area(prior.bbox, candidate);
+    if overlap <= 0.0 {
+        return None;
+    }
+    let logo_area = bbox_area(prior.bbox).max(1.0);
+    let candidate_area = bbox_area(candidate).max(1.0);
+    let mut best_ratio = 0.0f64;
+    let mut best_bbox = None;
+    let mut projected_any = false;
+    for segment in segments {
+        let middle = segment.start + segment.duration() / 2.0;
+        for time in [segment.start, middle, segment.end] {
+            let Some(projected) = segment.project_bbox(prior.bbox, time) else {
+                continue;
+            };
+            projected_any = true;
+            let Some(clipped) = clip_bbox(projected, meta.width, meta.height) else {
+                continue;
+            };
+            let projected_area = bbox_area(projected).max(1.0);
+            let ratio = bbox_area(clipped) / projected_area;
+            if ratio > best_ratio {
+                best_ratio = ratio;
+                best_bbox = Some(clipped);
+            }
+        }
+    }
+    let mut object = Map::new();
+    object.insert("name".into(), json!(prior.name));
+    object.insert("channel".into(), json!(prior.channel));
+    object.insert("position".into(), json!(prior.position));
+    object.insert(
+        "bbox".into(),
+        json!([
+            round_to(prior.bbox[0], 1),
+            round_to(prior.bbox[1], 1),
+            round_to(prior.bbox[2], 1),
+            round_to(prior.bbox[3], 1)
+        ]),
+    );
+    object.insert(
+        "logo_in_candidate".into(),
+        json!(round_to((overlap / logo_area).min(1.0), 3)),
+    );
+    object.insert(
+        "candidate_covered".into(),
+        json!(round_to((overlap / candidate_area).min(1.0), 3)),
+    );
+    if projected_any {
+        object.insert("visible_in_comp".into(), json!(best_ratio >= 0.10));
+        object.insert(
+            "visible_ratio".into(),
+            json!(round_to(best_ratio.min(1.0), 3)),
+        );
+    } else {
+        object.insert("projection".into(), json!("unsupported"));
+    }
+    if let Some(bbox) = best_bbox {
+        object.insert(
+            "projected_bbox".into(),
+            json!([
+                round_to(bbox[0], 1),
+                round_to(bbox[1], 1),
+                round_to(bbox[2], 1),
+                round_to(bbox[3], 1)
+            ]),
+        );
+    }
+    Some(Value::Object(object))
 }
 
 fn decide_impl(
@@ -1073,6 +1196,7 @@ mod tests {
             parent_dy: 0.0,
             null_parent: false,
             parent_keyframed: false,
+            rotated: false,
         }
     }
 
@@ -1165,6 +1289,101 @@ mod tests {
             .into_iter()
             .next()
             .unwrap()
+    }
+
+    fn meta() -> CompMeta {
+        CompMeta {
+            id: "2".into(),
+            width: 1080,
+            height: 1920,
+            fps: 25.0,
+            duration: 10.0,
+            n_layers: 1,
+            n_segments: 1,
+        }
+    }
+
+    fn source_logo_prior() -> SourceLogoPrior {
+        SourceLogoPrior {
+            name: "66 Minutes".into(),
+            channel: "M6".into(),
+            position: "bottom_left".into(),
+            bbox: [91.0, 846.0, 298.0, 1026.0],
+            variants: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn source_logo_overlap_is_documented_without_changing_action() {
+        let prior = source_logo_prior();
+        let details = source_logo_details(
+            &prior,
+            [120.0, 856.0, 1204.0, 1008.0],
+            &[segment(180.0)],
+            &meta(),
+        )
+        .unwrap();
+        assert_eq!(details["name"], "66 Minutes");
+        assert_eq!(details["logo_in_candidate"], 0.726);
+        assert_eq!(details["visible_in_comp"], false);
+
+        let mut decisions = vec![Decision::apply(
+            "A2",
+            "comp",
+            "bannière test",
+            0.9,
+            json!({"bbox": [120, 856, 1204, 1008]}),
+        )];
+        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta());
+        assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
+        assert_eq!(decisions[0].details["source_logo"]["name"], "66 Minutes");
+    }
+
+    #[test]
+    fn source_logo_visibility_uses_the_project_transform() {
+        let mut segment = segment(180.0);
+        segment.anchor = [0.0, 0.0, 0.0];
+        segment.position = [0.0, 0.0, 0.0];
+        segment.comp_x = 0.0;
+        let details = source_logo_details(
+            &source_logo_prior(),
+            [120.0, 856.0, 1204.0, 1008.0],
+            &[segment],
+            &meta(),
+        )
+        .unwrap();
+        assert_eq!(details["visible_in_comp"], true);
+        assert_eq!(details["visible_ratio"], 1.0);
+        assert!(details["projected_bbox"].is_array());
+    }
+
+    #[test]
+    fn source_logo_rotation_skips_visibility() {
+        let mut segment = segment(180.0);
+        segment.rotated = true;
+        let details = source_logo_details(
+            &source_logo_prior(),
+            [120.0, 856.0, 1204.0, 1008.0],
+            &[segment],
+            &meta(),
+        )
+        .unwrap();
+        assert_eq!(details["projection"], "unsupported");
+        assert!(details.get("visible_in_comp").is_none());
+    }
+
+    #[test]
+    fn source_logo_outside_candidate_is_not_added() {
+        let prior = source_logo_prior();
+        let mut decisions = vec![Decision::apply(
+            "A2",
+            "comp",
+            "bannière test",
+            0.9,
+            json!({"bbox": [600, 900, 1200, 1000]}),
+        )];
+        annotate_source_logo(&mut decisions, &prior, &[segment(180.0)], &meta());
+        assert!(decisions[0].details.get("source_logo").is_none());
     }
 
     #[test]

@@ -60,6 +60,13 @@ pub fn auto_approve(checks: &[QaCheck], findings: &[QaFinding]) -> (bool, String
             missing.push(format!("logo_visual={}", check.status.as_str()));
         }
     }
+    // Opt-in : quand l'annotation du logo source est demandée, un catalogue
+    // absent ne doit pas produire un `pass` silencieusement moins fiable.
+    if let Some(check) = checks.iter().find(|check| check.id == "source_logo") {
+        if !matches!(check.status, QaStatus::Pass | QaStatus::Info) {
+            missing.push(format!("source_logo={}", check.status.as_str()));
+        }
+    }
 
     if !missing.is_empty() {
         return (
@@ -134,6 +141,18 @@ mod tests {
         let (eligible, reason) = auto_approve(&required_checks(), &[]);
         assert!(eligible);
         assert!(reason.contains("aucun finding"));
+    }
+
+    #[test]
+    fn requested_source_logo_check_must_run_for_auto_approve() {
+        let mut checks = required_checks();
+        checks.push(QaCheck::not_applicable(
+            "source_logo",
+            "catalogue introuvable",
+        ));
+        let (eligible, reason) = auto_approve(&checks, &[]);
+        assert!(!eligible);
+        assert!(reason.contains("source_logo"));
     }
 
     #[test]

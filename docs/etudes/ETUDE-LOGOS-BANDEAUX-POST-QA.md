@@ -49,8 +49,9 @@ détecteurs morphologiques OpenCV, mais de :
   module neutre `vision`, utilisé par `qa` et `post`, plutôt que faire
   dépendre `post` de `qa`.
 
-Aucun code de production n'a été modifié par cette étude. La suite de tests
-reste verte : **467 tests**, `fmt` et `clippy -D warnings` OK.
+Les phases 1 à 3 et la phase A du registre logo (D-052) ont modifié le code
+de production. La suite de tests reste verte : **489 tests**, `fmt` et
+`clippy -D warnings` OK.
 
 ## 2. Méthode et périmètre
 
@@ -968,6 +969,64 @@ quelques textes isolés du corpus restent sous le seuil de trois échantillons
 d'un même cluster. Sorties sous
 `/tmp/workflow_investigation/corpus35-qa13/`.
 
+### 7.5 Phase A — registre spatial des logos source (2026-11-08)
+
+**Principe.** Le logo n'est pas recherché sur toute l'image : le client a
+documenté, pour 29 émissions, une position quasi déterministe dans le canvas
+source 1920×1080. Le pipeline répond d'abord à « où peut être le logo ? »
+(registre spatial), puis seulement ensuite à « est-il réellement là ? »
+(confirmation locale). La phase A ne fait que la première partie et
+**n'agit jamais** sur le recadrage : elle annote A2 et le QA.
+
+**Catalogue.** `assets/models/qa/source_logos.toml` est versionné et généré
+par `scripts/import-source-logos.py` depuis
+`SELECTION_VIDEOS_SOURCES_LOGOS.csv` et les crops RGBA du client. Il contient
+29 émissions (28 en bas-gauche, Piquantes ! en haut-gauche), leurs bboxes
+demi-ouvertes, leurs variantes, 15 clean feeds sans logo et 5 émissions sans
+logo à ignorer. Les crops restent hors dépôt ; le catalogue ne contient que
+des métadonnées auditables. `sources` reprend les noms de fichiers du CSV :
+il prime sur les alias, ce qui évite de classer « Kamila ne sait pas écrire
+Marseillais » comme Les Marseillais alors que c'est Le Cross.
+
+**Projection.** `Segment::project_bbox` reprend la formule A1/A5
+(`comp = position + parent_dx + (source - anchor) * scale / 100`) et
+interpole les clés de Position, Anchor et Scale. Un parent animé retourne
+`None` : mieux vaut ne rien annoter qu'annoncer une visibilité fausse. La
+visibilité est la part de la bbox **projetée** qui reste dans la composition,
+et non le rapport des surfaces source/projetée.
+
+**A2.** Derrière `a2_logo_prior = false`, la décision reste strictement
+identique. Quand le flag est actif, `details.source_logo` documente le nom,
+la chaîne, la bbox source, `logo_in_candidate`, `candidate_covered`,
+`visible_in_comp` et la bbox projetée. Rejeu réel avec OCR : `54` reste
+`apply` à 200,8 %, `58` reste `apply` à 210,0 %, `40 ABHARTACH` et
+`40 FOOTBALLEUR` restent `review` avec le logo 66 Minutes documenté à 72,6 %
+du candidat. Les seules différences sont le nouveau champ et les temps OCR.
+
+**QA.** `qa run --source-logo` ajoute le check `source_logo` (`pass` ou
+`info`, jamais bloquant) et exige un `.ecproj`. Sans émission reconnue, le
+check rappelle les zones génériques du catalogue sans les confirmer. Rejeu
+sur 35 exports GOOD avec leur `.ecproj` : 25 `pass`, 10 `info`, **0 nouveau
+finding** ; `227` E=M6 est hors cadre, `270` GOAL est reconnu clean feed.
+Deux exports (`286`, `298`) conservent un écart de durée MP4/comp de 3 s déjà
+présent dans l'appariement projet/export, sans rapport avec le registre.
+
+**Limites de la phase A.** Aucun pixel n'est comparé : le check est
+géométrique. Le QA écarte les observations couvertes par un overlay déclaré
+(le masque prime sur le prior), mais A2 ne consulte pas encore les overlays
+pour décider si le logo est caché. La zone générique n'est pas confirmée
+temporellement et ne produit aucune revue. Les crops de référence ne sont
+pas utilisés. Une rotation ou un parent animé/redimensionné rend la
+projection non calculable : le QA répond alors `not_applicable` au lieu de
+conclure « hors cadre », et A2 omet `visible_in_comp` avec
+`projection = "unsupported"`.
+
+**Critère pour la phase B.** Passer à la confirmation locale (template
+matching NCC + contours, ou stabilité temporelle pour la zone générique)
+seulement si les annotations A2/QA restent report-only sur le corpus GOOD et
+si le client valide que le logo source visible doit être exclu du groupe OCR
+dominant, sans jamais déclencher de recadrage automatique.
+
 ## 8. Risques et points ouverts
 
 1. **Rushes vs exports finaux.** Les vidéos QA sont des sources 1920×1080,
@@ -1030,6 +1089,7 @@ d'un même cluster. Sorties sous
 | 2 (fait) | Module `vision` sans changement de comportement | 447 tests + QA réel identique |
 | 3 (fait) | A2 v3 gate OCR, flag `a2_ocr=false` | `58` promu à 210,0 %, `54` inchangé à 200,8 %, `40` reviews enrichis, `sub_fast` veto ; audits `pass` |
 | 4 (option) | Niveau 2 bandeaux sombres, DINOv2 candidats étroits | validation client + corpus dédié |
+| 5 (fait, phase A) | Registre spatial des logos source, annotation A2/QA opt-in | 29 émissions + zones, `54`/`58` inchangés, `40` enrichi, 0 nouveau finding GOOD |
 
 ### 9.3 Prochaines actions concrètes
 
@@ -1038,9 +1098,13 @@ d'un même cluster. Sorties sous
 - mesurer le coût du gate sur un lot complet (15–25 s par projet mesuré) et
   vérifier le timeout STEP8 ;
 - décider du niveau 2 des bandeaux sombres et du volet logo avec le client ;
-  aucun des deux n'est implémenté ;
+  la phase A du registre spatial est implémentée mais reste opt-in et
+  report-only ;
 - si le niveau 2 est retenu, constituer un corpus dédié de lower-thirds
   sombres et de logos bas, puis rouvrir une décision ;
+- pour la phase B logo, faire valider le principe d'exclure le logo source du
+  groupe OCR dominant et de ne jamais recadrer sur cette base ; mesurer
+  d'abord le gain sur `40` et l'absence de régression sur `54`/`58`/GOOD ;
 - conserver la parité QA : toute évolution du clustering ou des moteurs
   `vision` doit rejouer les 36 exports GOOD et les cas synthétiques.
 
@@ -1059,6 +1123,9 @@ d'un même cluster. Sorties sous
 - `crates/workflow-steps/src/qa/cache.rs`
 - `crates/workflow-steps/src/vision/dino.rs`
 - `crates/workflow-steps/src/vision/ocr.rs`
+- `crates/workflow-steps/src/vision/source_logo.rs`
+- `crates/workflow-steps/src/qa/source_logo.rs`
+- `scripts/import-source-logos.py`, `assets/models/qa/source_logos.toml`
 - `crates/workflow-cli/src/main.rs`
 - `config/config.toml`, `assets/models/qa/manifest.toml`
 

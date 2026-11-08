@@ -4,6 +4,8 @@
 # linéaire (384 poids, biais, seuil) l'est, car il est petit et auditable.
 # `workflow-cli qa run` et le gate OCR A2 (`a2_ocr = true`) chargent ces
 # fichiers par défaut ; `--no-logo-visual` désactive le vérificateur visuel.
+# Le registre spatial des logos (`source_logos.toml`, D-052) est versionné
+# séparément : ce n'est pas un modèle.
 
 version = 1
 source = "https://huggingface.co/onnx-community/dinov2-small"

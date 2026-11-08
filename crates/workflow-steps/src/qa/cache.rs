@@ -16,7 +16,7 @@ use std::path::Path;
 
 /// À incrémenter dès qu'un changement de code modifie les résultats pour les
 /// mêmes export, projet, modèles et options (préprocessing OCR, seuils…).
-const CACHE_VERSION: u32 = 7;
+const CACHE_VERSION: u32 = 8;
 
 /// Empreinte complète : hash de l'export puis empreinte des autres entrées.
 pub fn fingerprint(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<String> {
@@ -52,6 +52,8 @@ pub fn fingerprint_from_export(
          logo={}\n\
          logo_visual={}\n\
          face={}\n\
+         source_logo={}\n\
+         source_logo_catalog={}\n\
          evidence={}\n\
          template_prefix={}\n\
          black={}\n\
@@ -77,6 +79,8 @@ pub fn fingerprint_from_export(
         u8::from(options.logo_enabled),
         u8::from(options.logo_visual_enabled),
         u8::from(options.face_enabled),
+        u8::from(options.source_logo_enabled),
+        source_logo_catalog_hash(options)?,
         u8::from(options.evidence_enabled),
         options.template_prefix,
         thresholds.black_finding_s,
@@ -105,6 +109,28 @@ fn model_hash_if(options: &QaOptions, enabled: bool, filename: &str) -> Result<S
     } else {
         Ok("none".into())
     }
+}
+
+/// Le catalogue spatial change la visibilité du logo : son contenu doit
+/// invalider le cache, même quand seul le chemin par défaut est utilisé.
+fn source_logo_catalog_hash(options: &QaOptions) -> Result<String> {
+    if !options.source_logo_enabled {
+        return Ok("none".into());
+    }
+    let path = options.source_logo_catalog.clone().or_else(|| {
+        options
+            .models_dir
+            .as_ref()
+            .map(|directory| directory.join(crate::vision::source_logo::CATALOG_FILENAME))
+    });
+    let Some(path) = path else {
+        return Ok("missing".into());
+    };
+    if !path.is_file() {
+        return Ok("missing".into());
+    }
+    detect::sha256_file(&path)
+        .with_context(|| format!("hachage du catalogue de logos {}", path.display()))
 }
 
 fn sha256_text(value: &str) -> String {
@@ -172,6 +198,10 @@ mod tests {
 
         let mut changed = options();
         changed.logo_visual_enabled = false;
+        assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
+
+        let mut changed = options();
+        changed.source_logo_enabled = true;
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
     }
 

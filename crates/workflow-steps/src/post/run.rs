@@ -14,6 +14,7 @@ use crate::post::model::{
 };
 use crate::post::{a1, a2, a3, a4, a6, detect, direct};
 use crate::template::{Bypass, BypassMode};
+use crate::vision::source_logo::SourceLogoCatalog;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
@@ -47,6 +48,9 @@ pub struct PostOptions {
     pub a2_ocr_det: PathBuf,
     pub a2_ocr_rec: PathBuf,
     pub a2_ocr_onnxruntime: Option<PathBuf>,
+    /// Registre spatial des logos source (D-052), annotation seule.
+    pub a2_logo_prior: bool,
+    pub a2_logo_catalog: PathBuf,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.
     pub report_only: bool,
     /// Émet les marqueurs `POST_*` sur `stdout` (hook STEP8) au lieu de
@@ -73,6 +77,8 @@ impl Default for PostOptions {
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
             a2_ocr_onnxruntime: None,
+            a2_logo_prior: false,
+            a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
             report_only: false,
             emit_progress: false,
         }
@@ -99,6 +105,8 @@ impl PostOptions {
             a2_ocr_det: resolve_models_path(&config.paths.models, &post.a2_ocr_det),
             a2_ocr_rec: resolve_models_path(&config.paths.models, &post.a2_ocr_rec),
             a2_ocr_onnxruntime: post.a2_ocr_onnxruntime.clone(),
+            a2_logo_prior: post.a2_logo_prior,
+            a2_logo_catalog: resolve_models_path(&config.paths.models, &post.a2_logo_catalog),
             report_only: false,
             emit_progress: false,
         }
@@ -472,6 +480,31 @@ pub fn run_post_project(
             .as_ref()
             .map(|specs| (specs.width, specs.height))
             .unwrap_or((1920, 1080));
+        let source_logo_prior = if options.a2_logo_prior {
+            let source_name = video
+                .as_deref()
+                .and_then(|path| path.file_name())
+                .and_then(|name| name.to_str());
+            match (
+                source_name,
+                SourceLogoCatalog::load(&options.a2_logo_catalog),
+            ) {
+                (Some(source_name), Ok(catalog)) => {
+                    catalog.prior_for_source(source_name, source_width, source_height)
+                }
+                (Some(_), Err(error)) => {
+                    tracing::warn!(
+                        catalog = %options.a2_logo_catalog.display(),
+                        error = %error,
+                        "A2: registre de logos source ignoré"
+                    );
+                    None
+                }
+                (None, _) => None,
+            }
+        } else {
+            None
+        };
         decisions.extend(coverage_reviews(
             &segments,
             &meta,
@@ -497,6 +530,7 @@ pub fn run_post_project(
                 rec_model: options.a2_ocr_rec.clone(),
                 onnxruntime: options.a2_ocr_onnxruntime.clone(),
             }),
+            logo_prior: source_logo_prior,
         };
         decisions.extend(a2::decide_a2(
             &segments,
@@ -1442,6 +1476,7 @@ mod tests {
             parent_dy: 0.0,
             null_parent: false,
             parent_keyframed: false,
+            rotated: false,
         }
     }
 

@@ -13,6 +13,7 @@ __pycache__/
 /assets/models/qa/*
 !/assets/models/qa/manifest.toml
 !/assets/models/qa/dinov2_logo_probe.json
+!/assets/models/qa/source_logos.toml
 
 # Corpus de parité : médias dérivés de productions et sorties volumineuses.
 /parity/cases/*

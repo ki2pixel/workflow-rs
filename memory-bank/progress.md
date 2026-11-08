@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- 467 tests unitaires, sans matériel.
+- 489 tests unitaires, sans matériel.
 - **Contrôle QA read-only Stage 0 + OCR + logos + visage (D-036 à D-048)** :
   `workflow-cli qa run` écrit `qa.json` sous `--out`, distinct de
   l'`audit.json` A5/A6. 35 exports, 35 `pass`, 0 écart Stage 0 avec le PoC.
@@ -57,6 +57,14 @@
   passe à `apply` 210,0 %, `40` restent `review` avec `details.ocr`,
   `sub_fast` est vétoé (dominance 25 %). Projets assistés : diffs limitées
   à `Scale`, audits `pass`. Coût 15–25 s/projet.
+- **Registre spatial des logos source (D-052, phase A, 2026-11-08)** :
+  catalogue versionné de 29 émissions (28 bas-gauche, Piquantes ! haut-gauche),
+  15 clean feeds et 5 émissions sans logo ; crops RGBA externes. A2 annote
+  `details.source_logo` derrière `a2_logo_prior = false`, le QA ajoute le
+  check `source_logo` (`pass`/`info`) derrière `--source-logo`. Rejeu :
+  `54`/`58` inchangés, `40` enrichis sans changement d'action ; 35 exports
+  GOOD avec `.ecproj` → 25 `pass`, 10 `info`, 0 nouveau finding. Phase B
+  (confirmation visuelle, exclusion OCR, veto logo seul) non implémentée.
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6
   sautés, CSV de scènes synthétisé par STEP7 ; SDM produit brut + A6, LPHDF
   aucun `.ecproj` (validé sur 295, 340, 341 et lots mixtes).

@@ -155,6 +155,26 @@ OCR en échec → warning et retour à la décision A2 actuelle, sans échec du
 post. Les fichiers `PP-OCRv6_det_small.onnx` et `PP-OCRv6_rec_small.onnx`
 doivent être copiés sous `paths.models/qa/`, ou renseignés en absolu.
 
+### Registre spatial des logos source (D-052, phase A, 2026-11-08)
+
+`a2_logo_prior = false` par défaut : sans flag, aucune lecture de catalogue
+et aucune clé JSON supplémentaire. Quand il est activé,
+`assets/models/qa/source_logos.toml` résout l'émission de la source (nom de
+fichier exact d'abord, alias ensuite) puis projette la bbox du logo par les
+transformations du `.ecproj` (keyframes de Position, Anchor et Scale
+interpolés ; parent animé refusé). `details.source_logo` expose `name`,
+`channel`, `position`, `bbox`, `logo_in_candidate`, `candidate_covered`,
+`visible_in_comp`, `visible_ratio` et `projected_bbox`. Une rotation ou un
+parent animé/redimensionné rend la projection non calculable :
+`projection = "unsupported"` remplace alors les champs de visibilité.
+L'action A2 n'est **jamais** modifiée par ce champ.
+
+Rejeu OCR réel : `54` reste `apply` 200,8 %, `58` reste `apply` 210,0 %,
+`40 ABHARTACH` et `40 FOOTBALLEUR` restent `review` avec le logo 66 Minutes
+documenté à 72,6 % du candidat ; les seules différences sont `source_logo`
+et les temps OCR. Les crops de référence restent hors dépôt ; le catalogue
+ne contient que des métadonnées.
+
 ## A3/A4 — revue seulement
 
 - A3 lit `_ae.json` et `segment_recommendations`, calcule l'amplitude et le
@@ -286,6 +306,9 @@ a2_ocr = false
 a2_ocr_det = "qa/PP-OCRv6_det_small.onnx"
 a2_ocr_rec = "qa/PP-OCRv6_rec_small.onnx"
 # a2_ocr_onnxruntime = "/chemin/vers/libonnxruntime.so"
+# Registre spatial des logos source (D-052), annotation seule.
+a2_logo_prior = false
+a2_logo_catalog = "qa/source_logos.toml"
 ```
 
 Le timeout `steps.step8.timeout_s` couvre EffectCraft **et** le
@@ -362,6 +385,7 @@ POST_DONE: N - <échecs>
 | A2 v3 OCR (54/58) | 54 `apply` 200,8 % inchangé, 58 `review` → `apply` 210,0 %, diffs limitées à `Scale`, audits `pass` |
 | A2 v3 OCR (40) | 2 `review` conservés, `details.ocr` et `texts` enrichis |
 | A2 v3 OCR (sub_fast) | sous-titres changeants → `review` « texte changeant », aucun recadrage |
+| A2 registre logos (D-052) | `54`/`58` actions et scales identiques, `40` enrichis sans changement d'action, audits `pass` |
 
 Les décisions A1/A2/A3/A4 de 268, 187 DISNEYWORLD, 187 ECOLE, 191 et 181 sont
 **identiques au prototype Python** (code, action, cible, raison et détails).

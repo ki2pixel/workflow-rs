@@ -728,6 +728,14 @@ enum QaCommand {
         /// Désactive le contrôle visage YuNet.
         #[arg(long)]
         no_face: bool,
+        /// Active l'annotation du logo source (registre spatial D-052).
+        /// Phase A : check `pass`/`info`, aucune décision.
+        #[arg(long)]
+        source_logo: bool,
+        /// Catalogue TOML du registre des logos source
+        /// (défaut : `<models>/qa/source_logos.toml`).
+        #[arg(long, requires = "source_logo")]
+        source_logo_catalog: Option<PathBuf>,
         /// Désactive le contrôle logos de la bande haute.
         #[arg(long)]
         no_logo: bool,
@@ -1616,6 +1624,8 @@ fn run() -> Result<()> {
                 no_logo_visual,
                 logo_visual,
                 no_face,
+                source_logo,
+                source_logo_catalog,
                 no_evidence,
                 per_segment,
                 video_id,
@@ -1640,6 +1650,8 @@ fn run() -> Result<()> {
                     logo_enabled: !no_logo,
                     logo_visual_enabled: !no_logo_visual || logo_visual,
                     face_enabled: !no_face,
+                    source_logo_enabled: source_logo,
+                    source_logo_catalog,
                     evidence_enabled: !no_evidence,
                     per_segment,
                     video_id,

@@ -183,6 +183,34 @@ Le plafond de 220 px est propre au vérificateur : le contrôle texte garde
 18–180 px, mais le logo Les 100 à l'échelle 1,0 produit une boîte OCR de
 204 px de haut. Les boîtes pleine frame (613 px) restent exclues.
 
+### Registre spatial des logos source (D-052, phase A, 2026-11-08)
+
+`--source-logo` ajoute un check `source_logo` purement géométrique, sans
+analyse de pixels et sans finding. Il exige un `.ecproj` et le catalogue
+`assets/models/qa/source_logos.toml` (ou `--source-logo-catalog`). Le
+catalogue contient 29 émissions, 15 clean feeds, 5 émissions sans logo et
+deux zones génériques ; les crops RGBA restent externes. La source est
+résolue par nom de fichier exact puis par alias, et un clean feed déclaré
+n'hérite jamais d'un prior. La bbox du logo est projetée par les
+transformations du `.ecproj` (keyframes interpolés, rotation ou parent
+animé/redimensionné refusé).
+
+Statuts : `pass` si le logo est hors cadre ou si la source est inconnue
+(les zones génériques sont rappelées sans être confirmées) ; `info` si une
+partie ≥ 15 % et ≥ 400 px² du logo projeté reste dans la composition. Une
+observation couverte par un overlay déclaré est écartée avant ce calcul : le
+masque prime sur le prior. Un catalogue demandé mais introuvable donne
+`not_applicable` et interdit l'auto-approbation, comme un modèle requis
+absent. Le cache passe en version 8 et inclut le hash du catalogue quand le
+flag est actif.
+
+Validation : 35 exports GOOD appariés à leur `.ecproj` → 25 `pass`,
+10 `info`, **0 nouveau finding** ; `227` E=M6 hors cadre, `270` GOAL
+reconnu clean feed. Deux exports (`286`, `298`) conservent un écart de durée
+MP4/comp de 3 s lié à l'appariement projet/export, sans rapport avec le
+registre. Le check ne remplace pas le contrôle logos de bande haute : il
+documente le logo de programme dans la source.
+
 ## Stage 1 visage
 
 | Paramètre | Valeur |
@@ -229,7 +257,11 @@ sans les fichiers `dinov2_vits14_quantized.onnx` et
 `dinov2_logo_probe.json` dans `--models`, le check `logo_visual` est
 `not_applicable`, le contrôle texte continue et l'auto-approbation est
 refusée. L'ancien `--logo-visual` reste accepté en alias caché, sans effet
-puisque DINOv2 est actif par défaut. `--per-segment` accepte 1 ou 3.
+puisque DINOv2 est actif par défaut. `--source-logo` active l'annotation du
+registre spatial des logos source (D-052) : check `source_logo` `pass`/`info`,
+projet `.ecproj` et catalogue requis ; `--source-logo-catalog` fixe un
+catalogue explicite, sinon `<models>/qa/source_logos.toml` est utilisé.
+`--per-segment` accepte 1 ou 3.
 `--no-evidence` n'écrit pas les
 frames WebP ; `--no-cache` force le recalcul en mode lot. `--docs` est accepté pour le contrat futur mais non utilisé en
 v1. `--ffmpeg` et `--ffprobe` surchargent la configuration

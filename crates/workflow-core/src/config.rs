@@ -1011,6 +1011,11 @@ pub struct PostConfig {
     pub a2_ocr_rec: PathBuf,
     /// Bibliothèque ONNX Runtime explicite ; vide = runtime système.
     pub a2_ocr_onnxruntime: Option<PathBuf>,
+    /// Registre spatial des logos de programme (D-052). Désactivé par défaut :
+    /// la décision A2 reste strictement inchangée.
+    pub a2_logo_prior: bool,
+    /// Catalogue TOML, relatif à `paths.models` ou absolu.
+    pub a2_logo_catalog: PathBuf,
 }
 
 impl Default for PostConfig {
@@ -1031,6 +1036,8 @@ impl Default for PostConfig {
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
             a2_ocr_rec: PathBuf::from("qa/PP-OCRv6_rec_small.onnx"),
             a2_ocr_onnxruntime: None,
+            a2_logo_prior: false,
+            a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
         }
     }
 }

@@ -33,9 +33,12 @@ rendus H.264 depuis les rushes et transformations réelles (`54`, `58`,
 rendu UJUD évalué avec le prior 66 Minutes → 0,07 ; zone générique
 statique → 100 % stable (contours 19,6 %). QA sur 35 exports GOOD avec
 `.ecproj` : 25 `pass`, 10 `info`, 0 nouveau finding ; un balayage
-exhaustif de six exports connus à 1 i/s ne dépasse jamais 0,50 (meilleur
-0,38 sur une bande de 24 px), donc les 10 `info` viennent de l'absence
-réelle du logo à la position projetée. Activation
+exhaustif de six des dix exports `info` (UJUD ×4, 66M ×2) à 1 i/s ne
+dépasse jamais 0,50 (meilleur 0,38 sur une bande de 24 px) ; les quatre
+autres n'ont pas été balayés. Ces `info` ne signifient pas une absence du
+logo dans le rush (vérification manuelle UJUD/66M : présent sur toute la
+durée), mais l'absence du logo source à la position projetée dans l'export
+final, où le logo social est ajouté manuellement en overlay. Activation
 production toujours soumise à validation client ; phase D optionnelle
 (DINOv2 résiduel, confirmation A2) non implémentée.
 

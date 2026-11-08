@@ -1094,10 +1094,20 @@ NCC 0,95 / 0,94 / 0,64 / 0,58, 3/3 à chaque fois ; le même rendu UJUD
 inconnue → zone générique stable à 100 % (contours 19,6 %). Sur les 35
 exports GOOD appariés : 25 `pass`, 10 `info`, **0 nouveau finding**,
 aucune zone générique stable sur les sources inconnues. Un balayage
-exhaustif de six exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à
-1 i/s ne trouve aucune frame au-dessus de 0,50 (meilleur 0,38 sur une bande
-de 24 px) : les 10 `info` de la validation QA viennent de l'absence réelle
-du logo à la position projetée, pas de l'échantillonnage.
+exhaustif de six des dix exports `info` (UJUD ×4, 66M ×2) à 1 i/s ne trouve
+aucune frame au-dessus de 0,50 (meilleur 0,38 sur une bande de 24 px) :
+pour ces six exports, l'échantillonnage n'est pas la cause. Les quatre
+autres `info` (270 Gulli, 3 W9 LAA9) n'ont pas été balayés à 1 i/s.
+
+Ces `info` ne signifient pas que le logo manque dans le rush : la
+vérification manuelle des rushes UJUD et 66M le montre présent sur toute la
+durée. Le check compare l'export final 1080×1920 au crop de référence du
+logo **source**, à la position géométriquement projetée. Or le logo social
+est ajouté manuellement en overlay ; la zone projetée peut donc ne pas
+contenir le logo source (logo manuel ailleurs, recadrage, habillage). Un
+`info` « logo non confirmé visuellement » signifie « logo source non
+retrouvé à cette position dans l'export analysé », pas « logo absent du
+rush » ni « export sans logo ». Le check ne valide pas l'overlay manuel.
 
 **Critère pour la phase D.** Ajouter DINOv2 uniquement sur les scores
 résiduels (0,35–0,55) et une confirmation A2 avant exclusion OCR seulement
@@ -1106,9 +1116,12 @@ sans recadrage automatique.
 
 ## 8. Risques et points ouverts
 
-1. **Rushes vs exports finaux.** Les vidéos QA sont des sources 1920×1080,
-   pas des exports 1080×1920. Les findings OCR/logos sont exploitables,
-   mais le Stage 0 `resolution: fail` n'est pas un défaut de production.
+1. **Rushes vs exports finaux.** Les replays A2/QA sur `54`, `58` et `40`
+   utilisent les rushes 1920×1080, pas les exports sociaux 1080×1920 ; le
+   corpus GOOD, lui, contient bien des exports 1080×1920. Un
+   `resolution: fail` observé sur un rush n'est pas un défaut de production.
+   Pour le check `source_logo`, l'image analysée est comparée au logo
+   **source** projeté, pas à l'overlay ajouté manuellement.
 2. **Bandeaux sombres.** La médiane de bande est un mauvais indicateur de
    contraste texte/fond. Le niveau 2 doit être validé sur un corpus dédié
    avant toute activation.
@@ -1188,8 +1201,9 @@ sans recadrage automatique.
   aucune régression d'action ni de scale sur `54`/`58` ;
 - phase C : mesurer la confirmation visuelle sur des exports AE réellement
   produits par l'opérateur (les rendus H.264 construits depuis les rushes
-  confirment déjà 0,58 à 0,95 ; les 35 GOOD ne contiennent pas le logo à la
-  position projetée), puis ajuster les seuils si nécessaire ;
+  confirment déjà 0,58 à 0,95 ; les 35 GOOD ne présentent pas le logo source
+  à la position projetée, le logo social étant ajouté manuellement en
+  overlay), puis ajuster les seuils si nécessaire ;
 - phase D optionnelle : DINOv2 sur les scores résiduels et confirmation A2
   avant exclusion OCR, après validation client ;
 - conserver la parité QA : toute évolution du clustering ou des moteurs

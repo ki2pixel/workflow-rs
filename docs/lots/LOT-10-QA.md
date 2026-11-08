@@ -226,10 +226,19 @@ les transformations réelles des projets (`54` à 148,68 s, `58` à 49,16 s,
 générique stable à 100 % (contours 19,6 %). Sur les 35 exports GOOD
 appariés : 25 `pass`, 10 `info`, **0 nouveau finding**, aucune zone
 générique stable sur les sources inconnues. Un balayage exhaustif de six
-exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à 1 i/s ne trouve aucune
-frame au-dessus de 0,50 (meilleur 0,38 sur une bande de 24 px) : les 10
-`info` viennent de l'absence réelle du logo à la position projetée, pas de
-l'échantillonnage.
+des dix exports `info` (UJUD ×4, 66M ×2) à 1 i/s ne trouve aucune frame
+au-dessus de 0,50 (meilleur 0,38 sur une bande de 24 px) : pour ces six
+exports, l'échantillonnage n'est pas la cause. Les quatre autres `info` (270
+Gulli, 3 W9 LAA9) n'ont pas été balayés à 1 i/s.
+
+Ces `info` ne disent pas que le logo manque dans le rush : la vérification
+manuelle des rushes UJUD et 66M le montre présent sur toute la durée. Le
+check compare l'export final au crop du logo **source** à la position
+projetée ; le logo social est ajouté manuellement en overlay, donc cette
+zone peut ne pas contenir le logo source. Un `info` « logo non confirmé
+visuellement » signifie « logo source non retrouvé à cette position dans
+l'export analysé », pas « logo absent du rush » ni « export sans logo ». Le
+check ne valide pas l'overlay manuel.
 
 Validation phase A/B : `54`/`58` inchangés (`apply` 200,8 % / 210,0 %),
 `40` reste `review` avec la bannière réelle à 91,7 % et un scale proposé de

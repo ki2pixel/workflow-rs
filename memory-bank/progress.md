@@ -74,7 +74,9 @@
   → 25 `pass`, 10 `info`, 0 nouveau finding ; quatre rendus H.264 construits
   depuis les rushes et transformations réelles (`54`, `58`, `40 ABHARTACH`,
   `40 FOOTBALLEUR`) → NCC 0,95 / 0,94 / 0,64 / 0,58, 3/3 ; 10 `info` non
-  confirmés car le logo n'est pas à la position projetée (balayage
+  confirmés car le logo source n'est pas à la position projetée dans
+  l'export final (logo social ajouté manuellement en overlay ; vérification
+  manuelle des rushes UJUD/66M : logo présent sur toute la durée ; balayage
   exhaustif à 1 i/s : maximum 0,38). Phase D optionnelle (DINOv2
   résiduel, confirmation A2) non implémentée.
 - Bypass direct SDM (D-034) et archive-only LPHDF (D-035) actifs : STEP2–STEP6

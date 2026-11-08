@@ -743,9 +743,17 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   statique inconnue → zone générique stable à 100 % (contours 19,6 %). Sur
   les 35 exports GOOD appariés : 25 `pass`, 10 `info`, 0 nouveau finding,
   aucune zone générique stable sur les sources inconnues ; un balayage
-  exhaustif de six exports GOOD d'émissions connues (UJUD ×4, 66M ×2) à
-  1 i/s ne trouve aucune frame au-dessus de 0,50 (meilleur 0,38 sur une
-  bande de 24 px), donc les 10 `info` viennent de l'absence réelle du logo.
+  exhaustif de six des dix exports `info` (UJUD ×4, 66M ×2) à 1 i/s ne
+  trouve aucune frame au-dessus de 0,50 (meilleur 0,38 sur une bande de
+  24 px) : pour ces six, l'échantillonnage n'est pas la cause ; les quatre
+  autres (270 Gulli, 3 W9 LAA9) n'ont pas été balayés. Ces `info` ne
+  signifient pas une absence du logo dans le rush : la vérification manuelle
+  des rushes UJUD et 66M le montre présent sur toute la durée. Le check
+  compare l'export final au crop du logo source à la position projetée ; le
+  logo social est ajouté manuellement en overlay, donc cette position peut
+  ne pas contenir le logo source. Un `info` « logo non confirmé visuellement
+  » veut dire « logo source non retrouvé dans l'export analysé », pas « logo
+  absent du rush ». Le check ne valide pas l'overlay manuel.
   505 tests workspace, `fmt` et `clippy -D warnings` verts ; aucune écriture
   dans `/mnt/cache` (lecture seule).
 - **Validation overlays A2** : sur `54` avec un habillage déclaré

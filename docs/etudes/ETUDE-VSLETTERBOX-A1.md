@@ -791,5 +791,81 @@ Python legacy.
 
 ---
 
+## 9. Spike Rust (D-057)
+
+Le spike est implémenté dans
+`crates/workflow-steps/examples/a1_letterbox_spike.rs`, **hors production** :
+il n'est pas câblé dans `workflow-cli` et ne modifie ni A1 ni `cropdetect`.
+Il reprend l'EWMA 5σ, un Sobel Y 3×3 ciblé sur les lignes candidates, une
+couverture de colonnes ≥ 2/3 et un clustering temporel ±2 px avec cluster
+dominant ≥ 60 %, sinon `review`. Le seuil de contour par défaut est 32/1020.
+Les écritures sont limitées à `/tmp/opencode/a1-letterbox-spike`.
+
+```sh
+cargo run -p workflow-steps --release --example a1_letterbox_spike -- \
+  --corpus "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2" \
+  --pre both --runs 3
+```
+
+### 9.1 Résultats
+
+Les deux variantes, luma seule (`gray`) et `pre` avec chroma (`chroma`),
+donnent les mêmes décisions et les mêmes barres sur les six fixtures :
+
+| Fixture | Décision | Cluster | Barres | cd16 | cd2 | Réf. | Δ px |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: |
+| 305 seg 1 | `apply` | 2/2 (100 %) | 81/79 | 86/82 | 82/80 | prototype 81/78 | +0/+1 |
+| 305 seg 9 | `apply` | 3/3 (100 %) | 81/79 | 86/82 | 82/80 | prototype 81/79 | +0/+0 |
+| 305 seg 17 | `review` | 2/4 (50 %) | 81/79 | 86/82 | 82/80 | transition | — |
+| 304 seg 9 | `noop` | 5/5 (100 %) | 0/0 | 642/6 | 636/0 | pas de barre | +0/+0 |
+| 356 seg 2 | `noop` | 3/3 (100 %) | 0/0 | 98/6 | 92/0 | pas de barre | +0/+0 |
+| 304 seg 34 | `noop` | 4/4 (100 %) | 0/0 | 80/56 | 74/52 | A1 80/56 | −80/−56 |
+
+- **Précision** : 81/79 sur le 305 seg 1 et le 305 seg 9, soit 1 px d'écart
+  maximum avec le prototype (81/78) et 3–5 px avec `cropdetect=24:16:0`
+  (86/82). Le
+  scale natif avec la marge 1,015 vaut 211,8 % (humain 210,0 %, +1,8 point) ;
+  sans marge, la hauteur exacte donne 208,7 % (−1,3 point). L'écart résiduel
+  est la marge de sécurité, pas une erreur de détection.
+- **Faux positifs** : sur le 304 seg 9, les candidats 935/936 (bandeau bas)
+  et 1002/1003 sont déclenchés par l'EWMA mais **rejetés par le Sobel Y** avec
+  une couverture de 0,38–0,46, contre 0,76–0,83 pour l'ExKirsch du prototype
+  Python. Le Sobel horizontal ciblé est donc plus robuste que le masque 5×5
+  multi-orientations sur les bandeaux et logos. Le clustering `(0,0)` 5/5
+  confirme `noop`.
+- **Transition** : le 305 seg 17 donne deux clusters à 50 % (81/79 et 29/30),
+  donc `review` ; le détecteur ne force ni `apply` ni `noop`.
+- **Faux négatif connu** : le 304 seg 34 ne déclenche pas l'EWMA sur la barre
+  réelle 80/56 (bord faible) ; les candidats de bandeau 935/936 sont rejetés
+  par le Sobel, d'où `noop`. A3 doit rester le filet pour ce cas.
+
+### 9.2 Coût
+
+| Pré | Analyse Rust | Total natif | `cropdetect` 16 px | Ratio médian |
+| --- | ---: | ---: | ---: | ---: |
+| `gray` | 8–17 ms | 353–630 ms | 313–605 ms | **1,12×** |
+| `chroma` | 18–34 ms | 398–734 ms | 314–591 ms | **1,24×** |
+
+Le temps d'analyse Rust est négligeable (≤ 34 ms) ; le total est dominé par
+le démarrage et le décodage `ffmpeg`. La variante luma seule respecte la
+cible ≤ 1,2× `cropdetect` ; la variante chroma la dépasse sur plusieurs
+fixtures sans gain de décision. **`gray` est le candidat A1.**
+
+### 9.3 Limites et suite
+
+- Six fixtures seulement ; l'échantillon stratifié des 65 `apply`, 116
+  `review` et 20 `noop` de l'étude GOOD reste à exécuter.
+- Les seuils (32/1020, couverture 2/3, tolérance ±2 px, 60 %) ne sont pas
+  calibrés sur un corpus large ; ils sont des valeurs de spike.
+- Le 304 seg 34 reste un faux négatif structurel du détecteur différentiel
+  sur bord faible ; A3 doit conserver le relais.
+- Aucune intégration production : pas de `a1_detector`, pas de modification
+  de `PostConfig`, pas de changement du contrat A1.
+
+La sortie brute du spike est conservée dans
+[`ETUDE-VSLETTERBOX-A1/results/spike-rust.md`](ETUDE-VSLETTERBOX-A1/results/spike-rust.md).
+
+---
+
 *Fin de l'étude. D-057 ouvre un spike opt-in ; aucune modification de
 production n'est incluse.*

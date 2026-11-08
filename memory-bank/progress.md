@@ -35,6 +35,16 @@
   clustering temporel requis pour le natif. Rapport :
   `docs/etudes/ETUDE-VSLETTERBOX-A1.md` ; ADR :
   `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`.
+- **Spike Rust A1 (D-057, 2026-11-08)** : exemple
+  `crates/workflow-steps/examples/a1_letterbox_spike.rs` (EWMA 5σ, Sobel Y
+  3×3 ciblé, couverture de colonnes, clustering ±2 px). Six fixtures,
+  `gray` et `chroma` : 305 seg 1/9 à 81/79 (1 px du prototype), 305 seg 17
+  en `review`, 304 seg 9 et 356 seg 2 en `noop`, 304 seg 34 en `noop`
+  (faux négatif connu, A3 filet). Le Sobel rejette les candidats 935/936
+  du 304 seg 9 à 0,38–0,46 de couverture, contre 0,76–0,83 pour
+  l'ExKirsch. Coût : analyse Rust 8–17 ms (`gray`), ratio médian 1,12×
+  `cropdetect` ; `gray` est le candidat. Aucun code de production modifié ;
+  sortie : `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

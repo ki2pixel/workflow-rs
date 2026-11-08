@@ -954,6 +954,15 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`. Mesures 304 seg 9,
   305 seg 1/9/17, 304 seg 34, 356 seg 2, tests synthétiques
   texte/aplat/ciel/contraste.
+- **Spike Rust (2026-11-08)** : exemple hors production
+  `crates/workflow-steps/examples/a1_letterbox_spike.rs` ; six fixtures,
+  variantes `gray` et `chroma`. 305 seg 1/9 à 81/79 (1 px du prototype),
+  305 seg 17 en `review` (cluster 2/4), 304 seg 9 et 356 seg 2 en `noop`,
+  304 seg 34 en `noop` (faux négatif connu, A3 filet). Le Sobel Y rejette
+  les candidats 935/936 du 304 seg 9 à 0,38–0,46 de couverture, contre
+  0,76–0,83 pour l'ExKirsch. Analyse Rust 8–17 ms (`gray`), ratio médian
+  1,12× `cropdetect` ; `gray` est le candidat. Sortie :
+  `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
 - **Limites** : prototype Python approximatif, pas une exécution
   VapourSynth ; échantillon restreint ; images synthétiques non compressées ;
   `cropdetect=24:2:0` est une référence à 2 px, pas une vérité manuelle.

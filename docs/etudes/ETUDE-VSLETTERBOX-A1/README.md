@@ -21,7 +21,12 @@ scripts/synthetic.py  tests texte/aplat/ciel/contraste
 results/*.json        sorties analyze.py par segment
 results/synthetic.txt sorties des tests synthétiques
 results/cropdetect.txt sorties cropdetect 16 px et 2 px
+results/spike-rust.md sortie du spike Rust EWMA + Sobel Y + clustering
 ```
+
+Le spike Rust est dans
+`crates/workflow-steps/examples/a1_letterbox_spike.rs` ; il est hors
+production et s'exécute avec `--out /tmp/...` uniquement.
 
 ## Méthode
 

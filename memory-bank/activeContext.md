@@ -164,6 +164,25 @@ D-034, D-035).
     inchangé ; rapport `docs/etudes/ETUDE-VSLETTERBOX-A1.md`, ADR
     `docs/decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`.
 
+- [2026-11-08] **Spike Rust A1 (D-057)** :
+  - exemple hors production
+    `crates/workflow-steps/examples/a1_letterbox_spike.rs` : EWMA 5σ,
+    Sobel Y 3×3 ciblé, couverture de colonnes ≥ 2/3, clustering ±2 px
+    avec cluster dominant ≥ 60 %, sinon `review` ;
+  - six fixtures (305 seg 1/9/17, 304 seg 9/34, 356 seg 2), variantes
+    `gray` et `chroma` : mêmes décisions et mêmes barres ;
+  - 305 seg 1/9 : 81/79, à 1 px du prototype ; scale 211,8 % avec la
+    marge 1,015 (humain 210,0 %) ; 304 seg 9 : `noop`, les candidats
+    935/936 et 1002/1003 sont rejetés par le Sobel (couverture
+    0,38–0,46) alors que l'ExKirsch les acceptait à 0,76–0,83 ;
+  - 305 seg 17 : `review` (cluster 2/4) ; 356 seg 2 : `noop` ; 304 seg 34 :
+    `noop`, faux négatif connu sur bord faible, A3 reste le filet ;
+  - coût : analyse Rust 8–17 ms (`gray`) / 18–34 ms (`chroma`) ; ratio
+    médian vs `cropdetect=24:16:0` 1,12× / 1,24× ; `gray` est le candidat ;
+  - 4 tests unitaires dans l'exemple, `cargo test --workspace` OK (545
+    tests), aucun code de production modifié ; sortie brute
+    `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-rust.md`.
+
 - [2026-11-08] **Catalogue D-052 étendu (30/21/9)** :
   - 30ᵉ émission *Les Reines de la Route* (6ter, `bottom_left`, bbox
     `[99, 848, 315, 1022]`, crop `Les_Reines_de_la_Route/crop.png`,

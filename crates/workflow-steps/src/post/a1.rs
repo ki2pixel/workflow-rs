@@ -578,6 +578,16 @@ fn native_details(
     params: &NativeParams,
 ) -> Value {
     let mut map = details.as_object().cloned().unwrap_or_default();
+    let left = map
+        .get("bars")
+        .and_then(|bars| bars.get("left"))
+        .cloned()
+        .unwrap_or_else(|| json!(0));
+    let right = map
+        .get("bars")
+        .and_then(|bars| bars.get("right"))
+        .cloned()
+        .unwrap_or_else(|| json!(0));
     let cropdetect = json!({
         "active_height": map.get("active_height").cloned().unwrap_or(Value::Null),
         "active_p10": map.get("active_p10").cloned().unwrap_or(Value::Null),
@@ -603,7 +613,7 @@ fn native_details(
     );
     map.insert(
         "bars".into(),
-        json!({"top": native.top, "bottom": native.bottom, "left": 0, "right": 0}),
+        json!({"top": native.top, "bottom": native.bottom, "left": left, "right": right}),
     );
     map.insert("symmetric".into(), json!(true));
     map.insert("cropdetect".into(), cropdetect);

@@ -289,6 +289,7 @@ def detector_summary(post):
             "source_logo_match": logo.get("source_logo_match"),
             "merged_with_lower_third": logo.get("merged_with_lower_third"),
             "clusters": block.get("clusters"),
+            "clustering": block.get("clustering"),
             "detections_total": block.get("detections_total"),
             "detections_a2": block.get("detections_a2"),
             "frames_analyzed": block.get("frames_analyzed"),

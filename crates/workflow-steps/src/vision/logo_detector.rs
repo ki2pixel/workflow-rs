@@ -548,6 +548,9 @@ pub(crate) fn iou(left: &[f32; 4], right: &[f32; 4]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vision::frame::FrameCache;
+    use std::path::Path;
+    use std::time::Instant;
 
     fn frame(width: usize, height: usize) -> BgrFrame {
         BgrFrame::new(width, height, vec![0u8; width * height * 3]).unwrap()
@@ -793,5 +796,89 @@ mod tests {
             println!("{detection:?}");
         }
         assert!(!detections.is_empty());
+    }
+
+    #[test]
+    #[ignore = "labo B2: LOGO_DETECTOR_ONNX, LOGO_DETECTOR_VIDEO et LOGO_DETECTOR_ORT requis"]
+    fn lab_profiles_load_grab_and_inference() {
+        let Ok(model) = std::env::var("LOGO_DETECTOR_ONNX") else {
+            return;
+        };
+        let Ok(video) = std::env::var("LOGO_DETECTOR_VIDEO") else {
+            return;
+        };
+        let ffmpeg = std::env::var("LOGO_DETECTOR_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
+        let ffprobe = std::env::var("LOGO_DETECTOR_FFPROBE").unwrap_or_else(|_| "ffprobe".into());
+        let device = std::env::var("LOGO_DETECTOR_DEVICE")
+            .ok()
+            .and_then(|value| ExecutionDevice::parse(&value).ok())
+            .unwrap_or(ExecutionDevice::Cuda);
+        let duration: f64 = String::from_utf8(
+            std::process::Command::new(ffprobe)
+                .args([
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "csv=p=0",
+                    &video,
+                ])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+        let config = DetectorConfig {
+            model: PathBuf::from(model),
+            device,
+            onnxruntime: std::env::var("LOGO_DETECTOR_ORT").ok().map(PathBuf::from),
+            input_size: 416,
+            conf_threshold: 0.30,
+            iou_threshold: 0.65,
+            class_names: vec!["logo".into()],
+            roi: Roi::Full,
+        };
+        let load = Instant::now();
+        let mut detector = LogoDetector::load(config).unwrap();
+        println!(
+            "chargement: {:.1} ms",
+            load.elapsed().as_secs_f64() * 1000.0
+        );
+
+        let cache = FrameCache::new(Path::new(&video), 1920, 1080, duration);
+        let grab = Instant::now();
+        let mut frames = Vec::new();
+        for index in 0..crate::vision::frame::SAMPLE_COUNT {
+            if let Some(frame) = cache.frame(Path::new(&ffmpeg), index).unwrap() {
+                frames.push(frame);
+            }
+        }
+        println!(
+            "12 frames (1er passage): {:.1} ms ({} frames)",
+            grab.elapsed().as_secs_f64() * 1000.0,
+            frames.len()
+        );
+
+        let cached = Instant::now();
+        for index in 0..crate::vision::frame::SAMPLE_COUNT {
+            assert!(cache.frame(Path::new(&ffmpeg), index).unwrap().is_some());
+        }
+        println!(
+            "12 frames (2e passage): {:.1} ms",
+            cached.elapsed().as_secs_f64() * 1000.0
+        );
+
+        let infer = Instant::now();
+        for frame in &frames {
+            detector.detect(frame).unwrap();
+        }
+        println!(
+            "12 inférences: {:.1} ms",
+            infer.elapsed().as_secs_f64() * 1000.0
+        );
     }
 }

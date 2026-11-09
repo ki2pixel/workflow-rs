@@ -13,7 +13,7 @@
 use crate::post::detect::VideoSpecs;
 use crate::post::model::Decision;
 use crate::post::run::PostOptions;
-use crate::vision::frame::grab_frame;
+use crate::vision::frame::{grab_frame, sample_time, FrameCache, SAMPLE_COUNT};
 use crate::vision::inference::init_ort;
 use crate::vision::logo_detector::{iou, Detection, DetectorConfig, ExecutionDevice, LogoDetector};
 use crate::vision::source_logo::SourceLogoPrior;
@@ -21,12 +21,24 @@ use crate::vision::source_logo::SourceLogoPrior;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Instant;
 use workflow_core::HardwareLock;
 use workflow_schema::round::round_to;
 
-const LOGO_DETECTOR_SAMPLES: usize = 12;
+const LOGO_DETECTOR_SAMPLES: usize = SAMPLE_COUNT;
 const LOGO_DETECTOR_MIN_TOP_PERSISTENCE: f64 = 0.25;
+/// Association historique : logos fixes, haute précision.
+const CLUSTER_STRICT_IOU: f32 = 0.50;
+const CLUSTER_STRICT_CENTER_PX: f32 = 10.0;
+/// Association relâchée pour les habillages animés (pulsations, brillance) :
+/// le cluster est recollé si la boîte reste proche et de taille comparable.
+/// Mesuré sur D-060 et le pilote B2 : aucun faux positif persistant
+/// supplémentaire, deux logos animés à 7/12 récupérés.
+const CLUSTER_ANIMATED_IOU: f32 = 0.35;
+const CLUSTER_ANIMATED_CENTER_PX: f32 = 25.0;
+const CLUSTER_ANIMATED_MIN_SIZE_RATIO: f32 = 0.50;
+const CLUSTER_ANIMATED_MAX_SIZE_RATIO: f32 = 2.00;
 
 /// Annotateur paresseux, créé une fois par lot `post run`.
 pub(crate) struct LogoAnnotation {
@@ -97,6 +109,7 @@ impl LogoAnnotation {
         specs: Option<&VideoSpecs>,
         ffmpeg: &Path,
         source_logo: Option<&SourceLogoPrior>,
+        frames: Option<&FrameCache>,
     ) -> Option<f64> {
         if self.disabled {
             return None;
@@ -133,20 +146,30 @@ impl LogoAnnotation {
         let mut observations = Vec::new();
         let mut latencies = Vec::new();
         for index in 0..LOGO_DETECTOR_SAMPLES {
-            let time = specs.duration_s * (index as f64 + 0.5) / LOGO_DETECTOR_SAMPLES as f64;
-            let frame = match grab_frame(
-                ffmpeg,
-                video,
-                time,
-                specs.width as usize,
-                specs.height as usize,
-            ) {
-                Ok(Some(frame)) => frame,
-                Ok(None) => continue,
-                Err(error) => {
-                    tracing::debug!("A2: frame de détection ignorée à {time:.2}s: {error:#}");
-                    continue;
-                }
+            let time = sample_time(specs.duration_s, index);
+            let frame = match frames {
+                Some(cache) => match cache.frame(ffmpeg, index) {
+                    Ok(Some(frame)) => frame,
+                    Ok(None) => continue,
+                    Err(error) => {
+                        tracing::debug!("A2: frame de détection ignorée à {time:.2}s: {error:#}");
+                        continue;
+                    }
+                },
+                None => match grab_frame(
+                    ffmpeg,
+                    video,
+                    time,
+                    specs.width as usize,
+                    specs.height as usize,
+                ) {
+                    Ok(Some(frame)) => Rc::new(frame),
+                    Ok(None) => continue,
+                    Err(error) => {
+                        tracing::debug!("A2: frame de détection ignorée à {time:.2}s: {error:#}");
+                        continue;
+                    }
+                },
             };
             let start = Instant::now();
             match detector.detect(&frame) {
@@ -253,7 +276,13 @@ impl Cluster {
     }
 }
 
-/// Agrège les détections en clusters stables : IoU ≥ 0,50 et centre ≤ 10 px.
+/// Agrège les détections en clusters temporels.
+///
+/// Une détection est d'abord associée à un cluster avec le critère strict
+/// (IoU ≥ 0,50, centre ≤ 10 px). Si aucun cluster ne correspond, on retente
+/// avec une tolérance d'habillage animé (IoU ≥ 0,35, centre ≤ 25 px, taille
+/// comprise entre 0,5× et 2×). Le second passage récupère les logos qui
+/// pulsent ou se déplacent légèrement sans fusionner deux logos distants.
 fn cluster_detections(observations: &[(usize, Vec<Detection>)]) -> Vec<Cluster> {
     let mut clusters: Vec<Cluster> = Vec::new();
     for (frame, detections) in observations {
@@ -265,13 +294,8 @@ fn cluster_detections(observations: &[(usize, Vec<Detection>)]) -> Vec<Cluster> 
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         for detection in &sorted {
-            let center = bbox_center(detection.bbox);
-            let matched = clusters.iter_mut().find(|cluster| {
-                iou(&cluster.bbox, &detection.bbox) >= 0.50
-                    && center_distance(&bbox_center(cluster.bbox), &center) <= 10.0
-            });
-            if let Some(cluster) = matched {
-                cluster.add(detection, *frame);
+            if let Some(index) = find_cluster(&clusters, detection) {
+                clusters[index].add(detection, *frame);
             } else {
                 clusters.push(Cluster::new(detection, *frame));
             }
@@ -290,6 +314,35 @@ fn cluster_detections(observations: &[(usize, Vec<Detection>)]) -> Vec<Cluster> 
             })
     });
     clusters
+}
+
+fn find_cluster(clusters: &[Cluster], detection: &Detection) -> Option<usize> {
+    clusters
+        .iter()
+        .position(|cluster| matches_cluster(cluster, detection, true))
+        .or_else(|| {
+            clusters
+                .iter()
+                .position(|cluster| matches_cluster(cluster, detection, false))
+        })
+}
+
+fn matches_cluster(cluster: &Cluster, detection: &Detection, strict: bool) -> bool {
+    let overlap = iou(&cluster.bbox, &detection.bbox);
+    let distance = center_distance(&bbox_center(cluster.bbox), &bbox_center(detection.bbox));
+    if strict {
+        return overlap >= CLUSTER_STRICT_IOU && distance <= CLUSTER_STRICT_CENTER_PX;
+    }
+    if overlap < CLUSTER_ANIMATED_IOU || distance > CLUSTER_ANIMATED_CENTER_PX {
+        return false;
+    }
+    let width_ratio =
+        (detection.bbox[2] - detection.bbox[0]) / (cluster.bbox[2] - cluster.bbox[0]).max(1.0);
+    let height_ratio =
+        (detection.bbox[3] - detection.bbox[1]) / (cluster.bbox[3] - cluster.bbox[1]).max(1.0);
+    (CLUSTER_ANIMATED_MIN_SIZE_RATIO..=CLUSTER_ANIMATED_MAX_SIZE_RATIO).contains(&width_ratio)
+        && (CLUSTER_ANIMATED_MIN_SIZE_RATIO..=CLUSTER_ANIMATED_MAX_SIZE_RATIO)
+            .contains(&height_ratio)
 }
 
 fn build_details(
@@ -337,6 +390,17 @@ fn build_details(
     object.insert(
         "min_persistence".into(),
         json!(round_to(meta.min_persistence, 3)),
+    );
+    object.insert(
+        "clustering".into(),
+        json!({
+            "iou": round_to(CLUSTER_ANIMATED_IOU as f64, 3),
+            "center_px": round_to(CLUSTER_ANIMATED_CENTER_PX as f64, 1),
+            "size_ratio": [
+                CLUSTER_ANIMATED_MIN_SIZE_RATIO,
+                CLUSTER_ANIMATED_MAX_SIZE_RATIO,
+            ],
+        }),
     );
     object.insert("samples_requested".into(), json!(LOGO_DETECTOR_SAMPLES));
     object.insert("frames_analyzed".into(), json!(frames_analyzed));
@@ -668,16 +732,65 @@ mod tests {
     }
 
     #[test]
-    fn cluster_splits_when_center_moves_more_than_ten_pixels() {
+    fn cluster_absorbs_a_twelve_pixel_shift() {
         // Given: deux détections de même taille décalées de 12 px.
         // When:  elles sont agrégées.
-        // Then:  deux clusters distincts sont créés.
+        // Then:  le micro-mouvement reste dans un seul cluster.
         let observations = vec![
             (0, vec![detection([100.0, 900.0, 300.0, 1000.0], 0.8)]),
             (1, vec![detection([112.0, 900.0, 312.0, 1000.0], 0.8)]),
         ];
         let clusters = cluster_detections(&observations);
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].frames.len(), 2);
+    }
+
+    #[test]
+    fn cluster_splits_a_distant_logo() {
+        // Given: deux logos séparés de 300 px.
+        // When:  ils sont agrégés.
+        // Then:  deux clusters distincts restent séparés.
+        let observations = vec![
+            (0, vec![detection([100.0, 900.0, 300.0, 1000.0], 0.8)]),
+            (1, vec![detection([500.0, 900.0, 700.0, 1000.0], 0.8)]),
+        ];
+        let clusters = cluster_detections(&observations);
         assert_eq!(clusters.len(), 2);
+    }
+
+    #[test]
+    fn cluster_rejects_a_giant_size_change() {
+        // Given: un logo et une boîte 2,5× plus large, même centre, IoU 0,40.
+        // When:  l'association relâchée est tentée.
+        // Then:  le garde-fou de taille refuse la fusion.
+        let observations = vec![
+            (0, vec![detection([500.0, 900.0, 700.0, 1000.0], 0.8)]),
+            (1, vec![detection([350.0, 900.0, 850.0, 1000.0], 0.7)]),
+        ];
+        let clusters = cluster_detections(&observations);
+        assert_eq!(clusters.len(), 2);
+    }
+
+    #[test]
+    fn animated_logo_is_recovered_by_relaxed_association() {
+        // Given: 7 frames du logo A, 3 frames du logo B à ~20 px du centre,
+        //        IoU 0,65 (boîtes réelles de « Manifestations », ordre
+        //        simplifié A puis B), 2 frames vides.
+        // When:  les 12 observations sont agrégées.
+        // Then:  un seul cluster persistant est détecté à 10/12.
+        let mut observations = Vec::new();
+        for frame in 0..12 {
+            let det = match frame {
+                0..=6 => Some(detection([104.5, 928.5, 384.6, 1009.4], 0.78)),
+                7..=9 => Some(detection([76.2, 915.6, 373.0, 1024.2], 0.77)),
+                _ => None,
+            };
+            observations.push((frame, det.into_iter().collect()));
+        }
+        let details = build_details(meta(), &observations, &specs(), None, None, &[]);
+        assert_eq!(details["logo"]["detected"], true);
+        assert_eq!(details["logo"]["persistence"], 0.8333);
+        assert_eq!(details["clusters"], 1);
     }
 
     #[test]
@@ -709,6 +822,7 @@ mod tests {
             Some(&specs()),
             Path::new("ffmpeg"),
             None,
+            None,
         );
         assert!(result.is_none());
         assert!(decisions[0].details.get("logo_detector").is_none());
@@ -733,6 +847,7 @@ mod tests {
             Some(Path::new("/inexistant.mp4")),
             Some(&specs()),
             Path::new("ffmpeg"),
+            None,
             None,
         );
         assert!(result.is_none());

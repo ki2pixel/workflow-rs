@@ -1,0 +1,787 @@
+{
+ "schema": 1,
+ "generated_at": "2026-11-09T20:05:26.967115+00:00",
+ "work_dir": "training_yolo_b1/pilot_b2",
+ "model": "assets/models/qa/logo_yolox_nano_a2.onnx",
+ "model_sha256": "5c03e8b6e404cc7f1fd13183c1cf3a35b12e1dc6a376bac9da13fdc650cb8caa",
+ "config": {
+  "conf": 0.3,
+  "iou": 0.65,
+  "min_persistence": 0.7,
+  "size": 416,
+  "roi": "full",
+  "device": "cuda",
+  "report_only": true
+ },
+ "projects_requested": 13,
+ "projects_compared": 13,
+ "annotated": 13,
+ "detected": 5,
+ "unknown": 5,
+ "action_diff_projects": 0,
+ "failures": [],
+ "projects": [
+  {
+   "stem": "Extrait 5 - EM6 (Morph)  Une chorégraphie inspirée de la maladie de Parkinson de son grand-père _TAT_M6_9x16",
+   "source": "104 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.1667,
+    "frames": 2,
+    "bbox": [
+     192.5,
+     848.3,
+     419.2,
+     974.3
+    ],
+    "score": 0.773,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 5,
+    "detections_a2": 2,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 9.02,
+     "p95": 11.47,
+     "mean": 9.57,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 217.1,
+    "a1_ms": 9151.5,
+    "a2_ms": 3625.7,
+    "a2_logo_detector_ms": 6177.3,
+    "a3_ms": 8.5,
+    "a4_ms": 0.7,
+    "a6_ms": 0.0,
+    "total_ms": 19262.5
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "Extrait 6 - EM6 (Gildo Gomes)  Il fond en larmes en répondant à la question d'Éric Antoine _TAT_M6_9x16",
+   "source": "104 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     36.2,
+     1040.8,
+     139.7,
+     1069.1
+    ],
+    "score": 0.339,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 1,
+    "detections_a2": 1,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 9.8,
+     "p95": 10.96,
+     "mean": 9.59,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 209.5,
+    "a1_ms": 6605.8,
+    "a2_ms": 2178.6,
+    "a2_logo_detector_ms": 4897.8,
+    "a3_ms": 9.0,
+    "a4_ms": 0.8,
+    "a6_ms": 0.0,
+    "total_ms": 13993.8
+   },
+   "audit_verdict": "warn"
+  },
+  {
+   "stem": "Extrait 7 - EM6 (Afonso the echo man)  Sa voix est capable de créer un effet d’écho_TAT_M6_9x16",
+   "source": "104 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     142.3,
+     846.7,
+     847.6,
+     989.9
+    ],
+    "score": 0.631,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 4,
+    "detections_a2": 4,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 10.84,
+     "p95": 11.83,
+     "mean": 10.39,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 225.1,
+    "a1_ms": 19645.4,
+    "a2_ms": 4766.2,
+    "a2_logo_detector_ms": 5082.5,
+    "a3_ms": 16.7,
+    "a4_ms": 0.9,
+    "a6_ms": 0.0,
+    "total_ms": 29825.1
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "Il déteste la communauté LGBTQIA+_9x16",
+   "source": "104 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": true,
+    "persistence": 1.0,
+    "frames": 12,
+    "bbox": [
+     105.6,
+     928.9,
+     382.5,
+     1009.5
+    ],
+    "score": 0.692,
+    "unknown_logo": true,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 1,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 18,
+    "detections_a2": 18,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 11.7,
+     "p95": 14.28,
+     "mean": 11.79,
+     "samples": 12
+    },
+    "top": [
+     {
+      "bbox": [
+       105.6,
+       928.9,
+       382.5,
+       1009.5
+      ],
+      "persistence": 1.0,
+      "frames": 12,
+      "score": 0.692,
+      "score_max": 0.787,
+      "width_frac": 0.1442,
+      "wide": false
+     },
+     {
+      "bbox": [
+       77.9,
+       927.5,
+       649.2,
+       1012.1
+      ],
+      "persistence": 0.25,
+      "frames": 3,
+      "score": 0.391,
+      "score_max": 0.506,
+      "width_frac": 0.2975,
+      "wide": false
+     }
+    ]
+   },
+   "timings_ms": {
+    "read_specs_ms": 128.8,
+    "a1_ms": 11154.6,
+    "a2_ms": 3113.9,
+    "a2_logo_detector_ms": 4953.5,
+    "a3_ms": 22.9,
+    "a4_ms": 1.0,
+    "a6_ms": 0.0,
+    "total_ms": 19439.0
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "Manifestations  antifascistes VS ultradroite !_9x16",
+   "source": "104 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": true,
+    "persistence": 0.75,
+    "frames": 9,
+    "bbox": [
+     104.5,
+     928.5,
+     384.6,
+     1009.4
+    ],
+    "score": 0.679,
+    "unknown_logo": true,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 1,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 14,
+    "detections_a2": 14,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 10.53,
+     "p95": 11.4,
+     "mean": 10.18,
+     "samples": 12
+    },
+    "top": [
+     {
+      "bbox": [
+       104.5,
+       928.5,
+       384.6,
+       1009.4
+      ],
+      "persistence": 0.75,
+      "frames": 9,
+      "score": 0.679,
+      "score_max": 0.782,
+      "width_frac": 0.1459,
+      "wide": false
+     },
+     {
+      "bbox": [
+       76.2,
+       915.6,
+       373.0,
+       1024.2
+      ],
+      "persistence": 0.25,
+      "frames": 3,
+      "score": 0.776,
+      "score_max": 0.788,
+      "width_frac": 0.1546,
+      "wide": false
+     }
+    ]
+   },
+   "timings_ms": {
+    "read_specs_ms": 126.8,
+    "a1_ms": 13515.3,
+    "a2_ms": 4909.1,
+    "a2_logo_detector_ms": 4392.6,
+    "a3_ms": 47.8,
+    "a4_ms": 1.0,
+    "a6_ms": 0.0,
+    "total_ms": 23078.3
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "Extrait 8 - EM6 (Diane)  Elle décroche le Golden Buzzer de Karine Le Marchand_TAT_M6_9x16",
+   "source": "105 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     0.0,
+     6.1,
+     244.3,
+     310.9
+    ],
+    "score": 0.49,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 2,
+    "detections_a2": 2,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 12.01,
+     "p95": 13.14,
+     "mean": 11.04,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 194.8,
+    "a1_ms": 15448.3,
+    "a2_ms": 3354.3,
+    "a2_logo_detector_ms": 4673.6,
+    "a3_ms": 14.9,
+    "a4_ms": 0.8,
+    "a6_ms": 0.0,
+    "total_ms": 23775.5
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "M6_EM6_ampoules short_9x16",
+   "source": "105 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": true,
+    "persistence": 1.0,
+    "frames": 12,
+    "bbox": [
+     93.3,
+     854.2,
+     276.9,
+     1026.6
+    ],
+    "score": 0.634,
+    "unknown_logo": true,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 1,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 13,
+    "detections_a2": 13,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 12.65,
+     "p95": 13.45,
+     "mean": 12.0,
+     "samples": 12
+    },
+    "top": [
+     {
+      "bbox": [
+       93.3,
+       854.2,
+       276.9,
+       1026.6
+      ],
+      "persistence": 1.0,
+      "frames": 12,
+      "score": 0.634,
+      "score_max": 0.728,
+      "width_frac": 0.0956,
+      "wide": false
+     }
+    ]
+   },
+   "timings_ms": {
+    "read_specs_ms": 180.1,
+    "a1_ms": 9596.3,
+    "a2_ms": 3148.2,
+    "a2_logo_detector_ms": 4314.5,
+    "a3_ms": 9.6,
+    "a4_ms": 0.8,
+    "a6_ms": 0.0,
+    "total_ms": 17310.4
+   },
+   "audit_verdict": "warn"
+  },
+  {
+   "stem": "Gulli - Totally Spies - Clover ne comprend pas le langage des jeunes_9x16",
+   "source": "106 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     1211.4,
+     950.2,
+     1576.1,
+     1015.9
+    ],
+    "score": 0.3,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 1,
+    "detections_a2": 1,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 11.92,
+     "p95": 13.21,
+     "mean": 11.26,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 133.2,
+    "a1_ms": 5394.7,
+    "a2_ms": 2191.1,
+    "a2_logo_detector_ms": 3894.3,
+    "a3_ms": 4.5,
+    "a4_ms": 0.8,
+    "a6_ms": 0.0,
+    "total_ms": 11684.9
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "Gulli - Totally Spies - Le cauchemar de Clover_9x16",
+   "source": "106 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     96.8,
+     846.1,
+     211.3,
+     1007.1
+    ],
+    "score": 0.499,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 1,
+    "detections_a2": 1,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 12.9,
+     "p95": 13.89,
+     "mean": 12.93,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 120.4,
+    "a1_ms": 7970.4,
+    "a2_ms": 3406.4,
+    "a2_logo_detector_ms": 3923.8,
+    "a3_ms": 8.5,
+    "a4_ms": 0.7,
+    "a6_ms": 0.0,
+    "total_ms": 15514.9
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "LMCR - Extrait 1_9x16",
+   "source": "106 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0,
+    "frames": 0,
+    "bbox": null,
+    "score": null,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 2,
+    "detections_a2": 0,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 10.95,
+     "p95": 11.28,
+     "mean": 10.41,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 96.3,
+    "a1_ms": 18381.3,
+    "a2_ms": 5317.1,
+    "a2_logo_detector_ms": 3368.6,
+    "a3_ms": 20.8,
+    "a4_ms": 0.9,
+    "a6_ms": 0.0,
+    "total_ms": 27271.1
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "LMCR - Extrait 2_9x16",
+   "source": "106 Cvmille",
+   "action_diffs": [],
+   "summary": {
+    "detected": false,
+    "persistence": 0.0833,
+    "frames": 1,
+    "bbox": [
+     0.0,
+     845.4,
+     190.8,
+     1052.2
+    ],
+    "score": 0.486,
+    "unknown_logo": false,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 0,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 6,
+    "detections_a2": 3,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 12.73,
+     "p95": 13.06,
+     "mean": 12.36,
+     "samples": 12
+    },
+    "top": []
+   },
+   "timings_ms": {
+    "read_specs_ms": 82.0,
+    "a1_ms": 5141.4,
+    "a2_ms": 1979.6,
+    "a2_logo_detector_ms": 3414.3,
+    "a3_ms": 5.3,
+    "a4_ms": 0.6,
+    "a6_ms": 0.0,
+    "total_ms": 10703.2
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "LMCR3 - EP26 CVDL 1 RS EXTRAIT 1_9x16",
+   "source": "112 Camille",
+   "action_diffs": [],
+   "summary": {
+    "detected": true,
+    "persistence": 0.75,
+    "frames": 9,
+    "bbox": [
+     108.0,
+     860.0,
+     283.0,
+     1024.6
+    ],
+    "score": 0.686,
+    "unknown_logo": true,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 1,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 14,
+    "detections_a2": 13,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 12.36,
+     "p95": 12.92,
+     "mean": 11.32,
+     "samples": 12
+    },
+    "top": [
+     {
+      "bbox": [
+       108.0,
+       860.0,
+       283.0,
+       1024.6
+      ],
+      "persistence": 0.75,
+      "frames": 9,
+      "score": 0.686,
+      "score_max": 0.836,
+      "width_frac": 0.0911,
+      "wide": false
+     }
+    ]
+   },
+   "timings_ms": {
+    "read_specs_ms": 119.2,
+    "a1_ms": 6660.8,
+    "a2_ms": 1321.2,
+    "a2_logo_detector_ms": 4687.9,
+    "a3_ms": 5.4,
+    "a4_ms": 0.6,
+    "a6_ms": 0.0,
+    "total_ms": 12896.2
+   },
+   "audit_verdict": "pass"
+  },
+  {
+   "stem": "LMCR3 - EP26 CVDL 1 RS EXTRAIT 2_9x16",
+   "source": "113 Camille",
+   "action_diffs": [],
+   "summary": {
+    "detected": true,
+    "persistence": 0.9167,
+    "frames": 11,
+    "bbox": [
+     112.1,
+     864.6,
+     284.4,
+     1029.2
+    ],
+    "score": 0.705,
+    "unknown_logo": true,
+    "source_prior": false,
+    "source_logo_match": false,
+    "merged_with_lower_third": false,
+    "clusters": 1,
+    "clustering": {
+     "iou": 0.35,
+     "center_px": 25.0,
+     "size_ratio": [
+      0.5,
+      2.0
+     ]
+    },
+    "detections_total": 19,
+    "detections_a2": 15,
+    "frames_analyzed": 12,
+    "latency_ms": {
+     "p50": 9.2,
+     "p95": 10.92,
+     "mean": 9.13,
+     "samples": 12
+    },
+    "top": [
+     {
+      "bbox": [
+       112.1,
+       864.6,
+       284.4,
+       1029.2
+      ],
+      "persistence": 0.9167,
+      "frames": 11,
+      "score": 0.705,
+      "score_max": 0.838,
+      "width_frac": 0.0897,
+      "wide": false
+     }
+    ]
+   },
+   "timings_ms": {
+    "read_specs_ms": 139.2,
+    "a1_ms": 22763.1,
+    "a2_ms": 3403.3,
+    "a2_logo_detector_ms": 5169.8,
+    "a3_ms": 25.9,
+    "a4_ms": 0.9,
+    "a6_ms": 0.0,
+    "total_ms": 31590.0
+   },
+   "audit_verdict": "pass"
+  }
+ ],
+ "sanitized": "chemins locaux et noms de fichiers vidéo retirés de la copie versionnée"
+}

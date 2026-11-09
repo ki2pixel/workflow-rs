@@ -1031,7 +1031,37 @@ pilote après retour opérateur. Détails, tableau par projet et limites :
 `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md` ; configuration :
 `docs/lots/LOT-9-POST-STEP8.md`.
 
-### 11.9 Artefacts
+### 11.9 Consolidation B2.1 — fusion temporelle et cache de frames
+
+Deux ajustements, sans changer le modèle ni la décision A2 :
+
+1. **Fusion temporelle** : association stricte (IoU ≥ 0,50, centre ≤ 10 px)
+   puis, si aucun cluster ne correspond, association animée (IoU ≥ 0,35,
+   centre ≤ 25 px, ratio de taille 0,5–2,0). Le garde-fou de taille évite
+   d'absorber une bannière large. Sur les 242 frames D-060 regroupées par
+   clip : 0/5 clip négatif persistant (inchangé), 26/30 groupes de
+   références persistants contre 21/30, dont 25/26 corrects ; les cinq
+   groupes récupérés sont de vrais logos. Le test synthétique reprenant les
+   deux boîtes réelles de « Manifestations » (7/12 puis 3/12) donne 10/12 ;
+   sur le pilote réel, l'ordre des détections diffère et le sous-cluster
+   reste séparé : 9/12 + 3/12, soit 0,75 et `detected=true`.
+2. **Cache de frames** : `vision/frame.rs` mémorise les 12 frames source en
+   `Rc<BgrFrame>`. Quand `a2_logo_detector` est actif, le gate OCR A2 remplit
+   le cache et le détecteur le relit : le second passage mesure **0,0 ms**
+   au lieu de 4 081–4 712 ms. Le coût résiduel du détecteur est la session
+   CUDA (1,4–1,5 s) et l'inférence (~0,11 s). Sans OCR, le détecteur garde
+   l'extraction directe ; une passe `select` unique mesure ~3,0 s, gain
+   insuffisant pour un second chemin.
+
+Pilote `report_only` B2.1 : 13/13 projets annotés, **0 différence d'action**
+et de `review.json`, **5/13** logos persistants contre 2/13 en B2, tous
+`unknown_logo`, latence p95 10,92–14,28 ms, coût 4 535 ms/projet. Aucun des
+13 projets ne déclenche le gate OCR : le cache n'a donc pas réduit le coût
+en conditions réelles, le gain de 0,0 ms restant prouvé en laboratoire.
+Détails et limites : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.1.md`. Le
+détecteur reste **désactivé par défaut** et hors décision A2.
+
+### 11.10 Artefacts
 
 - Modèle : `exports/logo_b1_nano416.onnx`, hash ci-dessus, non versionné.
 - Métriques : `metrics_final_iou45.json`, `metrics_final_iou65.json`,
@@ -1047,6 +1077,9 @@ pilote après retour opérateur. Détails, tableau par projet et limites :
   `scripts/pilot-b2-logo-detector.py` ; code
   `crates/workflow-steps/src/vision/logo_detector.rs` et
   `crates/workflow-steps/src/post/logo.rs`.
+- Consolidation B2.1 : `results/B2.1.md`, `results/b2.1-pilot.json`, cache
+  de frames `crates/workflow-steps/src/vision/frame.rs`, fusion temporelle
+  dans `crates/workflow-steps/src/post/logo.rs`.
 
 ## 12. Références
 

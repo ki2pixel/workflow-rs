@@ -367,6 +367,25 @@ byte-identique à l'assist (STEP7 supprime les bruts ; 2 `apply` exclus),
 logos animés à 7/12 sous le seuil, latence p50 9,28–10,86 ms / p95
 10,77–12,25 ms, coût 4,45 s/projet. Aucun `apply` créé.
 
+La consolidation **B2.1** (2026-11-09) ne change ni le modèle ni la
+décision. Le clustering tente d'abord l'association stricte (IoU ≥ 0,50,
+centre ≤ 10 px), puis une association animée (IoU ≥ 0,35, centre ≤ 25 px,
+ratio de taille 0,5–2,0) ; les seuils sont exposés dans
+`details.logo_detector.clustering`. Sur D-060, aucun clip négatif ne devient
+persistant et cinq groupes de références supplémentaires sont récupérés,
+tous corrects. Le test synthétique reprenant les deux boîtes de
+« Manifestations » donne 10/12 ; sur le pilote réel, le sous-cluster reste
+séparé (9/12 + 3/12, 0,75, `detected=true`). Le pilote B2.1 conserve
+**0 différence d'action** et de `review.json`, aucun `apply`, et fait
+passer les logos persistants de 2/13 à **5/13**, tous `unknown_logo`
+(latence p95 10,92–14,28 ms, coût 4 535 ms/projet). Les 12 frames source
+sont mises en cache (`vision/frame.rs`) : quand l'OCR A2 est actif, il les
+extrait et le détecteur les relit, ce qui ramène le second passage de
+4,1–4,7 s à 0 ms. Aucun des 13 projets du pilote ne déclenche l'OCR : le
+cache n'a donc pas réduit le coût en conditions réelles. Le coût résiduel
+du détecteur reste la session CUDA (~1,4–1,5 s) et l'inférence (~0,1 s).
+Détails : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.1.md`.
+
 ## A3/A4/A5 — revue et rapport seulement
 
 ### A3 — candidats de keyframes

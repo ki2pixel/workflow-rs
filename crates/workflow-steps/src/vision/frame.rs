@@ -5,8 +5,19 @@
 //! brut n'est pas auto-descriptif. Les contrôles ne modifient jamais la vidéo.
 
 use anyhow::{ensure, Context, Result};
-use std::path::Path;
+use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::rc::Rc;
+
+/// Nombre d'échantillons partagés par le gate OCR A2 et le détecteur de
+/// logos. Les deux consommateurs doivent lire exactement les mêmes instants.
+pub(crate) const SAMPLE_COUNT: usize = 12;
+
+/// Instant central de l'échantillon `index` sur `SAMPLE_COUNT`.
+pub(crate) fn sample_time(duration_s: f64, index: usize) -> f64 {
+    duration_s * (index as f64 + 0.5) / SAMPLE_COUNT as f64
+}
 
 /// Image BGR 8 bits, canaux entrelacés. L'ordre BGR est celui d'OpenCV, donc
 /// celui des modèles YuNet et PP-OCR importés du PoC.
@@ -145,6 +156,72 @@ pub(crate) fn grab_frame(
     Ok(Some(BgrFrame::new(width, height, output.stdout)?))
 }
 
+/// Cache mono-projet des 12 frames source. Il est partagé par le gate OCR A2
+/// et le détecteur de logos lorsque `a2_logo_detector` est actif : l'OCR
+/// remplit le cache, le détecteur le relit sans relancer ffmpeg ni recopier
+/// 75 Mio. Une frame manquante est mémorisée pour ne pas réessayer le même
+/// décodage en échec.
+pub(crate) struct FrameCache {
+    video: PathBuf,
+    width: usize,
+    height: usize,
+    duration_s: f64,
+    slots: RefCell<Vec<FrameSlot>>,
+}
+
+enum FrameSlot {
+    Pending,
+    Ready(Rc<BgrFrame>),
+    Missing,
+}
+
+impl FrameCache {
+    pub(crate) fn new(video: &Path, width: usize, height: usize, duration_s: f64) -> Self {
+        Self {
+            video: video.to_path_buf(),
+            width,
+            height,
+            duration_s,
+            slots: RefCell::new((0..SAMPLE_COUNT).map(|_| FrameSlot::Pending).collect()),
+        }
+    }
+
+    /// Retourne la frame `index`, en la décodant au premier accès.
+    pub(crate) fn frame(&self, ffmpeg: &Path, index: usize) -> Result<Option<Rc<BgrFrame>>> {
+        ensure!(
+            index < SAMPLE_COUNT,
+            "échantillon {index} hors 0..{SAMPLE_COUNT}"
+        );
+        {
+            let slots = self.slots.borrow();
+            match &slots[index] {
+                FrameSlot::Ready(frame) => return Ok(Some(Rc::clone(frame))),
+                FrameSlot::Missing => return Ok(None),
+                FrameSlot::Pending => {}
+            }
+        }
+        let time = sample_time(self.duration_s, index);
+        let grabbed = grab_frame(ffmpeg, &self.video, time, self.width, self.height);
+        let mut slots = self.slots.borrow_mut();
+        match grabbed {
+            Ok(Some(frame)) => {
+                let frame = Rc::new(frame);
+                slots[index] = FrameSlot::Ready(Rc::clone(&frame));
+                Ok(Some(frame))
+            }
+            Ok(None) => {
+                slots[index] = FrameSlot::Missing;
+                Ok(None)
+            }
+            Err(error) => {
+                // Erreur transitoire (ffmpeg, disque) : on laisse la case
+                // Pending pour que le second consommateur puisse réessayer.
+                Err(error)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,5 +249,18 @@ mod tests {
         assert_eq!(resized.height, 8);
         assert_eq!(resized.pixel(0, 0), [1, 2, 3]);
         assert_eq!(resized.pixel(7, 7), [1, 2, 3]);
+    }
+
+    #[test]
+    fn sample_times_are_centered_on_twelve_buckets() {
+        assert_eq!(SAMPLE_COUNT, 12);
+        assert_eq!(sample_time(60.0, 0), 2.5);
+        assert_eq!(sample_time(60.0, 11), 57.5);
+    }
+
+    #[test]
+    fn frame_cache_rejects_an_out_of_range_sample() {
+        let cache = FrameCache::new(Path::new("absent.mp4"), 10, 10, 60.0);
+        assert!(cache.frame(Path::new("ffmpeg"), SAMPLE_COUNT).is_err());
     }
 }

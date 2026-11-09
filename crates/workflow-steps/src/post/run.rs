@@ -15,6 +15,7 @@ use crate::post::model::{
 };
 use crate::post::{a1, a2, a3, a4, a6, detect, direct};
 use crate::template::{Bypass, BypassMode};
+use crate::vision::frame::FrameCache;
 use crate::vision::logo_detector::{ExecutionDevice, Roi};
 use crate::vision::source_logo::SourceLogoCatalog;
 use anyhow::{Context, Result};
@@ -543,6 +544,22 @@ fn run_post_project_inner(
     let mut a1_ms = 0.0;
     let mut a2_ms = 0.0;
     let mut a2_logo_detector_ms = 0.0;
+    // Le cache n'existe que si le détecteur est actif : sans lui, A2 OCR
+    // garde son extraction directe et la production reste inchangée. Quand il
+    // est actif, le gate OCR remplit les 12 frames et le détecteur les relit.
+    let frame_cache = if options.a2_logo_detector {
+        match (video.as_deref(), specs.as_ref()) {
+            (Some(video), Some(specs)) => Some(FrameCache::new(
+                video,
+                specs.width as usize,
+                specs.height as usize,
+                specs.duration_s,
+            )),
+            _ => None,
+        }
+    } else {
+        None
+    };
     let mut a3_ms = 0.0;
     let mut a4_ms = 0.0;
     if template.eligible != Some(true) {
@@ -638,6 +655,7 @@ fn run_post_project_inner(
             &meta,
             source_height,
             &a2_options,
+            frame_cache.as_ref(),
         ));
         a2_ms = start.elapsed().as_secs_f64() * 1000.0;
         a2_logo_detector_ms = logo
@@ -647,6 +665,7 @@ fn run_post_project_inner(
                 specs.as_ref(),
                 &options.ffmpeg,
                 a2_options.logo_prior.as_ref(),
+                frame_cache.as_ref(),
             )
             .unwrap_or(0.0);
         if !options.a1_defer_on_a3 {

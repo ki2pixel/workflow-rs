@@ -13,6 +13,9 @@
 `b2-pilot.json` (copie assainie, chemins locaux et noms de fichiers vidéo
 retirés).
 
+**Lot B2.1** (fusion temporelle des logos animés et cache de frames partagé
+avec l'OCR) : voir `B2.1.md` et `b2.1-pilot.json`.
+
 ## 1. Modèles exportés
 
 | Modèle | Entrée | Sortie | Opset | FP32 | FP16 |

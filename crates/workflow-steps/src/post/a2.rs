@@ -16,7 +16,7 @@ use crate::post::detect::{band_candidates, probe_video, BandCandidate, VideoSpec
 use crate::post::ecproj::{CompMeta, Segment};
 use crate::post::model::Decision;
 use crate::post::overlay::OverlayMask;
-use crate::vision::frame::grab_frame;
+use crate::vision::frame::{grab_frame, sample_time, FrameCache, SAMPLE_COUNT};
 use crate::vision::ocr::{DetEngine, RecEngine};
 use crate::vision::source_logo::{bbox_area, bbox_intersection_area, clip_bbox, SourceLogoPrior};
 use crate::vision::text::normalize_text;
@@ -24,6 +24,7 @@ use anyhow::{Context, Result};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Instant;
 use workflow_schema::round::round_to;
 
@@ -40,7 +41,7 @@ const ANIM_STD: f64 = 35.0;
 const GEOM_STD: f64 = 12.0;
 
 /// Échantillonnage du gate OCR A2 : même cadence que le contrôle logos QA.
-const A2_OCR_SAMPLES: usize = 12;
+const A2_OCR_SAMPLES: usize = SAMPLE_COUNT;
 const A2_OCR_MARGIN_PX: i64 = 16;
 const A2_OCR_MIN_CROP_HEIGHT: i64 = 30;
 /// Part minimale d'une détection contenue dans la bbox logo pour la retirer
@@ -224,6 +225,7 @@ struct OcrGate<'a> {
     options: &'a A2OcrOptions,
     logo_prior: Option<&'a SourceLogoPrior>,
     logo_coverage: LogoOverlayCoverage,
+    frames: Option<&'a FrameCache>,
 }
 
 trait OcrEvidenceSource {
@@ -240,6 +242,7 @@ impl OcrEvidenceSource for OcrGate<'_> {
             self.options,
             self.logo_prior,
             self.logo_coverage,
+            self.frames,
         ) {
             Ok(evidence) => Some(evidence),
             Err(error) => {
@@ -250,7 +253,8 @@ impl OcrEvidenceSource for OcrGate<'_> {
     }
 }
 
-pub fn decide_a2(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn decide_a2(
     segments: &[Segment],
     video: Option<&Path>,
     ffmpeg: &Path,
@@ -258,6 +262,7 @@ pub fn decide_a2(
     meta: &CompMeta,
     source_height: u32,
     options: &A2Options,
+    frames: Option<&FrameCache>,
 ) -> Vec<Decision> {
     let margin = options.margin;
     let ocr = options.ocr.as_ref();
@@ -329,6 +334,7 @@ pub fn decide_a2(
                 ),
                 None => LogoOverlayCoverage::default(),
             },
+            frames,
         }),
         _ => None,
     };
@@ -531,7 +537,7 @@ fn logo_overlay_coverage(
         return coverage;
     }
     for index in 0..A2_OCR_SAMPLES {
-        let time = duration * (index as f64 + 0.5) / A2_OCR_SAMPLES as f64;
+        let time = sample_time(duration, index);
         let Some(segment) = segments
             .iter()
             .find(|segment| time >= segment.start && time <= segment.end)
@@ -1172,6 +1178,7 @@ fn detection_is_logo(bbox: [i64; 4], prior: &SourceLogoPrior) -> bool {
     intersection / area >= A2_OCR_LOGO_OVERLAP
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_ocr_evidence(
     video: &Path,
     ffmpeg: &Path,
@@ -1180,6 +1187,7 @@ fn collect_ocr_evidence(
     options: &A2OcrOptions,
     logo_prior: Option<&SourceLogoPrior>,
     logo_coverage: LogoOverlayCoverage,
+    frames: Option<&FrameCache>,
 ) -> Result<A2OcrEvidence> {
     let started = Instant::now();
     let x0 = (candidate.x0_src - A2_OCR_MARGIN_PX).max(0);
@@ -1220,24 +1228,38 @@ fn collect_ocr_evidence(
     let mut frame_errors = 0usize;
     let mut detections_total = 0usize;
     for index in 0..A2_OCR_SAMPLES {
-        let time = specs.duration_s * (index as f64 + 0.5) / A2_OCR_SAMPLES as f64;
-        let frame = match grab_frame(
-            ffmpeg,
-            video,
-            time,
-            specs.width as usize,
-            specs.height as usize,
-        ) {
-            Ok(Some(frame)) => frame,
-            Ok(None) => {
-                frame_errors += 1;
-                continue;
-            }
-            Err(error) => {
-                tracing::warn!(time, error = %error, "extraction de frame A2 OCR en échec");
-                frame_errors += 1;
-                continue;
-            }
+        let time = sample_time(specs.duration_s, index);
+        let frame = match frames {
+            Some(cache) => match cache.frame(ffmpeg, index) {
+                Ok(Some(frame)) => frame,
+                Ok(None) => {
+                    frame_errors += 1;
+                    continue;
+                }
+                Err(error) => {
+                    tracing::warn!(time, error = %error, "extraction de frame A2 OCR en échec");
+                    frame_errors += 1;
+                    continue;
+                }
+            },
+            None => match grab_frame(
+                ffmpeg,
+                video,
+                time,
+                specs.width as usize,
+                specs.height as usize,
+            ) {
+                Ok(Some(frame)) => Rc::new(frame),
+                Ok(None) => {
+                    frame_errors += 1;
+                    continue;
+                }
+                Err(error) => {
+                    tracing::warn!(time, error = %error, "extraction de frame A2 OCR en échec");
+                    frame_errors += 1;
+                    continue;
+                }
+            },
         };
         let crop = frame.crop(
             x0 as usize,

@@ -46,6 +46,23 @@ activation de production ; suite B1.2 (ROI deux passes, fusion temporelle)
 ou pilote opérateur. Preuves :
 `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md` et `b2-pilot.json`.
 
+**Lot B2.1 — consolidation temporelle et cache (2026-11-09, exécuté).**
+Sans changer le modèle ni la décision, `post/logo.rs` tente l'association
+stricte (IoU 0,50 / centre 10 px) puis une association animée (IoU 0,35 /
+centre 25 px / ratio de taille 0,5–2,0), exposée dans
+`details.logo_detector.clustering`. `vision/frame.rs` ajoute un cache
+mono-projet des 12 frames, partagé avec le gate OCR A2 quand
+`a2_logo_detector` est actif. Pilote `report_only` sur les mêmes 13 projets :
+**0 différence d'action** et de `review.json`, aucun `apply`, **5/13** logos
+persistants contre 2/13 en B2 (dont `Il déteste` 12/12, `Manifestations`
+9/12 + 3/12, `LMCR3` 9/12 et 11/12), tous `unknown_logo`, latence p95
+**10,92–14,28 ms**, coût **4 535 ms/projet**. Le cache n'a pas été exercé :
+aucun projet ne déclenche l'OCR A2, donc le second passage à 0,0 ms n'est
+prouvé qu'en laboratoire. Le sous-cluster intercalé de `Manifestations`
+reste séparé (première boîte à ~30 px du cluster dominant) ; une fusion de
+clusters en post-traitement est la piste identifiée. Preuves :
+`docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.1.md` et `b2.1-pilot.json`.
+
 **Grounding DINO — spike A2 et logos source (2026-11-09, D-060).** Le
 détecteur ouvert `IDEA-Research/grounding-dino-tiny` (Swin-T, 659 Mio) a été
 évalué hors production sur 242 frames : 122 logos du catalogue, 60 bandeaux
@@ -221,6 +238,23 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-09] **Lot B2.1 YOLOX-Nano A2 — fusion temporelle et cache** :
+  - `post/logo.rs` : association stricte puis animée (IoU 0,35 / centre
+    25 px / taille 0,5–2,0), seuils exposés dans
+    `details.logo_detector.clustering` ; `vision/frame.rs` : cache
+    mono-projet des 12 frames partagé avec l'OCR A2 ;
+  - pilote `report_only` sur 13 projets : 13/13 annotés, 0 différence
+    d'action et de `review.json`, 0 `apply`, 5/13 logos persistants contre
+    2/13 (tous `unknown_logo`), p95 10,92–14,28 ms, coût 4 535 ms/projet ;
+  - `Manifestations` passe de 7/12 à 9/12 + 3/12 (0,75, détecté) ; le
+    sous-cluster intercalé reste séparé, la première boîte étant à ~30 px
+    du cluster dominant ; test synthétique 10/12 ;
+  - cache non sollicité par le pilote (aucun candidat OCR A2) : 0,0 ms
+    prouvé en labo, coût réel inchangé ; piste : fusion de clusters en
+    post-traitement ;
+  - preuves : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.1.md` et
+    `b2.1-pilot.json`.
 
 - [2026-11-09] **Lots B0/B1 YOLOX-Nano A2** :
   - B0 : exports ONNX YOLOX-Nano 416/640 et NanoDet-Plus-m 416, FP32/FP16,

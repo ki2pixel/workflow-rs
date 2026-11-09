@@ -482,7 +482,14 @@ intact. Le modèle reste hors dépôt et le verrou matériel
 `/tmp/workflow-rs-hw.lock` est obligatoire en CUDA. Le runtime CUDA doit
 être initialisé avant le gate OCR A2 ; sans `LD_LIBRARY_PATH` vers les
 bibliothèques `nvidia/*/lib`, le chargement échoue et le détecteur est
-ignoré. Détails et pilote : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md`.
+ignoré. Depuis B2.1, le clustering tente une association stricte (IoU
+≥ 0,50, centre ≤ 10 px) puis une association animée (IoU ≥ 0,35, centre
+≤ 25 px, ratio de taille 0,5–2,0), exposée dans
+`details.logo_detector.clustering`. Quand le détecteur est actif, un cache
+mono-projet (`vision/frame.rs`) partage les 12 frames source avec le gate
+OCR A2 : l'OCR les extrait, le détecteur les relit sans relancer ffmpeg.
+Sans détecteur, l'OCR garde son extraction directe. Détails et pilotes :
+`docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md` et `B2.1.md`.
 
 Depuis D-056, `steps.step8.post.a1_margin` vaut **1,015** (marge humaine
 médiane 1,0125 sur le corpus GOOD) et A2 exécute l'OCR avant le gate de

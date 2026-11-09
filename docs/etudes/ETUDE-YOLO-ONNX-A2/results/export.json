@@ -1,0 +1,371 @@
+{
+ "schema": "workflow-rs/yolo-a2-b0/1",
+ "date": "2026-11-09",
+ "environment": {
+  "gpu": "NVIDIA GeForce GTX 1650 4 Gio",
+  "driver": "535.309.01",
+  "cuda": "12.x",
+  "cudnn": "9",
+  "onnxruntime_export": "1.23.0 (CPU)",
+  "onnxruntime_bench": "1.23.2 (CUDA EP)",
+  "ort": "2.0.0-rc.10",
+  "python": "3.10",
+  "torch": "2.8.0+cu128",
+  "onnx": "1.19.1"
+ },
+ "selection": {
+  "manifest": "docs/etudes/ETUDE-GROUNDING-DINO-A2/results/manifest.json",
+  "frames": 20,
+  "reference_logo": 8,
+  "a2_lower_third": 6,
+  "negative": 6,
+  "rule": "sous-échantillon régulier de chaque source du manifeste D-060"
+ },
+ "models": [
+  {
+   "name": "yolox_nano",
+   "display_name": "YOLOX-Nano",
+   "license": "Apache-2.0",
+   "params_millions": 0.91,
+   "source_repo": "https://github.com/Megvii-BaseDetection/YOLOX/tree/0.3.0",
+   "weights_url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.pth",
+   "weights_sha256": "cd28f55fbbc1829f99d9ac9b38a16d259a22889739c8728ea877610201feff7b",
+   "weights_size_bytes": 7694953,
+   "export": "statique, batch 1, sans NMS, boîtes décodées cx/cy/w/h",
+   "torch28_patch": "torch.onnx._export -> torch.onnx.export(..., dynamo=False)",
+   "variants": [
+    {
+     "input_size": 416,
+     "input_shape": [
+      1,
+      3,
+      416,
+      416
+     ],
+     "output_shape": [
+      1,
+      3549,
+      85
+     ],
+     "opset": 12,
+     "fp32": {
+      "path": "onnx/yolox_nano_416.onnx",
+      "size_bytes": 3814604,
+      "sha256": "c8179298c5571561865963310142691b7a38b800e01fce1377efd51d927b14d8"
+     },
+     "fp16": {
+      "path": "onnx/yolox_nano_416_fp16.onnx",
+      "size_bytes": 2029716,
+      "sha256": "b7158abb068a21aec489dd115db51fe18428703168c7f063ab9b216680e58b6d"
+     },
+     "parity_fp32_vs_torch": {
+      "max_abs": 0.01193,
+      "mean_abs": 5.543e-06
+     },
+     "detection_parity_fp16": {
+      "fp32": 86,
+      "fp16": 86,
+      "matched_iou50": 86,
+      "unmatched_fp32": 0
+     }
+    },
+    {
+     "input_size": 640,
+     "input_shape": [
+      1,
+      3,
+      640,
+      640
+     ],
+     "output_shape": [
+      1,
+      8400,
+      85
+     ],
+     "opset": 12,
+     "fp32": {
+      "path": "onnx/yolox_nano_640.onnx",
+      "size_bytes": 3931826,
+      "sha256": "386cc5ef465330ed0f12707b07523d7c3dafec7702e92c2c467fddcc50f56fa5"
+     },
+     "fp16": {
+      "path": "onnx/yolox_nano_640_fp16.onnx",
+      "size_bytes": 2127587,
+      "sha256": "f5d51402823db71f605d8d697917de246ec5b6b70216d1f74d11145cc7ebb7c9"
+     },
+     "parity_fp32_vs_torch": {
+      "max_abs": 0.01115,
+      "mean_abs": 6.953e-06
+     },
+     "detection_parity_fp16": {
+      "fp32": 94,
+      "fp16": 93,
+      "matched_iou50": 93,
+      "unmatched_fp32": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "nanodet_plus_m",
+   "display_name": "NanoDet-Plus-m",
+   "license": "Apache-2.0",
+   "params_millions": 1.17,
+   "source_repo": "https://github.com/RangiLyu/nanodet",
+   "config": "config/nanodet-plus-m_416.yml",
+   "weights_url": "https://github.com/RangiLyu/nanodet/releases/download/v1.0.0-alpha-1/nanodet-plus-m_416_checkpoint.ckpt",
+   "weights_sha256": "dbfdf81f05e90f7d84f6171cf82b87f68cec0a2532543fd0d9da5b448169c385",
+   "weights_size_bytes": 35471019,
+   "export": "statique, batch 1, sans NMS, décodage DFL en Rust",
+   "variants": [
+    {
+     "input_size": 416,
+     "input_shape": [
+      1,
+      3,
+      416,
+      416
+     ],
+     "output_shape": [
+      1,
+      3598,
+      112
+     ],
+     "opset": 11,
+     "fp32": {
+      "path": "onnx/nanodet_plus_m_416.onnx",
+      "size_bytes": 5844349,
+      "sha256": "897d8d5691b8598524035868647e58f53681b5d0c51258655be84b77a15f8b75"
+     },
+     "fp16": {
+      "path": "onnx/nanodet_plus_m_416_fp16.onnx",
+      "size_bytes": 3471847,
+      "sha256": "8bd5f5d42024a61fa5db39ef7b0ae75219461cfb3512aa9814e0b55f93714bef"
+     },
+     "parity_fp32_vs_torch": {
+      "max_abs": 3.624e-05,
+      "mean_abs": 6.647e-07
+     },
+     "detection_parity_fp16": {
+      "fp32": 181,
+      "fp16": 127,
+      "matched_iou50": 118,
+      "unmatched_fp32": 63
+     }
+    }
+   ]
+  }
+ ],
+ "benchmarks": {
+  "protocol": "20 frames D-060, 20 warmup, 100 iterations/frame, batch 1, p50/p95",
+  "includes": [
+   "redimensionnement bilinéaire",
+   "conversion CHW",
+   "session.run",
+   "décodage",
+   "NMS"
+  ],
+  "excludes": [
+   "décodage ffmpeg",
+   "E/S disque"
+  ],
+  "results": {
+   "yolox416_fp32": {
+    "preprocess_ms": [
+     3.03,
+     3.18
+    ],
+    "run_ms": [
+     3.9,
+     5.29
+    ],
+    "postprocess_ms": [
+     0.04,
+     0.05
+    ],
+    "total_ms": [
+     7.01,
+     8.4
+    ],
+    "vram_delta_mb": 107,
+    "vram_peak_mb": 319,
+    "vram_base_mb": 212
+   },
+   "yolox640_fp32": {
+    "preprocess_ms": [
+     6.84,
+     7.1
+    ],
+    "run_ms": [
+     9.46,
+     9.78
+    ],
+    "postprocess_ms": [
+     0.08,
+     0.1
+    ],
+    "total_ms": [
+     16.36,
+     16.8
+    ],
+    "vram_delta_mb": 161,
+    "vram_peak_mb": 349,
+    "vram_base_mb": 188
+   },
+   "nanodet416_fp32": {
+    "preprocess_ms": [
+     5.16,
+     5.45
+    ],
+    "run_ms": [
+     5.28,
+     6.48
+    ],
+    "postprocess_ms": [
+     0.43,
+     0.47
+    ],
+    "total_ms": [
+     10.82,
+     12.16
+    ],
+    "vram_delta_mb": 109,
+    "vram_peak_mb": 304,
+    "vram_base_mb": 195
+   },
+   "yolox416_fp16": {
+    "preprocess_ms": [
+     2.91,
+     3.1
+    ],
+    "run_ms": [
+     3.5,
+     5.18
+    ],
+    "postprocess_ms": [
+     0.04,
+     0.05
+    ],
+    "total_ms": [
+     6.52,
+     8.19
+    ],
+    "vram_delta_mb": 112,
+    "vram_peak_mb": 309,
+    "vram_base_mb": 197
+   },
+   "yolox640_fp16": {
+    "preprocess_ms": [
+     6.81,
+     7.08
+    ],
+    "run_ms": [
+     6.77,
+     8.09
+    ],
+    "postprocess_ms": [
+     0.08,
+     0.1
+    ],
+    "total_ms": [
+     13.69,
+     15.0
+    ],
+    "vram_delta_mb": 107,
+    "vram_peak_mb": 305,
+    "vram_base_mb": 198
+   },
+   "nanodet416_fp16": {
+    "preprocess_ms": [
+     5.18,
+     5.35
+    ],
+    "run_ms": [
+     4.46,
+     6.04
+    ],
+    "postprocess_ms": [
+     0.43,
+     0.47
+    ],
+    "total_ms": [
+     10.11,
+     11.64
+    ],
+    "vram_delta_mb": 134,
+    "vram_peak_mb": 344,
+    "vram_base_mb": 210
+   },
+   "yolox416_cpu": {
+    "preprocess_ms": [
+     4.4,
+     4.52
+    ],
+    "run_ms": [
+     27.45,
+     35.28
+    ],
+    "postprocess_ms": [
+     0.02,
+     0.03
+    ],
+    "total_ms": [
+     31.96,
+     40.3
+    ],
+    "note": "diagnostic non optimisé, 10 frames x 20 itérations"
+   },
+   "nanodet416_cpu": {
+    "preprocess_ms": [
+     8.04,
+     10.91
+    ],
+    "run_ms": [
+     20.48,
+     40.48
+    ],
+    "postprocess_ms": [
+     0.48,
+     0.59
+    ],
+    "total_ms": [
+     29.1,
+     52.47
+    ],
+    "note": "diagnostic non optimisé, 10 frames x 20 itérations"
+   }
+  }
+ },
+ "zero_shot_sanity": {
+  "classes": "COCO 80, aucune classe logo/lower_third",
+  "yolox416": {
+   "reference_logo_frames_with_detection": "7/8",
+   "a2_lower_third_frames_with_detection": "6/6",
+   "negative_frames_with_detection": "6/6",
+   "total_detections": 86,
+   "person_detections": 61
+  },
+  "note": "activations COCO, pas un taux de faux positifs logo"
+ },
+ "artifacts": {
+  "benchmark_binary": "crates/workflow-steps/examples/yolo_bench.rs",
+  "study": "docs/etudes/ETUDE-YOLO-ONNX-A2.md",
+  "results": [
+   "bench-yolox416-fp32.json",
+   "bench-yolox416-fp16.json",
+   "bench-yolox640-fp32.json",
+   "bench-yolox640-fp16.json",
+   "bench-nanodet416-fp32.json",
+   "bench-nanodet416-fp16.json",
+   "bench-yolox416-cpu.json",
+   "bench-nanodet416-cpu.json",
+   "selection.json"
+  ]
+ },
+ "notes": [
+  "Les binaires ONNX ne sont pas versionnés.",
+  "Les poids dérivés du dataset client ne doivent pas être redistribués.",
+  "NanoDet FP16 est rejeté pour l'instant : 63 détections FP32 sur 181 ne sont pas retrouvées.",
+  "Le total 640 FP32 dépasse 15 ms à cause du prétraitement scalaire, pas du modèle (run p95 9,78 ms)."
+ ]
+}

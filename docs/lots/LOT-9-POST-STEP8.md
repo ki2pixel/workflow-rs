@@ -282,6 +282,31 @@ confirmation visuelle NCC/contours et la stabilité de la zone générique
 sont implémentées côté QA (`--source-logo-visual`, LOT-10) ; A2 ne les
 consulte pas et garde ses garde-fous géométriques.
 
+### Grounding DINO (D-060, hors production, 2026-11-09)
+
+Le spike `docs/etudes/ETUDE-GROUNDING-DINO-A2.md` évalue
+`IDEA-Research/grounding-dino-tiny` sur 242 frames (122 logos du catalogue,
+60 bandeaux A2, 60 négatifs). Au seuil 0,20, le prompt composite
+`logo . text . watermark . lower third . banner` donne 96,7 % de logos à
+IoU ≥ 0,50, 98,3 % de bandeaux et 97,2 % de texte IoU ≥ 0,30, mais 25 % de
+faux positifs **par frame** sur les négatifs. Le clustering temporel
+(IoU ≥ 0,50, centre ≤ 10 px, persistance ≥ 70 %) laisse 0/5 clip négatif
+persistant et conserve 5/5 logos positifs. Coût local : 1,279 s/frame à
+480 px, 1,47 Gio de VRAM, 15,3 s pour 12 frames.
+
+**Aucun flag de production n'est ajouté, aucune clé TOML, aucun appel de
+modèle dans A2.** Le détecteur reste un outil de laboratoire pour proposer
+des logos inconnus au catalogue et qualifier les revues. Si un pilote est
+autorisé, il sera `review` seulement : branche logo serrée (largeur ≤ 0,35),
+branche texte (largeur ≥ 0,20, `y ≥ 0,60`), persistance ≥ 70 %,
+`details.grounding_dino` additif, échec → décision A2 inchangée, verrou
+matériel obligatoire. Détails, seuils et conditions de réouverture :
+`docs/decisions/DECISION-GROUNDING-DINO-A2.md`. La suite est un détecteur
+local ONNX/YOLOX-Nano ou NanoDet-Plus exécuté nativement en Rust via `ort`,
+sans sidecar : `docs/etudes/ETUDE-YOLO-ONNX-A2.md`. Le **Lot B0** est
+exécuté (exports FP32/FP16, benchmark CUDA : YOLOX 416 FP32 à 8,40 ms p95
+au total) ; le fine-tuning et le pilote A2 restent à faire.
+
 ## A3/A4/A5 — revue et rapport seulement
 
 ### A3 — candidats de keyframes

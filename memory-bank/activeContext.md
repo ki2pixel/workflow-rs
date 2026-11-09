@@ -2,6 +2,41 @@
 
 ## Tâche en cours
 
+**Lot B0 — détecteur local ONNX pour A2 (2026-11-09, exécuté).** Après
+validation de D-060, l'approche B a été testée hors production : YOLOX-Nano
+416/640 et NanoDet-Plus-m 416 (Apache-2.0), exportés en ONNX FP32 puis FP16,
+exécutés nativement en Rust via `ort` CUDA. Sur 20 frames D-060 (100
+itérations, batch 1), YOLOX 416 FP32 donne **5,29 ms p95** de session et
+**8,40 ms p95** au total (prétraitement + NMS), pour +107 Mo de VRAM ;
+YOLOX 640 FP16 donne 15,00 ms au total, NanoDet 416 FP32 12,16 ms. Tous les
+modèles font 2,0–5,8 Mo. FP16 est stable pour YOLOX (86/86 détections
+identiques à 416, 93/94 à 640) mais pas pour NanoDet (127 détections FP16
+contre 181 FP32) : NanoDet reste en FP32. Le zéro-shot COCO est inutilisable (person sur 6/6 négatifs),
+le fine-tuning B1 est obligatoire. Dataset B1 : 1 499 PNG RGBA (1 273
+émissions M6+ + 226 chaînes), **100 % au train**, jeu externe pour
+l'open-set. Aucun changement de production, `a2.rs` intact. Résultats :
+`docs/etudes/ETUDE-YOLO-ONNX-A2/results/` ; binaire :
+`crates/workflow-steps/examples/yolo_bench.rs`.
+
+**Grounding DINO — spike A2 et logos source (2026-11-09, D-060).** Le
+détecteur ouvert `IDEA-Research/grounding-dino-tiny` (Swin-T, 659 Mio) a été
+évalué hors production sur 242 frames : 122 logos du catalogue, 60 bandeaux
+A2 (54/58 UJUD, 40 66 Minutes) et 60 frames négatives (5 clean feeds). Le
+prompt composite `logo . text . watermark . lower third . banner` donne
+96,7 % de logos à IoU ≥ 0,50 au seuil 0,20, 98,3 % de bandeaux et 97,2 % de
+texte IoU ≥ 0,30 ; mais 25 % de faux positifs **par frame** sur les
+négatifs. Le clustering temporel (IoU ≥ 0,50, centre ≤ 10 px, persistance
+≥ 70 %) ne laisse **0/5 clip négatif** persistant (maximum 16,7 %, IC 95 %
+[0 ; 43,4 %]) et conserve 5/5 logos et 3/5 textes sur les clips positifs.
+Coût local : 1,279 s/frame à 480 px, 1,47 Gio de VRAM, 15,3 s pour 12
+frames, soit +35 % sur le post complet. Décision : **laboratoire
+seulement**, aucun flag de production ; Replicate écarté (données client,
+réseau, secret ; non exécuté faute de jeton) ; ONNX non prêt (pas de config
+Optimum, ops custom). ADR :
+`docs/decisions/DECISION-GROUNDING-DINO-A2.md` ; étude :
+`docs/etudes/ETUDE-GROUNDING-DINO-A2.md` ; preuves :
+`docs/etudes/ETUDE-GROUNDING-DINO-A2/results/`.
+
 **A1 natif gardé — D-058 option A (2026-11-09).** Le flag opt-in
 `a1_refine_native = false` active un raffinement du seul `apply` A1 déjà
 décidé par `cropdetect` : natif v2 Sobel 20/1020, couverture 2/3 (0,45 si
@@ -158,6 +193,30 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-09] **Spike Grounding DINO A2 (D-060)** :
+  - `scripts/spike-grounding-dino.py` : manifeste de 242 frames (122 logos
+    du catalogue, 60 bandeaux A2, 60 négatifs), inférence locale
+    Transformers/CUDA, prompts, ROI, clustering temporel, métriques et
+    prototype de sidecar JSON Lines (`serve`) ; aucune écriture dans
+    `/mnt/cache`, `runtime/` ou le dépôt Python ;
+  - résultats au seuil 0,20 : 96,7 % de logos à IoU ≥ 0,50 (118/122),
+    98,3 % de bandeaux (59/60), 97,2 % de texte IoU ≥ 0,30 (35/36), 25 %
+    de faux positifs frame sur 60 négatifs ; après persistance ≥ 70 %,
+    0/5 clip négatif persistant (maximum 16,7 %) et 5/5 logos positifs
+    persistants ;
+  - coût : 1,279 s/frame à 480 px (1,47 Gio de VRAM, 3,48 s de chargement),
+    2,024 s à 640, 3,053 s à 800 ; 15,3 s pour 12 frames à chaud, 7,7 s
+    pour 6 ;
+  - limites : confusion logo/bandeau (boîtes « logo + lower third »),
+    corpus curé, 5 clips négatifs, 2 styles de bandeau, Replicate non
+    exécuté (pas de jeton), ONNX non exporté ;
+  - décision D-060 : laboratoire seulement, aucun flag de production ;
+    backend local PyTorch 480 px pour le labo, Replicate écarté en
+    production, ONNX/TensorRT ou Rust natif comme condition de réouverture ;
+  - preuves : `docs/etudes/ETUDE-GROUNDING-DINO-A2.md`,
+    `docs/etudes/ETUDE-GROUNDING-DINO-A2/results/`,
+    `docs/decisions/DECISION-GROUNDING-DINO-A2.md`.
 
 - [2026-11-08] **Étude `vapoursynth-letterbox` pour A1 et D-057** :
   - dépôt `Akatmks/vapoursynth-letterbox` (commit `ac274fa`) analysé en

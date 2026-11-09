@@ -118,6 +118,7 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 | [`decisions/DECISION-ABANDON-TAURI.md`](decisions/DECISION-ABANDON-TAURI.md) | D-028 : abandon du client desktop Tauri, périmètre retiré et procédure de restauration. | Référence |
 | [`decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`](decisions/DECISION-A1-DETECTEUR-LETTERBOX.md) | D-057 : détecteur de letterbox A1 natif opt-in, pas d'intégration VapourSynth. | Référence |
 | [`decisions/DECISION-A1-NATIVE-GARDE-D058.md`](decisions/DECISION-A1-NATIVE-GARDE-D058.md) | D-058 : A1 natif gardé (option A), Sobel 20 + barres sombres, opt-in `a1_refine_native`. | Acceptée |
+| [`decisions/DECISION-GROUNDING-DINO-A2.md`](decisions/DECISION-GROUNDING-DINO-A2.md) | D-060 : Grounding DINO hors production A2, laboratoire seulement, backend local 480 px, Replicate écarté, ONNX non prêt. | Acceptée |
 
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans
@@ -132,6 +133,8 @@ Toute nouvelle décision durable suit la convention
 | [`etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`](etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md) | Benchmark des sept dépôts logos/sous-titres, diagnostic A2/QA sur le corpus Camille et architecture cible du gate OCR (D-051). | Référence |
 | [`etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`](etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md) | Étude comparative A1–A6 sur 75 triplets GOOD : matrices A3, validation export, règles de marge A1, seuil A2 et tri A3. | Référence |
 | [`etudes/ETUDE-VSLETTERBOX-A1.md`](etudes/ETUDE-VSLETTERBOX-A1.md) | Étude d'opportunité du détecteur `vapoursynth-letterbox` pour A1 : EWMA 5σ, masque de contours, précision 1 px, limites et spike natif opt-in (D-057). | Référence |
+| [`etudes/ETUDE-GROUNDING-DINO-A2.md`](etudes/ETUDE-GROUNDING-DINO-A2.md) | Spike Grounding DINO pour A2 et les logos source : 242 frames, prompts, ROI, persistance temporelle, latence/VRAM, Replicate vs local, ONNX (D-060). | Preuve |
+| [`etudes/ETUDE-YOLO-ONNX-A2.md`](etudes/ETUDE-YOLO-ONNX-A2.md) | Approche B : détecteur local ONNX/YOLOX-Nano ou NanoDet-Plus en Rust (`ort`) pour logos inconnus et lower-thirds. Lot B0 exécuté : exports FP32/FP16, benchmark CUDA (8,40 ms p95 YOLOX 416 FP32), intégration A2 annotation-only à valider en B1/B2. | Preuve |
 
 Ces documents ne décrivent pas la production courante : la décision D-029
 maintient la consolidation déterministe avant tout STEP9 agentique.

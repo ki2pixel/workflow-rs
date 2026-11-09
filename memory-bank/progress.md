@@ -12,6 +12,14 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
+- **Lot B0 YOLOX/NanoDet (2026-11-09)** : exports ONNX Apache-2.0
+  (YOLOX-Nano 416/640, NanoDet-Plus-m 416) et microbenchmark Rust `ort`
+  CUDA. YOLOX 416 FP32 : 5,29 ms p95 de session, 8,40 ms au total, +107 Mo
+  de VRAM ; YOLOX 640 FP16 : 15,00 ms au total ; NanoDet 416 FP32 :
+  12,16 ms. FP16 stable pour YOLOX, rejeté pour NanoDet (118/181
+  détections appariées). Zéro-shot COCO inutilisable. Aucun changement de
+  production.
+  Preuves : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/`.
 - **557 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
@@ -71,6 +79,20 @@
   à 211,8 % au lieu de 213,7 %. Tests unitaires + `fmt` + `clippy` +
   `cargo test --workspace` (557) verts. Passe 2 609 segments et activation
   pilote à faire ; option C reportée à D-059.
+- **Grounding DINO — spike A2 (D-060, 2026-11-09)** : modèle tiny
+  Swin-T (659 Mio) évalué hors production sur 242 frames. Au seuil 0,20,
+  96,7 % des 122 logos du catalogue à IoU ≥ 0,50, 98,3 % des 60 bandeaux
+  A2, 97,2 % du texte (IoU ≥ 0,30), mais 25 % de faux positifs frame sur
+  60 négatifs. Le clustering IoU ≥ 0,50 + centre ≤ 10 px + persistance
+  ≥ 70 % donne 0/5 clip négatif persistant et 5/5 logos positifs
+  persistants ; texte persistant sur 3/5 clips (54/58 à 100/91,7 %,
+  40 CITROUILLES à 83,3 % ; 40 ABHARTACH/FOOTBALLEUR à 66,7/50 %,
+  cohérent avec les bandeaux animés). Coût local 1,279 s/frame à 480 px,
+  1,47 Gio de VRAM, 15,3 s pour 12 frames. Décision : laboratoire
+  seulement, aucun flag de production ; Replicate écarté (données client,
+  réseau, secret ; non exécuté), ONNX non prêt (pas de config Optimum,
+  ops custom). Preuves : `docs/etudes/ETUDE-GROUNDING-DINO-A2/` ; ADR :
+  `docs/decisions/DECISION-GROUNDING-DINO-A2.md`.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

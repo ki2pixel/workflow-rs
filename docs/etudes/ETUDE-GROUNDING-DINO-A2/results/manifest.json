@@ -1,0 +1,6856 @@
+{
+  "schema": 1,
+  "generated_at": "2026-11-09T10:42:06+00:00",
+  "model_id": "IDEA-Research/grounding-dino-tiny",
+  "catalog_sha256": "7bb3e6f96ec6eda88d831fc69e769812546e41c62da4c4aa781abad9136a4e86",
+  "a2_samples": 12,
+  "prompts": [
+    "logo",
+    "text",
+    "logo . text",
+    "lower third",
+    "television logo",
+    "banner",
+    "logo . text . watermark . lower third . banner"
+  ],
+  "best_prompt": "logo . text . watermark . lower third . banner",
+  "frames": [
+    {
+      "id": "ref_Les_Marseillais_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais accueille Maddy et Benjy après leur fiançailles_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais accueille Maddy et Benjy après leur fiançailles_01357.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais font un shooting photo avec une araignée sur eux_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais font un shooting photo avec une araignée sur eux_02431.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_04",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais profitent des fonds marins !_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_05",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais profitent des fonds marins !_01448.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_06",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais s’envolent sur une bouée_01274.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_07",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/Les Marseillais s’envolent sur une bouée_02008.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_08",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/crop1.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_09",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/crop2.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_10",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/crop3.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Marseillais_11",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Marseillais/crop4.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Marseillais",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          719.0,
+          437.0,
+          1021.0
+        ],
+        [
+          136.0,
+          774.0,
+          418.0,
+          979.0
+        ],
+        [
+          132.0,
+          777.0,
+          417.0,
+          1015.0
+        ],
+        [
+          97.0,
+          764.0,
+          437.0,
+          1021.0
+        ],
+        [
+          126.0,
+          719.0,
+          411.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Apprentis_Aventuriers_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Apprentis_Aventuriers/Les Rose sont en guerre contre le reste des Aventuriers !_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Apprentis Aventuriers",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          906.0,
+          360.0,
+          1044.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Apprentis_Aventuriers_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Apprentis_Aventuriers/Les Rose sont en guerre contre le reste des Aventuriers !_00198.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Apprentis Aventuriers",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          906.0,
+          360.0,
+          1044.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Apprentis_Aventuriers_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Apprentis_Aventuriers/prédiff – Les Apprentis découvrent que leur briquet a pris l’eau_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Apprentis Aventuriers",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          906.0,
+          360.0,
+          1044.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Apprentis_Aventuriers_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Apprentis_Aventuriers/prédiff – Les Apprentis découvrent que leur briquet a pris l’eau_00494.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Apprentis Aventuriers",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          906.0,
+          360.0,
+          1044.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Adixia et Simon se remettent officiellement ensemble_00551.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Adixia et Simon se remettent officiellement ensemble_01199.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Jean pleure car Tyler doit partir de l’aventure pour une opportunité professionnelle_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Jean pleure car Tyler doit partir de l’aventure pour une opportunité professionnelle_00615.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_04",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Marwa avoue qu’elle est jalouse que Théo parle d’Adixia_00664.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Reste_du_Monde_05",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Reste_du_Monde/Marwa avoue qu’elle est jalouse que Théo parle d’Adixia_02838.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Reste du Monde",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          122.0,
+          811.0,
+          345.0,
+          1024.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Christopher se prend un râteau !_00484.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Christopher se prend un râteau !_03286.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Kamila ne sait pas écrire Marseillais !_00238.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Kamila ne sait pas écrire Marseillais !_00463.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_04",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Le RDM remporte cette saison du cross !_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_05",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Le RDM remporte cette saison du cross !_00210.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_06",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/Le RDM remporte cette saison du cross !_02955.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_07",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/crop1.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Cross_08",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Cross/crop2.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Cross",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          106.0,
+          845.0,
+          435.0,
+          1039.0
+        ],
+        [
+          106.0,
+          853.0,
+          425.0,
+          1039.0
+        ],
+        [
+          108.0,
+          845.0,
+          435.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_daction_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_daction/Post diff 1 Course-poursuite dans sa fuite il manque de renverser des piétons_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête d'action",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          918.0,
+          282.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_daction_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_daction/Post diff 1 Course-poursuite dans sa fuite il manque de renverser des piétons_04593.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête d'action",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          918.0,
+          282.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_daction_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_daction/prediff 2 - Ces gendarmes maritimes découvrent des stupéfiants en pleine mer_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête d'action",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          918.0,
+          282.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_daction_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_daction/prediff 2 - Ces gendarmes maritimes découvrent des stupéfiants en pleine mer_01274.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête d'action",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          918.0,
+          282.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_Ile_de_la_tentation_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_Ile_de_la_tentation/Il cède à la tentation dans les toilettes_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'Île de la tentation",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          924.0,
+          416.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_Ile_de_la_tentation_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_Ile_de_la_tentation/Il cède à la tentation dans les toilettes_01509.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'Île de la tentation",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          924.0,
+          416.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_Ile_de_la_tentation_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_Ile_de_la_tentation/La tentatrice pense qu’il peut céder à la tentation_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'Île de la tentation",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          924.0,
+          416.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_Ile_de_la_tentation_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_Ile_de_la_tentation/La tentatrice pense qu’il peut céder à la tentation_01865.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'Île de la tentation",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          924.0,
+          416.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Chtis_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Chtis/Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins_00497.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Ch'tis",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          95.0,
+          787.0,
+          306.0,
+          994.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Chtis_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Chtis/Adixia et Marion ont espionné Jordan et Paga en boite avec les mannequins_01549.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Ch'tis",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          95.0,
+          787.0,
+          306.0,
+          994.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Chtis_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Chtis/Bilal s’énerve et insulte Vanessa ce qui dégoûte toute les filles_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Ch'tis",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          95.0,
+          787.0,
+          306.0,
+          994.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Chtis_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Chtis/Bilal s’énerve et insulte Vanessa ce qui dégoûte toute les filles_01546.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Ch'tis",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          95.0,
+          787.0,
+          306.0,
+          994.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cougar_Island_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cougar_Island/postdiff - Ca clash entre les jeunes et les vieux ! EM4_00679.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cougar Island",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          903.0,
+          396.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cougar_Island_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cougar_Island/postdiff - Ca clash entre les jeunes et les vieux ! EM4_01853.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cougar Island",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          903.0,
+          396.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cougar_Island_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cougar_Island/prédiff - Benoit et Estefania se tournent autour en cachette EM4_00277.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cougar Island",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          903.0,
+          396.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cougar_Island_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cougar_Island/prédiff - Benoit et Estefania se tournent autour en cachette EM4_01638.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cougar Island",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          97.0,
+          903.0,
+          396.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Qui_veut_epouser_mon_fils_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Qui_veut_epouser_mon_fils/Extrait 1 Sa mère est du côté de ses prétendantes_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Qui veut épouser mon fils ?",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          893.0,
+          342.0,
+          1041.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Qui_veut_epouser_mon_fils_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Qui_veut_epouser_mon_fils/Extrait 1 Sa mère est du côté de ses prétendantes_01627.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Qui veut épouser mon fils ?",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          893.0,
+          342.0,
+          1041.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Qui_veut_epouser_mon_fils_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Qui_veut_epouser_mon_fils/Il est impressionné par la poitrine de sa prétendante !_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Qui veut épouser mon fils ?",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          893.0,
+          342.0,
+          1041.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Qui_veut_epouser_mon_fils_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Qui_veut_epouser_mon_fils/Il est impressionné par la poitrine de sa prétendante !_01637.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Qui veut épouser mon fils ?",
+      "channel": "W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          893.0,
+          342.0,
+          1041.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cest_la_famille_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cest_la_famille/Extrait 1 Manon est contente des compliments que lui fait Julien_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "C'est la famille",
+      "channel": "6play / W9",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          98.0,
+          912.0,
+          418.0,
+          1025.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cest_la_famille_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cest_la_famille/Extrait 1 Manon est contente des compliments que lui fait Julien_02845.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "C'est la famille",
+      "channel": "6play / W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          98.0,
+          912.0,
+          418.0,
+          1025.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cest_la_famille_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cest_la_famille/Julien demande à Manon de résonner Jessica_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "C'est la famille",
+      "channel": "6play / W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          98.0,
+          912.0,
+          418.0,
+          1025.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cest_la_famille_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cest_la_famille/Julien demande à Manon de résonner Jessica_04320.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "C'est la famille",
+      "channel": "6play / W9",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          98.0,
+          912.0,
+          418.0,
+          1025.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cauchemar_en_cuisine_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cauchemar_en_cuisine/M6 - CEC - Cette restauratrice explose et craque face au chef Etchebest_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cauchemar en cuisine",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          938.0,
+          370.0,
+          1017.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cauchemar_en_cuisine_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cauchemar_en_cuisine/M6 - CEC - Cette restauratrice explose et craque face au chef Etchebest_00927.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cauchemar en cuisine",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          938.0,
+          370.0,
+          1017.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cauchemar_en_cuisine_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cauchemar_en_cuisine/M6 -CEC - Ce restaurateur utilise une porte de frigo comme... plan de travail !_00136.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cauchemar en cuisine",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          938.0,
+          370.0,
+          1017.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Cauchemar_en_cuisine_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Cauchemar_en_cuisine/M6 -CEC - Ce restaurateur utilise une porte de frigo comme... plan de travail !_01491.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Cauchemar en cuisine",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          101.0,
+          938.0,
+          370.0,
+          1017.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Un_Jour_Un_Doc_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Un_Jour_Un_Doc/UJUD - PIZZA_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Un_Jour_Un_Doc_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Un_Jour_Un_Doc/UJUD - PIZZA_01053.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Un_Jour_Un_Doc_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Un_Jour_Un_Doc/UJUD - YACHT_00186.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Un_Jour_Un_Doc_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Un_Jour_Un_Doc/UJUD - YACHT_01435.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_66_Minutes_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/66_Minutes/66M - SURNOM_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_66_Minutes_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/66_Minutes/66M - SURNOM_00790.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_66_Minutes_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/66_Minutes/66M - VENTES_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_66_Minutes_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/66_Minutes/66M - VENTES_00909.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/Jean-Louis et la géographie, ça fait deux_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/Jean-Louis et la géographie, ça fait deux_00184.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/M6 - ADP - Ils ne veulent pas mettre fin au speed-dating_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/M6 - ADP - Ils ne veulent pas mettre fin au speed-dating_00397.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_04",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/crop1.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_L_amour_est_dans_le_pre_05",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/L_amour_est_dans_le_pre/crop2.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "L'amour est dans le pré",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          93.0,
+          905.0,
+          352.0,
+          1032.0
+        ],
+        [
+          93.0,
+          905.0,
+          349.0,
+          1032.0
+        ],
+        [
+          94.0,
+          923.0,
+          352.0,
+          1031.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Capital_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Capital/APPARTEMENT 100 RECUP_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Capital",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          80.0,
+          914.0,
+          452.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Capital_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Capital/VIS A VIS_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Capital",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          80.0,
+          914.0,
+          452.0,
+          1005.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Pekin_Express_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Pekin_Express/M6 - Pékin Express - Embrouille couple story_00081.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Pékin Express",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          62.0,
+          870.0,
+          497.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Pekin_Express_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Pekin_Express/M6 - Pékin Express - Embrouille couple story_00360.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Pékin Express",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          62.0,
+          870.0,
+          497.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Pekin_Express_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Pekin_Express/M6 - Pékin Express - Ils font un karaoké avec des locaux_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Pékin Express",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          62.0,
+          870.0,
+          497.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Pekin_Express_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Pekin_Express/M6 - Pékin Express - Ils font un karaoké avec des locaux_00514.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Pékin Express",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          62.0,
+          870.0,
+          497.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Top_Chef_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Top_Chef/M6 - Top Chef - Il lui manque 7 desserts en pleine finale_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Top Chef",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          903.0,
+          387.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Top_Chef_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Top_Chef/M6 - Top Chef - Il lui manque 7 desserts en pleine finale_00394.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Top Chef",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          903.0,
+          387.0,
+          1028.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Zone_Interdite_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Zone_Interdite/CANCER_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Zone Interdite",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          116.0,
+          927.0,
+          357.0,
+          1001.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Zone_Interdite_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Zone_Interdite/CANCER_TAT_M6_00250.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Zone Interdite",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          116.0,
+          927.0,
+          357.0,
+          1001.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Zone_Interdite_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Zone_Interdite/SALLE DE BAINS_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Zone Interdite",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          116.0,
+          927.0,
+          357.0,
+          1001.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Zone_Interdite_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Zone_Interdite/SALLE DE BAINS_TAT_M6_01416.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Zone Interdite",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          116.0,
+          927.0,
+          357.0,
+          1001.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_Exclusive_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_Exclusive/PASTEUR_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête Exclusive",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          61.0,
+          913.0,
+          389.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Enquete_Exclusive_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Enquete_Exclusive/PASTEUR_TAT_M6_01275.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Enquête Exclusive",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          61.0,
+          913.0,
+          389.0,
+          1021.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_E_M6_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/E_M6/EM6_Short douche_TAT_M6_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "E=M6",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          70.0,
+          822.0,
+          305.0,
+          1061.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_E_M6_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/E_M6/EM6_Short douche_TAT_M6_00805.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "E=M6",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          70.0,
+          822.0,
+          305.0,
+          1061.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_E_M6_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/E_M6/M6 - EM6 - Savez-vous vraiment ce qui se passe pendant votre sommeil _00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "E=M6",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          70.0,
+          822.0,
+          305.0,
+          1061.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_E_M6_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/E_M6/references_logos_00207.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "E=M6",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          70.0,
+          822.0,
+          305.0,
+          1061.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Traitres_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Traitres/M6 - TRAITRES - Axel Huet avoue avoir peur de Victoria Abril_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Traîtres",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          83.0,
+          923.0,
+          389.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Traitres_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Traitres/M6 - TRAITRES - Axel Huet avoue avoir peur de Victoria Abril_00185.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Traîtres",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          83.0,
+          923.0,
+          389.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Traitres_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Traitres/M6 - TRAITRES - Victoria Abril n’arrive pas à aller aux toilettes_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Traîtres",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          83.0,
+          923.0,
+          389.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Traitres_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Traitres/M6 - TRAITRES - Victoria Abril n’arrive pas à aller aux toilettes_00375.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Traîtres",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          83.0,
+          923.0,
+          389.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Maries_au_premier_regard_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Maries_au_premier_regard/M6 - MAPR - Alex invite Lucile à vivre chez lui_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Mariés au premier regard",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          889.0,
+          392.0,
+          1010.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Maries_au_premier_regard_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Maries_au_premier_regard/M6 - MAPR - Alex invite Lucile à vivre chez lui_01394.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Mariés au premier regard",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          889.0,
+          392.0,
+          1010.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Maries_au_premier_regard_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Maries_au_premier_regard/MAPR - Elle est émue par le discours de son père_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Mariés au premier regard",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          889.0,
+          392.0,
+          1010.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Maries_au_premier_regard_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Maries_au_premier_regard/MAPR - Elle est émue par le discours de son père_02655.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Mariés au premier regard",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          86.0,
+          889.0,
+          392.0,
+          1010.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Maillon_Faible_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Maillon_Faible/Extrait 2_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Maillon Faible",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          156.0,
+          832.0,
+          380.0,
+          1007.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Maillon_Faible_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Maillon_Faible/Extrait 2_00619.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Maillon Faible",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          156.0,
+          832.0,
+          380.0,
+          1007.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Meilleur_Combat_des_Regions_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Meilleur_Combat_des_Regions/LMCR2 - GRAND EST J3 - BELLE MERE CASH - EXTRAIT RS_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Meilleur Combat des Régions (LMCR)",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          857.0,
+          290.0,
+          1032.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Le_Meilleur_Combat_des_Regions_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Le_Meilleur_Combat_des_Regions/LMCR2 - GRAND EST J3 - BELLE MERE CASH - EXTRAIT RS_00478.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Le Meilleur Combat des Régions (LMCR)",
+      "channel": "M6",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          96.0,
+          857.0,
+          290.0,
+          1032.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Ma_Super_Ligue_1_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Ma_Super_Ligue_1/Gulli - Ma Super Ligue 1 - L'itv quand j'étais petit de Christ Tapé_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Ma Super Ligue 1",
+      "channel": "Gulli",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          131.0,
+          870.0,
+          310.0,
+          1011.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Piquantes_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Piquantes/PP - Piquantes - Les odeurs du sexe_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Piquantes !",
+      "channel": "Téva",
+      "position": "top_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          48.0,
+          445.0,
+          112.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Piquantes_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Piquantes/PP - Piquantes - Les odeurs du sexe_01051.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Piquantes !",
+      "channel": "Téva",
+      "position": "top_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          48.0,
+          445.0,
+          112.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Piquantes_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Piquantes/TEVA_Piquantes EM12_prédiff_00443.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Piquantes !",
+      "channel": "Téva",
+      "position": "top_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          48.0,
+          445.0,
+          112.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Piquantes_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Piquantes/TEVA_Piquantes EM12_prédiff_01541.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Piquantes !",
+      "channel": "Téva",
+      "position": "top_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          87.0,
+          48.0,
+          445.0,
+          112.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Grosses_Tetes_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Grosses_Tetes/PP - Les grosses têtes - Blague Fabrice_00304.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Grosses Têtes",
+      "channel": "Paris Première",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          137.0,
+          900.0,
+          348.0,
+          1018.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Grosses_Tetes_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Grosses_Tetes/PP - Les grosses têtes - Blague Fabrice_00786.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Grosses Têtes",
+      "channel": "Paris Première",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          137.0,
+          900.0,
+          348.0,
+          1018.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Grosses_Tetes_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Grosses_Tetes/PP - Les grosses têtes - Sylvie Tellier_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Grosses Têtes",
+      "channel": "Paris Première",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          137.0,
+          900.0,
+          348.0,
+          1018.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Grosses_Tetes_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Grosses_Tetes/PP - Les grosses têtes - Sylvie Tellier_00691.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Grosses Têtes",
+      "channel": "Paris Première",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          137.0,
+          900.0,
+          348.0,
+          1018.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Mamans_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Mamans/6ter - Les mamans - pregen _TAT_6ter_01392.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Mamans",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          897.0,
+          424.0,
+          1033.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Mamans_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Mamans/6ter - Les mamans - pregen _TAT_6ter_02192.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Mamans",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          897.0,
+          424.0,
+          1033.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Mamans_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Mamans/6ter - les mamans - Tiziana se confie sur sa sleeve _00637.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Mamans",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          897.0,
+          424.0,
+          1033.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Mamans_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Mamans/6ter - les mamans - Tiziana se confie sur sa sleeve _01688.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Mamans",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          82.0,
+          897.0,
+          424.0,
+          1033.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Norbert_commis_doffice_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Norbert_commis_doffice/6TER_Norbert commis d'office_Il cuisine des moules au chocolat_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Norbert commis d'office",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          100.0,
+          898.0,
+          355.0,
+          1019.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Norbert_commis_doffice_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Norbert_commis_doffice/6TER_Norbert commis d'office_Il cuisine des moules au chocolat_00393.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Norbert commis d'office",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          100.0,
+          898.0,
+          355.0,
+          1019.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Norbert_commis_doffice_02",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Norbert_commis_doffice/6TER_norbert commis d'office_Ce plat risque de vous dégoûter_00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Norbert commis d'office",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          100.0,
+          898.0,
+          355.0,
+          1019.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Norbert_commis_doffice_03",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Norbert_commis_doffice/6TER_norbert commis d'office_Ce plat risque de vous dégoûter_00832.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Norbert commis d'office",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          100.0,
+          898.0,
+          355.0,
+          1019.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Reines_de_la_Route_00",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Reines_de_la_Route/6ter - LRDLR - Au volant de son camion, elle s’engage sur une route interdite aux poids lourds _00000.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Reines de la Route",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          99.0,
+          848.0,
+          315.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "ref_Les_Reines_de_la_Route_01",
+      "source": "reference_logo",
+      "path": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/emissions/Les_Reines_de_la_Route/6ter - LRDLR - Au volant de son camion, elle s’engage sur une route interdite aux poids lourds _00528.png",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Les Reines de la Route",
+      "channel": "6ter",
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          99.0,
+          848.0,
+          315.0,
+          1022.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": null,
+      "frame_index": null
+    },
+    {
+      "id": "a2_54_ujud_hotel_00",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 0,
+      "time_s": 9.001,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_01",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 1,
+      "time_s": 27.003,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_02",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 2,
+      "time_s": 45.004,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_03",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 3,
+      "time_s": 63.006,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_04",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 4,
+      "time_s": 81.008,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_05",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 5,
+      "time_s": 99.01,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_06",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 6,
+      "time_s": 117.012,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_07",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 7,
+      "time_s": 135.013,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_08",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 8,
+      "time_s": 153.015,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_09",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 9,
+      "time_s": 171.017,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_10",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 10,
+      "time_s": 189.019,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_54_ujud_hotel_11",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/54_ujud_hotel_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          316.0,
+          978.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          956.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "54_ujud_hotel",
+      "frame_index": 11,
+      "time_s": 207.02,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/54 Camille/docs/UJUD - CLIENT HOTEL.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_00",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 0,
+      "time_s": 4.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_01",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 1,
+      "time_s": 12.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_02",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 2,
+      "time_s": 20.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_03",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 3,
+      "time_s": 28.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_04",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 4,
+      "time_s": 36.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_05",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 5,
+      "time_s": 44.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_06",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 6,
+      "time_s": 52.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_07",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 7,
+      "time_s": 60.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_08",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 8,
+      "time_s": 68.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_09",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 9,
+      "time_s": 76.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_10",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 10,
+      "time_s": 84.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_58_ujud_crousty_11",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/58_ujud_crousty_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "Un Jour Un Doc",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          92.0,
+          925.0,
+          296.0,
+          1031.0
+        ]
+      ],
+      "gt_text": [
+        [
+          315.0,
+          977.0,
+          1223.0,
+          1016.0
+        ]
+      ],
+      "gt_band": [
+        [
+          100.0,
+          912.0,
+          1228.0,
+          1028.0
+        ]
+      ],
+      "clip": "58_ujud_crousty",
+      "frame_index": 11,
+      "time_s": 92.0,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/58 Camille/docs/UJUD - CROUSTY.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_00",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 0,
+      "time_s": 7.448,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_01",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 1,
+      "time_s": 22.344,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_02",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 2,
+      "time_s": 37.24,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_03",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 3,
+      "time_s": 52.136,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_04",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 4,
+      "time_s": 67.032,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_05",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 5,
+      "time_s": 81.928,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_06",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 6,
+      "time_s": 96.824,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_07",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 7,
+      "time_s": 111.72,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_08",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 8,
+      "time_s": 126.616,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_09",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 9,
+      "time_s": 141.512,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_10",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 10,
+      "time_s": 156.408,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_citrouilles_11",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_citrouilles_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": [
+        [
+          306.0,
+          925.0,
+          1096.0,
+          957.0
+        ]
+      ],
+      "gt_band": [
+        [
+          120.0,
+          900.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_citrouilles",
+      "frame_index": 11,
+      "time_s": 171.304,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - CITROUILLES.mp4",
+      "post_action": "apply"
+    },
+    {
+      "id": "a2_40_66m_abhartach_00",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 0,
+      "time_s": 4.804,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_01",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 1,
+      "time_s": 14.413,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_02",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 2,
+      "time_s": 24.022,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_03",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 3,
+      "time_s": 33.631,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_04",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 4,
+      "time_s": 43.24,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_05",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 5,
+      "time_s": 52.849,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_06",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 6,
+      "time_s": 62.458,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_07",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 7,
+      "time_s": 72.067,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_08",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 8,
+      "time_s": 81.676,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_09",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 9,
+      "time_s": 91.284,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_10",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 10,
+      "time_s": 100.893,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_abhartach_11",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_abhartach_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1084.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_abhartach",
+      "frame_index": 11,
+      "time_s": 110.502,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - ABHARTACH.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_00",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 0,
+      "time_s": 8.298,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_01",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "prompt",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 1,
+      "time_s": 24.893,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_02",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 2,
+      "time_s": 41.489,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_03",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 3,
+      "time_s": 58.084,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_04",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 4,
+      "time_s": 74.68,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_05",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 5,
+      "time_s": 91.276,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_06",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 6,
+      "time_s": 107.871,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_07",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 7,
+      "time_s": 124.467,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_08",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 8,
+      "time_s": 141.062,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_09",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 9,
+      "time_s": 157.658,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_10",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 10,
+      "time_s": 174.253,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "a2_40_66m_footballeur_11",
+      "source": "a2_lower_third",
+      "path": "/tmp/opencode/gdino/frames/40_66m_footballeur_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "66 Minutes",
+      "channel": null,
+      "position": "bottom_left",
+      "split": "validation",
+      "negative": false,
+      "gt_logo": [
+        [
+          91.0,
+          846.0,
+          298.0,
+          1026.0
+        ]
+      ],
+      "gt_text": null,
+      "gt_band": [
+        [
+          120.0,
+          856.0,
+          1288.0,
+          1008.0
+        ]
+      ],
+      "clip": "40_66m_footballeur",
+      "frame_index": 11,
+      "time_s": 190.849,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/66M - FOOTBALLEUR ESCROC.mp4",
+      "post_action": "review"
+    },
+    {
+      "id": "neg_wanted_soiree_00",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 0,
+      "time_s": 2.508,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_01",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 1,
+      "time_s": 7.525,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_02",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 2,
+      "time_s": 12.542,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_03",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 3,
+      "time_s": 17.558,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_04",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 4,
+      "time_s": 22.575,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_05",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 5,
+      "time_s": 27.592,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_06",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 6,
+      "time_s": 32.608,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_07",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 7,
+      "time_s": 37.625,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_08",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 8,
+      "time_s": 42.642,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_09",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 9,
+      "time_s": 47.658,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_10",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 10,
+      "time_s": 52.675,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_wanted_soiree_11",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_wanted_soiree_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "wanted_soiree",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "wanted_soiree",
+      "frame_index": 11,
+      "time_s": 57.692,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/37 Camille/docs/WANTED - SOIREE EM5 rs1.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_00",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 0,
+      "time_s": 4.395,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_01",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 1,
+      "time_s": 13.184,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_02",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 2,
+      "time_s": 21.973,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_03",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 3,
+      "time_s": 30.763,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_04",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 4,
+      "time_s": 39.552,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_05",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 5,
+      "time_s": 48.341,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_06",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 6,
+      "time_s": 57.131,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_07",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 7,
+      "time_s": 65.92,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_08",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 8,
+      "time_s": 74.709,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_09",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 9,
+      "time_s": 83.499,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_10",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 10,
+      "time_s": 92.288,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_pll_extrait5_11",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_pll_extrait5_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "pll_extrait5",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "pll_extrait5",
+      "frame_index": 11,
+      "time_s": 101.077,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/355 Camille/docs/M6+ - Pretty Little Liars - Extrait 5 - Quand Caleb vient s’excuser auprès de Spencer.mp4"
+    },
+    {
+      "id": "neg_younger_bar_00",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 0,
+      "time_s": 3.338,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_01",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 1,
+      "time_s": 10.013,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_02",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 2,
+      "time_s": 16.689,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_03",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 3,
+      "time_s": 23.364,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_04",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 4,
+      "time_s": 30.04,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_05",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 5,
+      "time_s": 36.716,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_06",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 6,
+      "time_s": 43.391,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_07",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 7,
+      "time_s": 50.067,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_08",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 8,
+      "time_s": 56.742,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_09",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 9,
+      "time_s": 63.418,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_10",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 10,
+      "time_s": 70.093,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_younger_bar_11",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_younger_bar_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "younger_bar",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "younger_bar",
+      "frame_index": 11,
+      "time_s": 76.769,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/45 Camille/docs/M6+ - Younger – Extrait 1 - Liza et Josh au bar.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_00",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 0,
+      "time_s": 3.578,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_01",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 1,
+      "time_s": 10.733,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_02",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 2,
+      "time_s": 17.889,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_03",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 3,
+      "time_s": 25.044,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_04",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 4,
+      "time_s": 32.2,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_05",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 5,
+      "time_s": 39.356,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_06",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 6,
+      "time_s": 46.511,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_07",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 7,
+      "time_s": 53.667,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_08",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 8,
+      "time_s": 60.822,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_09",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 9,
+      "time_s": 67.978,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_10",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 10,
+      "time_s": 75.133,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_lotr_troll_11",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_lotr_troll_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "lotr_troll",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "lotr_troll",
+      "frame_index": 11,
+      "time_s": 82.289,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/89 Camille/docs/M6 - Le seigneur des anneaux les anneaux de pouvoir - Troll des neiges.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_00",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_00.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 0,
+      "time_s": 2.452,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_01",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_01.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "prompt",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 1,
+      "time_s": 7.356,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_02",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_02.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 2,
+      "time_s": 12.261,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_03",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_03.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 3,
+      "time_s": 17.165,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_04",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_04.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 4,
+      "time_s": 22.069,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_05",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_05.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 5,
+      "time_s": 26.973,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_06",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_06.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 6,
+      "time_s": 31.878,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_07",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_07.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 7,
+      "time_s": 36.782,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_08",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_08.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 8,
+      "time_s": 41.686,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_09",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_09.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 9,
+      "time_s": 46.59,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_10",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_10.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 10,
+      "time_s": 51.495,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    },
+    {
+      "id": "neg_6ter_petite_maison_11",
+      "source": "negative",
+      "path": "/tmp/opencode/gdino/frames/neg_6ter_petite_maison_11.jpg",
+      "width": 1920,
+      "height": 1080,
+      "emission": "6ter_petite_maison",
+      "channel": null,
+      "position": "none",
+      "split": "validation",
+      "negative": true,
+      "gt_logo": [],
+      "gt_text": null,
+      "gt_band": null,
+      "clip": "6ter_petite_maison",
+      "frame_index": 11,
+      "time_s": 56.399,
+      "video": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Corpus_Exemple_2/40 Camille/docs/6ter - La petite maison dans la prairie - Il tombe amoureux de cette belle inconnue.mp4"
+    }
+  ],
+  "counts": {
+    "total": 242,
+    "reference_logo": 122,
+    "a2_lower_third": 60,
+    "negative": 60,
+    "prompt": 50,
+    "validation": 192,
+    "clips": 10
+  }
+}

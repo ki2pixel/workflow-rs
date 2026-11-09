@@ -8,6 +8,71 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-09 — D-060 : Grounding DINO hors production A2
+
+- **Décision** : Grounding DINO **n'entre pas** dans A2 en production. Aucun
+  flag `a2_grounding_dino`, aucune clé TOML, aucun appel de modèle dans
+  `post/a2.rs`. Le détecteur ouvert reste un outil de **laboratoire** pour
+  proposer des logos inconnus au catalogue `source_logos.toml` et qualifier
+  les revues A2. Backend local PyTorch 480 px retenu pour le laboratoire ;
+  Replicate écarté pour la production (données client, réseau, secret) et
+  non exécuté faute de `REPLICATE_API_TOKEN` ; ONNX non prêt (pas de config
+  d'export Optimum, ops de deformable attention, encodeur BERT).
+- **Spike** : `IDEA-Research/grounding-dino-tiny` (Swin-T, 172,3 M
+  paramètres, 659 Mio), 242 frames (122 logos du catalogue, 60 bandeaux A2,
+  60 frames négatives), 7 prompts, 3 résolutions, 592 inférences.
+  Prompt composite `logo . text . watermark . lower third . banner` :
+  - logos : **96,7 %** à IoU ≥ 0,50 au seuil 0,20 (118/122, IC 95 %
+    91,9–98,7 %), **91,8 %** à 0,25 (112/122) ; IoU médian 0,90 ;
+  - bandeaux : **98,3 %** à 0,20 (59/60), **91,7 %** à 0,25 (55/60) ;
+    texte IoU ≥ 0,30 sur **97,2 %** (35/36) à 0,20, 77,8 % à 0,25 ;
+  - faux positifs : **25 %** des 60 frames négatives à 0,20, 20 % à 0,25 ;
+    après clustering IoU ≥ 0,50 + centre ≤ 10 px + persistance ≥ 70 %,
+    **0/5 clips** négatifs persistants (maximum observé 16,7 %, IC 95 %
+    [0 ; 43,4 %]) ;
+  - persistance : **5/5** clips positifs avec logo ≥ 70 % à 0,20 (100,
+    100, 100, 100, 91,7 %) ; **3/5** avec texte ≥ 70 % (54 et 58 à
+    100/91,7 %, 40 CITROUILLES à 83,3 % ; 40 ABHARTACH/FOOTBALLEUR à
+    66,7/50 %, cohérent avec leurs bandeaux animés déjà en `review`) ;
+  - coût : **1,279 s/frame** à 480 px (1,47 Gio de VRAM, 3,48 s de
+    chargement), 1,320 s/frame pour l'ablation 480, 2,024 s à 640,
+    3,053 s à 800 ; 12 frames = 15,3 s à chaud (18,8 s avec chargement),
+    6 frames = 7,7 s.
+- **Limites** : confusion logo/bandeau (boîtes « logo + lower third » sur
+  Enquête d'action, Enquête Exclusive, Zone Interdite, Les Traîtres) ;
+  corpus de logos curé et non indépendant ; cinq clips négatifs seulement,
+  sans décor statique piégeur ; deux styles de bandeau (UJUD, 66 Minutes) ;
+  un seul modèle (tiny) et une seule carte (GTX 1650 4 Gio) ; Replicate non
+  mesuré ; ONNX non exporté.
+- **Règles si réouverture** : Grounding DINO ne peut ni créer un `apply`, ni
+  retirer un veto, ni modifier `scale_target` ; il annote
+  `details.grounding_dino` (branche logo serrée ≤ 0,35, branche texte
+  ≥ 0,20 et y ≥ 0,60, persistance ≥ 70 %, `unknown_logo`,
+  `banner_confirmed`, `logo_merged_with_lower_third`) et A2 décide. Le
+  sidecar local doit prendre le verrou matériel ou vérifier qu'aucun
+  STEP2/3/4 ne tourne (1,47 Gio de VRAM sur 3,81 Gio utilisables).
+- **Réouverture** : export ONNX/TensorRT ou moteur Rust natif validé ;
+  corpus indépendant ≥ 20 clips négatifs et ≥ 20 logos inconnus avec
+  rappel ≥ 90 % à IoU 0,50, centre ≥ 95 %, ≤ 5 % de clips négatifs
+  persistants ; latence ≤ 8 s/6 frames ou ≤ 16 s/12 frames ; pilote
+  `report_only` sans faux `apply`.
+- **Preuves** : `docs/etudes/ETUDE-GROUNDING-DINO-A2.md`,
+  `docs/etudes/ETUDE-GROUNDING-DINO-A2/results/`,
+  `scripts/spike-grounding-dino.py`,
+  `docs/decisions/DECISION-GROUNDING-DINO-A2.md`.
+- **Références** : D-051, D-052, D-055, D-056, D-058,
+  `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
+  `assets/models/qa/source_logos.toml`,
+  `crates/workflow-steps/src/post/a2.rs`.
+- **Suivi B0 (2026-11-09)** : l'approche B locale est lancée. YOLOX-Nano
+  416/640 et NanoDet-Plus-m 416 (Apache-2.0) sont exportés en ONNX FP32 et
+  FP16, puis mesurés nativement en Rust `ort` CUDA. YOLOX 416 FP32 donne
+  8,40 ms p95 au total (5,29 ms de session), +107 Mo de VRAM ; YOLOX 640
+  FP16 15,00 ms ; NanoDet 416 FP32 12,16 ms. FP16 est stable pour YOLOX,
+  rejeté pour NanoDet. Aucune production modifiée ; B1 (fine-tuning) et B2
+  (pilote `report_only`) restent à faire. Preuves :
+  `docs/etudes/ETUDE-YOLO-ONNX-A2/results/`.
+
 ## 2026-10-26 — D-028 : abandon du client desktop Tauri
 
 - **Contexte** : le PoC Tauri A-Strict (J1 à J5) puis le MVP J1/J2 ont ajouté

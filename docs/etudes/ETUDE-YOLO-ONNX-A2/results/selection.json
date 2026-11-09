@@ -1,0 +1,406 @@
+[
+ {
+  "id": "ref_Les_Marseillais_00",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    97.0,
+    719.0,
+    437.0,
+    1021.0
+   ],
+   [
+    136.0,
+    774.0,
+    418.0,
+    979.0
+   ],
+   [
+    132.0,
+    777.0,
+    417.0,
+    1015.0
+   ],
+   [
+    97.0,
+    764.0,
+    437.0,
+    1021.0
+   ],
+   [
+    126.0,
+    719.0,
+    411.0,
+    1021.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_Le_Reste_du_Monde_01",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    122.0,
+    811.0,
+    345.0,
+    1024.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_L_Ile_de_la_tentation_00",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    96.0,
+    924.0,
+    416.0,
+    1028.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_Cest_la_famille_01",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    98.0,
+    912.0,
+    418.0,
+    1025.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_L_amour_est_dans_le_pre_02",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    93.0,
+    905.0,
+    352.0,
+    1032.0
+   ],
+   [
+    93.0,
+    905.0,
+    349.0,
+    1032.0
+   ],
+   [
+    94.0,
+    923.0,
+    352.0,
+    1031.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_Enquete_Exclusive_01",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    61.0,
+    913.0,
+    389.0,
+    1021.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_Piquantes_00",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    87.0,
+    48.0,
+    445.0,
+    112.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "ref_Les_Reines_de_la_Route_01",
+  "source": "reference_logo",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    99.0,
+    848.0,
+    315.0,
+    1022.0
+   ]
+  ],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "a2_54_ujud_hotel_00",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    92.0,
+    925.0,
+    296.0,
+    1031.0
+   ]
+  ],
+  "gt_band": [
+   [
+    100.0,
+    956.0,
+    1228.0,
+    1028.0
+   ]
+  ],
+  "gt_text": [
+   [
+    316.0,
+    978.0,
+    1223.0,
+    1016.0
+   ]
+  ]
+ },
+ {
+  "id": "a2_58_ujud_crousty_00",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    92.0,
+    925.0,
+    296.0,
+    1031.0
+   ]
+  ],
+  "gt_band": [
+   [
+    100.0,
+    912.0,
+    1228.0,
+    1028.0
+   ]
+  ],
+  "gt_text": [
+   [
+    315.0,
+    977.0,
+    1223.0,
+    1016.0
+   ]
+  ]
+ },
+ {
+  "id": "a2_40_66m_citrouilles_00",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    91.0,
+    846.0,
+    298.0,
+    1026.0
+   ]
+  ],
+  "gt_band": [
+   [
+    120.0,
+    900.0,
+    1084.0,
+    1008.0
+   ]
+  ],
+  "gt_text": [
+   [
+    306.0,
+    925.0,
+    1096.0,
+    957.0
+   ]
+  ]
+ },
+ {
+  "id": "a2_40_66m_citrouilles_11",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    91.0,
+    846.0,
+    298.0,
+    1026.0
+   ]
+  ],
+  "gt_band": [
+   [
+    120.0,
+    900.0,
+    1084.0,
+    1008.0
+   ]
+  ],
+  "gt_text": [
+   [
+    306.0,
+    925.0,
+    1096.0,
+    957.0
+   ]
+  ]
+ },
+ {
+  "id": "a2_40_66m_abhartach_11",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    91.0,
+    846.0,
+    298.0,
+    1026.0
+   ]
+  ],
+  "gt_band": [
+   [
+    120.0,
+    856.0,
+    1084.0,
+    1008.0
+   ]
+  ],
+  "gt_text": null
+ },
+ {
+  "id": "a2_40_66m_footballeur_11",
+  "source": "a2_lower_third",
+  "negative": false,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [
+   [
+    91.0,
+    846.0,
+    298.0,
+    1026.0
+   ]
+  ],
+  "gt_band": [
+   [
+    120.0,
+    856.0,
+    1288.0,
+    1008.0
+   ]
+  ],
+  "gt_text": null
+ },
+ {
+  "id": "neg_wanted_soiree_00",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "neg_pll_extrait5_00",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "neg_younger_bar_00",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "neg_younger_bar_11",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "neg_lotr_troll_11",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ },
+ {
+  "id": "neg_6ter_petite_maison_11",
+  "source": "negative",
+  "negative": true,
+  "width": 1920,
+  "height": 1080,
+  "gt_logo": [],
+  "gt_band": null,
+  "gt_text": null
+ }
+]

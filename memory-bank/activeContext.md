@@ -2,6 +2,18 @@
 
 ## Tâche en cours
 
+**A1 natif gardé — D-058 option A (2026-11-09).** Le flag opt-in
+`a1_refine_native = false` active un raffinement du seul `apply` A1 déjà
+décidé par `cropdetect` : natif v2 Sobel 20/1020, couverture 2/3 (0,45 si
+les quatre lignes côté barre sont sous 10/255), clustering dominant ≥ 60 %,
+marge D-056 1,015. Un natif `review`/`noop`/instable ou qui échoue à un veto
+conserve `cropdetect` ; le natif ne crée ni ne retire jamais un `apply`.
+Détails additives `native_refined`, `native`, `cropdetect`. Validation
+unitaire et réelle sur le 305 (16/17 applies à 211,8 % au lieu de 213,7 %) ;
+la passe 2 609 segments et l'activation pilote restent à faire. L'option C
+est reportée à D-059. ADR :
+`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`.
+
 **Registre spatial des logos source — phases A/B/C (2026-11-08, D-052).** Le
 catalogue versionné `assets/models/qa/source_logos.toml` contient les 30
 émissions documentées par le client (position, bbox d'enveloppe, variantes,
@@ -736,7 +748,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 545 tests unitaires ; pas de CI.
+- 557 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

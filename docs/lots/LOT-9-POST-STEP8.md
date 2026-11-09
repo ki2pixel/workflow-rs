@@ -88,11 +88,22 @@ mêmes hauteurs actives ; les compensations Y sont à remesurer lors du prochain
 run de validation. Les ancres restent identiques au brut.
 
 D-057 (2026-11-08) : l'étude du détecteur `vapoursynth-letterbox` conclut à
-un **spike natif opt-in** (`a1_detector = "native"`), pas à une intégration
-VapourSynth. `cropdetect` reste le détecteur par défaut et tous les vetos
-ci-dessus sont conservés. Le futur détecteur devra utiliser un clustering
-temporel, pas le p10 actuel, pour agréger ses mesures. Rapport :
-`docs/etudes/ETUDE-VSLETTERBOX-A1.md`.
+un **spike natif opt-in**, pas à une intégration VapourSynth. `cropdetect`
+reste le détecteur par défaut et tous les vetos ci-dessus sont conservés. Le
+futur détecteur devra utiliser un clustering temporel, pas le p10 actuel,
+pour agréger ses mesures. Rapport : `docs/etudes/ETUDE-VSLETTERBOX-A1.md`.
+
+D-058 (2026-11-09) : l'option **A — natif gardé** est acceptée. Le flag
+`a1_refine_native` (défaut `false`) active un raffinement du seul `apply`
+A1 déjà décidé par `cropdetect` : natif v2 Sobel 20/1020, couverture 2/3
+(0,45 si les quatre lignes côté barre sont sous 10/255), clustering
+dominant ≥ 60 %, marge D-056 inchangée. Un natif `review`/`noop`, instable,
+asymétrique ou qui échoue à la couverture conserve la décision
+`cropdetect` ; le natif ne crée ni ne retire jamais un `apply`. Les détails
+JSON additives sont `native_refined`, `native` et `cropdetect`. Validation
+unitaire et réelle sur le 305 ; passe 2 609 segments et activation pilote
+restent à faire. ADR :
+`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`.
 
 ## A2 — bannière basse
 
@@ -428,6 +439,8 @@ ffprobe = "ffprobe"
 a1_margin = 1.015
 # P2 validé sur copies (2026-11-08) : différer A1 sur candidat A3 fort (R2).
 a1_defer_on_a3 = false
+# D-058 option A : raffiner un apply A1 avec le natif v2 (désactivé par défaut).
+a1_refine_native = false
 a2_margin = 1.05
 # P2 validé sur copies (2026-11-08) : gap < 0,7 en revue pour amplitude >= 200 px (R6).
 a3_relaxed_gap = false

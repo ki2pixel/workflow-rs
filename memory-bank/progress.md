@@ -12,7 +12,7 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- **545 tests unitaires**, sans matériel.
+- **557 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
   humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour
@@ -62,6 +62,15 @@
   241,5–242,4 % contre 243,0 % humain. Arbitrage A gardé / B v2 seul /
   C v2 + fallback. Preuves :
   `results/spike-good-sample-v2.{md,csv,json}`.
+- **A1 natif gardé — D-058 acceptée (2026-11-09)** : option A retenue,
+  `a1_refine_native = false` par défaut. Le natif v2 (Sobel 20/1020,
+  couverture 2/3 ou 0,45 sous 10/255, cluster ≥ 60 %) raffine uniquement
+  un `apply` déjà décidé par `cropdetect` ; tout `review`/`noop`/instable
+  ou échec de veto conserve `cropdetect`. Détails additives
+  `native_refined`, `native`, `cropdetect`. Validation 305 : 16/17 applies
+  à 211,8 % au lieu de 213,7 %. Tests unitaires + `fmt` + `clippy` +
+  `cargo test --workspace` (557) verts. Passe 2 609 segments et activation
+  pilote à faire ; option C reportée à D-059.
 - **Threads OCR A2 (D-053)** : `a2_ocr_threads` configurable, 8 en
   production ; sur `54`, OCR 23,6 s à 2 threads, 13,2 s à 8, 12,5 s à 12.
   A1 reste séquentiel (~23,5 s). `a2_ocr` est activé en production (D-055) ;

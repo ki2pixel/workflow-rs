@@ -3,8 +3,8 @@
 - **Statut** : acceptée
 - **Date** : 2026-11-08
 - **Portée** : A1 du post-STEP8, `crates/workflow-steps/src/post/{a1,detect}.rs`
-- **Voir aussi** : `memory-bank/decisionLog.md` (D-057), D-056,
-  `docs/etudes/ETUDE-VSLETTERBOX-A1.md`,
+- **Voir aussi** : `memory-bank/decisionLog.md` (D-057), D-056, D-058
+  (mise en œuvre du mode gardé), `docs/etudes/ETUDE-VSLETTERBOX-A1.md`,
   `docs/lots/LOT-9-POST-STEP8.md`
 
 ## TL;DR

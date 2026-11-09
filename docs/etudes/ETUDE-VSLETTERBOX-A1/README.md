@@ -11,7 +11,8 @@ exécutés en lecture seule sur le corpus.
   (projets 304, 305, 356), lecture seule.
 - **Date** : 8 novembre 2026.
 - **Décision** : D-057 (spike natif opt-in, `cropdetect` reste le défaut) ;
-  D-058 (proposition, arbitrage entre natif gardé et natif v2).
+  D-058 **acceptée** (option A, natif gardé, `a1_refine_native = false` par
+  défaut). L'option C est reportée à D-059.
 
 ## Contenu
 
@@ -50,7 +51,7 @@ L'échantillon GOOD complet a été exécuté en `gray` :
 Le natif seul est haute précision (0 faux apply sur 123) mais bas rappel
 (32/56 applies clairs manqués, 0/7 revues asymétriques résolues). Le 89
 concentre l'échec (4/34) ; le 305 reste à 15/17 et le 68 à 6/7. D'où la
-proposition D-058 d'un **natif gardé** avec fallback `cropdetect`.
+décision D-058 d'un **natif gardé** avec fallback `cropdetect`.
 Détail : [`results/spike-good-sample.md`](results/spike-good-sample.md).
 
 ### Calibration v2 (2026-11-09)
@@ -73,6 +74,14 @@ GOOD humain. Le contrôle 304 seg 9 reste `noop` 5/5 : les faux candidats
 935/936 et 1002/1003 sont rejetés. Les 9 applies natifs sur A1 `review`
 sont tous des 89 recadrés par l'humain (243,0 %), pas des faux positifs.
 Détail : [`results/spike-good-sample-v2.md`](results/spike-good-sample-v2.md).
+
+**Implémentation (D-058 option A, 2026-11-09)** : le mode gardé est dans
+`crates/workflow-steps/src/post/{a1,detect}.rs`, derrière
+`a1_refine_native = false`. Il ne raffine qu'un `apply` déjà décidé par
+`cropdetect` ; un natif `review`/`noop`/instable conserve la décision
+d'origine. Validation réelle sur le 305 : 16/17 applies à 211,8 % (un à
+211,6 %) au lieu de 213,7 %. La passe 2 609 segments et l'activation pilote
+restent à faire ; l'option C est reportée à D-059.
 
 ## Méthode
 

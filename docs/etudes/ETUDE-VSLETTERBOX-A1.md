@@ -935,7 +935,7 @@ La calibration de la section 11 révise ce constat : le natif v2 récupère
 33/34 applies du 89, mais conserve 5 faux négatifs clairs et 0/7 revues
 asymétriques résolues.
 
-Le draft D-058 est dans
+La décision D-058 (option A, natif gardé) est dans
 [`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`](../decisions/DECISION-A1-NATIVE-GARDE-D058.md).
 La sortie complète est dans
 [`ETUDE-VSLETTERBOX-A1/results/spike-good-sample.md`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample.md)
@@ -1038,9 +1038,9 @@ scale 211,8 % contre 210,0 % humain (+1,8 point, marge D-056).
 
 | Option | Principe | Gain | Limite |
 | --- | --- | --- | --- |
-| **A — gardé** (draft D-058) | `cropdetect` d'abord ; natif raffine un `apply` déjà décidé | 89 apply 33/34 raffinés à 242,1 ; 305/68 précis ; 0 nouvel `apply` | ne récupère pas les 9 revues 89 |
-| **B — natif v2 seul** | natif primaire | 42/48 au 89 ; 0 `apply` sur noop/veto | 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques |
-| **C — v2 primaire + fallback `cropdetect`** | natif décide ; si `review`/`noop`, `cropdetect` décide avec les vetos A1 | 42/48 au 89 + fallback sur les 5 FN et 304 | promeut 9 revues A1 (toutes recadrées humain ici) ; vetos à réévaluer |
+| **A — gardé** (D-058, retenue) | `cropdetect` d'abord ; natif raffine un `apply` déjà décidé | 89 apply 33/34 raffinés à 242,1 ; 305/68 précis ; 0 nouvel `apply` | ne récupère pas les 9 revues 89 |
+| B — natif v2 seul | natif primaire | 42/48 au 89 ; 0 `apply` sur noop/veto | 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques |
+| C — v2 primaire + fallback `cropdetect` (D-059) | natif décide ; si `review`/`noop`, `cropdetect` décide avec les vetos A1 | 42/48 au 89 + fallback sur les 5 FN et 304 | promeut 9 revues A1 (toutes recadrées humain ici) ; vetos à réévaluer |
 
 Le détail, les tableaux par segment et les commandes sont dans
 [`ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md`](ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md),
@@ -1048,6 +1048,8 @@ avec le CSV [`spike-good-sample-v2.csv`](ETUDE-VSLETTERBOX-A1/results/spike-good
 
 ---
 
-*Fin de l'étude. D-057 ouvre un spike opt-in ; D-058 propose un mode natif
-gardé, et la calibration v2 ouvre l'option d'un natif primaire avec fallback
-`cropdetect`. Aucune modification de production n'est incluse.*
+*Fin de l'étude. D-057 a ouvert un spike opt-in ; D-058 accepte le mode
+natif gardé (option A) derrière `a1_refine_native = false`. L'option C
+(natif primaire + fallback `cropdetect`) est reportée à D-059. Le mode gardé
+est implémenté et validé par tests unitaires et sur le 305 ; la passe
+2 609 segments et l'activation pilote restent à faire.*

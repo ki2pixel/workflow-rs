@@ -1,10 +1,11 @@
-# Proposition D-058 — A1 : détecteur natif gardé ou natif v2 (arbitrage)
+# Décision D-058 — A1 : détecteur natif gardé (option A)
 
-- **Statut** : proposée (draft, non acceptée)
+- **Statut** : acceptée (2026-11-09), option **A**, `dark_luma 10`, opt-in
 - **Date** : 2026-11-09
 - **Portée** : A1 du post-STEP8, `crates/workflow-steps/src/post/{a1,detect}.rs`,
-  `crates/workflow-core/src/config.rs` (`PostConfig`)
-- **Voir aussi** : D-057, D-056,
+  `crates/workflow-core/src/config.rs` (`PostConfig`),
+  `config/config.toml` (`a1_refine_native`)
+- **Voir aussi** : D-057, D-056, D-059 (option C, à ouvrir),
   `docs/etudes/ETUDE-VSLETTERBOX-A1.md` (§ 10–11),
   `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample.md`,
   `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md`,
@@ -22,21 +23,24 @@ donne : **33/34 applies du 89**, **5/56 faux négatifs clairs (8,9 %)**,
 A1 `review` sont tous des 89 recadrés par l'humain ; ce ne sont pas des faux
 positifs.
 
-Trois options restent à arbitrer :
+**Option A retenue** : `cropdetect` reste le décideur primaire ; le natif v2
+ne raffine un `apply` **que si `cropdetect` a déjà conclu `apply`**. Le
+natif ne peut ni créer un `apply` sur un `review`/`noop`, ni retirer un
+`apply` : si sa mesure est instable, asymétrique, trop faible ou si le
+raffinement échoue à un veto A1, la décision `cropdetect` est conservée.
+Les 9 revues 89 ne sont donc pas récupérées ; c'est le prix de la sûreté.
 
-- **A — natif gardé** (draft initial) : `cropdetect` d'abord, natif
-  seulement pour raffiner un `apply` déjà décidé. Sûr, mais ne récupère pas
-  les 9 revues 89.
-- **B — natif v2 seul** : natif primaire, sans fallback. 42/48 segments 89
-  en `apply`, mais 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non
-  appliqués et 0/7 asymétriques.
-- **C — v2 primaire + fallback `cropdetect`** : natif décide ; si
-  `review`/`noop`, `cropdetect` décide avec les vetos A1. Récupère les 9
-  revues 89 et les 5 FN clairs, mais promeut des revues A1 en `apply` et
-  demande une réévaluation des vetos avec les barres natives.
-
-Le mode reste **opt-in** ; `cropdetect` reste le défaut et tous les vetos A1
+Paramètres figés : Sobel Y **20/1020**, couverture **2/3** par défaut et
+**0,45** quand les quatre lignes côté barre sont sous **10/255**
+(`dark_luma 10`), clustering ±2 px avec dominant **≥ 60 %**, marge D-056
+**1,015**. Le mode est **opt-in** (`a1_refine_native = false` par défaut) ;
+`cropdetect` seul reste le chemin de production actuel et tous les vetos A1
 sont conservés.
+
+L'option B (natif seul) est écartée : 5/56 FN clairs, 304 seg 34/36 et
+0/7 asymétriques. L'option C (natif primaire + fallback `cropdetect`) est
+reportée à **D-059** : elle doit d'abord être testée sur les 2 609 segments
+et faire réévaluer les vetos avec les barres natives.
 
 ## Contexte
 
@@ -146,27 +150,69 @@ Le durcissement `--dark-luma 10` donne le même `noop` et les mêmes
 décisions d'`apply` sur les 201 segments ; il est plus conservateur sur les
 ciels sombres et supprime 5 revues 309 (veto correct).
 
-## Options d'arbitrage
+## Arbitrage retenu
 
 | Option | Principe | Gain | Limite |
 | --- | --- | --- | --- |
-| **A — gardé** | `cropdetect` d'abord ; natif raffine un `apply` déjà décidé, cluster ≥ 60 % | 89 apply 33/34 raffinés à 242,1 ; 305/68 précis ; 0 nouvel `apply` sur review/noop | ne récupère pas les 9 revues 89 |
-| **B — natif v2 seul** | natif primaire, pas de fallback | 42/48 au 89 ; 0 `apply` sur noop/veto | 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques |
-| **C — v2 primaire + fallback `cropdetect`** | natif décide ; si `review`/`noop`, `cropdetect` décide avec les vetos A1 | 42/48 au 89 + fallback sur les 5 FN clairs et 304 | promeut 9 revues A1 (toutes recadrées humain ici) ; vetos à réévaluer |
+| **A — gardé (retenue)** | `cropdetect` d'abord ; natif raffine un `apply` déjà décidé, cluster ≥ 60 % | 89 apply 33/34 raffinés à 242,1 ; 305/68 précis ; 0 nouvel `apply` sur review/noop | ne récupère pas les 9 revues 89 |
+| B — natif v2 seul | natif primaire, pas de fallback | 42/48 au 89 ; 0 `apply` sur noop/veto | 5/56 FN clairs, 304 seg 34/36, 6 segments 89 non appliqués, 0/7 asymétriques |
+| C — v2 primaire + fallback `cropdetect` | natif décide ; si `review`/`noop`, `cropdetect` décide avec les vetos A1 | 42/48 au 89 + fallback sur les 5 FN clairs et 304 | promeut 9 revues A1 (toutes recadrées humain ici) ; vetos à réévaluer |
 
-**Recommandation de travail** : A est l'incrément sûr et immédiat (il corrige
-la géométrie des 89 `apply` sans toucher au rappel des revues). C est la
-cible si l'on veut automatiser les 9 revues 89 ; il faut d'abord un test sur
-les 2 609 segments et une règle de réévaluation des vetos avec les barres
-natives. B n'est pas promouvable en l'état à cause des 5 FN clairs et de
-304 seg 34/36. Pour A et C, partir sur `dark_luma 10` : mêmes `apply` sur
-l'échantillon, 5 revues 309 inutiles en moins, et plus sûr sur les ciels
-sombres.
+**Décision** : A est retenue comme incrément sûr et immédiat. Elle corrige
+la géométrie des 89 `apply` sans toucher au rappel des revues. C est
+reportée à D-059 : elle doit d'abord être testée sur les 2 609 segments et
+faire réévaluer les vetos avec les barres natives. B est écartée à cause
+des 5 FN clairs et de 304 seg 34/36.
+
+`dark_luma 10` est retenu : mêmes `apply` sur l'échantillon, 5 revues 309
+inutiles en moins, et plus sûr sur les ciels sombres.
+
+## Implémentation
+
+### Configuration
+
+- `PostConfig.a1_refine_native` (`bool`, défaut `false`) et
+  `PostOptions.a1_refine_native` ; `config/config.toml` contient
+  `a1_refine_native = false`.
+- `A1Options.refine_native` est propagé à `decide_a1`. Sans le flag, le
+  chemin `cropdetect` est strictement identique à avant D-058.
+
+### Détecteur natif (`post/detect.rs`)
+
+- `NativeParams` fige Sobel **20/1020**, couverture sombre **0,45** sous
+  **10/255**, couverture par défaut **2/3**, cluster dominant **0,60**.
+- `native_letterbox` décode le segment en `gray` à
+  `fps = max(2, 2 / durée)` (deux frames minimum sur les segments courts),
+  applique l'EWMA 5σ (`alpha = 0,05`, plancher `0,005`), valide chaque
+  frontière par Sobel Y ciblé et couverture de colonnes, puis clusterise
+  les couples `(top, bottom)` à ±2 px.
+- `NativeLetterbox` expose `top`, `bottom`, `n_frames`, `cluster_frames`,
+  `fraction()` et `active(source_height)`. Le clustering refuse moins de
+  2 frames ou un dominant sous 60 % ; `decide_a1` conserve alors
+  `cropdetect`.
+
+### Mode gardé (`post/a1.rs`)
+
+- `refine_native` n'est appelé que si la décision `cropdetect` est
+  `Action::Apply`.
+- `refine_with_native` vérifie la stabilité, l'absence de barres
+  (`active >= active_noop`), la symétrie verticale et `bar_min`; il
+  recalcule ensuite `scale`, `Position Y` et `coverage` via
+  `decide_letterbox`. La couverture est évaluée sur les crops
+  `cropdetect` d'origine, pas sur une crop natif unique : les vetos
+  existants restent donc actifs.
+- Si le raffinement produit `review`/`noop`, ou échoue à un veto, la
+  décision `cropdetect` d'origine est retournée inchangée. Le natif ne
+  peut jamais créer un `apply` ni retirer un `apply`.
+- Les détails JSON additives sont `native_refined`, `native` (top, bottom,
+  active, frames, cluster, fraction, paramètres) et `cropdetect` (mesure
+  d'origine). L'ordre des clés existantes est préservé ; `post.json` garde
+  son schéma.
 
 ## Contrat à préserver
 
-1. **Mode opt-in** : `cropdetect` reste le défaut ; `a1_detector` reste une
-   clé de configuration additive.
+1. **Mode opt-in** : `cropdetect` reste le défaut ; `a1_refine_native` est
+   une clé de configuration additive.
 2. **Contrat A1** : `apply`/`review`/`noop`, `scale`, `Position Y`,
    `coverage`, `confidence` inchangés ; clés JSON additives seulement,
    schéma `post.json` inchangé.
@@ -197,20 +243,32 @@ sombres.
 - **Deux segments à une frame** (367 seg 33, 81 seg 23) : natif `review` par
   prudence ; ils sont déjà `review` A1, sans impact sur les applies.
 
-## Plan de validation avant acceptation
+## Validation
 
-1. Choisir l'option (A, B ou C) et figer les paramètres (`dark_luma` 20 ou
-   10).
-2. Implémenter `A1Detector { Cropdetect, Native, NativeOnly }` et le mode
-   retenu dans `decide_a1`, sans changer le chemin par défaut.
-3. Tests unitaires : natif applique sur le 305 ; natif `noop` sur le 89
-   retombe sur `cropdetect` en mode A/C ; `review`/`noop` A1 inchangés ;
-   aucun nouvel `apply` sur les 20 `noop`.
-4. Test d'intégration sur 305, 68, 89, 304 seg 34 : décisions, pixel,
-   `coverage`, `Position Y`.
-5. Mesurer le coût sur un projet réel (A1 actuel ~23,5 s) et vérifier
-   l'absence de régression sur les 2 609 segments.
-6. Activer sur un seul projet pilote, puis décider de la généralisation.
+1. **Tests unitaires** : 6 tests A1 du mode gardé (raffinement natif,
+   `noop`/`review`/cluster instable/couverture → fallback `cropdetect`,
+   opt-in) et 4 tests du détecteur natif (clustering, scan symétrique,
+   rejet d'un bord fragmenté, seuil sombre).
+2. **Configuration** : test TOML `a1_refine_native = true` accepté par
+   `deny_unknown_fields`, défaut `false` dans `PostConfig` et
+   `PostOptions`.
+3. **Validation réelle 305** : avec `refine_native = true`, 16/17 applies
+   passent de 213,7 % à **211,8 %** (un segment à 211,6 %), le segment 17
+   (transition) reste à 213,7 % par fallback. Sans le flag, les décisions
+   sont identiques à l'ancien chemin. Mesures natives vérifiées : 305
+   seg 1 **81/79**, 304 seg 9 **0/0**, 304 seg 34 **0/0**.
+4. **Suite** : `cargo fmt --check`, `cargo clippy --workspace --all-targets
+   -- -D warnings`, `cargo test --workspace` verts.
+5. **Reste à faire avant activation production** : passe sur les 2 609
+   segments, mesure du coût sur un projet réel, activation sur un projet
+   pilote. Le flag reste `false` dans `config/config.toml`.
+
+## Suites
+
+- **D-059** : option C (natif primaire + fallback `cropdetect`) sur les
+  2 609 segments, avec réévaluation des vetos et des 9 revues 89.
+- Amélioration séparée du critère d'asymétrie et des barres très basses
+  (304 seg 34/36).
 
 ## Références
 
@@ -223,4 +281,5 @@ sombres.
 - `crates/workflow-steps/examples/a1_letterbox_spike.rs`
 - `crates/workflow-steps/src/post/{a1,detect}.rs`
 - `crates/workflow-core/src/config.rs` (`PostConfig`)
-- D-057, D-056
+- `config/config.toml` (`a1_refine_native`)
+- D-057, D-056, D-059 (option C)

@@ -904,6 +904,46 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `crates/workflow-steps/src/post/run.rs`,
   `crates/workflow-core/src/config.rs`.
 
+## 2026-11-09 — D-058 acceptée : option A, natif gardé
+
+- **Décision** : l'option **A — natif gardé** est retenue. `cropdetect`
+  reste le décideur primaire ; le natif v2 ne raffine un `apply` que si
+  `cropdetect` a déjà conclu `apply`. Un natif `review`/`noop`, instable,
+  asymétrique ou qui échoue à un veto A1 conserve la décision `cropdetect`.
+  Le natif ne crée ni ne retire jamais un `apply`. L'option B est écartée
+  (5/56 FN clairs, 304 seg 34/36, 0/7 asymétriques) ; l'option C est
+  reportée à **D-059** (test 2 609 segments + réévaluation des vetos).
+- **Paramètres** : Sobel Y **20/1020**, couverture **2/3** par défaut et
+  **0,45** si les quatre lignes côté barre sont sous **10/255**
+  (`dark_luma 10`), clustering ±2 px avec dominant **≥ 60 %**, marge D-056
+  **1,015**. `dark_luma 10` conserve les mêmes `apply` que 20 sur
+  l'échantillon et supprime 5 revues 309 inutiles.
+- **Configuration** : `PostConfig.a1_refine_native` et
+  `PostOptions.a1_refine_native`, défaut `false` ;
+  `config/config.toml` contient `a1_refine_native = false`. Sans le flag,
+  le chemin A1 est strictement identique.
+- **Implémentation** : `post/detect.rs` expose `NativeParams`,
+  `NativeLetterbox` et `native_letterbox` (décodage gray, EWMA 5σ, Sobel Y
+  ciblé, couverture, clustering). `post/a1.rs` ajoute `refine_native` et
+  `refine_with_native` : recalcul de `scale`/`Position Y`/`coverage` via
+  `decide_letterbox`, couverture évaluée sur les crops `cropdetect`
+  d'origine. Détails JSON additives : `native_refined`, `native`,
+  `cropdetect`.
+- **Validation** : 6 tests A1 du mode gardé + 4 tests natifs ; test TOML du
+  flag ; `cargo fmt --check`, `cargo clippy --workspace --all-targets --
+  -D warnings`, `cargo test --workspace` verts. Validation réelle sur le
+  projet 305 : 16/17 applies passent de 213,7 % à **211,8 %** (un à
+  211,6 %), le segment 17 (transition) reste à 213,7 % par fallback ;
+  mesures natives 305 seg 1 **81/79**, 304 seg 9 **0/0**, 304 seg 34
+  **0/0**.
+- **Reste** : passe sur les 2 609 segments, coût sur un projet réel,
+  activation pilote. Le flag reste `false` en production.
+- **Références** : `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`,
+  `docs/lots/LOT-9-POST-STEP8.md`,
+  `docs/etudes/ETUDE-VSLETTERBOX-A1/README.md`,
+  `crates/workflow-steps/src/post/{a1,detect}.rs`,
+  `crates/workflow-core/src/config.rs`, `config/config.toml`.
+
 ## 2026-11-09 — D-058 (calibration v2) : barres sombres, Sobel 20
 
 - **Diagnostic 89** : sur les 30 échecs `apply`, 113 frames / 226 côtés ;

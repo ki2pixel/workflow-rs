@@ -479,8 +479,12 @@ continuité de source des deux côtés ; A5 reste report-only avec
 défaut : `a1_defer_on_a3` (R2, différer A1 sur candidat A3 fort) et
 `a3_relaxed_gap` (R6, `gap < 0,7` en revue pour une amplitude ≥ 200 px).
 Ils ont été validés sur copies le 2026-11-08 (68/54/356) et restent
-désactivés par défaut. Le schéma des artefacts reste `schema = 1` ; toutes
-les nouvelles clés sont additives.
+désactivés par défaut. Depuis D-058, `a1_refine_native` (défaut `false`)
+active le natif gardé : il ne raffine qu'un `apply` déjà décidé par
+`cropdetect`, avec Sobel 20/1020, couverture 2/3 (0,45 sous 10/255) et
+cluster ≥ 60 %. Un natif `review`/`noop`/instable conserve la décision
+`cropdetect`. Le schéma des artefacts reste `schema = 1` ; toutes les
+nouvelles clés sont additives.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 

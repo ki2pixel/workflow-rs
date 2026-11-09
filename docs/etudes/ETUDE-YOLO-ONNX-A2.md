@@ -1,7 +1,7 @@
 # Étude B — détecteur local ONNX pour logos inconnus et lower-thirds
 
 - **Type** : proposition d'étude + spike
-- **Statut** : Lot B0 **exécuté** (2026-11-09) ; B1/B2 à venir
+- **Statut** : Lots B0 et B1 **exécutés** (2026-11-09) ; pilote B2 à venir
 - **Date** : 2026-11-09
 - **Portée** : A2 du post-STEP8, `crates/workflow-steps/src/vision/`, `ort`
 - **Décision liée** : D-060 (Grounding DINO laboratoire), D-052/D-056 (A2 conservateur)
@@ -40,6 +40,17 @@ Trois constats structurent la proposition :
 La décision d'intégration sera prise après un benchmark sur les 242 frames
 D-060, avec des seuils go/no-go explicites (§6.4). Tant que ces seuils ne
 sont pas atteints, **aucun flag de production n'est ajouté**.
+
+Depuis, les lots B0 et B1 ont été exécutés. B1 a entraîné YOLOX-Nano 416 sur
+les 1 495 logos du catalogue et l'a évalué sur D-060, sur un test fermé et sur
+228 logos de chaînes internationales absents du train. Au point de
+fonctionnement 0,30 / NMS 0,65 : **95,5 % de rappel sur les logos de référence
+D-060, 96,7 % de présence lower-third A2, 3,3 % de frames négatives avec faux
+positif, 90,3 % de rappel open-set et 8,01 ms p95**. Les seuils
+opérationnels (présence, open-set, faux positifs, latence) sont atteints ;
+deux réserves subsistent : le rappel connu combiné (94,6 %) et la
+localisation fine du logo A2 (91,7 %) restent sous la cible 95 %. Le pilote
+`report_only` (B2) peut démarrer **sous réserve**, sans modifier `a2.rs`.
 
 ## 2. Besoin, périmètre et non-objectifs
 
@@ -789,7 +800,232 @@ son décodage DFL est plus coûteux et sa conversion FP16 est rejetée.
 4. Si les seuils passent, pilote A2 `report_only` sur 20 copies et diff
    JSON ; aucune modification de `a2.rs` avant ce pilote.
 
-## 11. Références
+Ces quatre étapes sont exécutées au §11 ; le pilote B2 reste à faire.
+
+## 11. Lot B1 — fine-tuning et évaluation (2026-11-09)
+
+Statut : **exécuté, hors production**. Aucun fichier de `a2.rs`, aucune
+configuration et aucun appel A2 n'ont été modifiés. L'entraînement, les
+données et les poids restent dans
+`/media/kidpixel/WORK/.../references_logos/training_yolo_b1/`, hors dépôt.
+Les petits JSON de résultats sont recopiés dans `results/`.
+
+### 11.1 Données
+
+Le jeu de synthèse est construit par copy-paste des PNG du catalogue sur les
+fonds de clean feeds réels, avec le canal alpha d'origine.
+
+| Split | Images | Positives | Négatives | Identités |
+| --- | ---: | ---: | ---: | --- |
+| train | 15 800 | 14 000 | 1 800 | 1 495 |
+| val | 1 800 | 1 500 | 300 | 1 495 |
+| test_closed | 1 000 | 900 | 100 | 1 495 |
+| test_open | 1 000 | 900 | 100 | 228 externes |
+
+- 1 495 logos utilisables sur 1 499 : quatre PNG ont un alpha entièrement
+  transparent (`arnaud-demanche-faut-quon-parle_27948`,
+  `les-as-des-bonnes-affaires_26368`, `m6-recommande_25893`,
+  `un-jour-un-doc-week-end_26838`).
+- 17 clean feeds, 1 829 frames à 2 fps, découpés **par vidéo** :
+  13 vidéos / 1 371 frames au train, 2 / 238 en validation, 3 / 220 en test.
+  Les fenêtres des 60 négatifs D-060 sont exclues des fonds.
+- Canvas 1280×720. Logo en 3–28 % de la largeur, hauteur minimale 9 px,
+  opacité 0,50–1,00, flou alpha 0,25–0,85, ombre 25 %, bandeau sombre 28 %
+  des placements bas, JPEG 70–96. 15 % des images positives ont deux logos.
+  Chaque identité apparaît au moins 8 fois dans le train.
+- Les marques persistantes des fonds (pictogramme CSA « -10 », bug « gulli »)
+  sont **conservées sans annotation** : ce sont des négatifs durs. Un premier
+  essai les masquait ; le modèle les apprenait comme logos (11 des 14 faux
+  positifs négatifs, 23,3 % de frames négatives à 0,25). Le run final les
+  laisse visibles.
+- Open-set : 228 logos de chaînes internationales (13 pays), absents du
+  catalogue, composités sur les **mêmes 17 fonds**. Le biais de domaine
+  résiduel est discuté en §11.7.
+
+### 11.2 Entraînement et sélection
+
+- YOLOX-Nano **depthwise** 416, 896 754 paramètres, 1 classe `logo`.
+- Initialisation COCO `yolox_nano.pth` : 636/642 tenseurs chargés, têtes de
+  classe réinitialisées.
+- 30 époques prévues, batch 12, AdamW, warmup 3, cosine, EMA, mosaic 0,5,
+  pas de mixup, flip 0,5, HSV 0,5, multi-échelle 320–576, 20 workers,
+  FP32, seed 20261109.
+- Sortie `[1, 3549, 6]` (5 + 1 classe), export ONNX statique sans NMS.
+
+L'entraînement a été arrêté volontairement après l'époque 15. La validation
+synthétique progressait encore, mais la performance réelle D-060 se dégradait :
+
+| Checkpoint | val mAP50 | Rappel réf. D-060 | Rappel logo A2 | FP négatifs |
+| --- | ---: | ---: | ---: | ---: |
+| époque 5 | 0,924 | 95,0 % | 91,7 % | 6,7 % |
+| époque 10 | 0,942 | 92,0 % | 81,7 % | 5,0 % |
+| époque 15 | 0,948 | 91,5 % | 71,7 % | 8,3 % |
+
+Les valeurs D-060 sont à 0,25 / NMS 0,45, sur les mêmes 242 frames. Le
+modèle fige donc l'**époque 5** (`logo_b1_nano416.onnx`) : la validation
+synthétique seule n'est pas un bon sélecteur, le rendu copy-paste reste plus
+facile que la diffusion réelle. Ce choix est une limite assumée (§11.7).
+
+### 11.3 D-060
+
+242 frames : 122 références (200 boîtes), 60 A2 (60 boîtes), 60 négatifs.
+Rappel boîte à IoU 0,50 ; NMS 0,65 retenu (le NMS 0,45 est fourni dans les
+JSON). Le seuil 0,30 est le point de fonctionnement proposé.
+
+| Seuil | Rappel global | Rappel réf. | Rappel logo A2 | Rappel bande A2 | Précision | FP négatifs |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0,10 | 96,9 % | 96,5 % | 98,3 % | 98,3 % | 51,7 % | 13,3 % |
+| 0,25 | 95,0 % | 95,5 % | 93,3 % | 96,7 % | 69,4 % | 6,7 % |
+| **0,30** | **94,6 %** | **95,5 %** | **91,7 %** | **96,7 %** | **73,2 %** | **3,3 %** |
+| 0,40 | 93,1 % | 94,5 % | 88,3 % | 90,0 % | 79,3 % | 1,7 % |
+| 0,50 | 89,2 % | 93,5 % | 75,0 % | 75,0 % | 85,3 % | 1,7 % |
+| 0,70 | 76,5 % | 84,0 % | 51,7 % | 51,7 % | 93,9 % | 0,0 % |
+
+« Rappel logo A2 » est l'IoU ≥ 0,50 avec la boîte `gt_logo` du lower-third ;
+« Rappel bande A2 » est le centre de la détection dans `gt_band`, la métrique
+de présence du §6.4. À 0,30, la présence lower-third est donc à 96,7 %
+(58/60), alors que la localisation fine du petit logo reste à 91,7 % (55/60).
+
+À 0,30 / NMS 0,45 : rappel global 93,8 %, références 95,0 %, logo A2
+90,0 %, précision 76,2 %, FP négatifs 3,3 %. Le NMS 0,65 garde une meilleure
+localisation des lower-thirds sans dégrader les négatifs ; il est retenu
+pour le pilote.
+
+La précision compte comme FP toute détection non appariée à une boîte GT.
+Les doublons appariés à la même boîte ne sont pas pénalisés : la précision
+est donc légèrement optimiste, sans effet sur le rappel, qui est le critère
+de décision.
+
+### 11.4 Tests synthétiques fermé et open-set
+
+Le test fermé mesure les identités vues ; le test open-set les 228 identités
+externes. AP COCO sur 1 000 images chacun.
+
+| Jeu | mAP | mAP50 | mAP75 | AP small | AP medium | AP large |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| test_closed | 0,596 | 0,918 | 0,653 | 0,221 | 0,538 | 0,700 |
+| test_open | 0,592 | 0,898 | 0,685 | 0,264 | 0,543 | 0,668 |
+
+| Seuil | Rappel fermé | Rappel open-set | FP négatifs fermé | FP négatifs open-set |
+| ---: | ---: | ---: | ---: | ---: |
+| 0,25 | 92,6 % | 90,5 % | 16 % | 17 % |
+| **0,30** | **92,5 %** | **90,3 %** | **12 %** | **13 %** |
+| 0,50 | 90,7 % | 87,4 % | 6 % | 4 % |
+
+L'écart fermé/open-set est faible (mAP50 0,918 vs 0,898 ; rappel 92,5 vs
+90,3 %), ce qui indique que le détecteur apprend une notion de logo plutôt
+que les seules identités du catalogue. Il reste toutefois mesuré sur les
+mêmes fonds M6.
+
+### 11.5 Latence et empreinte
+
+GTX 1650 4 Gio, 20 frames D-060, 20 warmup, 100 itérations/frame, batch 1,
+CUDA EP, p50 / p95 en ms :
+
+| Prétraitement | `run` | Post-traitement | Total | Δ VRAM |
+| ---: | ---: | ---: | ---: | ---: |
+| 3,01 / 3,21 | 3,35 / 4,97 | 0,01 / 0,01 | **6,39 / 8,01** | +107 Mio |
+
+Le delta VRAM a été mesuré sur une passe séparée de 300 itérations (175 →
+282 Mio). Le modèle pèse 3 752 972 octets (3,6 Mio) :
+
+```text
+logo_b1_nano416.onnx
+sha256 5c03e8b6e404cc7f1fd13183c1cf3a35b12e1dc6a376bac9da13fdc650cb8caa
+```
+
+### 11.6 Go/no-go B1
+
+Point de fonctionnement : seuil 0,30, NMS 0,65, 416×416, FP32.
+
+| Critère | Cible | Résultat | Verdict |
+| --- | --- | --- | --- |
+| Rappel logo connu D-060 (200 boîtes) | ≥ 95 % | 95,5 % [91,7–97,6] | OK |
+| Rappel logo connu A2 (60 boîtes) | ≥ 95 % (lecture stricte) | 91,7 % [81,9–96,4] | réserve |
+| Rappel lower-third A2 (centre dans la bande) | ≥ 90 % | 96,7 % [88,6–99,1] | OK |
+| Rappel connu combiné (260 boîtes) | ≥ 95 % | 94,6 % | réserve |
+| Rappel open-set externe (1 000 boîtes) | ≥ 80 % | 90,3 % [88,3–92,0] | OK |
+| FP frame sur 60 négatifs D-060 | ≤ 5 % | 3,3 % [0,9–11,4] | OK |
+| FP clip persistants | 0/5 | 0/5 ; 2 clips avec 1 frame FP sur 12 (8 %) | OK |
+| Confusion logo/bandeau | ≤ 5 % | non mesurable en mono-classe | N/A |
+| Latence p95 à 416 | ≤ 10 ms | 8,01 ms | OK |
+| Taille | ≤ 15 Mo | 3,6 Mo | OK |
+| VRAM | ≤ 1,5 Gio | +107 Mio | OK |
+| A2 `report_only`, 20 projets | 0 différence d'`action` | non exécuté | B2 |
+
+Les intervalles sont des IC 95 % de Wilson. La décision de sélectionner
+l'époque 5 avec D-060 rend le rappel D-060 optimiste ; l'open-set et le test
+fermé restent des jeux synthétiques indépendants du choix de checkpoint, mais
+partagent les fonds du train.
+
+**Conclusion B1** : les seuils de présence (références, lower-third),
+d'open-set, de faux positifs, de latence, de taille et de VRAM passent. Le
+rappel connu combiné (94,6 %) et la localisation fine du logo A2 (91,7 %)
+restent sous la cible 95 % ; c'est une réserve de localisation, pas
+d'absence. Le pilote A2 `report_only` (B2) est autorisé **sous réserve**,
+sans `apply` ni modification de `a2.rs`. Une amélioration ROI ou un B1.2 est
+attendue avant toute décision d'`apply`.
+
+### 11.7 Limites
+
+- **Sélection sur D-060** : l'époque 5 a été choisie sur le rappel réel
+  D-060, qui sert aussi à l'évaluation. Le 95,5 % est donc une borne haute.
+  Le test open-set n'a pas servi à la sélection, mais il utilise les mêmes
+  fonds.
+- **Fonds identiques** : les 228 logos externes sont composités sur les 17
+  clean feeds M6. Un vrai corpus externe (autres chaînes, autres pays,
+  autres graphismes) reste nécessaire pour mesurer le transfert de domaine.
+- **Négatifs synthétiques** : 12–13 % de frames négatives avec FP à 0,30,
+  contre 3,3 % sur les 60 négatifs D-060. Les négatifs synthétiques sont des
+  recadrages variés, plus difficiles que les 5 clips D-060 ; cela justifie le
+  mode `report_only` et un seuil par source en B2.
+- **Petits logos** : AP small 0,22 (fermé) / 0,26 (open). Les émissions dont
+  le logo fait 100–200 px (Capital, Zone Interdite, Top Chef) restent
+  fragiles en plein cadre 416. Un recadrage ROI (bande basse, coin haut
+  gauche) est la piste B2 la plus rentable.
+- **Localisation A2** : à 0,30, la présence lower-third est à 96,7 % mais la
+  boîte `gt_logo` du petit logo à 91,7 % ; le rappel connu combiné
+  (références + A2) est 94,6 %. Le détecteur trouve la bande, pas toujours
+  la boîte exacte du logo : suffisant pour une revue, insuffisant pour un
+  `apply` automatique.
+- **Mono-classe** : le modèle détecte une présence de logo, pas un type
+  `logo`/`bandeau`/`texte`. La confusion logo/bandeau n'est donc pas
+  mesurable ; la localisation dans la bande A2 est le critère utile.
+- **Pas de persistance** : les métriques sont par frame. Le clustering
+  temporel (12 frames, IoU 0,50, centre ≤ 10 px) et le FP clip sur 20 clips
+  restent à valider en B2.
+- **Précision** : convention de matching par boîte, doublons non pénalisés
+  (§11.3) ; ne pas utiliser ces chiffres comme précision de production.
+- **Pas de FP16/INT8 fine-tuné** : seul le FP32 est mesuré. FP16 B0 était
+  stable pour YOLOX, mais un export FP16 du modèle B1 devra être revalidé.
+
+### 11.8 Suite B2
+
+1. Piloter `report_only` sur 20 copies de projets, sans modifier `a2.rs` :
+   seuil 0,30, NMS 0,65, classe `logo`, sortie dans `review`.
+2. Mesurer les différences d'`action`, l'absence de nouvel `apply` et les
+   clés ajoutées hors `details` ; 0 différence exigée.
+3. Tester le recadrage ROI (bande basse et coin haut gauche) et la
+   persistance temporelle sur les clips D-060, sans réentraînement.
+4. Si le rappel A2 ou les FP clips ne tiennent pas, lancer B1.2 avec
+   davantage de domain randomization (fonds externes, dégradations JPEG,
+   logos partiellement occultés) et une sélection de checkpoint sans D-060.
+5. Ne rien câbler au CLI, au serveur ou à A2 avant le diff B2.
+
+### 11.9 Artefacts
+
+- Modèle : `exports/logo_b1_nano416.onnx`, hash ci-dessus, non versionné.
+- Métriques : `metrics_final_iou45.json`, `metrics_final_iou65.json`,
+  `band_final_iou45.json`, `band_final_iou65.json`,
+  `test_closed_final.json`, `test_open_final.json`, `latency_final.json`
+  (copies dans `results/`).
+- Scripts : `make_synth.py`, `make_coco.py`, `export_b1.py`, `eval_b1.py`,
+  `eval_d060.py`, `eval_band_d060.py`, `finalize_b1.sh` ; README du lot dans
+  `training_yolo_b1/README.md`.
+- Le checkpoint d'époque 5 n'est conservé qu'au format ONNX ; les
+  checkpoints intermédiaires du run arrêté ne sont pas versionnés.
+
+## 12. Références
 
 - D-060 : `docs/decisions/DECISION-GROUNDING-DINO-A2.md` et
   `docs/etudes/ETUDE-GROUNDING-DINO-A2.md`.

@@ -6,6 +6,9 @@
 - **Binaire** : `crates/workflow-steps/examples/yolo_bench.rs`
 - **Corpus** : 20 frames D-060 (8 références, 6 A2, 6 négatifs), 100 itérations
 
+**Lot B1** (fine-tuning et évaluation open-set) : voir `B1.md` et les fichiers
+`b1-*.json` du même dossier.
+
 ## 1. Modèles exportés
 
 | Modèle | Entrée | Sortie | Opset | FP32 | FP16 |

@@ -12,14 +12,21 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
-- **Lot B0 YOLOX/NanoDet (2026-11-09)** : exports ONNX Apache-2.0
+- **Lots B0/B1 YOLOX/NanoDet (2026-11-09)** : exports ONNX Apache-2.0
   (YOLOX-Nano 416/640, NanoDet-Plus-m 416) et microbenchmark Rust `ort`
   CUDA. YOLOX 416 FP32 : 5,29 ms p95 de session, 8,40 ms au total, +107 Mo
   de VRAM ; YOLOX 640 FP16 : 15,00 ms au total ; NanoDet 416 FP32 :
   12,16 ms. FP16 stable pour YOLOX, rejeté pour NanoDet (118/181
-  détections appariées). Zéro-shot COCO inutilisable. Aucun changement de
-  production.
-  Preuves : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/`.
+  détections appariées). Zéro-shot COCO inutilisable. B1 : fine-tuning
+  YOLOX-Nano 416 depthwise sur 1 495 logos et 15 800 images copy-paste,
+  checkpoint époque 5 figé (arrêt après l'époque 15). Point 0,30 / NMS 0,65 :
+  rappel D-060 95,5 % références, 96,7 % de présence lower-third A2
+  (91,7 % sur la boîte logo), 3,3 % de FP négatifs, open-set 90,3 %,
+  latence 8,01 ms p95, +107 Mo VRAM. Seuils de présence, open-set, FP et
+  latence atteints ; rappel connu combiné 94,6 % et localisation A2 91,7 %,
+  sous la cible 95 %. Pilote B2 `report_only` autorisé sous réserve,
+  `a2.rs` intact. Aucun changement de production.
+  Preuves : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/` et `results/B1.md`.
 - **557 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge

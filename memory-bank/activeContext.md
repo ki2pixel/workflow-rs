@@ -2,20 +2,28 @@
 
 ## Tâche en cours
 
-**Lot B0 — détecteur local ONNX pour A2 (2026-11-09, exécuté).** Après
-validation de D-060, l'approche B a été testée hors production : YOLOX-Nano
-416/640 et NanoDet-Plus-m 416 (Apache-2.0), exportés en ONNX FP32 puis FP16,
-exécutés nativement en Rust via `ort` CUDA. Sur 20 frames D-060 (100
-itérations, batch 1), YOLOX 416 FP32 donne **5,29 ms p95** de session et
-**8,40 ms p95** au total (prétraitement + NMS), pour +107 Mo de VRAM ;
-YOLOX 640 FP16 donne 15,00 ms au total, NanoDet 416 FP32 12,16 ms. Tous les
-modèles font 2,0–5,8 Mo. FP16 est stable pour YOLOX (86/86 détections
-identiques à 416, 93/94 à 640) mais pas pour NanoDet (127 détections FP16
-contre 181 FP32) : NanoDet reste en FP32. Le zéro-shot COCO est inutilisable (person sur 6/6 négatifs),
-le fine-tuning B1 est obligatoire. Dataset B1 : 1 499 PNG RGBA (1 273
-émissions M6+ + 226 chaînes), **100 % au train**, jeu externe pour
-l'open-set. Aucun changement de production, `a2.rs` intact. Résultats :
-`docs/etudes/ETUDE-YOLO-ONNX-A2/results/` ; binaire :
+**Lots B0/B1 — détecteur local ONNX pour A2 (2026-11-09, exécutés).**
+Après validation de D-060, l'approche B a été testée hors production :
+YOLOX-Nano 416/640 et NanoDet-Plus-m 416 (Apache-2.0), exportés en ONNX
+FP32/FP16 et exécutés nativement en Rust via `ort` CUDA. B0 : YOLOX 416 FP32
+donne 5,29 ms p95 de session et 8,40 ms au total pour +107 Mo de VRAM ;
+YOLOX 640 FP16 15,00 ms, NanoDet 416 FP32 12,16 ms. FP16 est stable pour
+YOLOX mais pas pour NanoDet (127 vs 181 détections), qui reste en FP32. Le
+zéro-shot COCO est inutilisable. B1 : fine-tuning YOLOX-Nano 416 depthwise
+(896 754 paramètres) sur 1 495 PNG du catalogue, 15 800 images synthétiques
+copy-paste (14 000 positives, 1 800 négatifs), test fermé et open-set avec
+228 logos de chaînes internationales. Entraînement arrêté après l'époque 15
+(la val synthétique montait, D-060 se dégradait), **checkpoint époque 5
+figé**. Au point **0,30 / NMS 0,65** : rappel D-060 **95,5 %** sur les
+références, **96,7 %** de présence lower-third A2 (91,7 % sur la boîte
+`gt_logo`), **3,3 %** de frames négatives avec FP, open-set **90,3 %**,
+latence totale **8,01 ms p95**, +107 Mo de VRAM, ONNX 3,6 Mo
+(`sha256 5c03e8b6…cb8caa`). Les seuils de présence, open-set, FP et latence
+sont atteints ; le rappel connu combiné (94,6 %) et la localisation fine du
+logo A2 (91,7 %) restent sous la cible 95 %. Le pilote A2 `report_only` (B2)
+est autorisé **sous réserve**, sans modification de `a2.rs`.
+Résultats : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B1.md` et `b1-*.json` ;
+étude : `docs/etudes/ETUDE-YOLO-ONNX-A2.md` §11 ; binaire :
 `crates/workflow-steps/examples/yolo_bench.rs`.
 
 **Grounding DINO — spike A2 et logos source (2026-11-09, D-060).** Le
@@ -193,6 +201,28 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-09] **Lots B0/B1 YOLOX-Nano A2** :
+  - B0 : exports ONNX YOLOX-Nano 416/640 et NanoDet-Plus-m 416, FP32/FP16,
+    parité PyTorch→ONNX, bench Rust `ort` CUDA ; YOLOX 416 FP32 8,40 ms
+    p95 total, +107 Mo VRAM ; NanoDet FP16 rejeté ;
+  - B1 : 1 495 logos, 15 800 images copy-paste, 1 800 négatifs, 228 logos
+    externes pour l'open-set ; marques CSA/« gulli » conservées comme
+    négatifs durs (les masquer donnait 23,3 % de FP négatifs) ;
+  - entraînement YOLOX-Nano 416 depthwise 1 classe, arrêté après l'époque 15
+    (val synthétique 0,948 mais D-060 en baisse) ; checkpoint époque 5 figé,
+    ONNX 3,6 Mo, `sha256 5c03e8b6…cb8caa` ;
+  - point 0,30 / NMS 0,65 : D-060 rappel réf. 95,5 %, présence lower-third A2
+    96,7 % (boîte logo 91,7 %), FP négatifs 3,3 %, open-set 90,3 %, test
+    fermé mAP50 0,918, open-set mAP50 0,898 ; latence 8,01 ms p95,
+    +107 Mo VRAM ;
+  - seuils de présence, open-set, FP et latence atteints ; rappel connu
+    combiné 94,6 % et localisation A2 91,7 %, sous la cible 95 %. Pilote B2
+    `report_only` autorisé sous réserve ; `a2.rs` intact, aucune
+    modification de production ; preuves :
+    `docs/etudes/ETUDE-YOLO-ONNX-A2.md` §11 et `results/B1.md`.
+  - limites : sélection du checkpoint sur D-060, fonds M6 partagés en
+    open-set, FP synthétiques 12–13 % à 0,30, AP small 0,22–0,26.
 
 - [2026-11-09] **Spike Grounding DINO A2 (D-060)** :
   - `scripts/spike-grounding-dino.py` : manifeste de 242 frames (122 logos

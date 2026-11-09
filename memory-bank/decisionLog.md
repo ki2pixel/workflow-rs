@@ -64,14 +64,22 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-10-QA.md`,
   `assets/models/qa/source_logos.toml`,
   `crates/workflow-steps/src/post/a2.rs`.
-- **Suivi B0 (2026-11-09)** : l'approche B locale est lancée. YOLOX-Nano
+- **Suivi B0/B1 (2026-11-09)** : l'approche B locale est lancée. YOLOX-Nano
   416/640 et NanoDet-Plus-m 416 (Apache-2.0) sont exportés en ONNX FP32 et
   FP16, puis mesurés nativement en Rust `ort` CUDA. YOLOX 416 FP32 donne
   8,40 ms p95 au total (5,29 ms de session), +107 Mo de VRAM ; YOLOX 640
   FP16 15,00 ms ; NanoDet 416 FP32 12,16 ms. FP16 est stable pour YOLOX,
-  rejeté pour NanoDet. Aucune production modifiée ; B1 (fine-tuning) et B2
-  (pilote `report_only`) restent à faire. Preuves :
-  `docs/etudes/ETUDE-YOLO-ONNX-A2/results/`.
+  rejeté pour NanoDet. B1 a fine-tuné YOLOX-Nano 416 depthwise sur 1 495
+  logos et 15 800 images copy-paste ; le checkpoint époque 5 est figé après
+  un arrêt volontaire à l'époque 15 (val synthétique en hausse, D-060 en
+  baisse). Point 0,30 / NMS 0,65 : rappel D-060 95,5 % références, 96,7 % de
+  présence lower-third A2 (91,7 % sur la boîte logo), 3,3 % de FP négatifs,
+  open-set 90,3 %, test fermé mAP50 0,918, open-set mAP50 0,898, latence
+  8,01 ms p95, +107 Mo de VRAM. Les seuils de présence, open-set, FP et
+  latence passent ; le rappel connu combiné (94,6 %) et la localisation A2
+  (91,7 %) restent sous 95 %. B2 (pilote `report_only`) est autorisé sous
+  réserve, aucune production modifiée. Preuves :
+  `docs/etudes/ETUDE-YOLO-ONNX-A2.md` §11 et `results/B1.md`.
 
 ## 2026-10-26 — D-028 : abandon du client desktop Tauri
 

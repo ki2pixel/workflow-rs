@@ -1,0 +1,80 @@
+{
+ "onnx": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/training_yolo_b1/exports/logo_b1_nano416.onnx",
+ "annotations": "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/Recadrage/2026/references_logos/training_yolo_b1/dataset/annotations/instances_test_closed2017.json",
+ "images": 1000,
+ "conf": 0.001,
+ "iou": 0.5,
+ "coco": {
+  "mAP": 0.5956150235494122,
+  "mAP50": 0.9175522477592051,
+  "mAP75": 0.6525603379367375,
+  "mAP_small": 0.22065303604752498,
+  "mAP_medium": 0.5383406220259231,
+  "mAP_large": 0.6997538136322349,
+  "AR1": 0.5898999999999999,
+  "AR10": 0.6607000000000001,
+  "AR100": 0.6609
+ },
+ "thresholds": {
+  "0.1": {
+   "tp": 936,
+   "fp": 362,
+   "fn": 64,
+   "negative_frames": 100,
+   "negative_fp_frames": 36,
+   "recall": 0.936,
+   "precision": 0.7211093990755008,
+   "negative_fp_rate": 0.36
+  },
+  "0.25": {
+   "tp": 926,
+   "fp": 193,
+   "fn": 74,
+   "negative_frames": 100,
+   "negative_fp_frames": 16,
+   "recall": 0.926,
+   "precision": 0.8275245755138516,
+   "negative_fp_rate": 0.16
+  },
+  "0.3": {
+   "tp": 925,
+   "fp": 168,
+   "fn": 75,
+   "negative_frames": 100,
+   "negative_fp_frames": 12,
+   "recall": 0.925,
+   "precision": 0.8462946020128088,
+   "negative_fp_rate": 0.12
+  },
+  "0.4": {
+   "tp": 915,
+   "fp": 133,
+   "fn": 85,
+   "negative_frames": 100,
+   "negative_fp_frames": 9,
+   "recall": 0.915,
+   "precision": 0.8730916030534351,
+   "negative_fp_rate": 0.09
+  },
+  "0.5": {
+   "tp": 907,
+   "fp": 98,
+   "fn": 93,
+   "negative_frames": 100,
+   "negative_fp_frames": 6,
+   "recall": 0.907,
+   "precision": 0.9024875621890547,
+   "negative_fp_rate": 0.06
+  },
+  "0.7": {
+   "tp": 765,
+   "fp": 28,
+   "fn": 235,
+   "negative_frames": 100,
+   "negative_fp_frames": 2,
+   "recall": 0.765,
+   "precision": 0.9646910466582598,
+   "negative_fp_rate": 0.02
+  }
+ }
+}

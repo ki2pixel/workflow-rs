@@ -35,7 +35,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 const YOLOX_CLASSES: usize = 80;
-const YOLOX_STRIDE: usize = 5 + YOLOX_CLASSES;
 const NANODET_CLASSES: usize = 80;
 const NANODET_BINS: usize = 8;
 const NANODET_STRIDE: usize = NANODET_CLASSES + 4 * NANODET_BINS;
@@ -102,6 +101,7 @@ struct Args {
     output: PathBuf,
     kind: Kind,
     size: usize,
+    classes: usize,
     device: Device,
     onnxruntime: Option<PathBuf>,
     warmup: usize,
@@ -118,6 +118,7 @@ impl Args {
         let mut output = None;
         let mut kind = None;
         let mut size = 416usize;
+        let mut classes = YOLOX_CLASSES;
         let mut device = Device::Cuda;
         let mut onnxruntime = None;
         let mut warmup = 20usize;
@@ -134,6 +135,9 @@ impl Args {
                 "--output" => output = Some(PathBuf::from(next_value(&mut args, "--output")?)),
                 "--kind" => kind = Some(Kind::parse(&next_value(&mut args, "--kind")?)?),
                 "--size" => size = parse_usize(&next_value(&mut args, "--size")?, "--size")?,
+                "--classes" => {
+                    classes = parse_usize(&next_value(&mut args, "--classes")?, "--classes")?
+                }
                 "--device" => device = Device::parse(&next_value(&mut args, "--device")?)?,
                 "--onnxruntime" => {
                     onnxruntime = Some(PathBuf::from(next_value(&mut args, "--onnxruntime")?))
@@ -163,8 +167,8 @@ impl Args {
             None if model.to_string_lossy().contains("nanodet") => Kind::Nanodet,
             None => Kind::Yolox,
         };
-        if size == 0 || warmup == 0 || iters == 0 {
-            bail!("--size, --warmup et --iters doivent être > 0");
+        if size == 0 || classes == 0 || warmup == 0 || iters == 0 {
+            bail!("--size, --classes, --warmup et --iters doivent être > 0");
         }
         if !(0.0..=1.0).contains(&conf) || !(0.0..=1.0).contains(&iou) {
             bail!("--conf et --iou doivent être dans [0, 1]");
@@ -176,6 +180,7 @@ impl Args {
             output,
             kind,
             size,
+            classes,
             device,
             onnxruntime,
             warmup,
@@ -211,6 +216,7 @@ fn print_usage() {
          Options :\n\
            --kind yolox|nanodet   type de modèle (auto-détecté si absent)\n\
            --size 416|640         taille d'entrée carrée (défaut 416)\n\
+           --classes N            nombre de classes YOLOX (défaut 80)\n\
            --device cuda|cpu      provider (défaut cuda)\n\
            --onnxruntime <lib>    bibliothèque ONNX Runtime explicite\n\
            --warmup N             itérations de chauffe (défaut 20)\n\
@@ -255,6 +261,7 @@ struct DecodeParams<'a> {
     pad_y: f32,
     conf: f32,
     iou: f32,
+    classes: usize,
     centers: &'a [(f32, f32)],
     strides: &'a [f32],
 }
@@ -378,6 +385,7 @@ fn run(args: Args) -> Result<()> {
                     pad_y: input.pad_y,
                     conf: args.conf,
                     iou: args.iou,
+                    classes: args.classes,
                     centers: &centers,
                     strides: &strides,
                 },
@@ -421,6 +429,7 @@ fn run(args: Args) -> Result<()> {
         "model_size_bytes": model_size,
         "kind": args.kind.label(),
         "input_size": args.size,
+        "classes": args.classes,
         "input_shape": input_shape,
         "device": args.device.label(),
         "frames": frames.len(),
@@ -667,8 +676,11 @@ fn decode(
     let anchors = shape[1] as usize;
     let stride = shape[2] as usize;
     match kind {
-        Kind::Yolox if stride != YOLOX_STRIDE => {
-            bail!("sortie YOLOX de largeur {stride} au lieu de {YOLOX_STRIDE}")
+        Kind::Yolox if stride != 5 + params.classes => {
+            bail!(
+                "sortie YOLOX de largeur {stride} au lieu de {}",
+                5 + params.classes
+            )
         }
         Kind::Nanodet if stride != NANODET_STRIDE => {
             bail!("sortie NanoDet de largeur {stride} au lieu de {NANODET_STRIDE}")
@@ -686,15 +698,16 @@ fn decode(
 
 fn decode_yolox(data: &[f32], anchors: usize, params: &DecodeParams<'_>) -> Vec<Detection> {
     let mut detections = Vec::new();
+    let stride = 5 + params.classes;
     for anchor in 0..anchors {
-        let base = anchor * YOLOX_STRIDE;
+        let base = anchor * stride;
         let objectness = data[base + 4];
         if objectness < params.conf {
             continue;
         }
         let mut class_id = 0;
         let mut class_score = 0.0f32;
-        for class in 0..YOLOX_CLASSES {
+        for class in 0..params.classes {
             let score = data[base + 5 + class];
             if score > class_score {
                 class_score = score;

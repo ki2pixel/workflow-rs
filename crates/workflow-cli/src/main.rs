@@ -656,9 +656,9 @@ enum PostCommand {
         /// Dossier docs explicite (un seul --project).
         #[arg(long)]
         docs: Option<PathBuf>,
-        /// Préfixe du template A6 (défaut : configuration STEP8).
-        #[arg(long)]
-        template_prefix: Option<String>,
+        /// Préfixe du template A6 (répétable ; remplace la liste configurée).
+        #[arg(long = "template-prefix")]
+        template_prefixes: Vec<String>,
         /// Suffixe du projet assisté (défaut : `_assist`).
         #[arg(long)]
         suffix: Option<String>,
@@ -1555,7 +1555,7 @@ fn run() -> Result<()> {
                 folders,
                 projects,
                 docs,
-                template_prefix,
+                template_prefixes,
                 suffix,
                 ffmpeg,
                 ffprobe,
@@ -1573,8 +1573,8 @@ fn run() -> Result<()> {
                 }
                 let mut options =
                     PostOptions::from_config(&config, &config.steps.step8.docs_subfolder);
-                if let Some(prefix) = template_prefix {
-                    options.template_prefix = prefix;
+                if !template_prefixes.is_empty() {
+                    options.template_prefixes = template_prefixes;
                 }
                 if let Some(suffix) = suffix {
                     options.suffix = suffix;
@@ -1652,7 +1652,7 @@ fn run() -> Result<()> {
                 let options = QaOptions {
                     ffmpeg: ffmpeg.unwrap_or_else(|| config.steps.step8.post.ffmpeg.clone()),
                     ffprobe: ffprobe.unwrap_or_else(|| config.steps.step8.post.ffprobe.clone()),
-                    template_prefix: config.steps.step8.post.template_prefix.clone(),
+                    template_prefixes: config.steps.step8.post.template_prefixes.clone(),
                     out_dir: out,
                     models_dir: models,
                     onnxruntime,

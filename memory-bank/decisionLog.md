@@ -8,6 +8,38 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-09 — D-061 : support multi-préfixes du template SDM
+
+- **Contexte** : `/mnt/cache/116 Camille/docs/SDM - Liliane et josé.mp4`
+  porte le préfixe `SDM - ` alors que `steps.step8.post.template_prefix`
+  valait `M6 - SDM - `. L'audit STEP8 concluait `a6_template = pass`
+  (« aucun template demandé ») et la vidéo traversait inutilement
+  STEP2–STEP6 puis un recadrage standard A1/A2 au lieu du template A6.
+- **Décision** : `PostConfig.template_prefixes: Vec<String>` remplace le
+  scalaire, avec `["M6 - SDM - ", "SDM - "]` par défaut. `Bypass`,
+  `a6::validate`, Stage 0 QA et `post run` acceptent la liste ; le préfixe
+  effectivement matché est écrit dans `template.prefix` (`post.json`) et
+  dans les détails de la décision A6. L'ancien champ `template_prefix` reste
+  accepté comme alias Serde (scalaire ou liste). `config check` refuse les
+  préfixes vides, les chevauchements entre préfixes de template et avec
+  `archive_only_prefixes`.
+- **Validation** : 589 tests listés (587 exécutés + 2 ignorés), `fmt` et
+  `clippy -D warnings` verts ; rejeu réel sous `/tmp/test-sdm` sur
+  `116 Camille` : les nommages `SDM - ` et `M6 - SDM - ` donnent
+  `a6_eligible = 1`, `template_applied = true`, 4 calques A6 (180 %,
+  84,3497774862575 %, 56,294573830734535 %, logo 100 %), audit `pass`,
+  aucune décision A1–A4 ; `config check` accepte la configuration de
+  production et l'ancien scalaire.
+- **Portée** : aucun changement A1–A5 ni nouvel artefact ; `post.json` et
+  `audit.json` gardent leur schéma, seul `template.prefix` reflète le
+  préfixe matché (vide si aucun). Le cache QA passe en version 10.
+- **Références** : D-034, D-035, `docs/lots/LOT-9-POST-STEP8.md`,
+  `docs/lots/LOT-10-QA.md`, `crates/workflow-core/src/config.rs`,
+  `crates/workflow-steps/src/template.rs`,
+  `crates/workflow-steps/src/post/a6.rs`,
+  `crates/workflow-steps/src/post/run.rs`,
+  `crates/workflow-steps/src/qa/stage0.rs`.
+
 ## 2026-11-09 — D-060 : Grounding DINO hors production A2
 
 - **Décision** : Grounding DINO **n'entre pas** dans A2 en production. Aucun

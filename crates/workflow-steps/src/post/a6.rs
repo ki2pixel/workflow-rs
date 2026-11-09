@@ -15,7 +15,16 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
-pub const DEFAULT_PREFIX: &str = "M6 - SDM - ";
+/// Nommages SDM reconnus par défaut : le préfixe historique `M6 - SDM - ` et
+/// la variante livrée par la production `SDM - `.
+pub const DEFAULT_PREFIXES: &[&str] = &["M6 - SDM - ", "SDM - "];
+
+pub fn default_prefixes() -> Vec<String> {
+    DEFAULT_PREFIXES
+        .iter()
+        .map(|prefix| (*prefix).to_string())
+        .collect()
+}
 
 static LOGO_LAYER: OnceLock<Value> = OnceLock::new();
 
@@ -72,21 +81,23 @@ pub fn validate(
     segments: &[Segment],
     meta: &CompMeta,
     stem: &str,
-    prefix: &str,
+    prefixes: &[String],
 ) -> (Vec<Decision>, TemplateInfo) {
-    let matched = !prefix.is_empty() && stem.starts_with(prefix);
-    if !matched {
+    let matched_prefix = prefixes
+        .iter()
+        .find(|prefix| !prefix.is_empty() && stem.starts_with(prefix.as_str()));
+    let Some(matched_prefix) = matched_prefix else {
         let details = json!({
             "checks": [{"id": "prefix_match", "status": "pass", "detail": "projet hors template SDM"}],
             "valid": true,
-            "prefix": prefix,
+            "prefix": "",
             "stem": stem
         });
         return (
             Vec::new(),
             TemplateInfo {
                 name: "sdm_v1",
-                prefix: prefix.to_string(),
+                prefix: String::new(),
                 stem: stem.to_string(),
                 matched: false,
                 eligible: None,
@@ -95,7 +106,7 @@ pub fn validate(
                 details,
             },
         );
-    }
+    };
 
     let mut checks = Vec::new();
     let mut valid = true;
@@ -256,7 +267,7 @@ pub fn validate(
     let details = json!({
         "checks": checks,
         "valid": valid,
-        "prefix": prefix,
+        "prefix": matched_prefix,
         "stem": stem,
         "logo": if logo_available { "available" } else { "missing" }
     });
@@ -267,7 +278,7 @@ pub fn validate(
             "template SDM éligible (mono-segment, sans keyframe)",
             0.95,
             json!({
-                "prefix": prefix,
+                "prefix": matched_prefix,
                 "stem": stem,
                 "matched": true,
                 "valid": valid,
@@ -283,7 +294,7 @@ pub fn validate(
             "préfixe SDM mais structure incompatible (voir audit)",
             0.4,
             json!({
-                "prefix": prefix,
+                "prefix": matched_prefix,
                 "stem": stem,
                 "matched": true,
                 "valid": valid,
@@ -297,7 +308,7 @@ pub fn validate(
         vec![action],
         TemplateInfo {
             name: "sdm_v1",
-            prefix: prefix.to_string(),
+            prefix: matched_prefix.to_string(),
             stem: stem.to_string(),
             matched: true,
             eligible: Some(valid),
@@ -671,22 +682,51 @@ mod tests {
     fn validates_prefix_and_structure() {
         let doc = doc();
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) =
-            validate(&doc, &segments, &meta(), "M6 - SDM - test", DEFAULT_PREFIX);
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "M6 - SDM - test",
+            &default_prefixes(),
+        );
         assert!(info.matched);
         assert_eq!(info.eligible, Some(true));
         assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
 
-        let (decisions, info) = validate(&doc, &segments, &meta(), "autre", DEFAULT_PREFIX);
+        let (decisions, info) = validate(&doc, &segments, &meta(), "autre", &default_prefixes());
         assert!(!info.matched);
         assert!(decisions.is_empty());
     }
 
     #[test]
-    fn empty_prefix_is_not_matched() {
+    fn validates_both_sdm_prefixes() {
+        // Given: un projet A6 valide et les deux nommages de production.
+        // When:  chaque variante est validée.
+        // Then:  le template matche et le préfixe effectif est enregistré.
         let doc = doc();
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) = validate(&doc, &segments, &meta(), "M6 - SDM - test", "");
+        let prefixes = default_prefixes();
+        for (stem, expected) in [
+            ("M6 - SDM - Leslie et Léo", "M6 - SDM - "),
+            ("SDM - Liliane et josé", "SDM - "),
+        ] {
+            let (decisions, info) = validate(&doc, &segments, &meta(), stem, &prefixes);
+            assert!(info.matched);
+            assert_eq!(info.prefix, expected);
+            assert_eq!(info.eligible, Some(true));
+            assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
+        }
+        let (decisions, info) = validate(&doc, &segments, &meta(), "Autre projet", &prefixes);
+        assert!(!info.matched);
+        assert!(info.prefix.is_empty());
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn empty_prefix_list_is_not_matched() {
+        let doc = doc();
+        let segments = ecproj::segments(&doc).unwrap();
+        let (decisions, info) = validate(&doc, &segments, &meta(), "M6 - SDM - test", &[]);
         assert!(!info.matched);
         assert!(decisions.is_empty());
     }
@@ -702,8 +742,13 @@ mod tests {
             "props": {"children": []}
         }));
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) =
-            validate(&doc, &segments, &meta(), "M6 - SDM - test", DEFAULT_PREFIX);
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "M6 - SDM - test",
+            &default_prefixes(),
+        );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
         assert!(decisions[0].details["checks"]
@@ -722,8 +767,13 @@ mod tests {
             {"time": 0, "value": {"v": [1390.39, 0.0, 0.0]}}
         ]);
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) =
-            validate(&doc, &segments, &meta(), "M6 - SDM - test", DEFAULT_PREFIX);
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "M6 - SDM - test",
+            &default_prefixes(),
+        );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
     }
@@ -737,8 +787,13 @@ mod tests {
             {"time": 0, "value": {"v": [50.0, 50.0, 0.0]}}
         ]);
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) =
-            validate(&doc, &segments, &meta(), "M6 - SDM - test", DEFAULT_PREFIX);
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "M6 - SDM - test",
+            &default_prefixes(),
+        );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
     }

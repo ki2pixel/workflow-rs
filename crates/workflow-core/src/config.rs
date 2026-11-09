@@ -316,42 +316,47 @@ impl Config {
                     .into(),
             ));
         }
-        for (index, prefix) in self
-            .steps
-            .step8
-            .post
-            .archive_only_prefixes
-            .iter()
-            .enumerate()
-        {
+        let post = &self.steps.step8.post;
+        for (index, prefix) in post.template_prefixes.iter().enumerate() {
+            if prefix.trim().is_empty() {
+                return Err(ConfigError::Invalid(
+                    "steps.step8.post.template_prefixes ne peut pas contenir de préfixe vide"
+                        .into(),
+                ));
+            }
+            let overlaps_other = post
+                .template_prefixes
+                .iter()
+                .skip(index + 1)
+                .any(|other| prefixes_overlap(prefix, other));
+            if overlaps_other {
+                return Err(ConfigError::Invalid(format!(
+                    "steps.step8.post: préfixe de template '{prefix}' ambigu (chevauchement)"
+                )));
+            }
+        }
+        for (index, prefix) in post.archive_only_prefixes.iter().enumerate() {
             if prefix.trim().is_empty() {
                 return Err(ConfigError::Invalid(
                     "steps.step8.post.archive_only_prefixes ne peut pas contenir de préfixe vide"
                         .into(),
                 ));
             }
-            let template_prefix = &self.steps.step8.post.template_prefix;
-            let overlaps_template = !template_prefix.trim().is_empty()
-                && (prefix == template_prefix
-                    || prefix.starts_with(template_prefix)
-                    || template_prefix.starts_with(prefix));
-            let overlaps_other = self
-                .steps
-                .step8
-                .post
+            let overlaps_template = post
+                .template_prefixes
+                .iter()
+                .any(|template| prefixes_overlap(prefix, template));
+            let overlaps_other = post
                 .archive_only_prefixes
                 .iter()
                 .skip(index + 1)
-                .any(|other| {
-                    other == prefix || other.starts_with(prefix) || prefix.starts_with(other)
-                });
+                .any(|other| prefixes_overlap(prefix, other));
             if overlaps_template || overlaps_other {
                 return Err(ConfigError::Invalid(format!(
                     "steps.step8.post: préfixe archive-only '{prefix}' ambigu (chevauchement)"
                 )));
             }
         }
-        let post = &self.steps.step8.post;
         if !matches!(
             post.a2_logo_detector_device
                 .trim()
@@ -477,6 +482,33 @@ fn parse_bool_env(value: &str, name: &str) -> Result<bool, ConfigError> {
         _ => Err(ConfigError::Invalid(format!(
             "{name}={value:?} n'est pas un booléen valide"
         ))),
+    }
+}
+
+/// Deux préfixes se chevauchent si l'un préfixe l'autre : un même nom
+/// relèverait alors de deux familles de bypass.
+fn prefixes_overlap(left: &str, right: &str) -> bool {
+    !left.trim().is_empty()
+        && !right.trim().is_empty()
+        && (left == right || left.starts_with(right) || right.starts_with(left))
+}
+
+/// Accepte la liste `template_prefixes` et l'ancien champ scalaire
+/// `template_prefix`, conservé en alias pour les configurations existantes.
+fn deserialize_template_prefixes<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Prefixes {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    match Prefixes::deserialize(deserializer)? {
+        Prefixes::One(prefix) => Ok(vec![prefix]),
+        Prefixes::Many(prefixes) => Ok(prefixes),
     }
 }
 
@@ -1037,7 +1069,15 @@ pub struct PostConfig {
     pub suffix: String,
     pub projects_subfolder: String,
     pub artifacts_subfolder: String,
-    pub template_prefix: String,
+    /// Préfixes du template SDM : A6 et bypass direct acceptent plusieurs
+    /// nommages (`M6 - SDM - `, `SDM - `). `template_prefix` reste accepté en
+    /// alias scalaire pour les configurations existantes.
+    #[serde(
+        default,
+        alias = "template_prefix",
+        deserialize_with = "deserialize_template_prefixes"
+    )]
+    pub template_prefixes: Vec<String>,
     /// Préfixes des vidéos qui ne produisent aucun `.ecproj` : STEP2 à STEP6
     /// sont sautés et STEP7 n'archive que le CSV de scènes.
     pub archive_only_prefixes: Vec<String>,
@@ -1100,7 +1140,7 @@ impl Default for PostConfig {
             suffix: "_assist".into(),
             projects_subfolder: "projets".into(),
             artifacts_subfolder: "post".into(),
-            template_prefix: "M6 - SDM - ".into(),
+            template_prefixes: vec!["M6 - SDM - ".into(), "SDM - ".into()],
             archive_only_prefixes: Vec::new(),
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
@@ -1303,9 +1343,49 @@ mod tests {
     }
 
     #[test]
+    fn template_prefixes_default_and_legacy_scalar() {
+        // Given: la configuration par défaut et deux TOML, scalaire historique
+        //        puis liste.
+        // When:  les champs sont lus.
+        // Then:  les deux nommages SDM sont actifs et l'alias scalaire reste
+        //        accepté.
+        assert_eq!(
+            PostConfig::default().template_prefixes,
+            vec!["M6 - SDM - ".to_string(), "SDM - ".to_string()]
+        );
+        let legacy =
+            Config::from_toml("[steps.step8.post]\ntemplate_prefix = \"SDM - \"\n").unwrap();
+        assert_eq!(
+            legacy.steps.step8.post.template_prefixes,
+            vec!["SDM - ".to_string()]
+        );
+        let list = Config::from_toml(
+            "[steps.step8.post]\ntemplate_prefixes = [\"M6 - SDM - \", \"SDM - \"]\n",
+        )
+        .unwrap();
+        assert_eq!(
+            list.steps.step8.post.template_prefixes,
+            vec!["M6 - SDM - ".to_string(), "SDM - ".to_string()]
+        );
+    }
+
+    #[test]
+    fn template_prefixes_must_not_overlap() {
+        let mut config = Config::default();
+        config.steps.step8.post.template_prefixes = vec!["SDM".into(), "SDM - ".into()];
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.template_prefixes = vec!["".into()];
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.template_prefixes = Vec::new();
+        assert!(config.validate_common().is_ok());
+    }
+
+    #[test]
     fn archive_only_prefixes_must_not_overlap() {
         let mut config = Config::default();
         config.steps.step8.post.archive_only_prefixes = vec!["M6 - SDM".into()];
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.archive_only_prefixes = vec!["SDM - ".into()];
         assert!(config.validate_common().is_err());
         config.steps.step8.post.archive_only_prefixes = vec!["W9 - LPHDF".into()];
         assert!(config.validate_common().is_ok());

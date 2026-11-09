@@ -23,7 +23,7 @@ use workflow_schema::round::round_to;
 pub struct Stage0Options {
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
-    pub template_prefix: String,
+    pub template_prefixes: Vec<String>,
     pub thresholds: Stage0Thresholds,
 }
 
@@ -32,7 +32,7 @@ impl Default for Stage0Options {
         Self {
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
-            template_prefix: crate::post::a6::DEFAULT_PREFIX.into(),
+            template_prefixes: crate::post::a6::default_prefixes(),
             thresholds: Stage0Thresholds::default(),
         }
     }
@@ -89,7 +89,7 @@ pub fn run_stage0(
             project,
             &specs,
             video,
-            &options.template_prefix,
+            &options.template_prefixes,
             &options.thresholds,
         )?;
         checks.extend(project_check.checks);
@@ -462,7 +462,7 @@ fn check_project(
     project: &Path,
     specs: &QaSpecs,
     video: &Path,
-    template_prefix: &str,
+    template_prefixes: &[String],
     thresholds: &Stage0Thresholds,
 ) -> Result<ProjectCheck> {
     let doc = match ecproj::load(project) {
@@ -556,7 +556,9 @@ fn check_project(
         .file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or_default();
-    let matched = !template_prefix.is_empty() && stem.starts_with(template_prefix);
+    let matched = template_prefixes
+        .iter()
+        .any(|prefix| !prefix.is_empty() && stem.starts_with(prefix.as_str()));
     if !matched {
         checks.push(QaCheck::not_applicable(
             "template_a6",
@@ -879,7 +881,7 @@ mod tests {
             &path,
             &specs(),
             Path::new("clip_9x16.mp4"),
-            crate::post::a6::DEFAULT_PREFIX,
+            &crate::post::a6::default_prefixes(),
             &Stage0Thresholds::default(),
         )
         .unwrap();
@@ -895,25 +897,32 @@ mod tests {
     }
 
     #[test]
-    fn missing_sdm_logo_is_blocking() {
+    fn missing_sdm_logo_is_blocking_for_both_prefixes() {
+        // Given: un projet sans sdm.png et les deux nommages SDM.
+        // When:  Stage 0 vérifie le template A6.
+        // Then:  le contrôle échoue pour chaque préfixe configuré.
         let dir = tempdir().unwrap();
-        let path = dir.path().join("M6 - SDM - test_9x16.ecproj");
-        fs::write(&path, serde_json::to_vec(&project_fixture()).unwrap()).unwrap();
-        let check = check_project(
-            &path,
-            &specs(),
-            Path::new("M6 - SDM - test_9x16.mp4"),
-            crate::post::a6::DEFAULT_PREFIX,
-            &Stage0Thresholds::default(),
-        )
-        .unwrap();
-        assert!(check
-            .checks
-            .iter()
-            .any(|item| item.id == "template_a6" && item.status == QaStatus::Fail));
-        assert!(check
-            .findings
-            .iter()
-            .any(|item| item.defect_type == DefectType::TemplateLogoMissing));
+        let document = serde_json::to_vec(&project_fixture()).unwrap();
+        for stem in ["M6 - SDM - test", "SDM - test"] {
+            let path = dir.path().join(format!("{stem}_9x16.ecproj"));
+            fs::write(&path, &document).unwrap();
+            let video = format!("{stem}_9x16.mp4");
+            let check = check_project(
+                &path,
+                &specs(),
+                Path::new(&video),
+                &crate::post::a6::default_prefixes(),
+                &Stage0Thresholds::default(),
+            )
+            .unwrap();
+            assert!(check
+                .checks
+                .iter()
+                .any(|item| item.id == "template_a6" && item.status == QaStatus::Fail));
+            assert!(check
+                .findings
+                .iter()
+                .any(|item| item.defect_type == DefectType::TemplateLogoMissing));
+        }
     }
 }

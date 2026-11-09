@@ -2,6 +2,18 @@
 
 ## Tâche en cours
 
+**SDM multi-préfixes — A6 et bypass direct (2026-11-09, D-061).**
+La vidéo `116 Camille/docs/SDM - Liliane et josé.mp4` n'était pas reconnue
+comme template SDM : `template_prefix` valait `M6 - SDM - `, l'audit STEP8
+concluait `a6_template = pass` (« aucun template demandé ») et la vidéo
+traversait STEP2–STEP6 puis un recadrage A1/A2 standard. Le champ devient
+`template_prefixes = ["M6 - SDM - ", "SDM - "]`, accepté par `Bypass`,
+`post/a6.rs`, Stage 0 QA, `post run` et `step7 finalize`. L'ancien scalaire
+reste un alias Serde ; `config check` rejette les préfixes vides et les
+chevauchements. Rejeu réel sous `/tmp/test-sdm` : les deux nommages donnent
+`a6_eligible = 1`, `template_applied = true`, 4 calques A6, audit `pass`,
+aucune décision A1–A4. 589 tests listés, `fmt` et clippy verts.
+
 **Lots B0/B1/B2 — détecteur local ONNX pour A2 (2026-11-09, exécutés).**
 Après validation de D-060, l'approche B a été testée hors production :
 YOLOX-Nano 416/640 et NanoDet-Plus-m 416 (Apache-2.0), exportés en ONNX
@@ -238,6 +250,22 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-09] **SDM multi-préfixes (D-061)** :
+  - `PostConfig.template_prefixes` remplace `template_prefix`, avec
+    `["M6 - SDM - ", "SDM - "]` par défaut et alias scalaire Serde ;
+  - `template::Bypass`, `a6::validate`, `post/direct.rs`, `post/run.rs`,
+    Stage 0 QA et `post run --template-prefix` (répétable) acceptent la
+    liste ; `template.prefix` enregistre le préfixe matché ;
+  - validation des chevauchements entre préfixes de template et avec
+    `archive_only_prefixes` ; cache QA version 10 ;
+  - rejeu réel `116 Camille` sous `/tmp/test-sdm` : `SDM - ` et
+    `M6 - SDM - ` donnent 4 calques A6, `template_applied = true`, audit
+    `pass`, aucune décision A1–A4 ; `config check` accepte l'ancien
+    scalaire ;
+  - 589 tests listés (587 exécutés + 2 ignorés), `fmt` et
+    `clippy -D warnings` verts ; docs LOT-9, LOT-10, README, AGENTS et
+    memory-bank alignés.
 
 - [2026-11-09] **Lot B2.1 YOLOX-Nano A2 — fusion temporelle et cache** :
   - `post/logo.rs` : association stricte puis animée (IoU 0,35 / centre
@@ -895,7 +923,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 577 tests unitaires ; pas de CI.
+- 589 tests unitaires listés (587 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

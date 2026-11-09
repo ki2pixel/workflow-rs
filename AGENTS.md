@@ -98,12 +98,13 @@ cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
   `workflow-cli post run --report-only` to compute reports without publishing
   an assisted project. Do not run either against `runtime/` or `/mnt/cache`
   for experiments.
-- With `steps.step8.post.direct = true`, `M6 - SDM - ` and
-  `archive_only_prefixes` videos (default `W9 - LPHDF`) matching the
-  1920×1080 25 fps H.264 profile skip STEP2–STEP6; STEP7 synthesizes the
-  mono-segment `_scenes.csv`. SDM builds the raw and A6 assist; LPHDF builds
-  no `.ecproj` at all, and STEP8 skips it by name even out of profile. Do not
-  enable it without `ffprobe`: the profile fallback is the normal pipeline.
+- With `steps.step8.post.direct = true`, videos matching
+  `template_prefixes` (default `M6 - SDM - ` and `SDM - `) or
+  `archive_only_prefixes` (default `W9 - LPHDF`) matching the 1920×1080
+  25 fps H.264 profile skip STEP2–STEP6; STEP7 synthesizes the mono-segment
+  `_scenes.csv`. SDM builds the raw and A6 assist; LPHDF builds no `.ecproj`
+  at all, and STEP8 skips it by name even out of profile. Do not enable it
+  without `ffprobe`: the profile fallback is the normal pipeline.
 - Before a switch: stop both servers (sync refuses if either `:5003` or
   `:5004` is listening), run `./scripts/sync-backends.sh` (dry-run), then
   `--apply`. `scripts/start-rust.sh` does this automatically when the Rust

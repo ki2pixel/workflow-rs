@@ -748,7 +748,8 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         let mut options = base_options(dir.path());
         options.model = model;
         options.ffprobe = ffprobe;
-        options.bypass = template::Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        options.bypass =
+            template::Bypass::new(&["M6 - SDM - ".to_string()], &["W9 - LPHDF".to_string()]);
         let report = run_step2(&options).unwrap();
         assert_eq!(report.total_videos, 0);
         assert_eq!(report.skipped_template, 2);

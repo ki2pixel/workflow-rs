@@ -99,11 +99,12 @@ Linux et le panneau CEP continue d'appeler Python.
   (`a3_relaxed_gap`) restent opt-in, désactivés par défaut ; ils ont été
   validés sur copies (68/54/356) le 2026-11-08.
 - Bypass direct : quand `steps.step8.post.direct = true`, les vidéos
-  `M6 - SDM - ` et `W9 - LPHDF` au profil 1920×1080 25 fps sautent
+  préfixées par `template_prefixes` (`M6 - SDM - ` ou `SDM - `) et celles de
+  `archive_only_prefixes` (`W9 - LPHDF`) au profil 1920×1080 25 fps sautent
   STEP2–STEP6 ; STEP7 synthétise un `_scenes.csv` mono-segment. SDM produit
-  le brut + A6 sans panel ; LPHDF (`archive_only_prefixes`) ne produit aucun
-  `.ecproj`, seul le CSV est archivé. Validé sur 295 (pixel), 340, 341 et
-  des lots mixtes ; les sorties non-bypass restent identiques.
+  le brut + A6 sans panel ; LPHDF ne produit aucun `.ecproj`, seul le CSV est
+  archivé. Validé sur 295 (pixel), 340, 341, 116 (`SDM - `) et des lots
+  mixtes ; les sorties non-bypass restent identiques.
 - Lot 2 terminé : STEP2 TransNetV2 en `ort` CUDA, FFmpeg `rawvideo` via
   `tokio::process`, fenêtres 100/50/25 et sortie CSV identique sur
   `cuts`, `short_2997`, `real_244` et `real_245`. Débit supérieur à la baseline

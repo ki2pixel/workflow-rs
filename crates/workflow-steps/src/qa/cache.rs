@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 /// À incrémenter dès qu'un changement de code modifie les résultats pour les
 /// mêmes export, projet, modèles et options (préprocessing OCR, seuils…).
-const CACHE_VERSION: u32 = 9;
+const CACHE_VERSION: u32 = 10;
 
 /// Empreinte complète : hash de l'export puis empreinte des autres entrées.
 pub fn fingerprint(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<String> {
@@ -58,7 +58,7 @@ pub fn fingerprint_from_export(
          source_logo_catalog={}\n\
          source_logo_references={}\n\
          evidence={}\n\
-         template_prefix={}\n\
+         template_prefixes={}\n\
          black={}\n\
          freeze={}\n\
          coverage={}\n\
@@ -87,7 +87,7 @@ pub fn fingerprint_from_export(
         source_logo_catalog_hash(options)?,
         source_logo_references_hash(options)?,
         u8::from(options.evidence_enabled),
-        options.template_prefix,
+        options.template_prefixes.join("\n"),
         thresholds.black_finding_s,
         thresholds.freeze_finding_s,
         thresholds.coverage_warn_s,
@@ -248,6 +248,10 @@ mod tests {
 
         let mut changed = options();
         changed.source_logo_visual = true;
+        assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
+
+        let mut changed = options();
+        changed.template_prefixes = vec!["SDM - ".to_string()];
         assert_ne!(base, fingerprint(&video, None, &changed).unwrap());
     }
 

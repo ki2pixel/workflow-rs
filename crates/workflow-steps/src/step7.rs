@@ -1091,7 +1091,7 @@ mod tests {
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let bypass = template::Bypass::new("M6 - SDM - ", &[]);
+        let bypass = template::Bypass::new(&["M6 - SDM - ".to_string()], &[]);
         let strict =
             find_projects_to_finalize(&work, FinalizeMode::Strict, None, &bypass, &ffprobe)
                 .unwrap();
@@ -1112,7 +1112,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             restore_archives: false,
             delete_source: false,
             project_filter: None,
-            bypass: template::Bypass::new("M6 - SDM - ", &[]),
+            bypass: template::Bypass::new(&["M6 - SDM - ".to_string()], &[]),
             ffprobe,
         };
         let report = finalize_work_dir(&options).unwrap();
@@ -1157,7 +1157,8 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"5253","duration":"210.120000"}]}'
 "#,
         );
-        let bypass = template::Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        let bypass =
+            template::Bypass::new(&["M6 - SDM - ".to_string()], &["W9 - LPHDF".to_string()]);
         let strict =
             find_projects_to_finalize(&work, FinalizeMode::Strict, None, &bypass, &ffprobe)
                 .unwrap();

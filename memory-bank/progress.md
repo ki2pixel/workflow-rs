@@ -12,6 +12,13 @@
   correctifs, fmt/clippy, `config check` et build release.
 - Moniteur webhook Rust activé dans la configuration depuis le 2026-10-23
   (`webhook.enabled = true`).
+- **SDM multi-préfixes (2026-11-09, D-061)** : `template_prefixes`
+  (`M6 - SDM - `, `SDM - `) remplace le scalaire, avec alias
+  `template_prefix` ; A6, bypass direct, Stage 0 QA et `post run` acceptent
+  les deux nommages. Rejeu réel `116 Camille` sous `/tmp/test-sdm` :
+  `template_applied`, 4 calques A6, audit `pass`, aucune décision A1–A4
+  (auparavant `template: null` et pipeline lourd). 589 tests listés,
+  fmt/clippy verts.
 - **Lots B0/B1 YOLOX/NanoDet (2026-11-09)** : exports ONNX Apache-2.0
   (YOLOX-Nano 416/640, NanoDet-Plus-m 416) et microbenchmark Rust `ort`
   CUDA. YOLOX 416 FP32 : 5,29 ms p95 de session, 8,40 ms au total, +107 Mo
@@ -40,7 +47,7 @@
   activation de production ; suite B1.2 (ROI deux passes/fusion
   temporelle) ou pilote opérateur. Preuves : `results/B2.md`,
   `results/b2-pilot.json` et `scripts/pilot-b2-logo-detector.py`.
-- **577 tests unitaires**, sans matériel.
+- **589 tests unitaires listés** (587 exécutés + 2 ignorés), sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
   humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour

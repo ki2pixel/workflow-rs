@@ -44,7 +44,8 @@ Ce contrôle est **read-only**. Il ne modifie ni le `.ecproj`, ni le MP4, ni
    - specs ffprobe : 1080×1920, 25 fps, H.264, AAC ; bitrate 9–11,5 Mbit/s
      en information seulement ;
    - durée MP4 vs durée composition `.ecproj` (tolérance 1 s) ;
-   - présence du template A6 (`sdm.png`) pour les projets `M6 - SDM - ` ;
+   - présence du template A6 (`sdm.png`) pour les projets préfixés
+     `M6 - SDM - ` ou `SDM - ` (`template_prefixes`) ;
    - structure de timeline : segments, segments courts, couverture ;
    - noir/gel : `ffmpeg blackdetect` + `freezedetect`, stockés en preuves.
 2. **Stage 1 — OCR** : PP-OCRv6 det/rec sur ONNX Runtime CPU, uniquement sur

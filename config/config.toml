@@ -205,7 +205,9 @@ direct = true
 suffix = "_assist"
 projects_subfolder = "projets"
 artifacts_subfolder = "post"
-template_prefix = "M6 - SDM - "
+# Préfixes du template SDM (A6 + bypass direct). Les deux nommages
+# coexistent en production : `M6 - SDM - ` et `SDM - `.
+template_prefixes = ["M6 - SDM - ", "SDM - "]
 # Familles sans `.ecproj` : CSV de scènes archivé uniquement.
 archive_only_prefixes = ["W9 - LPHDF"]
 ffmpeg = "ffmpeg"

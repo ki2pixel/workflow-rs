@@ -43,7 +43,7 @@ pub struct PostOptions {
     pub projects_subfolder: String,
     pub docs_subfolder: String,
     pub artifacts_subfolder: String,
-    pub template_prefix: String,
+    pub template_prefixes: Vec<String>,
     pub archive_only_prefixes: Vec<String>,
     pub a1_margin: f64,
     /// R2 : diffère A1 en revue sur candidat A3 fort. Désactivé par défaut.
@@ -93,7 +93,7 @@ impl Default for PostOptions {
             projects_subfolder: "projets".into(),
             docs_subfolder: "docs".into(),
             artifacts_subfolder: "post".into(),
-            template_prefix: a6::DEFAULT_PREFIX.into(),
+            template_prefixes: a6::default_prefixes(),
             archive_only_prefixes: Vec::new(),
             a1_margin: 1.015,
             a1_defer_on_a3: false,
@@ -135,7 +135,7 @@ impl PostOptions {
             projects_subfolder: post.projects_subfolder.clone(),
             docs_subfolder: docs_subfolder.to_string(),
             artifacts_subfolder: post.artifacts_subfolder.clone(),
-            template_prefix: post.template_prefix.clone(),
+            template_prefixes: post.template_prefixes.clone(),
             archive_only_prefixes: post.archive_only_prefixes.clone(),
             a1_margin: post.a1_margin,
             a1_defer_on_a3: post.a1_defer_on_a3,
@@ -185,7 +185,7 @@ pub fn run_post_for_folders(folders: &[String], options: &PostOptions) -> PostRu
     if !options.enabled {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
     // Pré-scan de tous les dossiers : le total A5/A6 est publié avant le
     // premier projet pour que la barre STEP8 couvre aussi cette phase.
     let mut projects = Vec::new();
@@ -216,7 +216,7 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
     if !options.enabled {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
     prepare_direct(options, folder, &bypass, &mut summary);
     let projects = discover_projects(options, folder, &bypass);
     if projects.is_empty() {
@@ -538,7 +538,7 @@ fn run_post_project_inner(
 
     let a6_start = Instant::now();
     let (a6_decisions, template) =
-        a6::validate(&doc, &segments, &meta, &stem, &options.template_prefix);
+        a6::validate(&doc, &segments, &meta, &stem, &options.template_prefixes);
     let mut decisions = Vec::new();
     let mut a6_ms = a6_start.elapsed().as_secs_f64() * 1000.0;
     let mut a1_ms = 0.0;

@@ -429,9 +429,12 @@ Détails : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.1.md`.
 
 ## A6 — template SDM
 
-Déclencheur explicite : préfixe configuré `M6 - SDM - ` sur le nom de la
-source (ou, à défaut, sur le nom du projet sans `_9x16`). Le contenu ne sert
-jamais à deviner le template.
+Déclencheur explicite : nom de la source (ou, à défaut, nom du projet sans
+`_9x16`) préfixé par l'un des `template_prefixes` configurés. Les deux
+nommages livrés en production sont `M6 - SDM - ` et `SDM - `. Le contenu ne
+sert jamais à deviner le template ; le préfixe effectivement matché est
+enregistré dans `template.prefix` (`post.json`) et dans les détails de la
+décision A6.
 
 Contrôles structurels : un seul segment, aucune keyframe, composition
 1080×1920, segment couvrant toute la composition, parent Null absent ou
@@ -460,10 +463,10 @@ vidéos SDM n'ont donc pas besoin de STEP2 (cuts), STEP3 (audio), STEP4
 (tracking), STEP5/6 (réduction) ni du panel `MediaSolution.jsx`. Quand
 `steps.step8.post.direct = true`, une vidéo SDM valide est court-circuitée.
 
-Prédicat volontairement conservateur : nom préfixé par `template_prefix`,
-`.mp4`, H.264, 1920×1080, SAR 1:1, 25 fps CFR, durée de flux et `nb_frames`
-valides. Un nom SDM qui ne respecte pas ce profil repart dans le pipeline
-normal.
+Prédicat volontairement conservateur : nom préfixé par l'un des
+`template_prefixes`, `.mp4`, H.264, 1920×1080, SAR 1:1, 25 fps CFR, durée de
+flux et `nb_frames` valides. Un nom SDM qui ne respecte pas ce profil repart
+dans le pipeline normal.
 
 - **STEP2 à STEP6** : `SKIP_TEMPLATE` est appliqué avant le chargement des
   modèles et le verrou matériel. Les rapports exposent `skipped_template`.
@@ -494,6 +497,8 @@ Validation :
 | 295 | CSV STEP7 identique au CSV STEP2 (`1,00:00:00.000,00:00:52.640,1,1317`) ; chaîne STEP7 → STEP8 ; rendu 0/10/30/50 s identique au pixel à la référence Rust acceptée |
 | 340 | CSV `1,00:00:00.000,00:00:21.200,1,531` ; brut et assist rendus, logo et panneaux conformes |
 | Lot mixte 303 + 340 | non-SDM `.ecproj` et `_assist.ecproj` identiques octet pour octet à l'ancien pipeline (chemins normalisés) ; rendu identique à 10/60 s ; SDM `apply` A6, audit `pass` |
+| 116 Camille, nom `SDM - Liliane et josé` (2026-11-09) | rejeu réel sous `/tmp/test-sdm` : préfixe `SDM - ` reconnu, brut + assist, 4 calques A6 (180 %, 84,3497774862575 %, 56,294573830734535 %, logo 100 %), `template.prefix = "SDM - "`, audit `pass`, aucune décision A1–A4 |
+| 116 Camille renommé `M6 - SDM - Liliane et josé` | même résultat avec `template.prefix = "M6 - SDM - "`, aucune régression |
 
 ## Bypass archive-only (LPHDF)
 
@@ -537,7 +542,8 @@ direct = true
 suffix = "_assist"
 projects_subfolder = "projets"
 artifacts_subfolder = "post"
-template_prefix = "M6 - SDM - "
+# Les deux nommages SDM coexistent (`M6 - SDM - ` et `SDM - `).
+template_prefixes = ["M6 - SDM - ", "SDM - "]
 # Familles sans `.ecproj` : CSV de scènes archivé uniquement.
 archive_only_prefixes = ["W9 - LPHDF"]
 ffmpeg = "ffmpeg"
@@ -561,6 +567,11 @@ a2_ocr_threads = 8
 a2_logo_prior = false
 a2_logo_catalog = "qa/source_logos.toml"
 ```
+
+`template_prefixes` remplace le champ scalaire `template_prefix`, encore
+accepté comme alias Serde pour les configurations existantes. `config check`
+refuse un préfixe vide et tout chevauchement entre préfixes de template ou
+avec `archive_only_prefixes`.
 
 Le timeout `steps.step8.timeout_s` couvre EffectCraft **et** le
 post-traitement lorsque STEP8 est lancé par le serveur. Le coût mesuré du

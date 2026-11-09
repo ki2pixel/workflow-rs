@@ -1519,7 +1519,10 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             skip_preserved_mov: true,
             preserved_mov_names: vec![],
             ffprobe,
-            bypass: crate::template::Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]),
+            bypass: crate::template::Bypass::new(
+                &["M6 - SDM - ".to_string()],
+                &["W9 - LPHDF".to_string()],
+            ),
         })
         .unwrap();
         assert_eq!(report.skipped_template, 2);

@@ -104,7 +104,7 @@ pub fn ensure_for_folders(
     if !options.direct {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefix, &options.archive_only_prefixes);
+    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
     if bypass.is_empty() {
         return summary;
     }
@@ -304,7 +304,7 @@ mod tests {
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let bypass = Bypass::new("M6 - SDM - ", &[]);
+        let bypass = Bypass::new(&["M6 - SDM - ".to_string()], &[]);
         let summary = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
         assert_eq!(summary.templates, 1);
         assert_eq!(summary.created, 0);
@@ -326,7 +326,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
 printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"531","duration":"21.240000"}]}'
 "#,
         );
-        let bypass = Bypass::new("M6 - SDM - ", &[]);
+        let bypass = Bypass::new(&["M6 - SDM - ".to_string(), "SDM - ".to_string()], &[]);
         let first = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
         assert_eq!(first.templates, 1);
         assert_eq!(first.created, 1);
@@ -341,6 +341,37 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         assert!(!docs.join("M6 - SDM - Leslie et Léo.csv").exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn ensure_folder_creates_raw_for_sdm_prefix() {
+        // Given: une vidéo livrée sous le nommage `SDM - ` et les deux
+        //        préfixes configurés.
+        // When:  le dossier est préparé en direct.
+        // Then:  le brut est créé comme pour `M6 - SDM - `.
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("116 Camille");
+        let docs = folder.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("SDM - Liliane et josé.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"1287","duration":"51.480000"}]}'
+"#,
+        );
+        let bypass = Bypass::new(&["M6 - SDM - ".to_string(), "SDM - ".to_string()], &[]);
+        let summary = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
+        assert_eq!(summary.templates, 1);
+        assert_eq!(summary.created, 1);
+        assert_eq!(summary.existing, 0);
+        assert!(folder
+            .join("projets")
+            .join("SDM - Liliane et josé_9x16.ecproj")
+            .is_file());
+        assert!(!docs.join("SDM - Liliane et josé.csv").exists());
+    }
+
     #[test]
     fn archive_only_videos_are_scanned_without_raw() {
         let dir = tempfile::tempdir().unwrap();
@@ -348,7 +379,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         let docs = folder.join("docs");
         fs::create_dir_all(&docs).unwrap();
         fs::write(docs.join("W9 - LPHDF - La découverte.mp4"), b"video").unwrap();
-        let bypass = Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        let bypass = Bypass::new(&["M6 - SDM - ".to_string()], &["W9 - LPHDF".to_string()]);
         let summary = ensure_folder(
             &folder,
             "docs",

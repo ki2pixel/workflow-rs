@@ -95,10 +95,12 @@ pub struct Bypass {
 }
 
 impl Bypass {
-    pub fn new(template_prefix: &str, archive_only_prefixes: &[String]) -> Self {
+    pub fn new(template_prefixes: &[String], archive_only_prefixes: &[String]) -> Self {
         let mut entries = Vec::new();
-        if !template_prefix.is_empty() {
-            entries.push((template_prefix.to_string(), BypassMode::Template));
+        for prefix in template_prefixes {
+            if !prefix.is_empty() {
+                entries.push((prefix.clone(), BypassMode::Template));
+            }
         }
         for prefix in archive_only_prefixes {
             if !prefix.is_empty() {
@@ -109,7 +111,7 @@ impl Bypass {
     }
 
     pub fn from_config(post: &workflow_core::config::PostConfig) -> Self {
-        Self::new(&post.template_prefix, &post.archive_only_prefixes)
+        Self::new(&post.template_prefixes, &post.archive_only_prefixes)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -528,10 +530,40 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
     }
 
     #[test]
+    fn matches_name_accepts_both_sdm_prefixes() {
+        // Given: les deux nommages SDM livrés par la production.
+        // When:  chaque préfixe est testé.
+        // Then:  seul le préfixe correspondant matche.
+        assert!(matches_name(
+            Path::new("SDM - Liliane et josé.mp4"),
+            "SDM - "
+        ));
+        assert!(matches_name(
+            Path::new("M6 - SDM - Leslie et Léo.mp4"),
+            "M6 - SDM - "
+        ));
+        assert!(!matches_name(
+            Path::new("SDM - Liliane et josé.mp4"),
+            "M6 - SDM - "
+        ));
+        assert!(!matches_name(
+            Path::new("M6 - SDM - Leslie et Léo.mp4"),
+            "SDM - "
+        ));
+    }
+
+    #[test]
     fn bypass_resolves_prefixes_and_boundaries() {
-        let bypass = Bypass::new("M6 - SDM - ", &["W9 - LPHDF".to_string()]);
+        let bypass = Bypass::new(
+            &["M6 - SDM - ".to_string(), "SDM - ".to_string()],
+            &["W9 - LPHDF".to_string()],
+        );
         assert_eq!(
             bypass.mode_for_name(Path::new("M6 - SDM - Leslie et Léo.mp4")),
+            Some(BypassMode::Template)
+        );
+        assert_eq!(
+            bypass.mode_for_name(Path::new("SDM - Liliane et josé.mp4")),
             Some(BypassMode::Template)
         );
         assert_eq!(
@@ -545,6 +577,7 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         assert_eq!(bypass.mode_for_name(Path::new("W9 - LPHDFX.mp4")), None);
         assert_eq!(bypass.mode_for_name(Path::new("Autre.mp4")), None);
         assert!(Bypass::default().is_empty());
+        assert!(Bypass::new(&[], &[]).is_empty());
     }
 
     #[cfg(unix)]

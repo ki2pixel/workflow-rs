@@ -53,7 +53,7 @@ use std::time::Instant;
 pub struct QaOptions {
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
-    pub template_prefix: String,
+    pub template_prefixes: Vec<String>,
     /// Répertoire de sortie explicite : jamais le dossier du MP4 par défaut.
     pub out_dir: PathBuf,
     /// Répertoire des modèles QA (YuNet, OCR).
@@ -95,7 +95,7 @@ impl Default for QaOptions {
         Self {
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
-            template_prefix: crate::post::a6::DEFAULT_PREFIX.into(),
+            template_prefixes: crate::post::a6::default_prefixes(),
             out_dir: PathBuf::new(),
             models_dir: None,
             onnxruntime: None,
@@ -143,7 +143,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
         &Stage0Options {
             ffmpeg: options.ffmpeg.clone(),
             ffprobe: options.ffprobe.clone(),
-            template_prefix: options.template_prefix.clone(),
+            template_prefixes: options.template_prefixes.clone(),
             thresholds: Stage0Thresholds::default(),
         },
     )

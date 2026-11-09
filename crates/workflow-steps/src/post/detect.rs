@@ -713,6 +713,308 @@ fn sobel_y(image: &[u8], width: usize, height: usize) -> (Vec<f32>, Vec<f32>) {
     (pixels, rows)
 }
 
+/// Paramètres du détecteur natif A1 (D-058, option A).
+#[derive(Debug, Clone, Copy)]
+pub struct NativeParams {
+    pub edge_threshold: f32,
+    /// Seuil de couverture pour les barres très sombres.
+    pub dark_coverage: f64,
+    /// Luminance moyenne (0–255) sous laquelle une barre est « très sombre ».
+    pub dark_luma: f32,
+    /// Fraction minimale du cluster temporel dominant.
+    pub cluster_min_frac: f64,
+}
+
+impl Default for NativeParams {
+    fn default() -> Self {
+        Self {
+            edge_threshold: 20.0,
+            dark_coverage: 0.45,
+            dark_luma: 10.0,
+            cluster_min_frac: 0.60,
+        }
+    }
+}
+
+/// Mesure native stable d'un letterbox : hauteurs de barre haute et basse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeLetterbox {
+    pub top: u32,
+    pub bottom: u32,
+    pub n_frames: usize,
+    pub cluster_frames: usize,
+}
+
+impl NativeLetterbox {
+    pub fn fraction(self) -> f64 {
+        if self.n_frames == 0 {
+            0.0
+        } else {
+            self.cluster_frames as f64 / self.n_frames as f64
+        }
+    }
+
+    pub fn active(self, source_height: u32) -> u32 {
+        source_height
+            .saturating_sub(self.top)
+            .saturating_sub(self.bottom)
+    }
+}
+
+const NATIVE_ALPHA: f64 = 0.05;
+const NATIVE_MIN_SIGMA: f64 = 0.005;
+const NATIVE_CLUSTER_TOL: i64 = 2;
+const NATIVE_REF_COVERAGE: f64 = 2.0 / 3.0;
+
+#[derive(Debug, Clone, Copy)]
+struct Ewma {
+    init: bool,
+    mean: f64,
+    var: f64,
+}
+
+impl Ewma {
+    fn new() -> Self {
+        Self {
+            init: false,
+            mean: 0.0,
+            var: 0.0,
+        }
+    }
+
+    fn add(&mut self, data: f64) {
+        if self.init {
+            let diff = data - self.mean;
+            let incr = NATIVE_ALPHA * diff;
+            self.mean += incr;
+            self.var = (1.0 - NATIVE_ALPHA) * (self.var + diff * incr);
+        } else {
+            self.init = true;
+            self.mean = data;
+            self.var = 0.0;
+        }
+    }
+
+    fn trigger(&self, value: f64) -> bool {
+        self.init && value > self.mean + 5.0 * self.var.sqrt().max(NATIVE_MIN_SIGMA)
+    }
+}
+
+/// Détecte un letterbox stable sur `[start, start + duration]`.
+///
+/// Le flux est décodé en gris à `fps` (deux frames minimum par segment court),
+/// puis chaque frame est scannée par EWMA 5σ et validée par Sobel Y ciblé.
+/// Retourne `None` si aucune frame n'est exploitable ou si le cluster dominant
+/// couvre moins de `cluster_min_frac` des frames (veto de stabilité).
+#[allow(clippy::too_many_arguments)]
+pub fn native_letterbox(
+    ffmpeg: &Path,
+    video: &Path,
+    start: f64,
+    duration: f64,
+    fps: f64,
+    width: usize,
+    height: usize,
+    params: &NativeParams,
+) -> Result<Option<NativeLetterbox>> {
+    if width < 2 || height < 2 {
+        bail!("dimensions natives invalides: {width}x{height}");
+    }
+    let start = start.max(0.0);
+    let duration = duration.max(0.2);
+    let fps = fps.max(1.0);
+    let mut child = Command::new(ffmpeg)
+        .args(["-v", "error", "-ss", &format!("{start:.3}"), "-i"])
+        .arg(video)
+        .args([
+            "-t",
+            &format!("{duration:.3}"),
+            "-vf",
+            &format!("fps={fps:.3}"),
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "-",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("ffmpeg natif introuvable pour {}", video.display()))?;
+    let stderr = child.stderr.take().context("stderr ffmpeg natif absent")?;
+    let stderr_handle = std::thread::spawn(move || {
+        let mut buffer = Vec::new();
+        let mut reader = stderr;
+        let _ = reader.read_to_end(&mut buffer);
+        buffer
+    });
+    let stdout = child.stdout.take().context("stdout ffmpeg natif absent")?;
+    let mut reader = BufReader::new(stdout);
+    let frame_size = width * height;
+    let mut bars = Vec::new();
+    loop {
+        let mut frame = vec![0u8; frame_size];
+        match reader.read_exact(&mut frame) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(error) => return Err(error).context("lecture des frames natives"),
+        }
+        let means = native_row_means(&frame, width, height);
+        let top = scan_native_top(&frame, &means, width, height, params);
+        let bottom = scan_native_bottom(&frame, &means, width, height, params);
+        bars.push((top, height as u32 - 1 - bottom));
+    }
+    drop(reader);
+    let status = child.wait().context("attente ffmpeg natif")?;
+    let stderr = stderr_handle.join().unwrap_or_default();
+    if !status.success() {
+        bail!("ffmpeg natif: {}", String::from_utf8_lossy(&stderr).trim());
+    }
+    Ok(cluster_native_frames(&bars, params))
+}
+
+fn native_row_means(frame: &[u8], width: usize, height: usize) -> Vec<f64> {
+    (0..height)
+        .map(|y| {
+            let row = &frame[y * width..(y + 1) * width];
+            row.iter().map(|value| *value as f64).sum::<f64>() / width as f64 / 255.0
+        })
+        .collect()
+}
+
+fn scan_native_top(
+    frame: &[u8],
+    means: &[f64],
+    width: usize,
+    height: usize,
+    params: &NativeParams,
+) -> u32 {
+    let mut stats = Ewma::new();
+    for (y, value) in means.iter().enumerate() {
+        if stats.trigger(*value) {
+            let threshold = native_coverage_threshold(means, y, true, params);
+            let (coverage, _) =
+                native_edge_coverage(frame, width, height, y, params.edge_threshold);
+            if coverage >= threshold {
+                return y as u32;
+            }
+        }
+        stats.add(*value);
+    }
+    0
+}
+
+fn scan_native_bottom(
+    frame: &[u8],
+    means: &[f64],
+    width: usize,
+    height: usize,
+    params: &NativeParams,
+) -> u32 {
+    let mut stats = Ewma::new();
+    for y in (0..means.len()).rev() {
+        let value = means[y];
+        if stats.trigger(value) {
+            let threshold = native_coverage_threshold(means, y, false, params);
+            let (coverage, _) =
+                native_edge_coverage(frame, width, height, y, params.edge_threshold);
+            if coverage >= threshold {
+                return y as u32;
+            }
+        }
+        stats.add(value);
+    }
+    height.saturating_sub(1) as u32
+}
+
+fn native_edge_coverage(
+    frame: &[u8],
+    width: usize,
+    height: usize,
+    y: usize,
+    threshold: f32,
+) -> (f64, usize) {
+    let ym1 = y.saturating_sub(1);
+    let yp1 = (y + 1).min(height - 1);
+    let mut hits = 0usize;
+    let mut run = 0usize;
+    let mut longest_run = 0usize;
+    for x in 0..width {
+        let xm1 = x.saturating_sub(1);
+        let xp1 = (x + 1).min(width - 1);
+        let gradient = -(frame[ym1 * width + xm1] as f32)
+            - 2.0 * frame[ym1 * width + x] as f32
+            - frame[ym1 * width + xp1] as f32
+            + frame[yp1 * width + xm1] as f32
+            + 2.0 * frame[yp1 * width + x] as f32
+            + frame[yp1 * width + xp1] as f32;
+        if gradient.abs() > threshold {
+            hits += 1;
+            run += 1;
+            longest_run = longest_run.max(run);
+        } else {
+            run = 0;
+        }
+    }
+    (hits as f64 / width as f64, longest_run)
+}
+
+/// Seuil de couverture applicable à la ligne `y`.
+///
+/// Une barre est « très sombre » quand la moyenne des quatre lignes situées
+/// côté barre est inférieure à `dark_luma`. On relaxe alors la couverture à
+/// `dark_coverage` au lieu de `2/3`.
+fn native_coverage_threshold(means: &[f64], y: usize, top: bool, params: &NativeParams) -> f64 {
+    if params.dark_coverage >= NATIVE_REF_COVERAGE {
+        return NATIVE_REF_COVERAGE;
+    }
+    let (start, end) = if top {
+        (y.saturating_sub(4), y)
+    } else {
+        ((y + 1).min(means.len()), (y + 5).min(means.len()))
+    };
+    if start >= end {
+        return NATIVE_REF_COVERAGE;
+    }
+    let mean_luma = means[start..end].iter().sum::<f64>() / (end - start) as f64 * 255.0;
+    if mean_luma < params.dark_luma as f64 {
+        params.dark_coverage
+    } else {
+        NATIVE_REF_COVERAGE
+    }
+}
+
+fn cluster_native_frames(bars: &[(u32, u32)], params: &NativeParams) -> Option<NativeLetterbox> {
+    if bars.len() < 2 {
+        return None;
+    }
+    let mut clusters: Vec<(u32, u32, usize)> = Vec::new();
+    for &(top, bottom) in bars {
+        if let Some(cluster) = clusters
+            .iter_mut()
+            .find(|(cluster_top, cluster_bottom, _)| {
+                (*cluster_top as i64 - top as i64).abs() <= NATIVE_CLUSTER_TOL
+                    && (*cluster_bottom as i64 - bottom as i64).abs() <= NATIVE_CLUSTER_TOL
+            })
+        {
+            cluster.2 += 1;
+        } else {
+            clusters.push((top, bottom, 1));
+        }
+    }
+    clusters.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(&b.0)).then(a.1.cmp(&b.1)));
+    let (top, bottom, cluster_frames) = clusters[0];
+    if cluster_frames as f64 / (bars.len() as f64) < params.cluster_min_frac {
+        return None;
+    }
+    Some(NativeLetterbox {
+        top,
+        bottom,
+        n_frames: bars.len(),
+        cluster_frames,
+    })
+}
+
 pub use crate::vision::hash::sha256_file;
 
 pub fn sha256_sample(path: &Path, chunk: u64) -> Result<VideoHash> {
@@ -795,5 +1097,81 @@ mod tests {
         assert_eq!(hash.mode, "sample");
         assert_eq!(hash.offsets, vec![0, 45, 90]);
         assert_eq!(hash.size, 100);
+    }
+
+    #[test]
+    fn native_cluster_requires_two_frames_and_dominance() {
+        let params = NativeParams::default();
+        assert!(cluster_native_frames(&[(10, 10)], &params).is_none());
+        assert!(
+            cluster_native_frames(&[(10, 10), (10, 10), (0, 0), (0, 0), (30, 30)], &params)
+                .is_none()
+        );
+        let stable = cluster_native_frames(&[(10, 10), (11, 9), (10, 10), (0, 0)], &params)
+            .expect("cluster stable");
+        assert_eq!(stable.top, 10);
+        assert_eq!(stable.bottom, 10);
+        assert_eq!(stable.n_frames, 4);
+        assert_eq!(stable.cluster_frames, 3);
+        assert_eq!(stable.fraction(), 0.75);
+        assert_eq!(stable.active(64), 44);
+    }
+
+    #[test]
+    fn native_scan_detects_symmetric_bars() {
+        // Given: 64x64, 10 lignes noires en haut et en bas, contenu clair.
+        // When:  le scan natif mesure la frame.
+        // Then:  les deux frontières sont trouvées à 10 px.
+        let width = 64;
+        let height = 64;
+        let mut frame = vec![0u8; width * height];
+        for y in 10..54 {
+            for x in 0..width {
+                frame[y * width + x] = 200;
+            }
+        }
+        let means = native_row_means(&frame, width, height);
+        let params = NativeParams::default();
+        let top = scan_native_top(&frame, &means, width, height, &params);
+        let bottom = scan_native_bottom(&frame, &means, width, height, &params);
+        assert_eq!(top, 10);
+        assert_eq!(height as u32 - 1 - bottom, 10);
+    }
+
+    #[test]
+    fn native_scan_rejects_fragmented_edge() {
+        // Given: une barre noire haute, mais un contenu qui n'occupe que 40 %
+        //        de la largeur (texte ou objet, pas un bord de letterbox).
+        // When:  le scan natif mesure la frame.
+        // Then:  la couverture insuffisante rejette la frontière.
+        let width = 64;
+        let height = 64;
+        let mut frame = vec![0u8; width * height];
+        for y in 10..54 {
+            for x in 0..((width as f64 * 0.4) as usize) {
+                frame[y * width + x] = 200;
+            }
+        }
+        let means = native_row_means(&frame, width, height);
+        let params = NativeParams::default();
+        let top = scan_native_top(&frame, &means, width, height, &params);
+        let bottom = scan_native_bottom(&frame, &means, width, height, &params);
+        assert_eq!(top, 0);
+        assert_eq!(bottom, height as u32 - 1);
+    }
+
+    #[test]
+    fn native_dark_coverage_only_applies_below_luma_threshold() {
+        let params = NativeParams::default();
+        let dark = vec![0.0f64; 20];
+        assert_eq!(
+            native_coverage_threshold(&dark, 10, true, &params),
+            params.dark_coverage
+        );
+        let bright = vec![0.2f64; 20];
+        assert_eq!(
+            native_coverage_threshold(&bright, 10, true, &params),
+            NATIVE_REF_COVERAGE
+        );
     }
 }

@@ -6,9 +6,10 @@
 //! avant toute application. Un candidat A3 fort peut différer le `apply` en
 //! revue (R2, `a1_defer_on_a3`).
 
-use crate::post::detect::{cropdetect, Crop};
+use crate::post::detect::{cropdetect, native_letterbox, Crop, NativeLetterbox, NativeParams};
 use crate::post::ecproj::{CompMeta, Segment};
-use crate::post::model::Decision;
+use crate::post::model::{Action, Decision};
+use anyhow::Result;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 use std::path::Path;
@@ -28,6 +29,10 @@ pub struct A1Options {
     /// Segments dont le `apply` A1 doit être transformé en revue : A3 y a
     /// détecté un candidat fort, donc un keyframing humain probable.
     pub defer_targets: HashSet<String>,
+    /// D-058 option A : raffine un `apply` `cropdetect` avec le détecteur
+    /// natif. Désactivé par défaut ; le natif ne peut jamais créer un `apply`
+    /// ni changer un `review`/`noop`.
+    pub refine_native: bool,
 }
 
 impl Default for A1Options {
@@ -35,6 +40,7 @@ impl Default for A1Options {
         Self {
             margin: DEFAULT_A1_MARGIN,
             defer_targets: HashSet::new(),
+            refine_native: false,
         }
     }
 }
@@ -86,8 +92,32 @@ pub fn decide_a1(
                 continue;
             }
         };
-        let (decision, delta) =
+        let (mut decision, mut delta) =
             decide_segment(segment, &crops, meta, source_width, source_height, options);
+        if options.refine_native && decision.action == Action::Apply {
+            match refine_native(
+                segment,
+                &crops,
+                &decision,
+                video,
+                ffmpeg,
+                meta,
+                source_width,
+                source_height,
+                options,
+            ) {
+                Ok(Some((refined, refined_delta))) => {
+                    decision = refined;
+                    delta = refined_delta;
+                }
+                Ok(None) => {}
+                Err(error) => tracing::warn!(
+                    segment = %segment.name,
+                    error = %error,
+                    "A1: raffinement natif ignoré, décision cropdetect conservée"
+                ),
+            }
+        }
         if let Some(delta) = delta {
             position_deltas.push(delta);
         }
@@ -278,6 +308,29 @@ fn decide_segment(
         );
     }
 
+    decide_letterbox(
+        segment,
+        crops,
+        crop,
+        active,
+        details,
+        meta,
+        source_height,
+        options,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decide_letterbox(
+    segment: &Segment,
+    crops: &[Crop],
+    crop: Crop,
+    active: u32,
+    details: Value,
+    meta: &CompMeta,
+    source_height: u32,
+    options: &A1Options,
+) -> (Decision, Option<f64>) {
     let scale = round_to(
         meta.height as f64 / active as f64 * 100.0 * options.margin,
         1,
@@ -408,6 +461,169 @@ fn decide_segment(
         Decision::apply("A1", segment.name.clone(), reason, 0.9, details),
         delta,
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn refine_native(
+    segment: &Segment,
+    crops: &[Crop],
+    original: &Decision,
+    video: &Path,
+    ffmpeg: &Path,
+    meta: &CompMeta,
+    source_width: u32,
+    source_height: u32,
+    options: &A1Options,
+) -> Result<Option<(Decision, Option<f64>)>> {
+    let duration = (segment.duration() - 0.1).clamp(0.3, 4.0);
+    let fps = round_to((2.0 / duration).max(2.0), 3);
+    let params = NativeParams::default();
+    let Some(native) = native_letterbox(
+        ffmpeg,
+        video,
+        segment.start + 0.05,
+        duration,
+        fps,
+        source_width as usize,
+        source_height as usize,
+        &params,
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(refine_with_native(
+        segment,
+        crops,
+        original,
+        &native,
+        meta,
+        source_width,
+        source_height,
+        options,
+        &params,
+    ))
+}
+
+/// Applique le natif uniquement comme raffinement d'un `apply` `cropdetect`.
+///
+/// Le natif doit être stable (≥ 2 frames, cluster dominant ≥ 60 %), voir un
+/// letterbox vertical symétrique et produire un `apply` qui repasse tous les
+/// vetos A1 (scale, Position Y, couverture). Sinon `None` : la décision
+/// `cropdetect` d'origine est conservée telle quelle.
+#[allow(clippy::too_many_arguments)]
+fn refine_with_native(
+    segment: &Segment,
+    crops: &[Crop],
+    original: &Decision,
+    native: &NativeLetterbox,
+    meta: &CompMeta,
+    source_width: u32,
+    source_height: u32,
+    options: &A1Options,
+    params: &NativeParams,
+) -> Option<(Decision, Option<f64>)> {
+    if native.n_frames < 2 || native.fraction() < params.cluster_min_frac {
+        return None;
+    }
+    let active = native.active(source_height);
+    if active < 1 {
+        return None;
+    }
+    let scale_ratio = source_height as f64 / 1080.0;
+    let active_noop = round_to(ACTIVE_NOOP as f64 * scale_ratio, 0) as u32;
+    if active >= active_noop {
+        return None;
+    }
+    let bar_min = round_to(8.0 * scale_ratio, 0).max(1.0) as i64;
+    let top = native.top as i64;
+    let bottom = native.bottom as i64;
+    if top < bar_min || bottom < bar_min {
+        return None;
+    }
+    let vertical = (top - bottom).abs() as f64 <= 0.5 * top.max(bottom) as f64;
+    if !vertical {
+        return None;
+    }
+    let crop = Crop {
+        w: source_width,
+        h: active,
+        x: 0,
+        y: native.top,
+    };
+    let details = native_details(
+        original.details.clone(),
+        native,
+        active,
+        source_width,
+        params,
+    );
+    let (decision, delta) = decide_letterbox(
+        segment,
+        crops,
+        crop,
+        active,
+        details,
+        meta,
+        source_height,
+        options,
+    );
+    (decision.action == Action::Apply).then_some((decision, delta))
+}
+
+fn native_details(
+    details: Value,
+    native: &NativeLetterbox,
+    active: u32,
+    source_width: u32,
+    params: &NativeParams,
+) -> Value {
+    let mut map = details.as_object().cloned().unwrap_or_default();
+    let cropdetect = json!({
+        "active_height": map.get("active_height").cloned().unwrap_or(Value::Null),
+        "active_p10": map.get("active_p10").cloned().unwrap_or(Value::Null),
+        "crop": map.get("crop").cloned().unwrap_or(Value::Null),
+        "bars": map.get("bars").cloned().unwrap_or(Value::Null),
+        "n_crops": map.get("n_crops").cloned().unwrap_or(Value::Null),
+        "barred_frac": map.get("barred_frac").cloned().unwrap_or(Value::Null),
+        "scale_target": map.get("scale_target").cloned().unwrap_or(Value::Null),
+        "position_y_target": map.get("position_y_target").cloned().unwrap_or(Value::Null),
+        "coverage": map.get("coverage").cloned().unwrap_or(Value::Null),
+    });
+    map.insert("active_height".into(), json!(active));
+    map.insert("active_p10".into(), json!(active));
+    map.insert(
+        "crop".into(),
+        json!({
+            "w": source_width,
+            "h": active,
+            "x": 0,
+            "y": native.top,
+            "ratio": round_to(native.fraction(), 3)
+        }),
+    );
+    map.insert(
+        "bars".into(),
+        json!({"top": native.top, "bottom": native.bottom, "left": 0, "right": 0}),
+    );
+    map.insert("symmetric".into(), json!(true));
+    map.insert("cropdetect".into(), cropdetect);
+    map.insert(
+        "native".into(),
+        json!({
+            "top": native.top,
+            "bottom": native.bottom,
+            "active": active,
+            "n_frames": native.n_frames,
+            "cluster_frames": native.cluster_frames,
+            "fraction": round_to(native.fraction(), 3),
+            "edge_threshold": params.edge_threshold,
+            "dark_coverage": params.dark_coverage,
+            "dark_luma": params.dark_luma,
+            "cluster_min_frac": params.cluster_min_frac
+        }),
+    );
+    map.insert("native_refined".into(), json!(true));
+    Value::Object(map)
 }
 
 fn coverage(
@@ -649,5 +865,119 @@ mod tests {
         );
         assert_eq!(decision.action, crate::post::model::Action::Review);
         assert!(delta.is_none());
+    }
+
+    fn cropdetect_880() -> Vec<Crop> {
+        vec![
+            Crop {
+                w: 1920,
+                h: 880,
+                x: 0,
+                y: 100,
+            },
+            Crop {
+                w: 1920,
+                h: 880,
+                x: 0,
+                y: 100,
+            },
+            Crop {
+                w: 1920,
+                h: 880,
+                x: 0,
+                y: 100,
+            },
+        ]
+    }
+
+    fn native(top: u32, bottom: u32, n_frames: usize, cluster_frames: usize) -> NativeLetterbox {
+        NativeLetterbox {
+            top,
+            bottom,
+            n_frames,
+            cluster_frames,
+        }
+    }
+
+    fn refine(native: &NativeLetterbox, crops: &[Crop]) -> Option<(Decision, Option<f64>)> {
+        let (original, _) = decide_segment(
+            &segment(),
+            crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(original.action, Action::Apply);
+        refine_with_native(
+            &segment(),
+            crops,
+            &original,
+            native,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+            &NativeParams::default(),
+        )
+    }
+
+    #[test]
+    fn native_refinement_uses_native_geometry() {
+        // Given: cropdetect 100/100 (880 px actifs), natif 140/140 (800 px).
+        // When:  le natif raffine un apply déjà décidé.
+        // Then:  le scale suit le natif et les deux mesures restent tracées.
+        let crops = cropdetect_880();
+        let (refined, delta) = refine(&native(140, 140, 4, 4), &crops).expect("raffinement");
+        assert_eq!(refined.action, Action::Apply);
+        assert_eq!(refined.details["scale_target"], 243.6);
+        assert_eq!(refined.details["native_refined"], true);
+        assert_eq!(refined.details["native"]["top"], 140);
+        assert_eq!(refined.details["native"]["bottom"], 140);
+        assert_eq!(refined.details["native"]["fraction"], 1.0);
+        assert_eq!(refined.details["cropdetect"]["active_height"], 880);
+        assert_eq!(refined.details["cropdetect"]["scale_target"], 221.5);
+        assert!(delta.unwrap().abs() > 100.0);
+    }
+
+    #[test]
+    fn native_noop_keeps_cropdetect_apply() {
+        // Given: le natif ne voit aucune barre (0/0).
+        // When:  il est proposé comme raffinement.
+        // Then:  il est ignoré et cropdetect reste la décision.
+        assert!(refine(&native(0, 0, 4, 4), &cropdetect_880()).is_none());
+    }
+
+    #[test]
+    fn native_asymmetric_review_keeps_cropdetect_apply() {
+        // Given: une seule barre native (0/140) ou des barres trop inégales.
+        // When:  le natif est proposé comme raffinement.
+        // Then:  le veto asymétrie A1 s'applique et cropdetect reste seul.
+        assert!(refine(&native(0, 140, 4, 4), &cropdetect_880()).is_none());
+        assert!(refine(&native(140, 40, 4, 4), &cropdetect_880()).is_none());
+        assert!(refine(&native(600, 600, 4, 4), &cropdetect_880()).is_none());
+    }
+
+    #[test]
+    fn unstable_native_cluster_keeps_cropdetect_apply() {
+        // Given: un cluster dominant à 50 %, sous le seuil de 60 %.
+        // When:  le natif est proposé comme raffinement.
+        // Then:  la stabilité temporelle le rejette.
+        assert!(refine(&native(140, 140, 4, 2), &cropdetect_880()).is_none());
+        assert!(refine(&native(140, 140, 1, 1), &cropdetect_880()).is_none());
+    }
+
+    #[test]
+    fn native_coverage_veto_keeps_cropdetect_apply() {
+        // Given: un natif 20/20 qui remonterait la zone active au-dessus du
+        //        comp pour les crops cropdetect à y=100.
+        // When:  le natif est proposé comme raffinement.
+        // Then:  le veto couverture A1 le rejette et cropdetect reste seul.
+        assert!(refine(&native(20, 20, 4, 4), &cropdetect_880()).is_none());
+    }
+
+    #[test]
+    fn native_refinement_is_opt_in() {
+        assert!(!A1Options::default().refine_native);
     }
 }

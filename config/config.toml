@@ -212,6 +212,9 @@ ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 # Marge A1 D-056 : médiane humaine 1,0125, 51/65 cas <= 1,015.
 a1_margin = 1.015
+# D-058 option A : raffine un apply A1 avec le détecteur natif (Sobel 20,
+# couverture sombre 0,45, cluster >= 60 %). Désactivé : cropdetect décide seul.
+a1_refine_native = false
 a2_margin = 1.05
 # Gate OCR A2 (D-051) : confirme un bandeau clair par texte persistant et
 # oppose un veto si le texte change. Activé en production le 2026-11-08

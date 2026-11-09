@@ -45,6 +45,8 @@ pub struct PostOptions {
     pub a1_margin: f64,
     /// R2 : diffère A1 en revue sur candidat A3 fort. Désactivé par défaut.
     pub a1_defer_on_a3: bool,
+    /// D-058 option A : raffine un `apply` A1 avec le détecteur natif.
+    pub a1_refine_native: bool,
     pub a2_margin: f64,
     /// R6 : autorise `gap < 0,7` en revue A3. Désactivé par défaut.
     pub a3_relaxed_gap: bool,
@@ -80,6 +82,7 @@ impl Default for PostOptions {
             archive_only_prefixes: Vec::new(),
             a1_margin: 1.015,
             a1_defer_on_a3: false,
+            a1_refine_native: false,
             a2_margin: 1.05,
             a3_relaxed_gap: false,
             a2_ocr: false,
@@ -111,6 +114,7 @@ impl PostOptions {
             archive_only_prefixes: post.archive_only_prefixes.clone(),
             a1_margin: post.a1_margin,
             a1_defer_on_a3: post.a1_defer_on_a3,
+            a1_refine_native: post.a1_refine_native,
             a2_margin: post.a2_margin,
             a3_relaxed_gap: post.a3_relaxed_gap,
             a2_ocr: post.a2_ocr,
@@ -549,6 +553,7 @@ pub fn run_post_project(
             } else {
                 HashSet::new()
             },
+            refine_native: options.a1_refine_native,
         };
         decisions.extend(a1::decide_a1(
             &segments,
@@ -1650,7 +1655,23 @@ mod tests {
             workflow_core::config::PostConfig::default().a1_margin
         );
         assert!(!options.a1_defer_on_a3);
+        assert!(!options.a1_refine_native);
         assert!(!options.a3_relaxed_gap);
+        assert_eq!(
+            options.a1_refine_native,
+            workflow_core::config::PostConfig::default().a1_refine_native
+        );
+    }
+
+    #[test]
+    fn native_refine_flag_is_propagated_from_config() {
+        let config = workflow_core::config::Config::from_toml(
+            "[steps.step8.post]\na1_refine_native = true\n",
+        )
+        .unwrap();
+        let options = PostOptions::from_config(&config, "docs");
+        assert!(options.a1_refine_native);
+        assert!(!PostOptions::default().a1_refine_native);
     }
 
     #[test]

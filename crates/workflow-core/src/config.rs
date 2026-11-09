@@ -1006,6 +1006,10 @@ pub struct PostConfig {
     /// Diffère A1 en `review` lorsqu'un candidat A3 fort est détecté
     /// (R2, validation sur copies). Désactivé par défaut.
     pub a1_defer_on_a3: bool,
+    /// D-058 option A : raffine un `apply` A1 avec le détecteur natif
+    /// (Sobel 20, couverture sombre 0,45, cluster ≥ 60 %). Désactivé par
+    /// défaut : `cropdetect` reste le seul décideur.
+    pub a1_refine_native: bool,
     pub a2_margin: f64,
     /// Autorise `gap < 0,70` en revue A3 pour une amplitude ≥ 200 px
     /// (R6, validation sur copies). Désactivé par défaut.
@@ -1043,6 +1047,7 @@ impl Default for PostConfig {
             ffprobe: PathBuf::from("ffprobe"),
             a1_margin: 1.015,
             a1_defer_on_a3: false,
+            a1_refine_native: false,
             a2_margin: 1.05,
             a3_relaxed_gap: false,
             a2_ocr: false,
@@ -1143,7 +1148,19 @@ mod tests {
         let post = PostConfig::default();
         assert_eq!(post.a1_margin, 1.015);
         assert!(!post.a1_defer_on_a3);
+        assert!(!post.a1_refine_native);
         assert!(!post.a3_relaxed_gap);
+    }
+
+    #[test]
+    fn post_native_refine_flag_is_typed() {
+        // Given: un TOML explicite avec le flag D-058.
+        // When:  la configuration est chargée.
+        // Then:  le booléen est accepté par deny_unknown_fields et le défaut
+        //        reste false.
+        let config = Config::from_toml("[steps.step8.post]\na1_refine_native = true\n").unwrap();
+        assert!(config.steps.step8.post.a1_refine_native);
+        assert!(!PostConfig::default().a1_refine_native);
     }
 
     #[test]

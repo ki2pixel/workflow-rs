@@ -9,6 +9,10 @@
 **Lot B1** (fine-tuning et évaluation open-set) : voir `B1.md` et les fichiers
 `b1-*.json` du même dossier.
 
+**Lot B2** (pilote `report_only`, annotation A2) : voir `B2.md` et
+`b2-pilot.json` (copie assainie, chemins locaux et noms de fichiers vidéo
+retirés).
+
 ## 1. Modèles exportés
 
 | Modèle | Entrée | Sortie | Opset | FP32 | FP16 |

@@ -56,3 +56,19 @@ purpose = "Probe logistique logo/non-logo entraîné sur les assets dev de la ga
 input = "CLS 384, normalisé L2, sigmoïde(w·x + b)"
 operating_point = "seuil 0.50, persistance 3/12"
 geometry = "hauteur 18–220 px, largeur ≥ 30 px, aspect ≥ 1.2"
+
+# Détecteur A2 du lot B1, pilote report-only B2 (2026-11-09).
+# Binaire local non versionné : copié depuis l'environnement d'entraînement
+# `training_yolo_b1/exports/logo_b1_nano416.onnx` (checkpoint époque 5).
+[[model]]
+role = "qa.logo_detector"
+path = "logo_yolox_nano_a2.onnx"
+size = 3752972
+sha256 = "5c03e8b6e404cc7f1fd13183c1cf3a35b12e1dc6a376bac9da13fdc650cb8caa"
+license = "Apache-2.0"
+source = "YOLOX-Nano COCO (Apache-2.0) fine-tuné en interne, lot B1"
+purpose = "détection de logos inconnus et de lower-thirds A2, annotation seule"
+input = "1x3x416x416, BGR 0-255, letterbox 114"
+classes = ["logo"]
+opset = 12
+operating_point = "seuil 0.30, NMS 0.65, persistance 0.70"

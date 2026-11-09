@@ -12,6 +12,7 @@ pub mod a6;
 pub mod detect;
 pub mod direct;
 pub mod ecproj;
+pub(crate) mod logo;
 pub mod model;
 pub mod overlay;
 pub mod run;

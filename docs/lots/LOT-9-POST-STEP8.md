@@ -294,10 +294,10 @@ faux positifs **par frame** sur les négatifs. Le clustering temporel
 persistant et conserve 5/5 logos positifs. Coût local : 1,279 s/frame à
 480 px, 1,47 Gio de VRAM, 15,3 s pour 12 frames.
 
-**Aucun flag de production n'est ajouté, aucune clé TOML, aucun appel de
-modèle dans A2.** Le détecteur reste un outil de laboratoire pour proposer
-des logos inconnus au catalogue et qualifier les revues. Si un pilote est
-autorisé, il sera `review` seulement : branche logo serrée (largeur ≤ 0,35),
+**Aucun flag Grounding DINO n'est ajouté, aucun appel de ce modèle dans
+A2.** Le détecteur reste un outil de laboratoire pour proposer des logos
+inconnus au catalogue et qualifier les revues. Si un pilote était autorisé,
+il serait `review` seulement : branche logo serrée (largeur ≤ 0,35),
 branche texte (largeur ≥ 0,20, `y ≥ 0,60`), persistance ≥ 70 %,
 `details.grounding_dino` additif, échec → décision A2 inchangée, verrou
 matériel obligatoire. Détails, seuils et conditions de réouverture :
@@ -305,7 +305,67 @@ matériel obligatoire. Détails, seuils et conditions de réouverture :
 local ONNX/YOLOX-Nano ou NanoDet-Plus exécuté nativement en Rust via `ort`,
 sans sidecar : `docs/etudes/ETUDE-YOLO-ONNX-A2.md`. Le **Lot B0** est
 exécuté (exports FP32/FP16, benchmark CUDA : YOLOX 416 FP32 à 8,40 ms p95
-au total) ; le fine-tuning et le pilote A2 restent à faire.
+au total) ; les lots B1 et B2 ci-dessous prennent la suite.
+
+### Détecteur YOLOX-Nano B1/B2 (annotation seule, 2026-11-09)
+
+Le **lot B1** a fine-tuné YOLOX-Nano 416 depthwise sur 1 495 logos et
+228 logos externes. Le checkpoint époque 5 est figé après un arrêt manuel à
+l'époque 15 (la val synthétique montait, D-060 baissait). Point de
+fonctionnement : seuil 0,30, NMS 0,65, 1 classe `logo`, persistance 0,70.
+Métriques : rappel D-060 95,5 %, présence lower-third 96,7 %, boîte logo A2
+91,7 %, open-set 90,3 %, FP négatifs 3,3 %, 8,01 ms p95 et +107 Mio de
+VRAM. Détails : `results/B1.md`.
+
+Le **lot B2** ajoute une annotation passive, désactivée par défaut :
+
+```toml
+a2_logo_detector = false
+a2_logo_detector_model = "qa/logo_yolox_nano_a2.onnx"
+a2_logo_detector_onnxruntime = ""   # vide = runtime système
+a2_logo_detector_device = "cuda"    # cpu = diagnostic
+a2_logo_detector_size = 416         # 640 possible
+a2_logo_detector_conf = 0.30
+a2_logo_detector_iou = 0.65
+a2_logo_detector_min_persistence = 0.70
+a2_logo_detector_roi = "full"       # bottom, bottom_left = essais
+```
+
+Quand il est actif, `post run` échantillonne 12 frames à la résolution
+source (les mêmes instants que le gate OCR A2, mais `a2.rs` reste intact),
+filtre les détections sur le candidat A2 et les zones logo, agrège les
+clusters (IoU ≥ 0,50, centre ≤ 10 px), puis ajoute
+`details.logo_detector` aux décisions A2. Le bloc expose le modèle, son
+SHA-256, les seuils, `detections_total`/`detections_a2`, `clusters`,
+`logo` (`detected`, `persistence`, `frames`, `bbox`, `score`, `unknown_logo`,
+`source_logo_match`, `merged_with_lower_third`) et `latency_ms`. Aucune
+action, raison, confiance ou `scale_target` n'est modifiée. Une erreur
+(modèle absent, verrou occupé, OOM, frame illisible) journalise un warning
+et laisse la décision intacte.
+
+Le verrou `/tmp/workflow-rs-hw.lock` est acquis sans attente avant le
+chargement de la session et relâché après destruction de la session CUDA.
+Le runtime CUDA est initialisé avant le gate OCR A2 pour que le `OnceLock`
+ONNX Runtime ne reste pas sur le runtime CPU de production ; le pilote
+utilise le runtime du venv TransNet et `LD_LIBRARY_PATH` avec les
+répertoires `nvidia/*/lib`. Le binaire ONNX reste hors dépôt ; le manifeste
+`assets/models/qa/manifest.toml` fige taille, SHA-256, licence et opset.
+
+Le recadrage ROI a été mesuré sur D-060 : `bottom_left` porte la boîte logo
+A2 de 91,7 % à 98,3 %, mais fait chuter les références de 95,5 % à 84,0 %.
+Le pilote B2 garde donc `full` ; une variante à deux passes reste la piste
+B1.2. Le pilote `report_only`, ses résultats et ses limites sont décrits
+dans `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md`. **Aucune activation
+de production n'est autorisée par ce lot** : le détecteur ne participe
+toujours pas à la décision A2.
+
+Résultats du pilote (2026-11-09) : 13 projets finalisés dont le brut est
+byte-identique à l'assist (STEP7 supprime les bruts ; 2 `apply` exclus),
+**0 différence d'action** et de `review.json`, aucun audit `fail`
+(2 `warn` `source_coverage` préexistants),
+2/13 logos persistants (11/12), tous deux hors catalogue D-052, deux
+logos animés à 7/12 sous le seuil, latence p50 9,28–10,86 ms / p95
+10,77–12,25 ms, coût 4,45 s/projet. Aucun `apply` créé.
 
 ## A3/A4/A5 — revue et rapport seulement
 

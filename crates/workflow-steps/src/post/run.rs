@@ -9,11 +9,13 @@ use crate::post::ecproj::{
     self, assist_path, comp_meta, comp_mut, find_item_by_name, project_stem, save_bytes, segments,
     set_position_y, set_scale, CompMeta, Segment,
 };
+use crate::post::logo::LogoAnnotation;
 use crate::post::model::{
     now_iso, verdict, Action, AuditCheck, Decision, PostProjectOutcome, PostRunSummary, PostSummary,
 };
 use crate::post::{a1, a2, a3, a4, a6, detect, direct};
 use crate::template::{Bypass, BypassMode};
+use crate::vision::logo_detector::{ExecutionDevice, Roi};
 use crate::vision::source_logo::SourceLogoCatalog;
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -60,6 +62,18 @@ pub struct PostOptions {
     /// Registre spatial des logos source (D-052), annotation et exclusion OCR.
     pub a2_logo_prior: bool,
     pub a2_logo_catalog: PathBuf,
+    /// Détecteur de logos B1/B2, annotation seule. Désactivé par défaut.
+    pub a2_logo_detector: bool,
+    pub a2_logo_detector_model: PathBuf,
+    pub a2_logo_detector_onnxruntime: Option<PathBuf>,
+    pub a2_logo_detector_device: ExecutionDevice,
+    pub a2_logo_detector_size: u32,
+    pub a2_logo_detector_conf: f32,
+    pub a2_logo_detector_iou: f32,
+    pub a2_logo_detector_min_persistence: f64,
+    pub a2_logo_detector_roi: Roi,
+    /// Verrou matériel partagé avec STEP2/3/4 (D-012).
+    pub hardware_lock: PathBuf,
     /// Laboratoire uniquement : calcule les rapports sans publier `_assist`.
     pub report_only: bool,
     /// Émet les marqueurs `POST_*` sur `stdout` (hook STEP8) au lieu de
@@ -92,6 +106,16 @@ impl Default for PostOptions {
             a2_ocr_threads: a2::A2_OCR_DEFAULT_THREADS,
             a2_logo_prior: false,
             a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
+            a2_logo_detector: false,
+            a2_logo_detector_model: PathBuf::from("qa/logo_yolox_nano_a2.onnx"),
+            a2_logo_detector_onnxruntime: None,
+            a2_logo_detector_device: ExecutionDevice::Cuda,
+            a2_logo_detector_size: 416,
+            a2_logo_detector_conf: 0.30,
+            a2_logo_detector_iou: 0.65,
+            a2_logo_detector_min_persistence: 0.70,
+            a2_logo_detector_roi: Roi::Full,
+            hardware_lock: PathBuf::from("/tmp/workflow-rs-hw.lock"),
             report_only: false,
             emit_progress: false,
         }
@@ -124,6 +148,23 @@ impl PostOptions {
             a2_ocr_threads: post.a2_ocr_threads.max(1),
             a2_logo_prior: post.a2_logo_prior,
             a2_logo_catalog: resolve_models_path(&config.paths.models, &post.a2_logo_catalog),
+            a2_logo_detector: post.a2_logo_detector,
+            a2_logo_detector_model: resolve_models_path(
+                &config.paths.models,
+                &post.a2_logo_detector_model,
+            ),
+            a2_logo_detector_onnxruntime: post
+                .a2_logo_detector_onnxruntime
+                .clone()
+                .filter(|path| !path.as_os_str().is_empty()),
+            a2_logo_detector_device: ExecutionDevice::parse(&post.a2_logo_detector_device)
+                .unwrap_or_default(),
+            a2_logo_detector_size: post.a2_logo_detector_size,
+            a2_logo_detector_conf: post.a2_logo_detector_conf as f32,
+            a2_logo_detector_iou: post.a2_logo_detector_iou as f32,
+            a2_logo_detector_min_persistence: post.a2_logo_detector_min_persistence,
+            a2_logo_detector_roi: Roi::parse(&post.a2_logo_detector_roi).unwrap_or_default(),
+            hardware_lock: config.hardware.lock_path.clone(),
             report_only: false,
             emit_progress: false,
         }
@@ -324,6 +365,7 @@ fn run_post_jobs(options: &PostOptions, projects: &[PathBuf], summary: &mut Post
     // `MS_BATCH_*` pour conserver l'ordre ; `post run` les garde sur `stderr`
     // afin que son JSON `stdout` reste parsable.
     emit_post_marker(options, format!("POST_TOTAL: {}", projects.len()));
+    let mut logo = LogoAnnotation::new(options);
     for (index, project) in projects.iter().enumerate() {
         let name = project
             .file_stem()
@@ -334,7 +376,7 @@ fn run_post_jobs(options: &PostOptions, projects: &[PathBuf], summary: &mut Post
             options,
             format!("POST_CURRENT: {}/{} - {}", index + 1, projects.len(), name),
         );
-        let outcome = run_post_project(options, project, None);
+        let outcome = run_post_project_inner(options, project, None, &mut logo);
         if let Some(error) = outcome.error.as_deref() {
             tracing::warn!("Post-traitement échoué pour {}: {error}", project.display());
         } else {
@@ -375,6 +417,16 @@ pub fn run_post_project(
     options: &PostOptions,
     project: &Path,
     docs_override: Option<&Path>,
+) -> PostProjectOutcome {
+    let mut logo = LogoAnnotation::new(options);
+    run_post_project_inner(options, project, docs_override, &mut logo)
+}
+
+fn run_post_project_inner(
+    options: &PostOptions,
+    project: &Path,
+    docs_override: Option<&Path>,
+    logo: &mut LogoAnnotation,
 ) -> PostProjectOutcome {
     let started = Instant::now();
     let docs = docs_override.map(Path::to_path_buf).unwrap_or_else(|| {
@@ -490,6 +542,7 @@ pub fn run_post_project(
     let mut a6_ms = a6_start.elapsed().as_secs_f64() * 1000.0;
     let mut a1_ms = 0.0;
     let mut a2_ms = 0.0;
+    let mut a2_logo_detector_ms = 0.0;
     let mut a3_ms = 0.0;
     let mut a4_ms = 0.0;
     if template.eligible != Some(true) {
@@ -587,6 +640,15 @@ pub fn run_post_project(
             &a2_options,
         ));
         a2_ms = start.elapsed().as_secs_f64() * 1000.0;
+        a2_logo_detector_ms = logo
+            .annotate(
+                &mut decisions,
+                video.as_deref(),
+                specs.as_ref(),
+                &options.ffmpeg,
+                a2_options.logo_prior.as_ref(),
+            )
+            .unwrap_or(0.0);
         if !options.a1_defer_on_a3 {
             let start = Instant::now();
             a3_decisions = a3::decide_a3(&segments, ae.as_deref(), fps, options.a3_relaxed_gap);
@@ -601,6 +663,10 @@ pub fn run_post_project(
     decisions.extend(a6_decisions);
     timings.insert("a1_ms".into(), json!(round_to(a1_ms, 1)));
     timings.insert("a2_ms".into(), json!(round_to(a2_ms, 1)));
+    timings.insert(
+        "a2_logo_detector_ms".into(),
+        json!(round_to(a2_logo_detector_ms, 1)),
+    );
     timings.insert("a3_ms".into(), json!(round_to(a3_ms, 1)));
     timings.insert("a4_ms".into(), json!(round_to(a4_ms, 1)));
 

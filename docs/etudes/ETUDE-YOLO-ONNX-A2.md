@@ -999,18 +999,37 @@ attendue avant toute décision d'`apply`.
 - **Pas de FP16/INT8 fine-tuné** : seul le FP32 est mesuré. FP16 B0 était
   stable pour YOLOX, mais un export FP16 du modèle B1 devra être revalidé.
 
-### 11.8 Suite B2
+### 11.8 Pilote B2 — exécuté (2026-11-09)
 
-1. Piloter `report_only` sur 20 copies de projets, sans modifier `a2.rs` :
-   seuil 0,30, NMS 0,65, classe `logo`, sortie dans `review`.
-2. Mesurer les différences d'`action`, l'absence de nouvel `apply` et les
-   clés ajoutées hors `details` ; 0 différence exigée.
-3. Tester le recadrage ROI (bande basse et coin haut gauche) et la
-   persistance temporelle sur les clips D-060, sans réentraînement.
-4. Si le rappel A2 ou les FP clips ne tiennent pas, lancer B1.2 avec
-   davantage de domain randomization (fonds externes, dégradations JPEG,
-   logos partiellement occultés) et une sélection de checkpoint sans D-060.
-5. Ne rien câbler au CLI, au serveur ou à A2 avant le diff B2.
+Le pilote `report_only` est implémenté sans modifier `a2.rs` :
+
+- `vision/logo_detector.rs` : YOLOX-Nano 416, letterbox 114, décodage,
+  NMS, ROI optionnelle (`full`, `bottom`, `bottom_left`) et remap source ;
+- `post/logo.rs` : 12 frames, filtre ROI A2, clusters IoU 0,50 /
+  centre 10 px, persistance 0,70, `details.logo_detector` additif ;
+- configuration `a2_logo_detector = false` par défaut, verrou matériel,
+  runtime CUDA initialisé avant l'OCR A2 ;
+- pilote sur les **13** projets finalisés dont le brut est byte-identique à
+  l'assist (STEP7 supprime les bruts ; 2 projets `apply` exclus). Le seuil
+  demandé de 20 projets n'est pas atteignable sur ce corpus.
+
+Résultats du run apparié : **13/13 annotés**, **0 différence d'action** et
+**0 différence de `review.json`**, aucun `apply` créé, aucun audit `fail`
+(11 `pass`, 2 `warn` `source_coverage` préexistants). **2/13** projets ont
+un logo persistant (11/12, 91,7 %), tous deux
+`unknown_logo` (M6 hors catalogue D-052). Deux logos animés à 7/12 sont
+sous le seuil, dont un scindé en 7/12 + 3/12 : la fragmentation temporelle
+est la principale limite. Latence détecteur p50 **9,28–10,86 ms**,
+p95 **10,77–12,25 ms** ; coût complet **4,45 s/projet** (décodage ffmpeg
+et chargement de session), inférence ~0,12 s/projet.
+
+Le recadrage `bottom_left` porte la boîte logo A2 de 91,7 % à 98,3 % mais
+fait chuter les références de 95,5 % à 84,0 % : il n'est pas retenu pour
+B2. Le détecteur reste **désactivé par défaut** et hors décision A2 ; la
+suite est B1.2 (ROI à deux passes, fusion temporelle) ou une activation
+pilote après retour opérateur. Détails, tableau par projet et limites :
+`docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md` ; configuration :
+`docs/lots/LOT-9-POST-STEP8.md`.
 
 ### 11.9 Artefacts
 
@@ -1024,6 +1043,10 @@ attendue avant toute décision d'`apply`.
   `training_yolo_b1/README.md`.
 - Le checkpoint d'époque 5 n'est conservé qu'au format ONNX ; les
   checkpoints intermédiaires du run arrêté ne sont pas versionnés.
+- Pilote B2 : `results/B2.md`, `results/b2-pilot.json`, `results/b2-roi.json`,
+  `scripts/pilot-b2-logo-detector.py` ; code
+  `crates/workflow-steps/src/vision/logo_detector.rs` et
+  `crates/workflow-steps/src/post/logo.rs`.
 
 ## 12. Références
 

@@ -80,6 +80,22 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   (91,7 %) restent sous 95 %. B2 (pilote `report_only`) est autorisé sous
   réserve, aucune production modifiée. Preuves :
   `docs/etudes/ETUDE-YOLO-ONNX-A2.md` §11 et `results/B1.md`.
+- **Suivi B2 (2026-11-09)** : le détecteur B1 est branché en annotation
+  seule (`a2_logo_detector = false`) dans `vision/logo_detector.rs` et
+  `post/logo.rs`, avec 12 frames, ROI A2, clusters IoU 0,50 / centre 10 px,
+  persistance 0,70 et `details.logo_detector` additif. Le pilote
+  `report_only` couvre 13 projets finalisés dont le brut est byte-identique
+  à l'assist (STEP7 supprime les bruts ; 2 projets `apply` exclus) :
+  **0 différence d'action** et de `review.json`, aucun audit `fail`
+  (2 `warn` `source_coverage` préexistants),
+  **2/13** logos persistants (11/12), tous deux hors catalogue D-052,
+  deux logos animés à 7/12 sous le seuil, latence p50 9,28–10,86 ms / p95
+  10,77–12,25 ms, coût 4,45 s/projet. Le recadrage `bottom_left` améliore
+  la boîte A2 (91,7 → 98,3 %) mais dégrade les références (95,5 → 84,0 %),
+  donc `full` reste le point B2. Aucune activation de production ;
+  `a2.rs`, `config/config.toml` et le runtime sont inchangés. Preuves :
+  `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md`,
+  `results/b2-pilot.json`, `scripts/pilot-b2-logo-detector.py`.
 
 ## 2026-10-26 — D-028 : abandon du client desktop Tauri
 

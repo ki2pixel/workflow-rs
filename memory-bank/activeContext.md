@@ -2,7 +2,7 @@
 
 ## Tâche en cours
 
-**Lots B0/B1 — détecteur local ONNX pour A2 (2026-11-09, exécutés).**
+**Lots B0/B1/B2 — détecteur local ONNX pour A2 (2026-11-09, exécutés).**
 Après validation de D-060, l'approche B a été testée hors production :
 YOLOX-Nano 416/640 et NanoDet-Plus-m 416 (Apache-2.0), exportés en ONNX
 FP32/FP16 et exécutés nativement en Rust via `ort` CUDA. B0 : YOLOX 416 FP32
@@ -25,6 +25,26 @@ est autorisé **sous réserve**, sans modification de `a2.rs`.
 Résultats : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B1.md` et `b1-*.json` ;
 étude : `docs/etudes/ETUDE-YOLO-ONNX-A2.md` §11 ; binaire :
 `crates/workflow-steps/examples/yolo_bench.rs`.
+
+**Lot B2 — pilote `report_only` A2 (2026-11-09, exécuté).** Le détecteur
+B1 est branché en annotation seule (`a2_logo_detector = false`) dans
+`vision/logo_detector.rs` et `post/logo.rs` : 12 frames à la résolution
+source, filtre ROI A2, clusters IoU 0,50 / centre 10 px, persistance 0,70,
+`details.logo_detector` additif. Aucune action, raison, confiance ou
+`scale_target` n'est modifiée ; toute erreur laisse A2 intact. Pilote sur
+les **13** projets finalisés dont le brut est byte-identique à l'assist
+(STEP7 supprime les bruts, 2 projets `apply` exclus) : **0 différence
+d'action** et de `review.json`, aucun audit `fail` (2 `warn`
+`source_coverage` préexistants), **2/13** logos
+persistants (11/12, 91,7 %), tous deux `unknown_logo` (M6 hors catalogue
+D-052), deux logos animés à 7/12 sous le seuil (fragmentation 7/12 +
+3/12), latence p50 **9,28–10,86 ms** / p95 **10,77–12,25 ms**, coût
+**4,45 s/projet** (décodage ffmpeg + chargement). Le recadrage
+`bottom_left` améliore la boîte A2 (91,7 → 98,3 %) mais dégrade les
+références (95,5 → 84,0 %), donc `full` reste le point B2. Aucune
+activation de production ; suite B1.2 (ROI deux passes, fusion temporelle)
+ou pilote opérateur. Preuves :
+`docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md` et `b2-pilot.json`.
 
 **Grounding DINO — spike A2 et logos source (2026-11-09, D-060).** Le
 détecteur ouvert `IDEA-Research/grounding-dino-tiny` (Swin-T, 659 Mio) a été
@@ -841,7 +861,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 557 tests unitaires ; pas de CI.
+- 577 tests unitaires ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

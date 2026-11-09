@@ -467,6 +467,23 @@ géométrique. Le mode visuel ne crée ni finding ni décision ; il enrichit le
 détail du check et ne compare pas un export dont le format diffère de la
 composition.
 
+Depuis le lot B2 (2026-11-09), `steps.step8.post.a2_logo_detector`
+(défaut `false`) active le détecteur YOLOX-Nano 416 en annotation seule.
+Il ajoute `details.logo_detector` aux décisions A2 : modèle, SHA-256,
+seuils, 12 frames, clusters temporels et latence. Les clés
+`a2_logo_detector_model` (relatif à `paths.models`),
+`a2_logo_detector_onnxruntime`, `a2_logo_detector_device`
+(`cuda`/`cpu`), `a2_logo_detector_size` (416/640),
+`a2_logo_detector_conf`, `a2_logo_detector_iou`,
+`a2_logo_detector_min_persistence` et `a2_logo_detector_roi`
+(`full`/`bottom`/`bottom_left`) règlent le détecteur. Aucune action,
+raison, confiance ou `scale_target` n'est modifiée ; une erreur laisse A2
+intact. Le modèle reste hors dépôt et le verrou matériel
+`/tmp/workflow-rs-hw.lock` est obligatoire en CUDA. Le runtime CUDA doit
+être initialisé avant le gate OCR A2 ; sans `LD_LIBRARY_PATH` vers les
+bibliothèques `nvidia/*/lib`, le chargement échoue et le détecteur est
+ignoré. Détails et pilote : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/B2.md`.
+
 Depuis D-056, `steps.step8.post.a1_margin` vaut **1,015** (marge humaine
 médiane 1,0125 sur le corpus GOOD) et A2 exécute l'OCR avant le gate de
 largeur : une bande basse persistante de 35–50 % peut être appliquée si le

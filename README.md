@@ -87,7 +87,11 @@ Linux et le panneau CEP continue d'appeler Python.
   overlay déclaré cache le logo, et alimente le QA (`--source-logo`) sans
   jamais recadrer ni masquer. Le QA peut confirmer localement les pixels
   (`--source-logo-visual`, crops externes via `--source-logo-references`) ;
-  30 émissions, 21 clean feeds et 9 émissions sans logo.
+  30 émissions, 21 clean feeds et 9 émissions sans logo. Depuis le lot B2,
+  un détecteur YOLOX-Nano 416 (`a2_logo_detector = false`) ajoute
+  `details.logo_detector` aux décisions A2 (clusters, persistance, logos
+  inconnus, latence) sans modifier aucune action ; il reste hors décision
+  et désactivé par défaut.
 - Depuis D-056, A1 vise une marge de 1,015, A2 peut appliquer une bande basse
   partielle de 35–50 % confirmée par OCR, A3 filtre les revues sous 250 px /
   2 clés et signale la haute confiance, A4 tague les flashes probables et A5

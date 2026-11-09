@@ -351,6 +351,48 @@ impl Config {
                 )));
             }
         }
+        let post = &self.steps.step8.post;
+        if !matches!(
+            post.a2_logo_detector_device
+                .trim()
+                .to_ascii_lowercase()
+                .as_str(),
+            "cuda" | "gpu" | "cpu"
+        ) {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post.a2_logo_detector_device doit être cuda ou cpu".into(),
+            ));
+        }
+        if !matches!(post.a2_logo_detector_size, 416 | 640) {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post.a2_logo_detector_size doit être 416 ou 640".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&post.a2_logo_detector_conf)
+            || !(0.0..=1.0).contains(&post.a2_logo_detector_iou)
+            || !(0.0..=1.0).contains(&post.a2_logo_detector_min_persistence)
+        {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post: seuils du détecteur de logos hors [0, 1]".into(),
+            ));
+        }
+        if !matches!(
+            post.a2_logo_detector_roi
+                .trim()
+                .to_ascii_lowercase()
+                .as_str(),
+            "full" | "frame" | "bottom" | "lower" | "bottom_left" | "bottom-left" | "corner"
+        ) {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post.a2_logo_detector_roi doit être full, bottom ou bottom_left"
+                    .into(),
+            ));
+        }
+        if post.a2_logo_detector && post.a2_logo_detector_model.as_os_str().is_empty() {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post.a2_logo_detector_model est vide".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -1031,6 +1073,23 @@ pub struct PostConfig {
     pub a2_logo_prior: bool,
     /// Catalogue TOML, relatif à `paths.models` ou absolu.
     pub a2_logo_catalog: PathBuf,
+    /// Détecteur de logos B1/B2 (annotation seule). Désactivé par défaut :
+    /// aucune session ONNX n'est ouverte et la décision A2 reste identique.
+    pub a2_logo_detector: bool,
+    /// Modèle ONNX, relatif à `paths.models` ou absolu.
+    pub a2_logo_detector_model: PathBuf,
+    /// Bibliothèque ONNX Runtime explicite ; vide = runtime système.
+    pub a2_logo_detector_onnxruntime: Option<PathBuf>,
+    /// `cuda` (production) ou `cpu` (diagnostic).
+    pub a2_logo_detector_device: String,
+    /// Taille d'entrée du modèle : 416 (B1) ou 640.
+    pub a2_logo_detector_size: u32,
+    pub a2_logo_detector_conf: f64,
+    pub a2_logo_detector_iou: f64,
+    /// Persistance minimale d'un cluster pour `detected` (0,70 en B1).
+    pub a2_logo_detector_min_persistence: f64,
+    /// `full` (validé B1), `bottom` ou `bottom_left` (essais de résolution).
+    pub a2_logo_detector_roi: String,
 }
 
 impl Default for PostConfig {
@@ -1057,6 +1116,15 @@ impl Default for PostConfig {
             a2_ocr_threads: 2,
             a2_logo_prior: false,
             a2_logo_catalog: PathBuf::from("qa/source_logos.toml"),
+            a2_logo_detector: false,
+            a2_logo_detector_model: PathBuf::from("qa/logo_yolox_nano_a2.onnx"),
+            a2_logo_detector_onnxruntime: None,
+            a2_logo_detector_device: "cuda".into(),
+            a2_logo_detector_size: 416,
+            a2_logo_detector_conf: 0.30,
+            a2_logo_detector_iou: 0.65,
+            a2_logo_detector_min_persistence: 0.70,
+            a2_logo_detector_roi: "full".into(),
         }
     }
 }
@@ -1150,6 +1218,64 @@ mod tests {
         assert!(!post.a1_defer_on_a3);
         assert!(!post.a1_refine_native);
         assert!(!post.a3_relaxed_gap);
+        assert!(!post.a2_logo_detector);
+        assert_eq!(post.a2_logo_detector_size, 416);
+        assert_eq!(post.a2_logo_detector_conf, 0.30);
+        assert_eq!(post.a2_logo_detector_iou, 0.65);
+        assert_eq!(post.a2_logo_detector_min_persistence, 0.70);
+        assert_eq!(post.a2_logo_detector_roi, "full");
+        assert_eq!(post.a2_logo_detector_device, "cuda");
+    }
+
+    #[test]
+    fn post_logo_detector_flags_are_typed() {
+        // Given: un TOML explicite avec le détecteur B1/B2.
+        // When:  la configuration est chargée.
+        // Then:  les champs sont typés et le défaut reste désactivé.
+        let config = Config::from_toml(
+            "[steps.step8.post]\n\
+             a2_logo_detector = true\n\
+             a2_logo_detector_model = \"qa/logo.onnx\"\n\
+             a2_logo_detector_device = \"cpu\"\n\
+             a2_logo_detector_size = 640\n\
+             a2_logo_detector_conf = 0.25\n\
+             a2_logo_detector_iou = 0.45\n\
+             a2_logo_detector_min_persistence = 0.75\n\
+             a2_logo_detector_roi = \"bottom_left\"\n",
+        )
+        .unwrap();
+        let post = &config.steps.step8.post;
+        assert!(post.a2_logo_detector);
+        assert_eq!(post.a2_logo_detector_model, PathBuf::from("qa/logo.onnx"));
+        assert_eq!(post.a2_logo_detector_device, "cpu");
+        assert_eq!(post.a2_logo_detector_size, 640);
+        assert_eq!(post.a2_logo_detector_conf, 0.25);
+        assert_eq!(post.a2_logo_detector_iou, 0.45);
+        assert_eq!(post.a2_logo_detector_min_persistence, 0.75);
+        assert_eq!(post.a2_logo_detector_roi, "bottom_left");
+        assert!(!PostConfig::default().a2_logo_detector);
+    }
+
+    #[test]
+    fn post_logo_detector_values_are_validated() {
+        // Given: des valeurs hors bornes pour le détecteur.
+        // When:  la configuration commune est validée.
+        // Then:  device, taille, seuils et ROI sont refusés.
+        let mut config = Config::default();
+        config.steps.step8.post.a2_logo_detector_device = "metal".into();
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.a2_logo_detector_device = "cuda".into();
+        config.steps.step8.post.a2_logo_detector_size = 300;
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.a2_logo_detector_size = 416;
+        config.steps.step8.post.a2_logo_detector_conf = 1.5;
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.a2_logo_detector_conf = 0.30;
+        config.steps.step8.post.a2_logo_detector_min_persistence = -0.1;
+        assert!(config.validate_common().is_err());
+        config.steps.step8.post.a2_logo_detector_min_persistence = 0.70;
+        config.steps.step8.post.a2_logo_detector_roi = "top_right".into();
+        assert!(config.validate_common().is_err());
     }
 
     #[test]

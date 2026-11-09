@@ -27,7 +27,20 @@
   sous la cible 95 %. Pilote B2 `report_only` autorisé sous réserve,
   `a2.rs` intact. Aucun changement de production.
   Preuves : `docs/etudes/ETUDE-YOLO-ONNX-A2/results/` et `results/B1.md`.
-- **557 tests unitaires**, sans matériel.
+- **Lot B2 — annotation A2 `report_only` (2026-11-09)** : détecteur B1
+  branché en annotation seule (`a2_logo_detector = false`) dans
+  `vision/logo_detector.rs` et `post/logo.rs`. 12 frames, ROI A2, clusters
+  IoU 0,50 / centre 10 px, persistance 0,70, `details.logo_detector` additif ;
+  aucune action A2 modifiée. Pilote sur 13 projets finalisés (bruts
+  supprimés par STEP7, 2 applies exclus) : 0 différence d'action et de
+  `review.json`, aucun audit `fail` (2 `warn` `source_coverage`
+  préexistants), 2/13 logos persistants (11/12) tous deux inconnus du
+  catalogue D-052, 2 clusters animés à 7/12 sous le seuil, latence p50
+  9,28–10,86 ms / p95 10,77–12,25 ms, coût 4,45 s/projet. Aucune
+  activation de production ; suite B1.2 (ROI deux passes/fusion
+  temporelle) ou pilote opérateur. Preuves : `results/B2.md`,
+  `results/b2-pilot.json` et `scripts/pilot-b2-logo-detector.py`.
+- **577 tests unitaires**, sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
   humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour

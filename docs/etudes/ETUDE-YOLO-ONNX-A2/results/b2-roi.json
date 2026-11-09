@@ -1,0 +1,104 @@
+{
+  "full": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.955,
+      "frame_recall": 0.9426229508196722,
+      "median_iou": 0.7436159286404183
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.9166666666666666,
+      "frame_recall": 0.9166666666666666,
+      "median_iou": 0.6870294002528534
+    },
+    "negative_frames": 60,
+    "negative_fp": 2,
+    "negative_fp_rate": 0.03333333333333333
+  },
+  "bottom": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.925,
+      "frame_recall": 0.9098360655737705,
+      "median_iou": 0.7575838084292388
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.9,
+      "frame_recall": 0.9,
+      "median_iou": 0.6686119322098198
+    },
+    "negative_frames": 60,
+    "negative_fp": 1,
+    "negative_fp_rate": 0.016666666666666666
+  },
+  "bottom_left_50": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.84,
+      "frame_recall": 0.8852459016393442,
+      "median_iou": 0.716203259204035
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.9833333333333333,
+      "frame_recall": 0.9833333333333333,
+      "median_iou": 0.6753213901161867
+    },
+    "negative_frames": 60,
+    "negative_fp": 2,
+    "negative_fp_rate": 0.03333333333333333
+  },
+  "bottom_left_45": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.84,
+      "frame_recall": 0.8688524590163934,
+      "median_iou": 0.6703795565642316
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.95,
+      "frame_recall": 0.95,
+      "median_iou": 0.6360667346684445
+    },
+    "negative_frames": 60,
+    "negative_fp": 2,
+    "negative_fp_rate": 0.03333333333333333
+  },
+  "bottom_left_55": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.88,
+      "frame_recall": 0.8852459016393442,
+      "median_iou": 0.7222049036802333
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.9833333333333333,
+      "frame_recall": 0.9833333333333333,
+      "median_iou": 0.6356223496244555
+    },
+    "negative_frames": 60,
+    "negative_fp": 5,
+    "negative_fp_rate": 0.08333333333333333
+  },
+  "bottom_left_40": {
+    "reference_logo": {
+      "boxes": 200,
+      "recall": 0.685,
+      "frame_recall": 0.7704918032786885,
+      "median_iou": 0.591808752628615
+    },
+    "a2_lower_third": {
+      "boxes": 60,
+      "recall": 0.95,
+      "frame_recall": 0.95,
+      "median_iou": 0.6320234076417811
+    },
+    "negative_frames": 60,
+    "negative_fp": 1,
+    "negative_fp_rate": 0.016666666666666666
+  }
+}

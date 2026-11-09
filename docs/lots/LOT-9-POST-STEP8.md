@@ -101,9 +101,12 @@ dominant ≥ 60 %, marge D-056 inchangée. Un natif `review`/`noop`, instable,
 asymétrique ou qui échoue à la couverture conserve la décision
 `cropdetect` ; le natif ne crée ni ne retire jamais un `apply`. Les détails
 JSON additives sont `native_refined`, `native` et `cropdetect`. Validation
-unitaire et réelle sur le 305 ; passe 2 609 segments et activation pilote
-restent à faire. ADR :
-`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`.
+unitaire et réelle sur le 305, puis sur le corpus GOOD complet : 2 607
+segments A1, 0 changement d'action, 52/65 applies raffinés, gain pixel moyen
+1,46 px, surcoût 2,66 % du temps A1. Reste le contrôle visuel des cas 89
+signalés et l'activation pilote. ADR :
+`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuve :
+`docs/etudes/ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`.
 
 ## A2 — bannière basse
 

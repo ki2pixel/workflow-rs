@@ -219,8 +219,8 @@ inutiles en moins, et plus sûr sur les ciels sombres.
 3. **Vetos conservés** : keyframes, asymétrie, `barred_frac`, `scale > 300 %`,
    `Position Y > 600`, couverture, différé A3.
 4. **Coût** : le natif ne tourne que sur les segments où il est utile
-   (65/2 609 dans le corpus GOOD pour le mode gardé), soit environ +0,45 s
-   par apply, ~+2,5 % du temps A1 global.
+   (65/2 607 segments A1 du corpus GOOD). Mesure complète : **+563 ms par
+   apply raffiné**, **+29,27 s** et **+2,66 %** du temps A1 global.
 5. **Écritures atomiques** et ordre des clés JSON préservés.
 
 ## Limites assumées
@@ -237,9 +237,11 @@ inutiles en moins, et plus sûr sur les ciels sombres.
 - **6 segments 89** non appliqués : 5 revues (1, 6, 17, 18, 35) et le
   segment 22 (`apply` A1, cluster 1/2) ; quatre revues ne voient qu'une
   barre. Ils sont recadrés par l'humain à 243,0.
-- **Échantillon** : 201 segments, pas les 2 609 du corpus ; le contrôle
-  304 seg 9 est ciblé, mais un ciel sombre et uniforme d'un autre projet
-  pourrait passer la relaxation. `dark_luma 10` réduit ce risque.
+- **Validation pixel** : la passe complète couvre 2 607 segments A1, mais
+  la référence reste `cropdetect=24:2:0`, pas une vérité terrain manuelle.
+  Les 4 dégradations 89 (0,5 à 2 px) et les 4 applies 89 bloqués par la
+  couverture demandent encore un contrôle visuel. `dark_luma 10` réduit le
+  risque de faux positif sur un ciel sombre.
 - **Deux segments à une frame** (367 seg 33, 81 seg 23) : natif `review` par
   prudence ; ils sont déjà `review` A1, sans impact sur les applies.
 
@@ -257,11 +259,22 @@ inutiles en moins, et plus sûr sur les ciels sombres.
    (transition) reste à 213,7 % par fallback. Sans le flag, les décisions
    sont identiques à l'ancien chemin. Mesures natives vérifiées : 305
    seg 1 **81/79**, 304 seg 9 **0/0**, 304 seg 34 **0/0**.
-4. **Suite** : `cargo fmt --check`, `cargo clippy --workspace --all-targets
+4. **Corpus GOOD complet** (2026-11-09) : 75 projets, **2 607 segments
+   porteurs d'une décision A1**, 0 erreur. `apply`/`review`/`noop` inchangés
+   (65/116/2 426 dans les deux modes), **0 changement d'action**,
+   **52/65 applies raffinés** (80,0 %). Gain pixel moyen vs
+   `cropdetect=24:2:0` : **1,46 px** (médiane 1,75, p10/p90 1,00/2,00,
+   min/max −2,00/+2,50 ; 47 améliorés, 1 neutre, 4 dégradés sur le 89).
+   MAE par côté : **2,23 px** (`cropdetect=24:16:0`) contre **0,77 px**
+   (natif). Coût : 1 102,4 s → 1 131,7 s, soit **+29,27 s** (**+2,66 %**)
+   et 563 ms par apply raffiné. Détail :
+   `docs/etudes/ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`.
+5. **Suite** : `cargo fmt --check`, `cargo clippy --workspace --all-targets
    -- -D warnings`, `cargo test --workspace` verts.
-5. **Reste à faire avant activation production** : passe sur les 2 609
-   segments, mesure du coût sur un projet réel, activation sur un projet
-   pilote. Le flag reste `false` dans `config/config.toml`.
+6. **Reste à faire avant activation production** : contrôle visuel des 4
+   dégradations 89 et des 4 applies 89 bloqués par la couverture, puis
+   activation sur un projet pilote. Le flag reste `false` dans
+   `config/config.toml`.
 
 ## Suites
 
@@ -278,7 +291,9 @@ inutiles en moins, et plus sûr sur les ciels sombres.
 - `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.md`
 - `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.csv`
 - `docs/etudes/ETUDE-VSLETTERBOX-A1/results/spike-good-sample-v2.json`
+- `docs/etudes/ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`
 - `crates/workflow-steps/examples/a1_letterbox_spike.rs`
+- `crates/workflow-steps/examples/a1_full_eval.rs`
 - `crates/workflow-steps/src/post/{a1,detect}.rs`
 - `crates/workflow-core/src/config.rs` (`PostConfig`)
 - `config/config.toml` (`a1_refine_native`)

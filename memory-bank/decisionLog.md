@@ -936,12 +936,24 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
   211,6 %), le segment 17 (transition) reste à 213,7 % par fallback ;
   mesures natives 305 seg 1 **81/79**, 304 seg 9 **0/0**, 304 seg 34
   **0/0**.
-- **Reste** : passe sur les 2 609 segments, coût sur un projet réel,
-  activation pilote. Le flag reste `false` en production.
+- **Corpus GOOD complet (2026-11-09)** : 75 projets, **2 607 segments A1**,
+  0 erreur ; `apply`/`review`/`noop` inchangés (65/116/2 426),
+  **0 changement d'action**, **52/65 applies raffinés** (80,0 %). Gain
+  pixel moyen vs `cropdetect=24:2:0` : **1,46 px** (médiane 1,75, p10/p90
+  1,00/2,00, min/max −2,00/+2,50 ; 47 améliorés, 1 neutre, 4 dégradés sur
+  le 89). MAE par côté : **2,23 px** (`cropdetect=24:16:0`) contre
+  **0,77 px** (natif).
+  Coût : 1 102,4 s → 1 131,7 s, soit **+29,27 s** (**+2,66 %**) et 563 ms
+  par apply raffiné.
+- **Reste** : contrôle visuel des 4 dégradations 89 et des 4 applies 89
+  bloqués par la couverture, puis activation pilote. Le flag reste `false`
+  en production.
 - **Références** : `docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`,
   `docs/lots/LOT-9-POST-STEP8.md`,
   `docs/etudes/ETUDE-VSLETTERBOX-A1/README.md`,
+  `docs/etudes/ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`,
   `crates/workflow-steps/src/post/{a1,detect}.rs`,
+  `crates/workflow-steps/examples/a1_full_eval.rs`,
   `crates/workflow-core/src/config.rs`, `config/config.toml`.
 
 ## 2026-11-09 — D-058 (calibration v2) : barres sombres, Sobel 20

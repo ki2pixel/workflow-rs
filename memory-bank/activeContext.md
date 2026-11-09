@@ -9,10 +9,14 @@ les quatre lignes côté barre sont sous 10/255), clustering dominant ≥ 60 %,
 marge D-056 1,015. Un natif `review`/`noop`/instable ou qui échoue à un veto
 conserve `cropdetect` ; le natif ne crée ni ne retire jamais un `apply`.
 Détails additives `native_refined`, `native`, `cropdetect`. Validation
-unitaire et réelle sur le 305 (16/17 applies à 211,8 % au lieu de 213,7 %) ;
-la passe 2 609 segments et l'activation pilote restent à faire. L'option C
+unitaire et réelle sur le 305 (16/17 applies à 211,8 % au lieu de 213,7 %),
+puis passe complète sur le corpus GOOD : 2 607 segments A1, 0 changement
+d'action, 52/65 applies raffinés, gain pixel moyen 1,46 px, surcoût 29,27 s
+(2,66 % du temps A1). Reste le contrôle visuel des 4 dégradations 89 et des
+4 applies 89 bloqués par la couverture, puis l'activation pilote. L'option C
 est reportée à D-059. ADR :
-`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md`.
+`docs/decisions/DECISION-A1-NATIVE-GARDE-D058.md` ; preuve :
+`docs/etudes/ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`.
 
 **Registre spatial des logos source — phases A/B/C (2026-11-08, D-052).** Le
 catalogue versionné `assets/models/qa/source_logos.toml` contient les 30

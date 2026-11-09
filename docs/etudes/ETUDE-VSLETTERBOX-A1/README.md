@@ -29,6 +29,7 @@ results/spike-good-sample.csv décisions par segment (65 apply / 116 review / 20
 results/spike-good-sample-v2.md  calibration v2 (Sobel 20 + barres sombres)
 results/spike-good-sample-v2.csv décisions par segment de la v2
 results/spike-good-sample-v2.json matrice et taux de la v2
+results/full-corpus-v2.md  validation du mode gardé sur 2 607 segments
 scripts/confusion.py  calcul de la matrice depuis le CSV du spike
 ```
 
@@ -80,8 +81,34 @@ Détail : [`results/spike-good-sample-v2.md`](results/spike-good-sample-v2.md).
 `a1_refine_native = false`. Il ne raffine qu'un `apply` déjà décidé par
 `cropdetect` ; un natif `review`/`noop`/instable conserve la décision
 d'origine. Validation réelle sur le 305 : 16/17 applies à 211,8 % (un à
-211,6 %) au lieu de 213,7 %. La passe 2 609 segments et l'activation pilote
-restent à faire ; l'option C est reportée à D-059.
+211,6 %) au lieu de 213,7 %.
+
+### Validation sur le corpus complet (2026-11-09)
+
+La passe Rust sur le corpus GOOD complet couvre **2 607 segments porteurs
+d'une décision A1** (75 projets, 0 erreur). Le décompte 2 609 de l'inventaire
+inclut deux couches template SDM de l'assist du projet 328, hors A1.
+
+| Mesure | `refine_native = false` | `refine_native = true` |
+| --- | ---: | ---: |
+| `apply` | 65 | 65 |
+| `review` | 116 | 116 |
+| `noop` | 2 426 | 2 426 |
+| Temps A1 | 1 102,4 s | 1 131,7 s |
+
+- **0 changement d'action** ; **52/65 applies raffinés** (80,0 %).
+- Gain pixel moyen vs `cropdetect=24:2:0` : **1,46 px** (médiane 1,75,
+  p10/p90 1,00/2,00, min/max −2,00/+2,50 ; 47 améliorés, 1 neutre,
+  4 dégradés sur le 89).
+- MAE par côté : **2,23 px** (`cropdetect=24:16:0`) contre **0,77 px**
+  (natif raffiné).
+- Surcoût : **29,27 s** sur 2 607 segments, soit **2,66 %** du temps A1
+  (563 ms par apply raffiné).
+- 13 applies non raffinés : 9 natifs `noop`/`review` connus et 4 cas 89
+  bloqués par le veto de couverture.
+
+Détail et limites : [`results/full-corpus-v2.md`](results/full-corpus-v2.md).
+L'activation pilote reste à faire ; l'option C est reportée à D-059.
 
 ## Méthode
 
@@ -182,7 +209,8 @@ Dépendances : Python 3.10, `numpy`, `ffmpeg`/`ffprobe`. Aucune écriture dans
 ## Limites
 
 - Prototype approximatif, pas VapourSynth ; pas de validation à 25 fps.
-- Échantillon 304/305/356, pas les 2 609 segments.
+- Le prototype Python reste limité à 304/305/356 ; la passe Rust complète
+  est dans [`results/full-corpus-v2.md`](results/full-corpus-v2.md).
 - Images synthétiques non compressées : le bruit H.264 n'est pas modélisé.
 - Les valeurs `cropdetect=24:2:0` restent une référence à 2 px, pas une
   vérité terrain manuelle.

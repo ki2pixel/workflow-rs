@@ -104,8 +104,10 @@ commandes sont en § 8.
   calibré sur un nombre de frames suffisant.
 - Les tests synthétiques sont des images non compressées : ils isolent le
   critère, ils ne mesurent pas l'effet du bruit H.264.
-- L'étude ne réexécute pas A1 sur les 2 609 segments ; elle ne prouve pas une
-  amélioration globale. C'est le rôle du spike de § 6.
+- L'étude initiale ne réexécutait pas A1 sur les 2 609 segments ; la
+  validation complète du mode gardé est désormais dans
+  [`ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md`](ETUDE-VSLETTERBOX-A1/results/full-corpus-v2.md)
+  (2 607 segments A1, 52/65 applies raffinés, 0 changement d'action).
 
 ---
 
@@ -1057,5 +1059,7 @@ avec le CSV [`spike-good-sample-v2.csv`](ETUDE-VSLETTERBOX-A1/results/spike-good
 *Fin de l'étude. D-057 a ouvert un spike opt-in ; D-058 accepte le mode
 natif gardé (option A) derrière `a1_refine_native = false`. L'option C
 (natif primaire + fallback `cropdetect`) est reportée à D-059. Le mode gardé
-est implémenté et validé par tests unitaires et sur le 305 ; la passe
-2 609 segments et l'activation pilote restent à faire.*
+est implémenté, validé par tests unitaires et sur le 305, puis passé sur le
+corpus GOOD complet : 2 607 segments A1, 52/65 applies raffinés, 0
+changement d'action, gain pixel moyen 1,46 px, surcoût 2,66 % du temps A1.
+L'activation pilote reste à faire.*

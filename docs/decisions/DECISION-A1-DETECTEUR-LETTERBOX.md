@@ -41,7 +41,8 @@ demandée évalue sa transposition dans A1.
    un Sobel Y 3×3 ciblé sur les lignes candidates, une couverture de colonnes
    et un clustering temporel des couples `(top, bottom)`.
 3. **Ajouter** un mode opt-in `a1_detector = "native"` ; `cropdetect` reste
-   le défaut. Aucun changement du chemin par défaut.
+   le défaut. Aucun changement du chemin par défaut. Le nom final retenu par
+   D-058 est `a1_refine_native` (booléen, option A gardée).
 4. **Conserver** tous les vetos A1 : keyframes, asymétrie, `barred_frac`,
    `scale > 300 %`, `Position Y > 600`, couverture, différé A3.
 5. **Ne pas utiliser** le p10 actuel pour agréger les mesures natives :

@@ -498,6 +498,12 @@ L'intégration minimale et sûre :
    `detector`, `samples`, `edge_coverage`, `persistence`, `cluster_frac`.
    Le schéma `post.json` reste `1` (clés additives).
 
+> **Note D-058 (2026-11-09)** : l'implémentation retenue est plus simple que
+> ce plan : `A1Options.refine_native: bool` et
+> `PostConfig.a1_refine_native`, pas d'enum `A1Detector`. Le natif ne
+> raffine qu'un `apply` déjà décidé par `cropdetect` (option A) ; voir
+> §11.6 et l'ADR D-058.
+
 Contrat préservé :
 
 - `Decision::apply/review/noop` et les champs `scale_target`,

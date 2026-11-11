@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.5 |
-| Date | 2026-10-28 |
+| Version | 1.6 |
+| Date | 2026-11-10 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -412,8 +412,8 @@ décision ne s'applique). Trois artefacts additifs sont écrits sous
 template), `review.json` (abstentions) et `audit.json` (contrôles, SHA-256 du
 brut et du projet assisté, hash échantillonné de la vidéo). A1/A2 ne déplacent
 jamais l'Anchor Point ; A3/A4 restent en revue et A5 en rapport ; A6 applique
-le template SDM si le préfixe configuré correspond et si la structure est
-mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
+le template SDM si l'un des `template_prefixes` configurés correspond et si la
+structure est mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
 avec `workflow-cli post run`. Sa progression (`POST_*`) prolonge la barre
 STEP8 et publie `progress_phase = "post"`. Depuis D-034,
@@ -425,6 +425,15 @@ Depuis D-035, `steps.step8.post.archive_only_prefixes` (par défaut
 bypass mais sans aucun `.ecproj` : seul le CSV de scènes est archivé et
 copié, STEP8 ignore la vidéo par son nom. Détail :
 `docs/lots/LOT-9-POST-STEP8.md`.
+
+Depuis D-061, `steps.step8.post.template_prefixes` remplace le scalaire
+`template_prefix` par une liste de préfixes, `["M6 - SDM - ", "SDM - "]` par
+défaut ; l'ancien champ reste accepté comme alias Serde. Le préfixe réellement
+matché est enregistré dans `template.prefix` du `post.json` et dans les détails
+de la décision A6. `config check` rejette les préfixes vides et les
+chevauchements entre préfixes de template et avec `archive_only_prefixes` ;
+`post run --template-prefix` est répétable et le cache QA passe en version 10
+pour intégrer la liste.
 
 Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
 opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes
@@ -514,7 +523,7 @@ After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 a
 
 ## 8. Configuration unifiée
 
-Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 163 clés ; `config/env.map.toml` documente 150 correspondances.
+Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 189 clés ; `config/env.map.toml` documente 152 correspondances.
 
 Sections : `[server]`, `[paths]`, `[legacy]`, `[webhook]`, `[download]`, `[steps]`, `[steps.filter]`, `[steps.stepN]` (dont `[steps.step8.post]`), `[retention]` et `[hardware]`.
 

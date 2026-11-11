@@ -90,8 +90,10 @@ Linux et le panneau CEP continue d'appeler Python.
   30 émissions, 21 clean feeds et 9 émissions sans logo. Depuis le lot B2,
   un détecteur YOLOX-Nano 416 (`a2_logo_detector = false`) ajoute
   `details.logo_detector` aux décisions A2 (clusters, persistance, logos
-  inconnus, latence) sans modifier aucune action ; il reste hors décision
-  et désactivé par défaut.
+  inconnus, latence) sans modifier aucune action. Depuis B2.1, l'association
+  temporelle stricte puis animée et un cache de frames partagé avec le gate
+  OCR complètent l'annotation, toujours sans effet sur les décisions ; le
+  détecteur reste désactivé par défaut.
 - Depuis D-056, A1 vise une marge de 1,015, A2 peut appliquer une bande basse
   partielle de 35–50 % confirmée par OCR, A3 filtre les revues sous 250 px /
   2 clés et signale la haute confiance, A4 tague les flashes probables et A5

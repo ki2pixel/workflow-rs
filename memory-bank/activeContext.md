@@ -2,6 +2,27 @@
 
 ## Tâche en cours
 
+**Étude corpus 248 — post-STEP8 et flags A2 (2026-11-11, lecture seule).**
+Le corpus `Corpus_Exemple_3` (92 dossiers, 248 projets, 9 779 segments) a été
+audité sans modifier les `.ecproj` ni `/mnt/cache` : 9 359 segments appariés
+(95,7 %), accord strict 58,93 %, matrice zoom 660 TP / 7 FP / 3 218 FN /
+5 474 TN, précision 98,95 %, rappel 17,02 %. A1 conserve 373/380 `apply`
+(98,16 %) ; les 7 faux applies sont tous des sources pillarboxées,
+`horizontal` calculé mais non utilisé comme veto. A2 conserve 287/287
+segments (0 revert, 0 sur-zoom) ; 35/175 revues (20 %) cachent un bandeau et
+13 cibles A2 sont manquées (7,4 %). A3 ajoute des clés dans 31,6 % des
+revues, A4 agit dans 6 %, A5 résout 111/111 en report-only. La shadow
+evaluation des 248 projets avec `a2_logo_prior=true` + `a2_logo_detector=true`
+crée **1 `apply` correct** (`257 Camille — 66M VENTES`, 218,2 % contre
+215,3 % humain), ne perd aucun apply, ajoute 2 fausses revues (`108`, `243`)
+et reformule 15 motifs ; le détecteur ne change aucune action et coûte
+2 313 ms/projet en moyenne (médiane 1 858,5 ms, max 5,34 s). Décision D-062 :
+`a2_logo_prior = true` activé dans `config/config.toml` en pilote contrôlé,
+`a2_logo_detector` maintenu `false` ; le veto A1 barres latérales ≥ 32 px est
+formalisé dans `docs/lots/LOT-11-A1-VETO-LATERAL.md`. Rapport :
+`docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`. Aucun code de production,
+`runtime/` ou `/mnt/cache` modifié.
+
 **SDM multi-préfixes — A6 et bypass direct (2026-11-09, D-061).**
 La vidéo `116 Camille/docs/SDM - Liliane et josé.mp4` n'était pas reconnue
 comme template SDM : `template_prefix` valait `M6 - SDM - `, l'audit STEP8
@@ -250,6 +271,34 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-11] **Étude corpus 248 post-STEP8 (lecture seule)** :
+  - 248 projets / 9 359 segments appariés ; 660 TP / 7 FP / 3 218 FN /
+    5 474 TN, précision 98,95 %, rappel 17,02 % ;
+  - A1 373/380 `apply` conservés, 7 faux applies pillarbox (veto latéral
+    `horizontal` non utilisé) ; A2 287/287 segments conservés, 0 revert ;
+    35/175 revues avec bandeau, 13 cibles A2 manquées ;
+  - shadow 248 `a2_logo_prior + a2_logo_detector` : 1 `apply` créé
+    (`257 Camille`, 218,2 % contre 215,3 %), 0 perdu, 3 changements
+    d'action (dont 2 fausses revues `108`/`243`), 15 reformulations de
+    motif, 41/199 actions de revue confirmées toutes étroites, 0 action de bandeau ;
+  - coût détecteur : 2 313 ms/projet en moyenne, 1 858,5 ms de médiane,
+    5,34 s max, 573,6 s sur le run ;
+  - D-062 : `a2_logo_prior=true` activé dans `config/config.toml` (pilote),
+    `a2_logo_detector=false` ; ticket A1 `LOT-11-A1-VETO-LATERAL.md` ;
+  - aucun code de production, `runtime/` ou `/mnt/cache` modifié ; rapport
+    `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`.
+
+- [2026-11-10] **Synchronisation documentaire post-D-061/B2.1** :
+  - AGENTS.md aligné sur la mesure réelle : 589 tests listés (587 exécutés +
+    2 ignorés) ;
+  - contrat en version 1.6 : D-061 (`template_prefixes`, alias scalaire,
+    validation des chevauchements, `template.prefix`, cache QA 10) et
+    décomptes réels (189 clés TOML, 152 correspondances `env.map.toml`) ;
+  - `docs/README.md` : description de l'étude YOLO passée à B0–B2.1 et
+    indexation de `etudes/Architecture_QA_Vidéo_Locale.md` ;
+  - README : consolidation temporelle et cache B2.1 ;
+  - aucune modification de code, de `runtime/` ou de `/mnt/cache`.
 
 - [2026-11-09] **SDM multi-préfixes (D-061)** :
   - `PostConfig.template_prefixes` remplace `template_prefix`, avec

@@ -4,7 +4,7 @@
 | --- | --- |
 | Type | Index |
 | Statut | Actif |
-| Date | 2026-10-30 |
+| Date | 2026-11-11 |
 | Portée | Navigation, taxonomie et règles de maintenance de `docs/` |
 | Voir aussi | `../README.md`, `../AGENTS.md`, `../parity/DRIFT.md`, `../memory-bank/activeContext.md` |
 
@@ -83,7 +83,8 @@ Le contrat est complété par [`../parity/DRIFT.md`](../parity/DRIFT.md) pour le
 | STEP6 | [`lots/LOT-1-STEP6.md`](lots/LOT-1-STEP6.md) | Lot 1 | Référence |
 | STEP7 | [`lots/LOT-1-STEP7.md`](lots/LOT-1-STEP7.md) | Lot 1 | Référence |
 | STEP8 | [`lots/LOT-1-STEP8.md`](lots/LOT-1-STEP8.md) | Lot 1 | Référence |
-| A5/A6, bypass direct SDM/archive-only et gate OCR A2 opt-in (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
+| A5/A6, bypass direct SDM/archive-only, template SDM multi-préfixes (D-061) et gate OCR A2 opt-in (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
+| A1 — veto latéral des sources pillarboxées (ticket) | [`lots/LOT-11-A1-VETO-LATERAL.md`](lots/LOT-11-A1-VETO-LATERAL.md) | Lot 11 | Proposé |
 
 La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 `LOT-4-STEP3` sont volontairement dans cet ordre historique.
@@ -119,6 +120,7 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 | [`decisions/DECISION-A1-DETECTEUR-LETTERBOX.md`](decisions/DECISION-A1-DETECTEUR-LETTERBOX.md) | D-057 : détecteur de letterbox A1 natif opt-in, pas d'intégration VapourSynth. | Référence |
 | [`decisions/DECISION-A1-NATIVE-GARDE-D058.md`](decisions/DECISION-A1-NATIVE-GARDE-D058.md) | D-058 : A1 natif gardé (option A), Sobel 20 + barres sombres, opt-in `a1_refine_native`. | Acceptée |
 | [`decisions/DECISION-GROUNDING-DINO-A2.md`](decisions/DECISION-GROUNDING-DINO-A2.md) | D-060 : Grounding DINO hors production A2, laboratoire seulement, backend local 480 px, Replicate écarté, ONNX non prêt. | Acceptée |
+| [`decisions/DECISION-A2-LOGO-PRIOR.md`](decisions/DECISION-A2-LOGO-PRIOR.md) | D-062 : activation pilote de `a2_logo_prior`, détecteur YOLOX maintenu `false`. | Acceptée |
 
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans
@@ -132,9 +134,11 @@ Toute nouvelle décision durable suit la convention
 | [`etudes/SPIKE-STEP9-PROTOCOLE.md`](etudes/SPIKE-STEP9-PROTOCOLE.md) | Protocole de spike isolé, corpus, métriques, critères d'acceptation et d'arrêt. | Preuve |
 | [`etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md`](etudes/ETUDE-LOGOS-BANDEAUX-POST-QA.md) | Benchmark des sept dépôts logos/sous-titres, diagnostic A2/QA sur le corpus Camille et architecture cible du gate OCR (D-051). | Référence |
 | [`etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md`](etudes/ETUDE-CORPUS-GOOD-POST-STEP8.md) | Étude comparative A1–A6 sur 75 triplets GOOD : matrices A3, validation export, règles de marge A1, seuil A2 et tri A3. | Référence |
+| [`etudes/ETUDE-CORPUS-248-POST-STEP8.md`](etudes/ETUDE-CORPUS-248-POST-STEP8.md) | Audit post-STEP8 sur 248 projets finalisés : précision/rappel A1–A5, 7 faux applies pillarbox, 35 revues A2 avec bandeau, et shadow evaluation des flags `a2_logo_prior`/`a2_logo_detector` (D-062 : prior en pilote, détecteur `false`). | Référence |
 | [`etudes/ETUDE-VSLETTERBOX-A1.md`](etudes/ETUDE-VSLETTERBOX-A1.md) | Étude d'opportunité du détecteur `vapoursynth-letterbox` pour A1 : EWMA 5σ, masque de contours, précision 1 px, limites et spike natif opt-in (D-057). | Référence |
 | [`etudes/ETUDE-GROUNDING-DINO-A2.md`](etudes/ETUDE-GROUNDING-DINO-A2.md) | Spike Grounding DINO pour A2 et les logos source : 242 frames, prompts, ROI, persistance temporelle, latence/VRAM, Replicate vs local, ONNX (D-060). | Preuve |
-| [`etudes/ETUDE-YOLO-ONNX-A2.md`](etudes/ETUDE-YOLO-ONNX-A2.md) | Approche B : détecteur local ONNX/YOLOX-Nano ou NanoDet-Plus en Rust (`ort`) pour logos inconnus et lower-thirds. Lot B0 exécuté : exports FP32/FP16, benchmark CUDA (8,40 ms p95 YOLOX 416 FP32), intégration A2 annotation-only à valider en B1/B2. | Preuve |
+| [`etudes/ETUDE-YOLO-ONNX-A2.md`](etudes/ETUDE-YOLO-ONNX-A2.md) | Approche B : détecteur local ONNX/YOLOX-Nano en Rust (`ort`) pour logos inconnus et lower-thirds. Lots B0 à B2.1 exécutés : exports FP32/FP16, benchmark CUDA, fine-tuning YOLOX-Nano 416, pilote `report_only` sur 13 projets, consolidation temporelle et cache de frames. Détecteur annotation-only, désactivé par défaut (`a2_logo_detector = false`). | Preuve |
+| [`etudes/Architecture_QA_Vidéo_Locale.md`](etudes/Architecture_QA_Vidéo_Locale.md) | Note de décision du scénario B : cascade QA locale, `qa.json` séparé et commande `workflow-cli qa run`. | Référence |
 
 Ces documents ne décrivent pas la production courante : la décision D-029
 maintient la consolidation déterministe avant tout STEP9 agentique.

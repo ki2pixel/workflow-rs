@@ -2,6 +2,26 @@
 
 ## Statut actuel
 
+- **Étude corpus 248 — post-STEP8 et flags A2 (2026-11-11)** : audit en
+  lecture seule de 248 projets / 9 359 segments appariés. Précision de zoom
+  98,95 %, rappel 17,02 % (le monteur zoome aussi pour des raisons
+  sémantiques) ; A1 373/380 `apply` conservés, 7 faux applies pillarbox ;
+  A2 287/287 conservés, 35/175 revues avec bandeau, 13 cibles A2 manquées.
+  Shadow 248 des flags `a2_logo_prior` + `a2_logo_detector` : 1 `apply`
+  correct créé (`257 Camille`), 0 perdu, 0 faux apply, 2 fausses revues,
+  41/199 actions de revue confirmées toutes étroites, 0 action de bandeau confirmée,
+  détecteur à 2 313 ms/projet en moyenne. Décision D-062 :
+  `a2_logo_prior=true` activé dans `config/config.toml` (pilote),
+  `a2_logo_detector=false` ; veto A1 barres latérales ≥ 32 px formalisé dans
+  `docs/lots/LOT-11-A1-VETO-LATERAL.md`. Rapport :
+  `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`. Aucun code de production,
+  `runtime/` ou `/mnt/cache` modifié.
+- **Synchronisation documentaire (2026-11-10)** : alignement post-D-061 et
+  B2.1. AGENTS.md passe à 589 tests listés, le contrat en version 1.6
+  documente `template_prefixes` (D-061) et les décomptes réels (189 clés,
+  152 correspondances), `docs/README.md` met à jour l'étude YOLO et indexe
+  `Architecture_QA_Vidéo_Locale.md`, et le README mentionne B2.1. Aucun
+  code ni artefact de production modifié.
 - Migration Rust terminée pour les 8 étapes.
 - Backend de production : Rust `:5004` headless via
   `scripts/switch-rust.sh` ; Python legacy `:5003` arrêté (rollback

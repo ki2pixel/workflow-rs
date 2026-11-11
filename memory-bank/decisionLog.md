@@ -8,6 +8,37 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-11 — D-062 : activation pilote de `a2_logo_prior`
+
+- **Contexte** : l'étude `Corpus_Exemple_3` (248 projets, 9 359 segments
+  appariés) chiffre A2 : 9 `apply`, 287 segments conservés, 0 revert, mais
+  13 recadrages de bandeau manqués sur 175 revues mesurables. La shadow
+  evaluation des flags A2 sur les 248 projets montre que le prior crée
+  **1 `apply` correct** (`257 Camille — 66M VENTES`, 218,2 % contre 215,3 %
+  humain, +2,9 points), 0 `apply` perdu, 0 faux apply, 2 fausses revues
+  (`108`, `243`) et 15 reformulations de motif, sans coût CPU mesurable.
+  Le détecteur YOLOX ne change aucune action, confirme 41/199 actions de
+  revue toutes étroites (0 des 38 actions de bandeau) et coûte 2 313 ms/
+  projet en moyenne (médiane 1 858,5 ms, max 5,34 s).
+- **Décision** : `config/config.toml` passe à `a2_logo_prior = true` en
+  pilote contrôlé ; `a2_logo_detector` reste `false`. Aucun changement de
+  code : le flag active le comportement livré par D-052. Le pilote surveille
+  les `apply` créés, les revues « logo source uniquement » et les faux
+  applies ; retour à `false` au premier faux apply ou si la charge de revue
+  dépasse le gain.
+- **Validation** : run shadow 248/248, `rc=0`, 245 audits `pass`, 3 `warn`
+  `source_coverage`, 0 `fail` ; corpus en lecture seule, aucun `.ecproj`
+  modifié. `config check` exécuté après la bascule.
+- **Portée** : A2 du post-STEP8 et la configuration de production
+  uniquement. Les 12 autres cibles A2 manquées restent hors de portée
+  (bandes larges, hautes, sombres, animées, sous-titres). Le veto latéral A1
+  (7 faux applies pillarbox sur 380) est une décision séparée, formalisée
+  dans `docs/lots/LOT-11-A1-VETO-LATERAL.md`.
+- **Références** : D-052, D-055, D-060, D-061,
+  `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`,
+  `docs/decisions/DECISION-A2-LOGO-PRIOR.md`,
+  `docs/lots/LOT-11-A1-VETO-LATERAL.md`.
+
 ## 2026-11-09 — D-061 : support multi-préfixes du template SDM
 
 - **Contexte** : `/mnt/cache/116 Camille/docs/SDM - Liliane et josé.mp4`

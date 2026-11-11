@@ -2,6 +2,15 @@
 
 ## Statut actuel
 
+- **Lot 11 — veto latéral A1 (2026-11-11, D-063)** : `a1.rs` rétrograde en
+  `review` (confiance 0,4) tout `apply` avec une barre gauche ou droite
+  ≥ `arrondi(32 × hauteur_source / 1080)` (32 px en 1080p, 21 px en 720p,
+  64 px en 4K), motif explicite et `details.lateral_min`. 9 tests A1
+  nouveaux, 598 tests listés (596 exécutés + 2 ignorés), fmt/clippy verts.
+  Rejeu réel 6 projets / 7 segments : 7/7 en `review`, 0 autre changement
+  sur 305 décisions A1. Rejeu des 382 applies : 19 bons rétrogradés sur
+  380 appariés (12 à ±2 pts), 354 applies sans barre ≥ 32 px inchangés.
+  Ticket `docs/lots/LOT-11-A1-VETO-LATERAL.md` clos.
 - **Étude corpus 248 — post-STEP8 et flags A2 (2026-11-11)** : audit en
   lecture seule de 248 projets / 9 359 segments appariés. Précision de zoom
   98,95 %, rappel 17,02 % (le monteur zoome aussi pour des raisons
@@ -12,8 +21,8 @@
   41/199 actions de revue confirmées toutes étroites, 0 action de bandeau confirmée,
   détecteur à 2 313 ms/projet en moyenne. Décision D-062 :
   `a2_logo_prior=true` activé dans `config/config.toml` (pilote),
-  `a2_logo_detector=false` ; veto A1 barres latérales ≥ 32 px formalisé dans
-  `docs/lots/LOT-11-A1-VETO-LATERAL.md`. Rapport :
+  `a2_logo_detector=false` ; veto A1 barres latérales ≥ 32 px implémenté et
+  validé sous D-063 (`docs/lots/LOT-11-A1-VETO-LATERAL.md`). Rapport :
   `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`. Aucun code de production,
   `runtime/` ou `/mnt/cache` modifié.
 - **Synchronisation documentaire (2026-11-10)** : alignement post-D-061 et
@@ -67,7 +76,7 @@
   activation de production ; suite B1.2 (ROI deux passes/fusion
   temporelle) ou pilote opérateur. Preuves : `results/B2.md`,
   `results/b2-pilot.json` et `scripts/pilot-b2-logo-detector.py`.
-- **589 tests unitaires listés** (587 exécutés + 2 ignorés), sans matériel.
+- **598 tests unitaires listés** (596 exécutés + 2 ignorés), sans matériel.
 - **Étude corpus GOOD (D-056)** : 75 triplets, 2 609 segments, 676 revues,
   71 exports comparés en lecture seule. A1 : marge 1,04 → **1,015** (marge
   humaine médiane 1,0125). A2 : seuil **0,35** avec OCR avant le gate pour

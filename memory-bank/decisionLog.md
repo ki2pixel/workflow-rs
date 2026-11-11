@@ -8,6 +8,46 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-11 — D-063 : veto latéral A1 (pillarbox)
+
+- **Contexte** : l'étude `Corpus_Exemple_3` (248 projets, 9 359 segments
+  appariés) isole 7 faux applies A1 sur 380 `apply` appariés (1,84 %), tous
+  des sources pillarboxées. `a1.rs` calculait `horizontal` mais ne l'utilisait
+  pas comme veto ; sa définition exige les deux côtés et un équilibre à 50 %,
+  alors que `134 Camille — Segment 24` n'a qu'une barre gauche de 64 px. Le
+  cropdetect trouve un letterbox vertical (parfois aidé par une scène
+  nocturne), A1 zoome sur la hauteur, mais la largeur active ne couvre pas la
+  composition ; le monteur a laissé 180 %.
+- **Décision** : dans `decide_letterbox`, après les vetos scale/Position
+  Y/couverture et après `noop`/`a1_defer_on_a3`, une barre
+  `left >= lateral_min` **ou** `right >= lateral_min` rétrograde l'`apply` en
+  `review` (`confidence = 0.4`) avec le motif « barres latérales (gauche
+  X px, droite Y px) : recadrage non fiable ». Le seuil est normalisé :
+  `lateral_min = arrondi(32 × hauteur_source / 1080)`, minimum 1 px, soit
+  32 px en 1080p, 21 px en 720p et 64 px en 4K. `details.lateral_min` est
+  ajouté pour l'audit, à côté de `details.bars`. Le veto ne touche ni `noop`,
+  ni keyframes, ni letterbox intermittent/variable, ni les revues A3, et ne
+  peut pas être contourné par `a1_refine_native`. Aucune clé de configuration
+  n'est ajoutée.
+- **Validation** : 598 tests listés (596 exécutés + 2 ignorés), `fmt` et
+  `clippy -D warnings` verts, dont 9 nouveaux tests A1 (barre gauche seule
+  64/0, 164/412, 120/24, 20/15 sous le seuil, `noop` et keyframes préservés,
+  seuils 720p/4K). Rejeu réel des 6 projets / 7 segments du corpus 248 en
+  `post run --report-only` sur le miroir : 7/7 passent `apply` → `review`
+  avec le motif attendu, 0 autre changement d'action sur 305 décisions A1.
+  Rejeu déterministe des 382 `apply` A1 : 7/7 faux applies couverts,
+  19 bons applies rétrogradés sur 380 appariés (dont 12 à ±2 pts), 354
+  applies appariés sans barre ≥ 32 px inchangés ; 1 apply non apparié
+  rétrogradé. Contrôle visuel des 7 frames : toutes pillarboxées. Aucun
+  `.ecproj` du corpus, `runtime/` ou `/mnt/cache` modifié.
+- **Portée / rollback** : A1 du post-STEP8 uniquement, sans changement de
+  schéma `post.json` hors détails A1. Rollback = revert du commit ; aucune
+  migration de données ni configuration à défaire. Le coût mesuré est de
+  19 revues supplémentaires sur 380 applies, sans perte de zoom.
+- **Références** : D-056, D-057, D-058, D-062,
+  `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md` (3.5, 5.6),
+  `docs/lots/LOT-11-A1-VETO-LATERAL.md`.
+
 ## 2026-11-11 — D-062 : activation pilote de `a2_logo_prior`
 
 - **Contexte** : l'étude `Corpus_Exemple_3` (248 projets, 9 359 segments

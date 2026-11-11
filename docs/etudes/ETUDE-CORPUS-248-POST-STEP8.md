@@ -764,8 +764,9 @@ durcissement séparée, avec validation visuelle et critères d'acceptation.
 
 **Décision D-062 acceptée le 2026-11-11.** `config/config.toml` active
 `a2_logo_prior` ; aucun changement de `crates/workflow-steps`, du runtime ou
-de `/mnt/cache`. Le ticket A1 `LOT-11-A1-VETO-LATERAL.md` reste proposé et
-non planifié.
+de `/mnt/cache`. Le ticket A1 `LOT-11-A1-VETO-LATERAL.md` a été implémenté
+et validé le 2026-11-11 sous D-063 : veto latéral ≥ 32 px normalisé,
+7/7 faux applies couverts, 19 bons applies rétrogradés (12 à ±2 pts).
 
 ## 6. Reproductibilité
 

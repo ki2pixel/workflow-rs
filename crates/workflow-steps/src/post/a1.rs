@@ -4,7 +4,10 @@
 //! 10e percentile des hauteurs actives du segment avec la marge 1,015 de D-056 ;
 //! la couverture de tous les crops est vérifiée après scale et compensation
 //! avant toute application. Un candidat A3 fort peut différer le `apply` en
-//! revue (R2, `a1_defer_on_a3`).
+//! revue (R2, `a1_defer_on_a3`). Une barre latérale atteignant le seuil D-063
+//! rétrograde aussi l'`apply` en revue : le cropdetect peut trouver un
+//! letterbox vertical sur une source pillarboxée sans que la largeur active
+//! couvre la composition.
 
 use crate::post::detect::{cropdetect, native_letterbox, Crop, NativeLetterbox, NativeParams};
 use crate::post::ecproj::{CompMeta, Segment};
@@ -21,6 +24,10 @@ const OUTLIER_FRAC: f64 = 0.10;
 const COVERAGE_TOL: f64 = 0.5;
 /// Marge A1 validée par D-056 (médiane humaine 1,0125).
 const DEFAULT_A1_MARGIN: f64 = 1.015;
+/// Seuil latéral D-063 à 1080p : 32 px ≈ 3 % de la hauteur. Il couvre les
+/// 7 faux applies pillarbox du corpus 248 sans déclencher sur le bruit
+/// d'encodage (barres < 8 px).
+const LATERAL_BAR_MIN_PX_1080: f64 = 32.0;
 
 /// Politique A1 : marge de scale et cibles différées sur candidat A3 (R2).
 #[derive(Debug, Clone)]
@@ -198,6 +205,7 @@ fn decide_segment(
     let right = source_width as i64 - (crop.x + crop.w) as i64;
     let scale_ratio = source_height as f64 / 1080.0;
     let bar_min = round_to(8.0 * scale_ratio, 0).max(1.0) as i64;
+    let lateral_min = lateral_threshold(source_height);
     let intermittent_delta = round_to(INTERMITTENT_DELTA as f64 * scale_ratio, 0) as i64;
     let vertical = top >= bar_min
         && bottom >= bar_min
@@ -228,6 +236,7 @@ fn decide_segment(
         "bars".into(),
         json!({"top": top, "bottom": bottom, "left": left, "right": right}),
     );
+    details.insert("lateral_min".into(), json!(lateral_min));
     details.insert("symmetric".into(), json!(vertical || horizontal));
     details.insert("barred_frac".into(), json!(barred_frac));
     details.insert("barred_crops".into(), json!(barred));
@@ -342,6 +351,17 @@ fn decide_letterbox(
     let position_y_target = comp_y_target - segment.parent_dy;
     let position_y_delta = position_y_target - segment.position[1];
     let coverage = coverage(crops, segment, scale, position_y_target, meta);
+    let lateral_min = lateral_threshold(source_height);
+    let left = details
+        .get("bars")
+        .and_then(|bars| bars.get("left"))
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    let right = details
+        .get("bars")
+        .and_then(|bars| bars.get("right"))
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
 
     let mut details = details.as_object().cloned().unwrap_or_default();
     details.insert("scale_target".into(), json!(scale));
@@ -444,6 +464,23 @@ fn decide_letterbox(
                 segment.name.clone(),
                 "compensation Y différée : keyframes probables détectées par A3",
                 0.45,
+                details,
+            ),
+            None,
+        );
+    }
+    // D-063 : une seule barre latérale suffit (le cas 134/Segment 24 n'a que
+    // 64 px à gauche). Le veto ne s'applique qu'à l'apply destructif ; noop et
+    // revues existantes gardent leur décision et leur motif.
+    if left >= lateral_min || right >= lateral_min {
+        return (
+            Decision::review(
+                "A1",
+                segment.name.clone(),
+                format!(
+                    "barres latérales (gauche {left} px, droite {right} px) : recadrage non fiable"
+                ),
+                0.4,
                 details,
             ),
             None,
@@ -691,6 +728,12 @@ fn percentile(values: &[u32], quantile: f64) -> f64 {
     ordered[index.min(ordered.len() - 1)] as f64
 }
 
+/// Seuil latéral D-063 normalisé sur la hauteur source, minimum 1 px.
+fn lateral_threshold(source_height: u32) -> i64 {
+    let scale_ratio = source_height as f64 / 1080.0;
+    round_to(LATERAL_BAR_MIN_PX_1080 * scale_ratio, 0).max(1.0) as i64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -752,6 +795,24 @@ mod tests {
         ]
     }
 
+    fn pillarbox_crops(
+        source_width: u32,
+        source_height: u32,
+        left: u32,
+        right: u32,
+        active_height: u32,
+        top: u32,
+    ) -> Vec<Crop> {
+        assert!(left + right < source_width);
+        assert!(top + active_height <= source_height);
+        vec![Crop {
+            w: source_width - left - right,
+            h: active_height,
+            x: left,
+            y: top,
+        }]
+    }
+
     #[test]
     fn default_margin_matches_d056() {
         let (decision, delta) = decide_segment(
@@ -764,6 +825,7 @@ mod tests {
         );
         assert_eq!(decision.action, crate::post::model::Action::Apply);
         assert_eq!(decision.details["scale_target"], 243.6);
+        assert_eq!(decision.details["lateral_min"], 32);
         assert!(delta.unwrap().abs() > 100.0);
     }
 
@@ -875,6 +937,198 @@ mod tests {
         );
         assert_eq!(decision.action, crate::post::model::Action::Review);
         assert!(delta.is_none());
+    }
+
+    #[test]
+    fn left_lateral_bar_alone_is_reviewed() {
+        // Given: 134 Camille — Segment 24, une seule barre à gauche (64 px).
+        // When:  A1 veut zoomer sur la hauteur active.
+        // Then:  D-063 rétrograde en revue, sans compensation Y.
+        let crops = pillarbox_crops(1920, 1080, 64, 0, 752, 218);
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, Action::Review);
+        assert_eq!(
+            decision.reason,
+            "barres latérales (gauche 64 px, droite 0 px) : recadrage non fiable"
+        );
+        assert_eq!(decision.confidence, 0.4);
+        assert_eq!(decision.details["lateral_min"], 32);
+        assert_eq!(decision.details["bars"]["left"], 64);
+        assert_eq!(decision.details["bars"]["right"], 0);
+        assert!(delta.is_none());
+    }
+
+    #[test]
+    fn bilateral_lateral_bars_are_reviewed() {
+        // Given: 134 Camille — Segment 31, barres gauche 164 / droite 412.
+        // When:  A1 veut appliquer un recadrage vertical.
+        // Then:  les deux mesures sont tracées et l'action devient review.
+        let crops = pillarbox_crops(1920, 1080, 164, 412, 864, 96);
+        let (decision, delta) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, Action::Review);
+        assert!(decision.reason.contains("gauche 164 px"));
+        assert!(decision.reason.contains("droite 412 px"));
+        assert_eq!(decision.confidence, 0.4);
+        assert_eq!(decision.details["lateral_min"], 32);
+        assert!(delta.is_none());
+    }
+
+    #[test]
+    fn narrow_lateral_bars_above_threshold_are_reviewed() {
+        // Given: 210 Camille — Extrait 2, barres 120/24.
+        // When:  A1 veut appliquer un léger zoom.
+        // Then:  la barre gauche suffit à déclencher le veto.
+        let crops = pillarbox_crops(1920, 1080, 120, 24, 1040, 18);
+        let (decision, _) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, Action::Review);
+        assert!(decision.reason.contains("gauche 120 px"));
+        assert!(decision.reason.contains("droite 24 px"));
+    }
+
+    #[test]
+    fn lateral_bars_below_threshold_keep_apply() {
+        // Given: des barres 20/15, sous le seuil de 32 px à 1080p.
+        // When:  A1 calcule le recadrage.
+        // Then:  l'apply est maintenu et le seuil reste auditable.
+        let crops = pillarbox_crops(1920, 1080, 20, 15, 800, 140);
+        let (decision, _) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, Action::Apply);
+        assert_eq!(decision.details["lateral_min"], 32);
+        assert_eq!(decision.details["bars"]["left"], 20);
+        assert_eq!(decision.details["bars"]["right"], 15);
+    }
+
+    #[test]
+    fn lateral_threshold_scales_with_source_height() {
+        assert_eq!(lateral_threshold(1080), 32);
+        assert_eq!(lateral_threshold(720), 21);
+        assert_eq!(lateral_threshold(2160), 64);
+        assert_eq!(lateral_threshold(1), 1);
+    }
+
+    #[test]
+    fn lateral_veto_uses_scaled_threshold_on_720p() {
+        // Given: 25 px de barre, sous les 32 px de 1080p mais au-dessus des
+        //        21 px normalisés pour une source 720p.
+        // When:  A1 décide sur la source 720p puis sur la même barre en 1080p.
+        // Then:  le seuil normalisé déclenche seulement en 720p.
+        let crops_720 = pillarbox_crops(1280, 720, 25, 0, 650, 35);
+        let (decision_720, _) = decide_segment(
+            &segment(),
+            &crops_720,
+            &meta(),
+            1280,
+            720,
+            &A1Options::default(),
+        );
+        assert_eq!(decision_720.action, Action::Review);
+        assert_eq!(decision_720.details["lateral_min"], 21);
+        assert!(decision_720.reason.contains("gauche 25 px"));
+
+        let crops_1080 = pillarbox_crops(1920, 1080, 25, 0, 800, 140);
+        let (decision_1080, _) = decide_segment(
+            &segment(),
+            &crops_1080,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision_1080.action, Action::Apply);
+    }
+
+    #[test]
+    fn lateral_veto_uses_scaled_threshold_on_4k() {
+        // Given: une source 4K dont le seuil normalisé vaut 64 px.
+        // When:  une barre de 70 px puis une paire 60/40.
+        // Then:  seule la barre au-dessus du seuil rétrograde l'apply.
+        let above = pillarbox_crops(3840, 2160, 70, 0, 1600, 280);
+        let (decision_above, _) = decide_segment(
+            &segment(),
+            &above,
+            &meta(),
+            3840,
+            2160,
+            &A1Options::default(),
+        );
+        assert_eq!(decision_above.action, Action::Review);
+        assert_eq!(decision_above.details["lateral_min"], 64);
+
+        let below = pillarbox_crops(3840, 2160, 60, 40, 1600, 280);
+        let (decision_below, _) = decide_segment(
+            &segment(),
+            &below,
+            &meta(),
+            3840,
+            2160,
+            &A1Options::default(),
+        );
+        assert_eq!(decision_below.action, Action::Apply);
+        assert_eq!(decision_below.details["lateral_min"], 64);
+    }
+
+    #[test]
+    fn lateral_bars_do_not_change_noop() {
+        // Given: une hauteur active pleine avec une barre latérale détectée.
+        // When:  A1 n'a aucun zoom à appliquer.
+        // Then:  la décision reste noop : D-063 ne vise que l'apply.
+        let crops = pillarbox_crops(1920, 1080, 64, 0, 1080, 0);
+        let (decision, _) = decide_segment(
+            &segment(),
+            &crops,
+            &meta(),
+            1920,
+            1080,
+            &A1Options::default(),
+        );
+        assert_eq!(decision.action, Action::Noop);
+        assert_eq!(decision.details["lateral_min"], 32);
+    }
+
+    #[test]
+    fn lateral_bars_do_not_override_keyframe_review() {
+        // Given: un segment keyframé qui porte aussi une barre latérale.
+        // When:  A1 évalue le segment.
+        // Then:  la revue keyframe garde son motif d'origine.
+        let mut segment = segment();
+        segment.position_keys.push(crate::post::ecproj::Keyframe {
+            t: 1.0,
+            v: [0.0, 0.0, 0.0],
+        });
+        let crops = pillarbox_crops(1920, 1080, 64, 0, 752, 218);
+        let (decision, _) =
+            decide_segment(&segment, &crops, &meta(), 1920, 1080, &A1Options::default());
+        assert_eq!(decision.action, Action::Review);
+        assert!(decision.reason.contains("keyframé"));
+        assert!(!decision.reason.contains("barres latérales"));
     }
 
     fn cropdetect_880() -> Vec<Crop> {

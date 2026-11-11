@@ -2,6 +2,24 @@
 
 ## Tâche en cours
 
+**Lot 11 — veto latéral A1 (2026-11-11, implémenté et validé, D-063).**
+`crates/workflow-steps/src/post/a1.rs` rétrograde désormais en `review`
+(`confidence = 0.4`) tout `apply` dont une barre gauche **ou** droite atteint
+`lateral_min = arrondi(32 × hauteur_source / 1080)`, minimum 1 px : 32 px en
+1080p, 21 px en 720p, 64 px en 4K. Le motif est explicite (« barres latérales
+(gauche X px, droite Y px) : recadrage non fiable ») et `details.lateral_min`
+est ajouté à côté de `details.bars`. `noop`, keyframes, letterbox
+intermittent/variable et différés A3 conservent leur décision ; le chemin
+natif ne contourne pas le veto. Validation : 9 tests A1 nouveaux, 598 tests
+listés (596 exécutés + 2 ignorés), `fmt` et clippy verts ; rejeu réel des
+6 projets / 7 segments du corpus 248 : 7/7 passent en `review`, 0 autre
+changement d'action sur 305 décisions A1 ; rejeu déterministe des 382
+`apply` : 19 bons applies rétrogradés sur 380 appariés (dont 12 à ±2 pts),
+354 applies appariés sans barre ≥ 32 px inchangés ; 7 frames contrôlées.
+Documentation : `docs/lots/LOT-11-A1-VETO-LATERAL.md` ; décision D-063.
+Aucun `.ecproj` du corpus, `runtime/`, `/mnt/cache` ou `config/config.toml`
+modifié.
+
 **Étude corpus 248 — post-STEP8 et flags A2 (2026-11-11, lecture seule).**
 Le corpus `Corpus_Exemple_3` (92 dossiers, 248 projets, 9 779 segments) a été
 audité sans modifier les `.ecproj` ni `/mnt/cache` : 9 359 segments appariés
@@ -19,7 +37,8 @@ et reformule 15 motifs ; le détecteur ne change aucune action et coûte
 2 313 ms/projet en moyenne (médiane 1 858,5 ms, max 5,34 s). Décision D-062 :
 `a2_logo_prior = true` activé dans `config/config.toml` en pilote contrôlé,
 `a2_logo_detector` maintenu `false` ; le veto A1 barres latérales ≥ 32 px est
-formalisé dans `docs/lots/LOT-11-A1-VETO-LATERAL.md`. Rapport :
+implémenté et validé sous D-063 (`docs/lots/LOT-11-A1-VETO-LATERAL.md`).
+Rapport :
 `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`. Aucun code de production,
 `runtime/` ou `/mnt/cache` modifié.
 
@@ -271,6 +290,20 @@ Le post-traitement A5/A6 et les bypass SDM/LPHDF restent en production (D-032,
 D-034, D-035).
 
 ## Dernière session
+
+- [2026-11-11] **Lot 11 — veto latéral A1 (D-063)** :
+  - `decide_letterbox` rétrograde en `review` (0,4) si
+    `left >= lateral_min || right >= lateral_min`, avec
+    `lateral_min = arrondi(32 × hauteur_source / 1080)` (32 px en 1080p,
+    21 px en 720p, 64 px en 4K) ; `details.lateral_min` ajouté ;
+  - 9 tests A1 nouveaux ; 598 tests listés (596 + 2 ignorés), `fmt` et
+    `clippy -D warnings` verts ;
+  - rejeu réel 6 projets / 7 segments : 7/7 `apply` → `review`, 0 autre
+    changement sur 305 décisions A1 ;
+  - rejeu des 382 applies : 19 bons rétrogradés (12 à ±2 pts), 354 applies
+    appariés sans barre ≥ 32 px inchangés ; 7 frames pillarbox contrôlées ;
+  - ticket `docs/lots/LOT-11-A1-VETO-LATERAL.md` clos, D-063 dans le
+    journal des décisions ;
 
 - [2026-11-11] **Étude corpus 248 post-STEP8 (lecture seule)** :
   - 248 projets / 9 359 segments appariés ; 660 TP / 7 FP / 3 218 FN /
@@ -972,7 +1005,7 @@ D-034, D-035).
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 589 tests unitaires listés (587 exécutés + 2 ignorés) ; pas de CI.
+- 598 tests unitaires listés (596 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

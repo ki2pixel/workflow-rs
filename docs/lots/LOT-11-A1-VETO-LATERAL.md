@@ -1,10 +1,10 @@
 # Lot 11 — veto latéral A1 (ticket de durcissement)
 
-> Statut : **proposé, non planifié, non implémenté**.
+> Statut : **implémenté et validé le 2026-11-11** (D-063).
 > Date : 2026-11-11.
 > Source : `docs/etudes/ETUDE-CORPUS-248-POST-STEP8.md`, sections 3.5 et 5.6.
 > Décisions liées : D-056 (marge A1 1,015), D-057/D-058 (détecteur natif
-> opt-in), D-062 (activation pilote de `a2_logo_prior`).
+> opt-in), D-062 (activation pilote de `a2_logo_prior`), D-063 (ce veto).
 > Code visé : `crates/workflow-steps/src/post/a1.rs`.
 
 ## Problème
@@ -67,6 +67,58 @@ confirme ou ajuste. Un seuil de 100 px laisse passer `134/Segment 24`
 Le brut reste inchangé et les autres décisions A1 ne bougent pas ; seule la
 décision destructive est évitée. Aucun changement de schéma `post.json` en
 dehors des détails A1.
+
+## Implémentation (2026-11-11, D-063)
+
+Le correctif est dans `crates/workflow-steps/src/post/a1.rs` :
+
+- `LATERAL_BAR_MIN_PX_1080 = 32.0` et `lateral_threshold(source_height)` :
+  `arrondi(32 × hauteur_source / 1080)`, minimum 1 px. Le seuil vaut 32 px
+  en 1080p, 21 px en 720p et 64 px en 4K ;
+- `details.lateral_min` est écrit pour toutes les décisions A1, à côté de
+  `details.bars`, pour l'audit et le rejeu ;
+- dans `decide_letterbox`, après les vetos scale/Position Y/couverture et
+  après les décisions `noop` et `a1_defer_on_a3`, une barre
+  `left >= lateral_min` **ou** `right >= lateral_min` rétrograde l'`apply`
+  en `review` avec `confidence = 0.4` et le motif
+  « barres latérales (gauche X px, droite Y px) : recadrage non fiable » ;
+- `noop`, keyframes, letterbox intermittent/variable, asymétrie verticale et
+  revues A3 conservent leur décision et leur motif ; le veto ne s'applique
+  qu'à l'`apply` destructif ;
+- le chemin `refine_native` réutilise `decide_letterbox` et les barres
+  latérales déjà tracées : il ne peut pas contourner le veto.
+
+## Validation (2026-11-11)
+
+- `cargo test -p workflow-steps a1 --lib` : 22 tests, dont 9 nouveaux
+  (barre gauche seule 64/0, barres 164/412, barres 120/24, barres 20/15
+  sous le seuil, aucun changement de `noop`, revue keyframe préservée,
+  seuils 720p/4K et normalisation 1080/720/2160).
+- `cargo test --workspace` : 598 tests listés (596 exécutés + 2 ignorés),
+  0 échec.
+- `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` : verts.
+- **Rejeu réel des 7 cas** : les 6 projets concernés ont été rejoués sur le
+  miroir `benchmark_corpus3` en `post run --report-only` avec la
+  configuration baseline. Les 7 segments passent tous de `apply` à
+  `review`, avec `confidence = 0.4`, `details.lateral_min = 32` et le motif
+  attendu (64/0, 164/412, 162/606, 162/366, 164/428, 166/458, 120/24).
+  Sur les 305 décisions A1 de ces projets, **aucune autre action ne change**.
+- **Rejeu déterministe sur les 382 `apply` A1 du corpus 248** (détails
+  `bars`/`crop` gelés, seuil recalculé par segment) : 7/7 faux applies
+  couverts ; 19 bons applies rétrogradés sur 380 appariés, dont 12 à ±2 pts ;
+  354 applies appariés sans barre latérale ≥ 32 px restent `apply`. Un
+  apply non apparié est aussi rétrogradé. Aucun `apply` sans barre latérale
+  au seuil n'est altéré : le veto est la seule branche ajoutée avant
+  l'`apply`. Le chiffre 346 du critère d'origine correspondait aux applies
+  sans barre ≥ 8 px ; à ≥ 32 px, 354 des 380 applies appariés sont hors
+  seuil et restent inchangés.
+- **Contrôle visuel** : les 7 frames médianes ont été extraites et
+  vérifiées ; toutes montrent une source pillarboxée (scène nocturne,
+  split-screen ou archive), jamais un letterbox 16:9 homogène.
+- Aucune modification de `config/config.toml`, de `runtime/`, de
+  `/mnt/cache` ou des 248 `.ecproj` du corpus : le miroir seul a reçu les
+  artefacts `--report-only`.
 
 ## Critères d'acceptation
 

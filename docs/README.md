@@ -84,7 +84,7 @@ Le contrat est complété par [`../parity/DRIFT.md`](../parity/DRIFT.md) pour le
 | STEP7 | [`lots/LOT-1-STEP7.md`](lots/LOT-1-STEP7.md) | Lot 1 | Référence |
 | STEP8 | [`lots/LOT-1-STEP8.md`](lots/LOT-1-STEP8.md) | Lot 1 | Référence |
 | A5/A6, bypass direct SDM/archive-only, template SDM multi-préfixes (D-061) et gate OCR A2 opt-in (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
-| A1 — veto latéral des sources pillarboxées (ticket) | [`lots/LOT-11-A1-VETO-LATERAL.md`](lots/LOT-11-A1-VETO-LATERAL.md) | Lot 11 | Proposé |
+| A1 — veto latéral des sources pillarboxées (D-063) | [`lots/LOT-11-A1-VETO-LATERAL.md`](lots/LOT-11-A1-VETO-LATERAL.md) | Lot 11 | Référence |
 
 La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 `LOT-4-STEP3` sont volontairement dans cet ordre historique.

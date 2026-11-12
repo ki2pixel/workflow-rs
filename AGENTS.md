@@ -28,9 +28,11 @@ documentation map `docs/README.md`, and
 - `crates/workflow-schema`: JSON schemas and Python-compatible decimal rounding
   (`round.rs`).
 - `crates/workflow-steps`: STEP1–STEP8 implementations (modules `step1` …
-  `step8`) plus `template` (bypass direct SDM et archive-only LPHDF) and
-  `post/` (A5/A6 post-traitement after STEP8: `_assist.ecproj`, `post.json`,
-  `review.json`, `audit.json`).
+  `step8`) plus `template` (bypass direct SDM et archive-only LPHDF),
+  `post/` (A5/A6/A7 post-traitement after STEP8: `_assist.ecproj`,
+  `post.json`, `review.json`, `audit.json`, mission sidecar
+  `<stem>_mission.json`), `qa/` (read-only QA) and `vision/` (shared
+  inference, OCR, frame sampling and logo helpers).
 - `crates/workflow-cli`: operational entrypoint for all eight steps; the
   server and scripts invoke it. There is no Python fallback.
 - `crates/workflow-server`: axum server on `:5004`. It serializes runs and
@@ -45,7 +47,9 @@ documentation map `docs/README.md`, and
   modes). The CEP panel still calls Python (D-022).
 - `crates/workflow-tpu`: dynamic TFLite/Edge TPU FFI plus the spike binary.
 - `assets/web` is a copy of the legacy frontend; `assets/models/*` binaries and
-  `vendor/*.so*` are gitignored. Only the model manifest/README are versioned.
+  `vendor/*.so*` are gitignored. Only the model manifests, the QA probe
+  (`qa/dinov2_logo_probe.json`), the source-logo catalogue
+  (`qa/source_logos.toml`) and the READMEs are versioned.
 - `assets/mission_overlays` is the A7 central fallback bank: PNGs, manifest and
   README are versioned, the 2.2 GB of MOVs are gitignored (D-066).
 
@@ -58,7 +62,7 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build --release -p workflow-server -p workflow-cli  # required by launchers
 cargo run -p workflow-cli -- config check                 # no secrets needed
-cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
+cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6/A7 only
 cargo run -p workflow-cli -- email audit \
   --json-dir <emails_json> --assets <logos_overlay> [--json] # offline corpus audit
 python3 scripts/audit-a7-benchmark.py <audit.json> [--split 2026-10] # Markdown
@@ -97,12 +101,14 @@ python3 scripts/audit-a7-benchmark.py <audit.json> [--split 2026-10] # Markdown
   backend may run (Python `:5003`, Rust `:5004`), and `switch-rust.sh` refuses
   to start Rust while Python answers. Even with the monitor off, never run
   hardware STEP2/3/4 on both stacks at once (they use separate locks).
-- STEP8 always runs the A5/A6 post-traitement when it succeeds: it writes a
-  second `<stem>_assist.ecproj` and `docs/post/<stem>_assist/` artifacts. The
-  raw project is never modified. Use `--no-post` to disable it, or
-  `workflow-cli post run --report-only` to compute reports without publishing
-  an assisted project. Do not run either against `runtime/` or `/mnt/cache`
-  for experiments.
+- STEP8 always runs the A5/A6/A7 post-traitement when it succeeds: it writes
+  a second `<stem>_assist.ecproj` and `docs/post/<stem>_assist/` artifacts.
+  A7 also writes `<docs>/<stem>_mission.json` when missions are available and
+  `mission_overlay` is enabled. The raw project is never modified. Use
+  `--no-post` to disable the post, `--no-email` to isolate the mission proxy
+  and cache, or `workflow-cli post run --report-only` to compute reports
+  without publishing an assisted project. Do not run either against
+  `runtime/` or `/mnt/cache` for experiments.
 - With `steps.step8.post.direct = true`, videos matching
   `template_prefixes` (default `M6 - SDM - ` and `SDM - `) or
   `archive_only_prefixes` (default `W9 - LPHDF`) matching the 1920×1080
@@ -147,6 +153,14 @@ python3 scripts/audit-a7-benchmark.py <audit.json> [--split 2026-10] # Markdown
 - Keep documented quirks, e.g. STEP1's scan ignores `.tar.gz`/`.tar.bz2`/
   `.tar.xz` (D-016), STEP3 no-audio exits 0 with no artifact (D-002), and STEP4
   requires `<stem>.csv` and `_audio.json` by default (D-004).
+- A1 applies a lateral pillarbox veto: any `apply` with a left or right bar
+  ≥ `round(32 × source_height / 1080)` becomes `review` (confidence 0.4) with
+  additive `details.lateral_min`; narrower bars keep the current decision
+  (D-063).
+- A2 `a2_logo_prior` is the spatial logo registry, default-off and enabled as
+  a pilot in `config/config.toml` (D-062); it can change the A2 action
+  (confirm, veto or review) within the A2 guards. `a2_logo_detector` stays
+  `false` and is annotation-only.
 - A7 mission sidecars are `schema: 2`; keep `requested`, `source` and
   `known_absent` additive. `tail_overlay` never extends the composition
   (`tail_s = 0`) and mutes the MOV audio; `d > main + 1 ms` is a review, never

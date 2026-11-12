@@ -128,7 +128,9 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans
-[`../memory-bank/decisionLog.md`](../memory-bank/decisionLog.md).
+[`../memory-bank/decisionLog.md`](../memory-bank/decisionLog.md). Les décisions
+D-063 à D-067 (lots 11 à 12.3) sont consignées dans le journal des décisions et
+dans les fiches `lots/` correspondantes ; elles n'ont pas d'ADR séparé.
 
 ## 7. Études
 

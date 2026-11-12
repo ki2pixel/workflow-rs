@@ -1144,7 +1144,7 @@ impl Default for Step7Config {
     }
 }
 
-/// Post-traitement déterministe A5/A6 après STEP8.
+/// Post-traitement déterministe A5/A6/A7 après STEP8.
 ///
 /// Le projet brut n'est jamais modifié : un second `.ecproj` suffixé
 /// (`_assist` par défaut) est publié, même lorsqu'aucune décision n'est

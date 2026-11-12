@@ -73,7 +73,7 @@ Linux et le panneau CEP continue d'appeler Python.
   `effectcraft-cli`, sans pont Python ni application. Le projet 250 a produit
   un `.ecproj` ouvrable (82 segments, 1080×1920, 25 fps, 133 s) et la
   progression `MS_BATCH_*` est relayée en direct.
-- Post-traitement A5/A6 intégré après STEP8 : A1 letterbox noir, A2 bannière
+- Post-traitement A5/A6 puis A7 intégrés après STEP8 : A1 letterbox noir, A2 bannière
   basse, A3/A4 en revue, A6 template SDM. Le brut `<vidéo>_9x16.ecproj` reste
   inchangé ; `<vidéo>_9x16_assist.ecproj` et `post.json`/`review.json`/
   `audit.json` sont toujours produits. Validation 295 au pixel (0/255) et
@@ -82,7 +82,9 @@ Linux et le panneau CEP continue d'appeler Python.
   ou oppose un veto aux sous-titres changeants ; la preuve est ajoutée sous
   `details.ocr`, sans changer le schéma `post.json`. Détail dans
   `docs/lots/LOT-9-POST-STEP8.md`. Depuis D-052, un registre spatial versionné
-  des logos de programme annote A2 (`a2_logo_prior = false`), retire le texte
+  des logos de programme annote A2 (`a2_logo_prior`, désactivé par défaut) ;
+  D-062 l'active en pilote dans `config/config.toml`, tandis que
+  `a2_logo_detector` reste `false`. Le registre retire le texte
   du logo du groupe OCR dominant, neutralise le veto logo seul quand un
   overlay déclaré cache le logo, et alimente le QA (`--source-logo`) sans
   jamais recadrer ni masquer. Le QA peut confirmer localement les pixels
@@ -121,6 +123,13 @@ Linux et le panneau CEP continue d'appeler Python.
   classe les revues de couverture comme résolues. R2 (`a1_defer_on_a3`) et R6
   (`a3_relaxed_gap`) restent opt-in, désactivés par défaut ; ils ont été
   validés sur copies (68/54/356) le 2026-11-08.
+- Depuis D-063, A1 rétrograde en `review` (confiance 0,4) tout `apply` dont
+  une barre latérale gauche ou droite atteint
+  `arrondi(32 × hauteur_source / 1080)` : 32 px en 1080p, 21 px en 720p,
+  64 px en 4K. `details.lateral_min` est additif. Le rejeu réel rétrograde
+  7/7 segments pillarbox du corpus 248 ; sur 380 `apply` appariés, 19 sont
+  rétrogradés (dont 12 à ±2 pts) et 354 restent inchangés. Détail :
+  `docs/lots/LOT-11-A1-VETO-LATERAL.md`.
 - Bypass direct : quand `steps.step8.post.direct = true`, les vidéos
   préfixées par `template_prefixes` (`M6 - SDM - ` ou `SDM - `) et celles de
   `archive_only_prefixes` (`W9 - LPHDF`) au profil 1920×1080 25 fps sautent
@@ -204,6 +213,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` : benchmark stratifié du corpus, masque QA des MOV alpha (`kind: "mov"`, schéma 1.5.0/cache 12) et canari de 20 missions réelles.
 - `scripts/audit-a7-benchmark.py` : consolidation Markdown d'un audit `email audit --json` par période et format.
 - `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj`, vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, `qa.json`, auto-approbation, seuils et limites v1.
+- `docs/lots/LOT-11-A1-VETO-LATERAL.md` : veto latéral A1 sur les sources pillarboxées, seuil proportionnel à la hauteur et validation sur le corpus 248.
 - `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
 - `docs/lots/LOT-4-STEP3.md` : VAD YAMNet Split, ECAPA-TDNN, AHC, parité STEP3 et limites.

@@ -207,7 +207,7 @@ pub fn run_post_for_folders(folders: &[String], options: &PostOptions) -> PostRu
         return summary;
     }
     let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
-    // Pré-scan de tous les dossiers : le total A5/A6 est publié avant le
+    // Pré-scan de tous les dossiers : le total A5/A6/A7 est publié avant le
     // premier projet pour que la barre STEP8 couvre aussi cette phase.
     let mut projects = Vec::new();
     for folder in folders {

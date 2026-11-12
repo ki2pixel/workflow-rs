@@ -21,7 +21,7 @@ Cette skill décrit l'exploitation du pipeline Rust. Elle s'appuie sur
 | STEP6 | `step6` | `step6 project` / `build` | `<stem>_ae.json` |
 | STEP7 | `step7` | `step7 finalize` | copie finalisée + manifeste |
 | STEP8 | `step8` | `step8 run` | `<video>_9x16.ecproj` brut |
-| A5/A6 | `post` (hook après STEP8) | `post run` | `<video>_9x16_assist.ecproj` + `docs/post/<projet_assisté>/` |
+| A5/A6/A7 | `post` (hook après STEP8) | `post run` | `<video>_9x16_assist.ecproj` + `docs/post/<projet_assisté>/` ; sidecar `<docs>/<stem>_mission.json` si missions |
 
 - Le serveur `workflow-server` écoute sur **5004** et délègue à
   `workflow-cli`. Il ne contient pas la logique métier.
@@ -78,7 +78,7 @@ cargo run --release -p workflow-cli -- --config config/config.toml step7 finaliz
 
 cargo run --release -p workflow-cli -- --config config/config.toml step8 run --dry-run
 
-# Post-traitement A5/A6 : hook automatique après STEP8 réussi.
+# Post-traitement A5/A6/A7 : hook automatique après STEP8 réussi.
 cargo run --release -p workflow-cli -- --config config/config.toml step8 run \
   --folder <dossier_projet> --no-post
 cargo run --release -p workflow-cli -- --config config/config.toml post run \
@@ -124,9 +124,12 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
   `steps.step1.source_dir == paths.downloads`.
 - `step1 run` supprime les archives après succès par défaut.
 - Un STEP8 réussi publie aussi `<video>_9x16_assist.ecproj` et les rapports
-  `docs/post/` : le brut reste intact. Utiliser `--no-post` pour désactiver le
-  hook, ou `post run --report-only` pour calculer les rapports sans publier
-  d'assist. Ne pas traiter l'assist comme le projet brut.
+  `docs/post/` : le brut reste intact. A7 ajoute le sidecar
+  `<docs>/<stem>_mission.json` quand des missions sont disponibles et que
+  `mission_overlay` est actif. Utiliser `--no-post` pour désactiver le hook,
+  `--no-email` pour isoler proxy/cache de missions, `--no-mission-overlay`
+  pour auditer sans insérer, ou `post run --report-only` pour calculer les
+  rapports sans publier d'assist. Ne pas traiter l'assist comme le projet brut.
 - `step7 finalize` supprime la source par défaut ; utiliser `--no-delete` ou
   `--dry-run` pour un test.
 - `retention plan` avant `retention apply`.
@@ -144,7 +147,8 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
 
 ## 7. Tests et docs
 
-- `cargo test --workspace` (426 tests, sans matériel).
+- `cargo test --workspace` (670 tests listés, 668 exécutés + 2 ignorés, sans
+  matériel).
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`.
 - Parité : `scripts/shadow-step56.py`, `scripts/validate-lot5.py`,
   `scripts/validate-step1.py`, `tools/parity/parity.py`.

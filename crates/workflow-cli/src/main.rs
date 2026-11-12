@@ -78,7 +78,7 @@ enum Command {
     Step7(Step7Args),
     /// Génération des projets EffectCraft (STEP8, effectcraft-cli headless).
     Step8(Step8Args),
-    /// Post-traitement A5/A6 d'un projet ou d'un dossier (second `.ecproj`).
+    /// Post-traitement A5/A6/A7 d'un projet ou d'un dossier (second `.ecproj`).
     Post(PostArgs),
     /// Contrôle qualité read-only après export humain (`qa.json`).
     Qa(QaArgs),
@@ -712,7 +712,7 @@ enum Step8Command {
         /// Génère le driver et affiche les dossiers sans lancer EffectCraft.
         #[arg(long)]
         dry_run: bool,
-        /// Désactive le post-traitement A5/A6 après EffectCraft.
+        /// Désactive le post-traitement A5/A6/A7 après EffectCraft.
         #[arg(long)]
         no_post: bool,
         /// Active le bypass direct des vidéos du template.
@@ -734,7 +734,7 @@ struct PostArgs {
 }
 #[derive(Debug, Subcommand)]
 enum PostCommand {
-    /// Calcule A5/A6 et publie un `.ecproj` `_assist` par projet brut.
+    /// Calcule A5/A6/A7 et publie un `.ecproj` `_assist` par projet brut.
     Run {
         /// Dossier projet contenant `projets/` et `docs/` (répétable).
         #[arg(long = "folder")]

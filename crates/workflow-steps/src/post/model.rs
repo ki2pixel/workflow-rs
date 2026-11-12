@@ -1,4 +1,4 @@
-//! Modèles sérialisables du post-traitement A5/A6.
+//! Modèles sérialisables du post-traitement A5/A6/A7.
 
 use serde::Serialize;
 use serde_json::{json, Map, Value};

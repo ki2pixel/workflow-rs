@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.7 |
+| Version | 1.8 |
 | Date | 2026-11-12 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
@@ -104,7 +104,7 @@ Routes de l'application : `GET /favicon.ico` retourne 204, `GET /test-slideshow-
 }
 ```
 
-`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`. Le serveur Rust ajoute le champ `is_stopping` et publie `stopping` pendant un arrêt demandé (voir §3). Le champ optionnel `progress_phase` vaut `"post"` pendant le post-traitement A5/A6 de STEP8 et est absent sinon.
+`log` n'est présent que sur `/status/<key>`. Les deux routes renvoient `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` et `Expires: 0`. Le serveur Rust ajoute le champ `is_stopping` et publie `stopping` pendant un arrêt demandé (voir §3). Le champ optionnel `progress_phase` vaut `"post"` pendant le post-traitement A5/A6/A7 de STEP8 et est absent sinon.
 
 `GET /sequence/status` :
 
@@ -294,7 +294,7 @@ Nomenclature des artefacts :
 | STEP5 | `<stem>_tracking.json`, et réécriture sur place de `<stem>_audio.json` |
 | STEP6 | `<stem>_ae.json` |
 | STEP7 | `<projet>__finalized_<timestamp>/docs/`, manifeste dans `logs/step7/finalized_projects_<ts>.json` |
-| STEP8 | `<video>_9x16.ecproj` (brut) et `<video>_9x16_assist.ecproj` (post A5/A6), plus `<docs>/post/<projet_assisté>/` |
+| STEP8 | `<video>_9x16.ecproj` (brut) et `<video>_9x16_assist.ecproj` (post A5/A6/A7), plus `<docs>/post/<projet_assisté>/` |
 
 Points d'attention :
 
@@ -404,7 +404,7 @@ avec le panel `assets/effectcraft/MediaSolution.jsx` (copie du panel de
 production) et sa configuration `assets/effectcraft/mediasolution_ec.json`,
 pour produire les `.ecproj`.
 
-Post-traitement A5/A6 : après un STEP8 réussi, le projet brut
+Post-traitement A5/A6/A7 : après un STEP8 réussi, le projet brut
 `<vidéo>_9x16.ecproj` reste **inchangé** et un second projet
 `<vidéo>_9x16_assist.ecproj` est publié à côté (copie exacte du brut si aucune
 décision ne s'applique). Trois artefacts additifs sont écrits sous
@@ -506,7 +506,9 @@ actif, les détections OCR majoritairement contenues dans cette bbox sont
 retirées du groupe dominant (`details.ocr.logo_texts`,
 `logo_detections_total`, `logo_only`) ; un logo seul ne peut jamais
 confirmer une bannière et part en `review`. Sans prior, ces clés restent
-absentes et l'action A2 est inchangée.
+absentes et l'action A2 est inchangée. Depuis D-062, la configuration de
+production active `a2_logo_prior = true` en pilote ; `a2_logo_detector` reste
+`false`.
 
 Quand le prior est actif, A2 lit aussi le masque des overlays image
 déclarés dans le `.ecproj` (module partagé `post::overlay`, le même que le
@@ -567,14 +569,18 @@ désactivés par défaut. Depuis D-058, `a1_refine_native` (défaut `false`)
 active le natif gardé : il ne raffine qu'un `apply` déjà décidé par
 `cropdetect`, avec Sobel 20/1020, couverture 2/3 (0,45 sous 10/255) et
 cluster ≥ 60 %. Un natif `review`/`noop`/instable conserve la décision
-`cropdetect`. Le schéma des artefacts reste `schema = 1` ; toutes les
-nouvelles clés sont additives.
+`cropdetect`. Depuis D-063, tout `apply` A1 dont une barre gauche ou droite
+atteint `arrondi(32 × hauteur_source / 1080)` (minimum 1 px) est rétrogradé en
+`review` (confiance 0,4) avec `details.lateral_min` additif : 32 px en 1080p,
+21 px en 720p, 64 px en 4K. Les barres sous le seuil, les `noop`, les keyframes
+et les différés A3 conservent leur décision. Le schéma des artefacts reste
+`schema = 1` ; toutes les nouvelles clés sont additives.
 
 After Effects : `scripts/after_effects/MediaSolution-CEP/` en ExtendScript ES3 appelle Python via `system.callSystem()`. Le contrat JSON `{ "status": "ok", "data": ... }` et le préfixe `[PY] Error:` sont conservés. Le remplacement par `workflow-bridge.exe` est abandonné (D-022) : la production cible Linux et le panneau CEP continue d'appeler Python.
 
 ## 8. Configuration unifiée
 
-Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 189 clés ; `config/env.map.toml` documente 152 correspondances.
+Le `.env` actuel dépasse 300 lignes et la majorité des clés sert à choisir entre des méthodes supprimées. La cible est un `config.toml` validé au démarrage, avec surcharge par variables d'environnement pour les secrets. Décision du 2026-10-22 : ce format TOML est retenu. Le fichier de production compte 183 clés terminales ; `config/env.map.toml` documente 152 correspondances.
 
 Sections : `[server]`, `[paths]`, `[legacy]`, `[webhook]`, `[download]`, `[steps]`, `[steps.filter]`, `[steps.stepN]` (dont `[steps.step8.post]`), `[retention]` et `[hardware]`.
 

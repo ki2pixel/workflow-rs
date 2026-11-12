@@ -8,6 +8,57 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-12 — D-064 : logos de mission A7 (emails `email_proxy.php`)
+
+- **Contexte** : les emails Média Solution décrivent, par lot, les vidéos et
+  les logos à incruster (`Logos requis: …`) ou `Pas de logo`. Ces informations
+  étaient appliquées manuellement après STEP8. Le pipeline doit pouvoir les
+  exploiter sans jamais bloquer une production quand l'endpoint
+  `email_proxy.php` est absent, lent, en erreur ou renvoie `[]`.
+- **Décision** : ajouter une passe A7 strictement additive au post-traitement
+  STEP8 (`crates/workflow-steps/src/post/a7.rs`). Elle résout la mission du lot
+  à la demande depuis un cache SQLite dédié (`email_missions.sqlite3`), valide
+  les assets (PNG/MOV 1080×1920 avec alpha), puis insère les calques dans le
+  seul projet `_assist`. Le brut n'est jamais modifié et aucun calque humain ou
+  A6 n'est supprimé. Trois interrupteurs : `[email_proxy] enabled` (réseau +
+  cache), `steps.step8.post.mission_overlay` (écriture) et
+  `steps.step8.post.a2_mission_mask` (masque A2). `post run`/`step8 run`
+  ajoutent `--no-email` (isolation totale) et `--no-mission-overlay` (mission
+  auditée, `added: []`). Le seuil `mission_end_card_max_s` (défaut 5,0 s)
+  distingue end-card et MOV ambigu.
+- **Classification** : MOV `d >= main - 1 ms` = `full_duration` ; MOV court
+  (`<= 5 s + 1 ms`) avec au moins un PNG = `end_card` (comp prolongée) ; MOV
+  court seul, MOV intermédiaire ou plusieurs MOV = `review` sans insertion du
+  MOV ; les PNG valides restent insérés. Premier asset de l'email = calque le
+  plus haut, end-card au-dessus des PNG, déduplication par nom normalisé.
+  `Pas de logo` ne crée rien et ne supprime rien ; un `sdm.png` A6 déjà présent
+  est signalé en `review` sans être retiré.
+- **Artefacts** : sidecar `<docs>/<stem>_mission.json` écrit uniquement si
+  l'assist est publié ; bloc `mission` ajouté **après** `summary` dans
+  `post.json` (ordre des clés préservé) ; contrôles `mission_*` dans
+  `audit.json`. Le QA découvre le sidecar, expose `mission_overlays` et passe
+  en `QA_SCHEMA_VERSION = 1.4.0` ; le cache QA passe en version 11 et hash le
+  sidecar.
+- **Validation** : 634 tests exécutés (2 ignorés), `fmt` et
+  `clippy -D warnings` verts. Rejeux sur copies `/tmp/opencode` : 136
+  end-card `44,4 → 47,4 s` (19 calques, frame RGBA à 45 s), 80 `MSL1.mov`
+  plein durée `0–79,2 s` et `Pas de logo` à 0 calque, 131 déduplication A6
+  (`added: []`, `skipped: ["sdm.png"]`, 4 calques), 158 trois `Pas de logo`,
+  89 PNG statique `0–85,84 s`, 999 `teva.png` absente (`review`, exit 0,
+  audit `warn`). `--no-email` conserve 44,4 s / 16 calques sans sidecar ni
+  `a7_ms` ; `--no-mission-overlay` conserve 44,4 s avec sidecar et audit
+  `warn`. Les projets et médias de production n'ont pas été modifiés.
+- **Portée / rollback** : A7 est désactivé par défaut
+  (`email_proxy.enabled = false`, `mission_overlay = false`). Rollback =
+  remettre ces deux clés à `false` puis redémarrer ; les sidecars et les
+  calques déjà produits restent additifs et peuvent être ignorés. Aucune
+  migration de `download_history.sqlite3`, aucune modification du panneau CEP
+  ni de `MediaSolution.jsx`.
+- **Références** : D-041, D-052, D-061,
+  `docs/lots/LOT-12-A7-MISSIONS.md`,
+  `crates/workflow-core/src/mission.rs`,
+  `crates/workflow-ingest/src/email.rs`.
+
 ## 2026-11-11 — D-063 : veto latéral A1 (pillarbox)
 
 - **Contexte** : l'étude `Corpus_Exemple_3` (248 projets, 9 359 segments

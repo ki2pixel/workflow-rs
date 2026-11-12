@@ -101,7 +101,7 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## État de validation
 
-- 598 tests unitaires listés (596 exécutés + 2 ignorés), sans matériel.
+- 636 tests unitaires listés (634 exécutés + 2 ignorés), sans matériel.
 - QA read-only étape B : Stage 0 35/35, OCR 12/12 synthétiques, logos
   34/39 sur la galerie d'assets, DINOv2 actif par défaut (opt-out) 39/39 en
   union, 0 nouveau faux positif sur les exports GOOD ; validation réelle par

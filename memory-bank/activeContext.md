@@ -2,6 +2,25 @@
 
 ## Tâche en cours
 
+**Lot 12 — logos de mission A7 (2026-11-12, implémenté et validé, D-064).**
+A7 résout les missions `email_proxy.php` par lot, valide les assets
+1080×1920 avec alpha et insère les logos dans le seul `_assist.ecproj` :
+end-card `.mov` court avec PNG (comp prolongée), plein durée pour un MOV long,
+`review` pour un MOV ambigu, `Pas de logo` sans calque ni suppression. Le
+cache est la base dédiée `email_missions.sqlite3` ; doubles interrupteurs
+`email_proxy.enabled` / `mission_overlay`, plus `a2_mission_mask` et
+`mission_end_card_max_s`. Sidecar `<docs>/<stem>_mission.json`, bloc `mission`
+après `summary` dans `post.json`, contrôles `mission_*`, QA `1.4.0` et cache
+11. Validation sur copies `/tmp/opencode` : 136 end-card 44,4→47,4 s (19
+calques), 80 MOV plein durée 0–79,2 s et `Pas de logo`, 131 déduplication A6
+(0 doublon), 158 trois `Pas de logo`, 89 PNG statique 0–85,84 s, 999 asset
+absent (`review`, exit 0). `--no-email` isole totalement (44,4 s, 16 calques,
+aucun sidecar, aucun `a7_ms`) ; `--no-mission-overlay` audite sans insérer.
+634 tests exécutés / 2 ignorés, fmt et clippy verts. Documentation :
+`docs/lots/LOT-12-A7-MISSIONS.md` ; décision D-064. Activation en production :
+`email_proxy.enabled = true` et `mission_overlay = true` configurés dans `config/config.toml`.
+Les projets et médias de production n'ont pas été modifiés.
+
 **Lot 11 — veto latéral A1 (2026-11-11, implémenté et validé, D-063).**
 `crates/workflow-steps/src/post/a1.rs` rétrograde désormais en `review`
 (`confidence = 0.4`) tout `apply` dont une barre gauche **ou** droite atteint

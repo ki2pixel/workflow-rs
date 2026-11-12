@@ -5,10 +5,15 @@ pub mod error;
 pub mod fsutil;
 pub mod isolation;
 pub mod lock;
+pub mod mission;
 pub mod paths;
 
-pub use config::{Config, DownloadConfig, LegacyConfig, WebhookConfig};
+pub use config::{Config, DownloadConfig, EmailProxyConfig, LegacyConfig, WebhookConfig};
 pub use error::ConfigError;
 pub use isolation::validate_isolation;
 pub use lock::HardwareLock;
+pub use mission::{
+    ClientMission, MissionIndexEntry, MissionLink, MissionWarning, VideoInstruction, VideoMatch,
+    VIDEO_EXTENSIONS,
+};
 pub use paths::{ResolvedLegacyPaths, ResolvedPaths};

@@ -98,15 +98,20 @@ impl Decision {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         object.insert("code".into(), json!(self.code));
+        let explicit = self
+            .details
+            .get("severity")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         object.insert(
             "severity".into(),
-            json!(
-                if matches!(self.code, "A1" | "A2" | "A6") || high_confidence {
-                    "high"
-                } else {
-                    "medium"
-                }
-            ),
+            json!(if matches!(explicit, "low" | "medium" | "high") {
+                explicit
+            } else if matches!(self.code, "A1" | "A2" | "A6") || high_confidence {
+                "high"
+            } else {
+                "medium"
+            }),
         );
         object.insert("target".into(), json!(self.target));
         object.insert("reason".into(), json!(self.reason));
@@ -263,6 +268,18 @@ mod tests {
             "candidat haute confiance",
             0.55,
             json!({"high_confidence": true}),
+        );
+        assert_eq!(decision.to_review_json()["severity"], "high");
+    }
+
+    #[test]
+    fn a7_explicit_severity_is_preserved() {
+        let decision = Decision::review(
+            "A7",
+            "m6+.png",
+            "asset absent",
+            0.2,
+            json!({"severity": "high", "reason": "missing_asset"}),
         );
         assert_eq!(decision.to_review_json()["severity"], "high");
     }

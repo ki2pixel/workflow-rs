@@ -5,6 +5,7 @@
 //! l'interface. Le serveur ne fait que l'exposer.
 
 pub mod download;
+pub mod email;
 pub mod error;
 pub mod history;
 pub mod monitor;
@@ -14,6 +15,10 @@ pub mod url;
 pub mod webhook;
 
 pub use download::{DownloadResult, Downloader, ErrorKind};
+pub use email::{
+    import_eml, mission_for_video, parse_eml, parse_index_text, EmailMissionStore,
+    EmailProxyClient, EmailSyncReport, EmlImportReport, MissionLookup, MissionResolution,
+};
 pub use error::{IngestError, IngestResult};
 pub use history::{cooldown_remaining_s, FailureRecord, HistoryRepository, ImportReport};
 pub use monitor::{plan_downloads, DownloadPlan, PlanContext};

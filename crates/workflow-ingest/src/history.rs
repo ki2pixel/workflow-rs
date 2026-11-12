@@ -68,7 +68,15 @@ impl HistoryRepository {
                      last_error      TEXT NOT NULL DEFAULT '',
                      first_seen_at   TEXT NOT NULL DEFAULT '',
                      last_attempt_at TEXT NOT NULL DEFAULT ''
-                 );",
+                 );
+                 CREATE TABLE IF NOT EXISTS download_origins (
+                     url               TEXT PRIMARY KEY,
+                     original_filename TEXT NOT NULL DEFAULT '',
+                     first_seen_at     TEXT NOT NULL DEFAULT '',
+                     last_seen_at      TEXT NOT NULL DEFAULT ''
+                 );
+                 CREATE INDEX IF NOT EXISTS download_origins_filename
+                     ON download_origins(original_filename);",
             )
             .with_context(|| format!("initialisation de la base {}", path.display()))?;
         Ok(Self {
@@ -289,6 +297,59 @@ impl HistoryRepository {
         })
     }
 
+    /// Mémorise le nom d'origine associé à une URL téléchargée.
+    ///
+    /// Table additive : l'historique Python ne la connaît pas et la
+    /// synchronisation ne la réécrit jamais. `first_seen_at` est conservé.
+    pub fn record_origin(&self, url: &str, original_filename: &str) -> Result<()> {
+        if url.is_empty() {
+            return Ok(());
+        }
+        let now = Local::now()
+            .naive_local()
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string();
+        self.with_connection(|connection| {
+            connection.execute(
+                "INSERT INTO download_origins(url, original_filename, first_seen_at, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?3)
+                 ON CONFLICT(url) DO UPDATE SET
+                   original_filename =
+                     CASE
+                       WHEN excluded.original_filename = '' THEN download_origins.original_filename
+                       ELSE excluded.original_filename
+                     END,
+                   last_seen_at = excluded.last_seen_at",
+                params![url, original_filename, now],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn get_origin(&self, url: &str) -> Result<Option<(String, String, String)>> {
+        self.with_connection(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT original_filename, first_seen_at, last_seen_at
+                 FROM download_origins WHERE url = ?1",
+            )?;
+            let mut rows = statement.query(params![url])?;
+            Ok(rows
+                .next()?
+                .map(|row| Ok::<_, rusqlite::Error>((row.get(0)?, row.get(1)?, row.get(2)?)))
+                .transpose()?)
+        })
+    }
+
+    pub fn origin_count(&self) -> Result<u64> {
+        self.with_connection(|connection| {
+            let count: i64 =
+                connection.query_row("SELECT COUNT(*) FROM download_origins", [], |row| {
+                    row.get(0)
+                })?;
+            Ok(count.max(0) as u64)
+        })
+    }
+
     /// Compte les lignes d'une base Python sans rien écrire.
     pub fn preview_import(source: &Path) -> Result<u64> {
         let source = std::fs::canonicalize(source)
@@ -495,6 +556,20 @@ mod tests {
         let later =
             NaiveDateTime::parse_from_str("2026-01-01T01:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
         assert_eq!(cooldown_remaining_s(&failure, later, 15, 3600), 0.0);
+    }
+
+    #[test]
+    fn records_download_origins_without_touching_history() {
+        let (_dir, repo) = repository();
+        let url = "https://server.kidpixel.workers.dev/dropbox/a/b/file";
+        repo.record_origin(url, "153 Camille.zip").unwrap();
+        let origin = repo.get_origin(url).unwrap().unwrap();
+        assert_eq!(origin.0, "153 Camille.zip");
+        assert!(!origin.1.is_empty());
+        repo.record_origin(url, "").unwrap();
+        assert_eq!(repo.get_origin(url).unwrap().unwrap().0, "153 Camille.zip");
+        assert_eq!(repo.origin_count().unwrap(), 1);
+        assert_eq!(repo.count().unwrap(), 0);
     }
 
     #[test]

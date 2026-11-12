@@ -1,11 +1,13 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
+use workflow_core::mission::{ClientMission, VideoMatch};
 use workflow_core::Config;
 use workflow_ingest::download::Downloader;
+use workflow_ingest::email::{import_eml, EmailMissionStore, EmailProxyClient};
 use workflow_ingest::history::HistoryRepository;
 use workflow_ingest::monitor::{plan_downloads, PlanContext};
 use workflow_ingest::url::normalize_url;
@@ -50,6 +52,8 @@ enum Command {
     History(HistoryArgs),
     /// Diagnostic du webhook, sans écriture d'historique.
     Webhook(WebhookArgs),
+    /// Missions client extraites des emails de recadrage (cache SQLite).
+    Email(EmailArgs),
     /// Télécharge une URL avec le même moteur que le moniteur (sans historique).
     Download(DownloadArgs),
     /// Extraction des archives et normalisation vidéo STEP1.
@@ -140,6 +144,69 @@ enum WebhookCommand {
         /// Compare le webhook à l'historique Rust et liste ce qui serait téléchargé.
         #[arg(long)]
         plan: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct EmailArgs {
+    #[command(subcommand)]
+    command: EmailCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum EmailCommand {
+    /// Liste les missions en cache, de la plus récente à la plus ancienne.
+    List {
+        /// Filtre un lot.
+        #[arg(long)]
+        lot: Option<u32>,
+        /// Nombre maximal de missions.
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Affiche une mission complète (identifiant ou lot).
+    Show {
+        #[arg(long, conflicts_with = "lot")]
+        id: Option<String>,
+        #[arg(long, conflicts_with = "id")]
+        lot: Option<u32>,
+    },
+    /// Synchronise l'index et les détails dans le cache SQLite.
+    Sync {
+        /// Nombre de missions demandées à l'index (max 200).
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Retélécharge les détails même lorsque `stored_at` est inchangé.
+        #[arg(long)]
+        force: bool,
+        /// N'écrit pas dans le cache (diagnostic réseau).
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Interroge le détail d'une mission sans écrire dans le cache.
+    Test {
+        #[arg(long)]
+        id: String,
+    },
+    /// Associe les vidéos d'un dossier projet aux instructions email.
+    Match {
+        #[arg(long)]
+        folder: PathBuf,
+        /// Nom de vidéo explicite (défaut : fichiers du dossier docs).
+        #[arg(long)]
+        video: Option<PathBuf>,
+        /// Ne pas interroger le réseau avant la comparaison.
+        #[arg(long)]
+        offline: bool,
+    },
+    /// Importe des emails `.eml` hors ligne.
+    Import {
+        /// Fichiers `.eml` (répétable).
+        #[arg(long = "eml")]
+        eml: Vec<PathBuf>,
+        /// Dossier contenant des `.eml`.
+        #[arg(long)]
+        dir: Option<PathBuf>,
     },
 }
 
@@ -635,6 +702,12 @@ enum Step8Command {
         /// Active le bypass direct des vidéos du template.
         #[arg(long)]
         direct: bool,
+        /// Isole totalement du proxy email : aucune requête, aucune mission.
+        #[arg(long)]
+        no_email: bool,
+        /// Résout la mission pour l'audit mais n'injecte aucun calque A7.
+        #[arg(long)]
+        no_mission_overlay: bool,
     },
 }
 
@@ -674,6 +747,12 @@ enum PostCommand {
         /// Active le bypass direct des vidéos du template.
         #[arg(long)]
         direct: bool,
+        /// Isole totalement du proxy email : aucune requête, aucune mission.
+        #[arg(long)]
+        no_email: bool,
+        /// Résout la mission pour l'audit mais n'injecte aucun calque A7.
+        #[arg(long)]
+        no_mission_overlay: bool,
     },
 }
 
@@ -896,6 +975,213 @@ fn validate_retention_paths(options: &RetentionOptions, config: &Config) -> Resu
     Ok(())
 }
 
+fn email_db_path(config: &Config) -> PathBuf {
+    let resolved = config.paths.resolve();
+    let configured = &config.email_proxy.db;
+    if configured.as_os_str().is_empty() {
+        resolved.base.join("email_missions.sqlite3")
+    } else if configured.is_absolute() {
+        configured.clone()
+    } else {
+        resolved.base.join(configured)
+    }
+}
+
+fn open_email_store(config: &Config) -> Result<EmailMissionStore> {
+    Ok(EmailMissionStore::open(&email_db_path(config))?)
+}
+
+fn email_client(config: &Config) -> Result<EmailProxyClient> {
+    if !config.email_proxy.enabled {
+        anyhow::bail!(
+            "email_proxy.enabled = false : activer la section [email_proxy] pour interroger le réseau"
+        );
+    }
+    Ok(EmailProxyClient::new(&config.email_proxy)?)
+}
+
+/// Vidéos sources d'un dossier : fichiers analysés (`_tracking.json`,
+/// `.json` ou `.csv`), à l'exclusion des assets de mission (`MSL1.mov`).
+fn email_source_videos(folder: &Path) -> Result<Vec<PathBuf>> {
+    let docs = folder.join("docs");
+    if !docs.is_dir() {
+        anyhow::bail!("dossier docs introuvable: {}", docs.display());
+    }
+    let mut videos = Vec::new();
+    for entry in std::fs::read_dir(&docs)? {
+        let path = entry?.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+            continue;
+        };
+        if !workflow_core::mission::VIDEO_EXTENSIONS
+            .iter()
+            .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+        {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        let analyzed = docs.join(format!("{stem}_tracking.json")).is_file()
+            || docs.join(format!("{stem}.json")).is_file()
+            || docs.join(format!("{stem}.csv")).is_file();
+        if analyzed {
+            videos.push(path);
+        }
+    }
+    videos.sort();
+    Ok(videos)
+}
+
+fn latest_step7_manifest(logs_dir: &Path) -> Option<PathBuf> {
+    let step7_dir = logs_dir.join("step7");
+    let mut candidates: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(step7_dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        name.starts_with("finalized_projects_") && name.ends_with(".json")
+                    })
+        })
+        .map(|path| {
+            let modified = std::fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            (modified, path)
+        })
+        .collect();
+    candidates.sort_by_key(|(modified, _)| *modified);
+    candidates.pop().map(|(_, path)| path)
+}
+
+fn folders_from_manifest(manifest: &Path) -> Vec<PathBuf> {
+    let Ok(bytes) = std::fs::read(manifest) else {
+        return Vec::new();
+    };
+    let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+        return Vec::new();
+    };
+    value
+        .get("projects")
+        .and_then(Value::as_array)
+        .map(|projects| {
+            projects
+                .iter()
+                .filter_map(|entry| entry.get("path").and_then(Value::as_str))
+                .map(PathBuf::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn mission_folders_for_step8(
+    manual: &[PathBuf],
+    manifest: Option<&Path>,
+    logs_dir: &Path,
+) -> Vec<PathBuf> {
+    if !manual.is_empty() {
+        return manual.to_vec();
+    }
+    let path = manifest
+        .map(Path::to_path_buf)
+        .or_else(|| latest_step7_manifest(logs_dir));
+    path.as_deref()
+        .map(folders_from_manifest)
+        .unwrap_or_default()
+}
+
+fn folder_for_project(project: &Path) -> PathBuf {
+    let parent = project.parent().unwrap_or_else(|| Path::new("."));
+    if parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "projets" || name == "projets_extraits")
+    {
+        parent
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| parent.to_path_buf())
+    } else {
+        parent.to_path_buf()
+    }
+}
+
+/// Charge les missions des lots présents dans les dossiers. Toute erreur
+/// réseau est journalisée et ne bloque jamais le pipeline.
+fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<ClientMission> {
+    if !config.email_proxy.enabled || folders.is_empty() {
+        return Vec::new();
+    }
+    let store = match open_email_store(config) {
+        Ok(store) => store,
+        Err(error) => {
+            tracing::warn!("email: cache indisponible: {error:#}");
+            return Vec::new();
+        }
+    };
+    let lots: std::collections::HashSet<u32> = folders
+        .iter()
+        .filter_map(|folder| ClientMission::lot_from_folder(folder))
+        .collect();
+    if lots.is_empty() {
+        return Vec::new();
+    }
+    let client = match EmailProxyClient::new(&config.email_proxy) {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::warn!("email: client indisponible: {error:#}");
+            return Vec::new();
+        }
+    };
+    match tokio::runtime::Runtime::new() {
+        Ok(runtime) => {
+            match runtime.block_on(client.sync(&store, config.email_proxy.index_limit, false)) {
+                Ok(report) => tracing::info!(
+                    "email: {} entrée(s), {} détail(s), {} erreur(s)",
+                    report.index_entries,
+                    report.fetched,
+                    report.errors.len()
+                ),
+                Err(error) => tracing::warn!("email: synchronisation impossible: {error:#}"),
+            }
+        }
+        Err(error) => tracing::warn!("email: runtime indisponible: {error:#}"),
+    }
+    if let Err(error) = store.purge_retention(config.email_proxy.retention_days) {
+        tracing::warn!("email: purge impossible: {error:#}");
+    }
+    let mut missions = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for lot in lots {
+        for mission in store.list_for_lot(lot).unwrap_or_default() {
+            if !seen.insert(mission.id.clone()) {
+                continue;
+            }
+            if config.email_proxy.require_media_solution
+                && !mission.sender_masked.is_empty()
+                && !mission.sender_masked.ends_with("@media-solution.fr")
+            {
+                tracing::warn!(
+                    mission = %mission.id,
+                    sender = %mission.sender_masked,
+                    "email: expéditeur hors média-solution, mission ignorée"
+                );
+                continue;
+            }
+            missions.push(mission);
+        }
+    }
+    missions
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("error: {error:#}");
@@ -1078,6 +1364,219 @@ fn run() -> Result<()> {
                         status.available,
                         status.last_fetch_ts.unwrap_or_else(|| "n/a".into())
                     );
+                }
+            }
+        },
+        Command::Email(args) => match args.command {
+            EmailCommand::List { lot, limit } => {
+                let store = open_email_store(&config)?;
+                let mut missions = if let Some(lot) = lot {
+                    store.list_for_lot(lot)?
+                } else {
+                    store.list(limit)?
+                };
+                missions.truncate(limit);
+                let items: Vec<Value> = missions
+                    .iter()
+                    .map(|mission| {
+                        json!({
+                            "id": mission.id,
+                            "lot": mission.lot,
+                            "subject": mission.subject,
+                            "received_at": mission.received_at,
+                            "stored_at": mission.stored_at,
+                            "deadline": mission.deadline,
+                            "urgent": mission.urgent,
+                            "videos": mission.videos.len(),
+                            "warnings": mission.warnings.len(),
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json!({
+                        "db": email_db_path(&config),
+                        "count": items.len(),
+                        "missions": items,
+                    }))?
+                );
+            }
+            EmailCommand::Show { id, lot } => {
+                let store = open_email_store(&config)?;
+                let missions = match (id, lot) {
+                    (Some(id), _) => store.get(&id)?.into_iter().collect::<Vec<_>>(),
+                    (None, Some(lot)) => store.list_for_lot(lot)?,
+                    (None, None) => anyhow::bail!("passer --id ou --lot"),
+                };
+                if missions.is_empty() {
+                    anyhow::bail!("aucune mission en cache pour cette sélection");
+                }
+                println!("{}", serde_json::to_string_pretty(&missions)?);
+            }
+            EmailCommand::Sync {
+                limit,
+                force,
+                dry_run,
+            } => {
+                let store = open_email_store(&config)?;
+                let client = email_client(&config)?;
+                let runtime = tokio::runtime::Runtime::new()?;
+                let limit = limit.unwrap_or(config.email_proxy.index_limit);
+                if dry_run {
+                    let entries = runtime.block_on(client.index(limit))?;
+                    let mut errors = Vec::new();
+                    let mut parsed = 0usize;
+                    for entry in &entries {
+                        match runtime.block_on(client.detail(&entry.id)) {
+                            Ok(_) => parsed += 1,
+                            Err(error) => errors.push(format!("{}: {error}", entry.id)),
+                        }
+                    }
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "dry_run": true,
+                            "index_entries": entries.len(),
+                            "parsed": parsed,
+                            "errors": errors,
+                        }))?
+                    );
+                } else {
+                    let report = runtime.block_on(client.sync(&store, limit, force))?;
+                    let purged = store.purge_retention(config.email_proxy.retention_days)?;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "db": store.path(),
+                            "report": report,
+                            "purged": purged,
+                            "cached": store.count()?,
+                        }))?
+                    );
+                }
+            }
+            EmailCommand::Test { id } => {
+                let client = email_client(&config)?;
+                let runtime = tokio::runtime::Runtime::new()?;
+                let mission = runtime.block_on(client.detail(&id))?;
+                println!("{}", serde_json::to_string_pretty(&mission)?);
+            }
+            EmailCommand::Match {
+                folder,
+                video,
+                offline,
+            } => {
+                let store = open_email_store(&config)?;
+                if !offline && config.email_proxy.enabled {
+                    let client = email_client(&config)?;
+                    let runtime = tokio::runtime::Runtime::new()?;
+                    match runtime.block_on(client.sync(
+                        &store,
+                        config.email_proxy.index_limit,
+                        false,
+                    )) {
+                        Ok(report) => tracing::info!(
+                            "email: {} entrée(s), {} détail(s) récupéré(s), {} erreur(s)",
+                            report.index_entries,
+                            report.fetched,
+                            report.errors.len()
+                        ),
+                        Err(error) => tracing::warn!("email: synchronisation impossible: {error}"),
+                    }
+                }
+                let lot = ClientMission::lot_from_folder(&folder)
+                    .ok_or_else(|| anyhow::anyhow!("lot introuvable dans {}", folder.display()))?;
+                let missions = store.list_for_lot(lot)?;
+                let videos = match video {
+                    Some(video) => vec![video],
+                    None => email_source_videos(&folder)?,
+                };
+                let mut results = Vec::new();
+                for video in videos {
+                    let name = video
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or_default();
+                    let matches: Vec<Value> = missions
+                        .iter()
+                        .filter_map(|mission| match mission.match_video(name) {
+                            VideoMatch::Matched(instruction) => Some(json!({
+                                "mission": mission.id,
+                                "filename": instruction.filename,
+                                "deadline": instruction.deadline,
+                                "urgent": instruction.urgent,
+                                "logos": instruction.logos,
+                                "no_logo": instruction.no_logo,
+                                "logo_unresolved": instruction.logo_unresolved,
+                            })),
+                            VideoMatch::Ambiguous => Some(json!({
+                                "mission": mission.id,
+                                "ambiguous": true,
+                            })),
+                            VideoMatch::NotFound => None,
+                        })
+                        .collect();
+                    results.push(json!({
+                        "video": name,
+                        "matches": matches,
+                    }));
+                }
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json!({
+                        "folder": folder,
+                        "lot": lot,
+                        "missions": missions.len(),
+                        "videos": results,
+                    }))?
+                );
+            }
+            EmailCommand::Import { eml, dir } => {
+                let store = open_email_store(&config)?;
+                let mut files = eml;
+                if let Some(dir) = dir {
+                    for entry in std::fs::read_dir(&dir)
+                        .with_context(|| format!("lecture de {}", dir.display()))?
+                    {
+                        let path = entry?.path();
+                        if path
+                            .extension()
+                            .and_then(|extension| extension.to_str())
+                            .is_some_and(|extension| extension.eq_ignore_ascii_case("eml"))
+                        {
+                            files.push(path);
+                        }
+                    }
+                }
+                if files.is_empty() {
+                    anyhow::bail!("passer au moins --eml ou --dir");
+                }
+                files.sort();
+                let mut reports = Vec::new();
+                let mut failures = 0usize;
+                for path in files {
+                    match import_eml(&store, &path) {
+                        Ok(report) => reports.push(json!(report)),
+                        Err(error) => {
+                            failures += 1;
+                            reports.push(json!({
+                                "source": path,
+                                "error": format!("{error:#}"),
+                            }));
+                        }
+                    }
+                }
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json!({
+                        "db": store.path(),
+                        "imported": reports.len() - failures,
+                        "failures": failures,
+                        "reports": reports,
+                    }))?
+                );
+                if failures > 0 {
+                    std::process::exit(1);
                 }
             }
         },
@@ -1503,6 +2002,8 @@ fn run() -> Result<()> {
                 dry_run,
                 no_post,
                 direct,
+                no_email,
+                no_mission_overlay,
             } => {
                 let resolved = config.paths.resolve();
                 let logs_dir = logs_dir.unwrap_or(resolved.logs);
@@ -1521,6 +2022,14 @@ fn run() -> Result<()> {
                 }
                 if direct {
                     post.direct = true;
+                }
+                if no_mission_overlay {
+                    post.mission_overlay = false;
+                }
+                let mission_folders =
+                    mission_folders_for_step8(&folders, manifest.as_deref(), &logs_dir);
+                if !no_email {
+                    post.missions = load_missions_for_folders(&config, &mission_folders);
                 }
                 let options = Step8Options {
                     manifest,
@@ -1561,6 +2070,8 @@ fn run() -> Result<()> {
                 ffprobe,
                 report_only,
                 direct,
+                no_email,
+                no_mission_overlay,
             } => {
                 if folders.is_empty() && projects.is_empty() {
                     anyhow::bail!("passer au moins --folder ou --project");
@@ -1588,6 +2099,14 @@ fn run() -> Result<()> {
                 options.report_only = report_only;
                 if direct {
                     options.direct = true;
+                }
+                if no_mission_overlay {
+                    options.mission_overlay = false;
+                }
+                let mut mission_folders = folders.clone();
+                mission_folders.extend(projects.iter().map(|project| folder_for_project(project)));
+                if !no_email {
+                    options.missions = load_missions_for_folders(&config, &mission_folders);
                 }
                 let mut results = Vec::new();
                 let mut failures = 0usize;
@@ -1665,6 +2184,9 @@ fn run() -> Result<()> {
                     source_logo_visual,
                     source_logo_catalog,
                     source_logo_references,
+                    // Le sidecar de mission est découvert automatiquement à
+                    // côté du projet ou de l'export.
+                    mission_sidecar: None,
                     evidence_enabled: !no_evidence,
                     per_segment,
                     video_id,

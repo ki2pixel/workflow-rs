@@ -24,6 +24,8 @@ pub struct Stage0Options {
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
     pub template_prefixes: Vec<String>,
+    /// Sidecar `<stem>_mission.json` pour le contrôle des logos de mission.
+    pub mission_sidecar: Option<PathBuf>,
     pub thresholds: Stage0Thresholds,
 }
 
@@ -33,6 +35,7 @@ impl Default for Stage0Options {
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
             template_prefixes: crate::post::a6::default_prefixes(),
+            mission_sidecar: None,
             thresholds: Stage0Thresholds::default(),
         }
     }
@@ -103,6 +106,8 @@ pub fn run_stage0(
             "aucun .ecproj fourni",
         ));
     }
+    let mission_checks = check_mission(options.mission_sidecar.as_deref(), project);
+    checks.extend(mission_checks);
     timings.project_ms = elapsed_ms(project_started);
     timings.total_ms = elapsed_ms(started);
 
@@ -167,7 +172,241 @@ fn probe_audio_codec(ffprobe: &Path, video: &Path) -> Result<String> {
     })
 }
 
-pub fn check_specs(specs: &QaSpecs) -> (Vec<QaCheck>, Vec<QaFinding>) {
+/// Vérifie le sidecar de mission et la présence réelle des calques A7.
+fn check_mission(sidecar: Option<&Path>, project: Option<&Path>) -> Vec<QaCheck> {
+    let Some(sidecar) = sidecar else {
+        return vec![QaCheck::not_applicable(
+            "mission_overlays",
+            "aucun sidecar de mission",
+        )];
+    };
+    let value: serde_json::Value = match std::fs::read(sidecar)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+    {
+        Some(value) => value,
+        None => {
+            return vec![QaCheck::warn(
+                "mission_overlays",
+                format!("sidecar illisible: {}", sidecar.display()),
+            )];
+        }
+    };
+    let Some(mission) = value.get("mission") else {
+        return vec![QaCheck::warn(
+            "mission_overlays",
+            "sidecar sans bloc mission",
+        )];
+    };
+    let decision = mission
+        .get("decision")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    let no_logo = mission
+        .get("no_logo")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let added = mission
+        .get("added")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let missing = mission
+        .get("missing")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let skipped = mission
+        .get("skipped")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let reasons: Vec<&str> = mission
+        .get("reasons")
+        .and_then(serde_json::Value::as_array)
+        .map(|reasons| {
+            reasons
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if decision == "review" && !missing.is_empty() {
+        let names: Vec<&str> = missing
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect();
+        return vec![QaCheck::warn(
+            "mission_overlays",
+            format!("assets de mission manquants: {names:?}"),
+        )];
+    }
+    if decision == "review" {
+        return vec![QaCheck::warn(
+            "mission_overlays",
+            format!("décision A7 en revue: {reasons:?}"),
+        )];
+    }
+    if no_logo {
+        if added.is_empty() {
+            return vec![QaCheck::pass(
+                "mission_overlays",
+                "Pas de logo, aucun calque de mission",
+            )];
+        }
+        return vec![QaCheck::warn(
+            "mission_overlays",
+            "Pas de logo mais des calques sont déclarés",
+        )];
+    }
+    if added.is_empty() {
+        if reasons.contains(&"overlay_disabled") {
+            return vec![QaCheck::info(
+                "mission_overlays",
+                "mission résolue, insertion A7 désactivée",
+            )];
+        }
+        if !skipped.is_empty() {
+            let Some(project) = project else {
+                return vec![QaCheck::info(
+                    "mission_overlays",
+                    format!("{} logo(s) déjà présent(s), projet absent", skipped.len()),
+                )];
+            };
+            let names = match mission_layer_names(project) {
+                Ok(names) => names,
+                Err(error) => {
+                    return vec![QaCheck::warn(
+                        "mission_overlays",
+                        format!("projet illisible pour vérifier A7: {error:#}"),
+                    )];
+                }
+            };
+            let absent: Vec<&str> = skipped
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .filter(|name| {
+                    let key = workflow_core::mission::filename_key(name);
+                    !names
+                        .iter()
+                        .any(|candidate| workflow_core::mission::filename_key(candidate) == key)
+                })
+                .collect();
+            return if absent.is_empty() {
+                vec![QaCheck::pass(
+                    "mission_overlays",
+                    format!("{} logo(s) déjà présent(s), aucun doublon", skipped.len()),
+                )]
+            } else {
+                vec![QaCheck::warn(
+                    "mission_overlays",
+                    format!("logo(s) annoncé(s) déjà présent(s) mais absent(s): {absent:?}"),
+                )]
+            };
+        }
+        return vec![QaCheck::warn(
+            "mission_overlays",
+            "mission avec logos mais aucun calque ajouté",
+        )];
+    }
+    let Some(project) = project else {
+        return vec![QaCheck::info(
+            "mission_overlays",
+            format!("{} calque(s) déclaré(s), projet absent", added.len()),
+        )];
+    };
+    let doc = match ecproj::load(project) {
+        Ok(doc) => doc,
+        Err(error) => {
+            return vec![QaCheck::warn(
+                "mission_overlays",
+                format!("projet illisible pour vérifier A7: {error:#}"),
+            )];
+        }
+    };
+    let comp = match ecproj::comp(&doc) {
+        Ok(comp) => comp,
+        Err(error) => {
+            return vec![QaCheck::warn(
+                "mission_overlays",
+                format!("composition illisible: {error:#}"),
+            )];
+        }
+    };
+    let layers = comp
+        .get("layers")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut problems = Vec::new();
+    for addition in &added {
+        let name = addition
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        let key = workflow_core::mission::filename_key(name);
+        let layer = layers.iter().find(|layer| {
+            layer
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|candidate| workflow_core::mission::filename_key(candidate) == key)
+        });
+        let Some(layer) = layer else {
+            problems.push(format!("{name}: calque absent"));
+            continue;
+        };
+        let start = layer
+            .get("start_time")
+            .and_then(ecproj::as_i64)
+            .unwrap_or(0) as f64
+            / ecproj::TICKS_PER_SECOND;
+        let end = layer.get("out_point").and_then(ecproj::as_i64).unwrap_or(0) as f64
+            / ecproj::TICKS_PER_SECOND;
+        let expected_start = addition
+            .get("start_s")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(start);
+        let expected_end = addition
+            .get("end_s")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(end);
+        if (start - expected_start).abs() > 0.041 || (end - expected_end).abs() > 0.041 {
+            problems.push(format!(
+                "{name}: {start:.3}-{end:.3}s au lieu de {expected_start:.3}-{expected_end:.3}s"
+            ));
+        }
+    }
+    if problems.is_empty() {
+        vec![QaCheck::pass(
+            "mission_overlays",
+            format!("{} calque(s) de mission conforme(s)", added.len()),
+        )]
+    } else {
+        vec![QaCheck::warn(
+            "mission_overlays",
+            format!("calques non conformes: {problems:?}"),
+        )]
+    }
+}
+
+fn mission_layer_names(project: &Path) -> Result<Vec<String>> {
+    let doc = ecproj::load(project)?;
+    let comp = ecproj::comp(&doc)?;
+    Ok(comp
+        .get("layers")
+        .and_then(serde_json::Value::as_array)
+        .map(|layers| {
+            layers
+                .iter()
+                .filter_map(|layer| layer.get("name").and_then(serde_json::Value::as_str))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+fn check_specs(specs: &QaSpecs) -> (Vec<QaCheck>, Vec<QaFinding>) {
     let mut checks = Vec::new();
     let mut findings = Vec::new();
     let mut mismatch = false;
@@ -894,6 +1133,136 @@ mod tests {
             .checks
             .iter()
             .any(|item| item.id == "template_a6" && item.status == QaStatus::NotApplicable));
+    }
+
+    #[test]
+    fn mission_sidecar_without_file_is_not_applicable() {
+        let checks = check_mission(None, None);
+        assert_eq!(checks[0].id, "mission_overlays");
+        assert_eq!(checks[0].status, QaStatus::NotApplicable);
+    }
+
+    #[test]
+    fn mission_no_logo_sidecar_passes() {
+        let dir = tempdir().unwrap();
+        let sidecar = dir.path().join("clip_mission.json");
+        fs::write(
+            &sidecar,
+            serde_json::to_vec(&json!({
+                "project_stem": "clip",
+                "mission": {"decision": "noop", "no_logo": true, "added": [], "missing": [], "reasons": ["no_logo"]}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let checks = check_mission(Some(&sidecar), None);
+        assert_eq!(checks[0].status, QaStatus::Pass);
+    }
+
+    #[test]
+    fn mission_missing_asset_requests_review() {
+        let dir = tempdir().unwrap();
+        let sidecar = dir.path().join("clip_mission.json");
+        fs::write(
+            &sidecar,
+            serde_json::to_vec(&json!({
+                "project_stem": "clip",
+                "mission": {
+                    "decision": "review",
+                    "no_logo": false,
+                    "added": [],
+                    "missing": ["teva.png"],
+                    "reasons": ["missing_asset"]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let checks = check_mission(Some(&sidecar), None);
+        assert_eq!(checks[0].status, QaStatus::Review);
+        assert!(checks[0].detail.contains("teva.png"));
+    }
+
+    #[test]
+    fn mission_layer_is_verified_against_the_project() {
+        let dir = tempdir().unwrap();
+        let mut document = project_fixture();
+        let comp = document["items"]["2"]["kind"].as_object_mut().unwrap();
+        let layers = comp["layers"].as_array_mut().unwrap();
+        layers.insert(
+            0,
+            json!({
+                "id": 900,
+                "name": "m6+.png",
+                "source": {"type": "Footage", "item": 1},
+                "start_time": 0,
+                "in_point": 0,
+                "out_point": 2540160000000i64,
+                "props": {"children": []}
+            }),
+        );
+        let project = dir.path().join("clip_9x16.ecproj");
+        fs::write(&project, serde_json::to_vec(&document).unwrap()).unwrap();
+        let sidecar = dir.path().join("clip_mission.json");
+        fs::write(
+            &sidecar,
+            serde_json::to_vec(&json!({
+                "project_stem": "clip",
+                "mission": {
+                    "decision": "apply",
+                    "no_logo": false,
+                    "added": [{"name": "m6+.png", "mode": "static", "start_s": 0.0, "end_s": 10.0}],
+                    "missing": [],
+                    "reasons": []
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let checks = check_mission(Some(&sidecar), Some(&project));
+        assert_eq!(checks[0].status, QaStatus::Pass);
+    }
+
+    #[test]
+    fn mission_skipped_layer_is_verified_against_the_project() {
+        let dir = tempdir().unwrap();
+        let mut document = project_fixture();
+        let comp = document["items"]["2"]["kind"].as_object_mut().unwrap();
+        let layers = comp["layers"].as_array_mut().unwrap();
+        layers.insert(
+            0,
+            json!({
+                "id": 901,
+                "name": "sdm.png",
+                "source": {"type": "Footage", "item": 1},
+                "start_time": 0,
+                "in_point": 0,
+                "out_point": 2540160000000i64,
+                "props": {"children": []}
+            }),
+        );
+        let project = dir.path().join("clip_9x16.ecproj");
+        fs::write(&project, serde_json::to_vec(&document).unwrap()).unwrap();
+        let sidecar = dir.path().join("clip_mission.json");
+        fs::write(
+            &sidecar,
+            serde_json::to_vec(&json!({
+                "project_stem": "clip",
+                "mission": {
+                    "decision": "noop",
+                    "no_logo": false,
+                    "added": [],
+                    "missing": [],
+                    "skipped": ["sdm.png"],
+                    "reasons": []
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let checks = check_mission(Some(&sidecar), Some(&project));
+        assert_eq!(checks[0].status, QaStatus::Pass);
+        assert!(checks[0].detail.contains("déjà présent"));
     }
 
     #[test]

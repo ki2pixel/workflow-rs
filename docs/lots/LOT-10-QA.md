@@ -7,6 +7,8 @@
 > Décision : scénario B de `docs/etudes/Architecture_QA_Vidéo_Locale.md`.
 > Passage en production le 2026-11-02 : auto-approbation conditionnelle et
 > DINOv2 en opt-out (D-049).
+> Depuis D-064 : sidecar `<stem>_mission.json`, contrôle `mission_overlays`,
+> schéma `1.4.0` et cache version 11.
 > Code : `crates/workflow-steps/src/qa/`, commande `workflow-cli qa run`.
 
 ## Problème
@@ -348,7 +350,7 @@ workflow-cli qa run \
 
 ## Schéma `qa.json`
 
-Champs principaux : `schema_version` (1.3.0), `generated_at`, `video_id`,
+Champs principaux : `schema_version` (1.4.0), `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
@@ -372,6 +374,14 @@ n'invalide pas le rapport.
 score minimal et le début de la bande. `timings_ms` ajoute
 `stage1_ocr_ms` ; `models_provenance.ocr_det` porte le SHA-256 de la
 détection et `models_provenance.ocr_rec` celui de la reconnaissance.
+
+Depuis le schéma 1.4.0 (D-064), le QA découvre automatiquement
+`<docs>/<stem>_mission.json` à côté du projet ou de l'export et ajoute le
+check `mission_overlays`. Il vérifie les assets manquants, le cas
+`Pas de logo`, les calques ajoutés par A7 et les calques déjà présents
+(déduplication A6), avec une tolérance temporelle de 41 ms. Le sidecar entre
+dans l'empreinte du cache (version 11) : une modification de mission invalide
+le `qa.json` en cache.
 
 Depuis le schéma 1.3.0, l'agrégation OCR regroupe les détections par **boîte
 stable**, et non plus par moyenne de tous les blocs de l'échantillon. Un

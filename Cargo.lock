@@ -2687,6 +2687,7 @@ dependencies = [
  "thiserror",
  "toml",
  "tracing",
+ "unicode-normalization",
 ]
 
 [[package]]

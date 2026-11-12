@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 /// À incrémenter dès qu'un changement de code modifie les résultats pour les
 /// mêmes export, projet, modèles et options (préprocessing OCR, seuils…).
-const CACHE_VERSION: u32 = 10;
+const CACHE_VERSION: u32 = 11;
 
 /// Empreinte complète : hash de l'export puis empreinte des autres entrées.
 pub fn fingerprint(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<String> {
@@ -37,12 +37,21 @@ pub fn fingerprint_from_export(
             .with_context(|| format!("hachage SHA-256 de {}", path.display()))?,
         None => "none".to_string(),
     };
+    let mission_sidecar_hash = match project {
+        Some(path) => super::find_mission_sidecar_for_project(path)
+            .map(|sidecar| detect::sha256_file(&sidecar))
+            .transpose()
+            .with_context(|| format!("hachage du sidecar de mission de {}", path.display()))?
+            .unwrap_or_else(|| "none".into()),
+        None => "none".into(),
+    };
     let thresholds = Stage0Thresholds::default();
     let canonical = format!(
         "cache_version={CACHE_VERSION}\n\
          schema={QA_SCHEMA_VERSION}\n\
          export={export_sha256}\n\
          project={project_hash}\n\
+         mission_sidecar={mission_sidecar_hash}\n\
          model.det={}\n\
          model.rec={}\n\
          model.face={}\n\
@@ -211,6 +220,33 @@ mod tests {
         fs::write(&project, b"one").unwrap();
         let first = fingerprint(&video, Some(&project), &options()).unwrap();
         fs::write(&project, b"two").unwrap();
+        let second = fingerprint(&video, Some(&project), &options()).unwrap();
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn fingerprint_changes_with_mission_sidecar() {
+        let dir = tempdir().unwrap();
+        let video = dir.path().join("export.mp4");
+        fs::write(&video, b"video").unwrap();
+        let projets = dir.path().join("projets");
+        let docs = dir.path().join("docs");
+        fs::create_dir_all(&projets).unwrap();
+        fs::create_dir_all(&docs).unwrap();
+        let project = projets.join("clip_9x16.ecproj");
+        fs::write(&project, b"project").unwrap();
+        let sidecar_path = docs.join("clip_mission.json");
+        fs::write(
+            &sidecar_path,
+            br#"{"project_stem":"clip","mission":{"decision":"noop"}}"#,
+        )
+        .unwrap();
+        let first = fingerprint(&video, Some(&project), &options()).unwrap();
+        fs::write(
+            &sidecar_path,
+            br#"{"project_stem":"clip","mission":{"decision":"apply"}}"#,
+        )
+        .unwrap();
         let second = fingerprint(&video, Some(&project), &options()).unwrap();
         assert_ne!(first, second);
     }

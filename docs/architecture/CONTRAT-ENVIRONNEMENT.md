@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.6 |
-| Date | 2026-11-10 |
+| Version | 1.7 |
+| Date | 2026-11-12 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -410,7 +410,10 @@ Post-traitement A5/A6 : après un STEP8 réussi, le projet brut
 décision ne s'applique). Trois artefacts additifs sont écrits sous
 `<docs>/post/<projet_assisté>/` : `post.json` (décisions, timings, specs,
 template), `review.json` (abstentions) et `audit.json` (contrôles, SHA-256 du
-brut et du projet assisté, hash échantillonné de la vidéo). A1/A2 ne déplacent
+brut et du projet assisté, hash échantillonné de la vidéo). Depuis D-064, un
+sidecar `<docs>/<stem>_mission.json` est écrit en plus lorsque le projet
+assisté est publié ; `post.json` ajoute alors un bloc `mission` **après**
+`summary`, sans changer l'ordre des clés existantes. A1/A2 ne déplacent
 jamais l'Anchor Point ; A3/A4 restent en revue et A5 en rapport ; A6 applique
 le template SDM si l'un des `template_prefixes` configurés correspond et si la
 structure est mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
@@ -432,8 +435,8 @@ défaut ; l'ancien champ reste accepté comme alias Serde. Le préfixe réelleme
 matché est enregistré dans `template.prefix` du `post.json` et dans les détails
 de la décision A6. `config check` rejette les préfixes vides et les
 chevauchements entre préfixes de template et avec `archive_only_prefixes` ;
-`post run --template-prefix` est répétable et le cache QA passe en version 10
-pour intégrer la liste.
+`post run --template-prefix` est répétable et le cache QA est en version 11
+(liste de préfixes D-061, sidecar de mission D-064).
 
 Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
 opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes
@@ -446,6 +449,18 @@ additifs, schéma `post.json` inchangé) ; les bandeaux sombres restent en
 `a2_ocr_det` et `a2_ocr_rec` (relatifs à `paths.models`), le runtime via
 `a2_ocr_onnxruntime`. Sans flag ou sans modèle, la décision A2 actuelle
 s'applique.
+
+Depuis D-064, `[email_proxy]` résout les missions de recadrage depuis
+`email_proxy.php` et les met en cache dans une base SQLite dédiée
+(`email_missions.sqlite3`, jamais `download_history.sqlite3`). A7
+(`steps.step8.post.mission_overlay`, défaut `false`) insère les logos validés
+dans le seul `_assist.ecproj` ; `mission_end_card_max_s` (défaut `5,0`) règle
+la frontière end-card/MOV ambigu. `a2_mission_mask` permet à A2 de lire les
+calques mission comme masque. `post run` et `step8 run` exposent `--no-email`
+(isolation réseau/cache) et `--no-mission-overlay` (audit sans insertion). Le
+QA découvre le sidecar et ajoute le contrôle `mission_overlays`
+(`QA_SCHEMA_VERSION = 1.4.0`, cache QA version 11). Détail :
+`docs/lots/LOT-12-A7-MISSIONS.md`.
 
 Depuis D-052, `steps.step8.post.a2_logo_prior` (défaut `false`) ajoute
 `details.source_logo` au candidat A2 à partir du catalogue

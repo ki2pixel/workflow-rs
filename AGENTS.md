@@ -50,7 +50,7 @@ documentation map `docs/README.md`, and
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 598 listed (596 run + 2 ignored), no hardware
+cargo test --workspace                                    # 636 listed (634 run + 2 ignored), no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -164,7 +164,7 @@ cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
 - STEP2 needs an ONNX Runtime 1.23 CUDA library (path in `[steps.step2]`) and a
   CUDA GPU. CPU devices are diagnostic/test paths, not the production config.
 - STEP1–STEP4 need `ffmpeg`/`ffprobe`; RAR archives need `unrar`; STEP8 needs
-  `effectcraft-cli` 0.13. `scripts/switch-rust.sh check` reports missing items.
+  `effectcraft-cli` 0.24. `scripts/switch-rust.sh check` reports missing items.
 
 ## Conventions
 

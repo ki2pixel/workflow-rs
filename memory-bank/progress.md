@@ -2,6 +2,18 @@
 
 ## Statut actuel
 
+- **Lot 12 — logos de mission A7 (2026-11-12, D-064)** : résolution des
+  missions `email_proxy.php` par lot dans un cache SQLite dédié, validation
+  stricte des assets 1080×1920 alpha et insertion des logos dans le seul
+  `_assist.ecproj`. End-card MOV court + PNG (comp prolongée), MOV long en
+  plein durée, MOV ambigu en `review`, `Pas de logo` sans calque ni
+  suppression, déduplication A6. Sidecar `<docs>/<stem>_mission.json`, bloc
+  `mission` après `summary`, contrôles `mission_*`, QA 1.4.0 et cache 11.
+  Validation sur copies `/tmp/opencode` : 136, 80, 131, 158, 89 et un cas
+  d'asset manquant (`teva.png`, review + exit 0) ; `--no-email` et
+  `--no-mission-overlay` vérifiés. 634 tests exécutés / 2 ignorés, fmt et
+  clippy verts. Ticket `docs/lots/LOT-12-A7-MISSIONS.md` clos. Les projets et
+  médias de production n'ont pas été modifiés.
 - **Lot 11 — veto latéral A1 (2026-11-11, D-063)** : `a1.rs` rétrograde en
   `review` (confiance 0,4) tout `apply` avec une barre gauche ou droite
   ≥ `arrondi(32 × hauteur_source / 1080)` (32 px en 1080p, 21 px en 720p,

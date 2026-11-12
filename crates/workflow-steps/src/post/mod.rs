@@ -9,6 +9,7 @@ pub mod a2;
 pub mod a3;
 pub mod a4;
 pub mod a6;
+pub mod a7;
 pub mod detect;
 pub mod direct;
 pub mod ecproj;

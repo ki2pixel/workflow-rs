@@ -81,6 +81,9 @@ pub struct QaOptions {
     /// Racine des crops RGBA de référence ; sinon `reference_root` du
     /// catalogue.
     pub source_logo_references: Option<PathBuf>,
+    /// Sidecar de mission explicite. Sans valeur, il est recherché à côté
+    /// du projet (`<docs>/<stem>_mission.json`).
+    pub mission_sidecar: Option<PathBuf>,
     /// Écrit une frame WebP par finding sous `<out>/evidence/`.
     pub evidence_enabled: bool,
     /// 1 ou 3 échantillons par segment.
@@ -108,6 +111,7 @@ impl Default for QaOptions {
             source_logo_visual: false,
             source_logo_catalog: None,
             source_logo_references: None,
+            mission_sidecar: None,
             evidence_enabled: true,
             per_segment: 1,
             video_id: None,
@@ -121,6 +125,142 @@ impl Default for QaOptions {
 pub struct QaOutcome {
     pub report: QaReport,
     pub qa_path: PathBuf,
+}
+
+/// Recherche le sidecar de mission correspondant à l'export ou au projet.
+pub(crate) fn find_mission_sidecar(video: &Path, project: Option<&Path>) -> Option<PathBuf> {
+    if let Some(project) = project {
+        if let Some(path) = find_mission_sidecar_for_project(project) {
+            return Some(path);
+        }
+    }
+    let mut docs_dirs = Vec::new();
+    if let Some(parent) = video.parent() {
+        docs_dirs.push(parent.join("docs"));
+    }
+    if let Some(project) = project {
+        if let Some(parent) = project.parent() {
+            docs_dirs.push(parent.join("docs"));
+            if parent
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name == "projets" || name == "projets_extraits")
+            {
+                if let Some(root) = parent.parent() {
+                    docs_dirs.push(root.join("docs"));
+                }
+            }
+        }
+    }
+    let video_key = workflow_core::mission::filename_key(
+        video
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default(),
+    );
+    let video_key = strip_project_suffix(&video_key);
+    let mut matches = Vec::new();
+    for docs in docs_dirs {
+        for path in mission_sidecars(&docs) {
+            if let Some(value) = read_sidecar(&path) {
+                let stem = value
+                    .get("project_stem")
+                    .and_then(serde_json::Value::as_str)
+                    .map(workflow_core::mission::filename_key)
+                    .unwrap_or_default();
+                let stem = strip_project_suffix(&stem);
+                let project_matches = project.is_some_and(|project| {
+                    value
+                        .get("project")
+                        .and_then(serde_json::Value::as_str)
+                        .is_some_and(|candidate| Path::new(candidate) == project)
+                });
+                if stem == video_key || project_matches {
+                    matches.push(path);
+                }
+            }
+        }
+    }
+    matches.sort();
+    matches.dedup();
+    if matches.len() == 1 {
+        Some(matches.remove(0))
+    } else {
+        None
+    }
+}
+
+pub(crate) fn find_mission_sidecar_for_project(project: &Path) -> Option<PathBuf> {
+    let parent = project.parent()?;
+    let docs = if parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "projets" || name == "projets_extraits")
+    {
+        parent.parent()?.join("docs")
+    } else {
+        parent.join("docs")
+    };
+    let project_stem = project
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default();
+    let project_key = strip_project_suffix(&workflow_core::mission::filename_key(project_stem));
+    let mut matches = Vec::new();
+    for path in mission_sidecars(&docs) {
+        if let Some(value) = read_sidecar(&path) {
+            let stem = value
+                .get("project_stem")
+                .and_then(serde_json::Value::as_str)
+                .map(workflow_core::mission::filename_key)
+                .unwrap_or_default();
+            let stem = strip_project_suffix(&stem);
+            let exact_project = value
+                .get("project")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|candidate| Path::new(candidate) == project);
+            if stem == project_key || exact_project {
+                matches.push(path);
+            }
+        }
+    }
+    matches.sort();
+    matches.dedup();
+    if matches.len() == 1 {
+        Some(matches.remove(0))
+    } else {
+        None
+    }
+}
+
+fn mission_sidecars(docs: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(docs) else {
+        return Vec::new();
+    };
+    let mut paths: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with("_mission.json"))
+        })
+        .collect();
+    paths.sort();
+    paths
+}
+
+fn read_sidecar(path: &Path) -> Option<serde_json::Value> {
+    let bytes = std::fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+fn strip_project_suffix(stem: &str) -> String {
+    let mut stem = stem.trim_end_matches("_assist").to_string();
+    stem = stem.trim_end_matches("_9x16").to_string();
+    stem.trim_end_matches("_assist").to_string()
 }
 
 pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Result<QaOutcome> {
@@ -137,6 +277,10 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
     }
 
     let started = Instant::now();
+    let mission_sidecar = options
+        .mission_sidecar
+        .clone()
+        .or_else(|| find_mission_sidecar(video, project));
     let stage0 = run_stage0(
         video,
         project,
@@ -144,6 +288,7 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             ffmpeg: options.ffmpeg.clone(),
             ffprobe: options.ffprobe.clone(),
             template_prefixes: options.template_prefixes.clone(),
+            mission_sidecar,
             thresholds: Stage0Thresholds::default(),
         },
     )

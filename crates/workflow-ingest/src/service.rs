@@ -353,6 +353,25 @@ impl IngestionService {
                         tracing::warn!("CSV DOWNLOAD: historique non écrit: {error:#}");
                     }
                 }
+                let original = if plan.original_filename.trim().is_empty() {
+                    result.filename.as_str()
+                } else {
+                    plan.original_filename.as_str()
+                };
+                if let Err(error) = self
+                    .history
+                    .record_origin(&normalize_url(&plan.url), original)
+                {
+                    tracing::warn!("CSV DOWNLOAD: origine non écrite: {error:#}");
+                }
+                if !plan.fallback_url.is_empty() {
+                    if let Err(error) = self
+                        .history
+                        .record_origin(&normalize_url(&plan.fallback_url), original)
+                    {
+                        tracing::warn!("CSV DOWNLOAD: origine de repli non écrite: {error:#}");
+                    }
+                }
                 for url in &urls {
                     if let Err(error) = self.history.clear_failure(&normalize_url(url)) {
                         tracing::warn!("CSV DOWNLOAD: échec non effacé: {error:#}");

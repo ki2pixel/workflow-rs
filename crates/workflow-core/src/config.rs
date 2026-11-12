@@ -15,6 +15,7 @@ pub struct Config {
     pub paths: PathsConfig,
     pub webhook: WebhookConfig,
     pub download: DownloadConfig,
+    pub email_proxy: EmailProxyConfig,
     pub steps: StepsConfig,
     pub retention: RetentionConfig,
     pub hardware: HardwareConfig,
@@ -100,6 +101,24 @@ impl Config {
         if let Some(value) = env_first(&lookup, &["WORKFLOW_STEP1_SOURCE_DIR"]) {
             self.steps.step1.source_dir = PathBuf::from(value);
         }
+        if let Some(value) = env_first(
+            &lookup,
+            &["WORKFLOW_EMAIL_PROXY_ENABLED", "EMAIL_PROXY_ENABLED"],
+        ) {
+            self.email_proxy.enabled = parse_bool_env(&value, "WORKFLOW_EMAIL_PROXY_ENABLED")?;
+        }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_EMAIL_PROXY_URL", "EMAIL_PROXY_URL"]) {
+            self.email_proxy.url = value;
+        }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_EMAIL_PROXY_TIMEOUT_S"]) {
+            self.email_proxy.timeout_s = parse_env(&value, "WORKFLOW_EMAIL_PROXY_TIMEOUT_S")?;
+        }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_EMAIL_PROXY_INDEX_LIMIT"]) {
+            self.email_proxy.index_limit = parse_env(&value, "WORKFLOW_EMAIL_PROXY_INDEX_LIMIT")?;
+        }
+        if let Some(value) = env_first(&lookup, &["WORKFLOW_EMAIL_PROXY_DB"]) {
+            self.email_proxy.db = PathBuf::from(value);
+        }
         if let Some(value) = env_first(&lookup, &["DOWNLOAD_CONNECT_TIMEOUT_S"]) {
             self.download.connect_timeout_s = parse_env(&value, "DOWNLOAD_CONNECT_TIMEOUT_S")?;
         }
@@ -139,6 +158,21 @@ impl Config {
         if self.server.port < 1024 {
             return Err(ConfigError::Invalid(
                 "server.port doit être supérieur ou égal à 1024".into(),
+            ));
+        }
+        if self.email_proxy.enabled && self.email_proxy.url.trim().is_empty() {
+            return Err(ConfigError::Invalid(
+                "email_proxy.url ne peut pas être vide lorsque email_proxy.enabled = true".into(),
+            ));
+        }
+        if self.email_proxy.timeout_s == 0 || self.email_proxy.index_limit == 0 {
+            return Err(ConfigError::Invalid(
+                "email_proxy.timeout_s et email_proxy.index_limit doivent être > 0".into(),
+            ));
+        }
+        if !(0.0..=60.0).contains(&self.steps.step8.post.mission_end_card_max_s) {
+            return Err(ConfigError::Invalid(
+                "steps.step8.post.mission_end_card_max_s doit être dans [0, 60]".into(),
             ));
         }
         if self.steps.step1.fps == 0 {
@@ -662,6 +696,45 @@ impl Default for WebhookConfig {
     }
 }
 
+/// Accès en lecture au proxy d'emails de missions (`email_proxy.php`).
+///
+/// Désactivé par défaut : sans flag, aucune requête réseau n'est émise et le
+/// pipeline reste strictement identique. Le cache SQLite est dédié
+/// (`email_missions.sqlite3`) et n'écrit jamais dans `download_history`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EmailProxyConfig {
+    /// Active la résolution réseau et le cache des missions.
+    pub enabled: bool,
+    pub url: String,
+    pub timeout_s: u64,
+    /// Durée de validité du cache avant reevaluation de l'index.
+    pub cache_ttl_s: u64,
+    /// Nombre de missions demandées à l'index (buffer serveur : 200).
+    pub index_limit: usize,
+    /// Base SQLite dédiée. Vide : `<paths.base>/email_missions.sqlite3`.
+    pub db: PathBuf,
+    /// Purge les missions absentes de l'index depuis N jours (0 désactive).
+    pub retention_days: u64,
+    /// Exige un expéditeur `@media-solution.fr` (garde-fou de parsing).
+    pub require_media_solution: bool,
+}
+
+impl Default for EmailProxyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            url: "https://webhook.kidpixel.fr/email_proxy.php".into(),
+            timeout_s: 5,
+            cache_ttl_s: 300,
+            index_limit: 50,
+            db: PathBuf::new(),
+            retention_days: 90,
+            require_media_solution: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DownloadConfig {
@@ -1130,6 +1203,13 @@ pub struct PostConfig {
     pub a2_logo_detector_min_persistence: f64,
     /// `full` (validé B1), `bottom` ou `bottom_left` (essais de résolution).
     pub a2_logo_detector_roi: String,
+    /// A7 : associe les logos de la mission email au projet assisté.
+    /// Désactivé par défaut, activé après validation sur lots pilotes.
+    pub mission_overlay: bool,
+    /// A7 : durée maximale d'un `.mov` interprété comme end-card.
+    pub mission_end_card_max_s: f64,
+    /// A2 : utilise les calques de mission comme masque de logos.
+    pub a2_mission_mask: bool,
 }
 
 impl Default for PostConfig {
@@ -1165,6 +1245,9 @@ impl Default for PostConfig {
             a2_logo_detector_iou: 0.65,
             a2_logo_detector_min_persistence: 0.70,
             a2_logo_detector_roi: "full".into(),
+            mission_overlay: false,
+            mission_end_card_max_s: 5.0,
+            a2_mission_mask: false,
         }
     }
 }

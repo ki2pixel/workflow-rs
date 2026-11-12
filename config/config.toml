@@ -69,6 +69,21 @@ cache_ttl_s = 60
 interval_s = 15
 dry_run = false
 
+[email_proxy]
+# Missions client extraites des emails de recadrage (lot, logos, échéances).
+# Activé en production pour réception et application automatique des missions.
+enabled = true
+url = "https://webhook.kidpixel.fr/email_proxy.php"
+timeout_s = 5
+cache_ttl_s = 300
+# Buffer serveur : 200 missions maximum, 50 en incrémental.
+index_limit = 50
+# Vide : <paths.base>/email_missions.sqlite3 (base dédiée, jamais fusionnée
+# avec download_history.sqlite3).
+db = ""
+retention_days = 90
+require_media_solution = true
+
 [download]
 allow_private_hosts = false
 connect_timeout_s = 15
@@ -237,6 +252,13 @@ a2_ocr_threads = 8
 # source reconnu. Le détecteur YOLOX reste désactivé (`a2_logo_detector`).
 a2_logo_prior = true
 a2_logo_catalog = "qa/source_logos.toml"
+# A7 : logos de mission email. Activé en production pour habillage automatique.
+mission_overlay = true
+# Seuil de classification des `.mov` : end-card si durée <= 5 s et PNG présent.
+mission_end_card_max_s = 5.0
+# A2 : masque les calques de mission (PNG) dans l'analyse source. Activé
+# après comparatif A2, indépendamment de mission_overlay.
+a2_mission_mask = false
 
 [retention]
 # Projets sources : `steps.step7.cleanup_threshold_hours` (48 h) est utilisé.

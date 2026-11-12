@@ -328,7 +328,14 @@ fn resolve_asset(project: &Path, item: &Value) -> Option<PathBuf> {
         .and_then(|kind| kind.get("path"))
         .and_then(Value::as_str)
     {
-        candidates.push(PathBuf::from(declared));
+        let declared = PathBuf::from(declared);
+        if declared.is_absolute() {
+            candidates.push(declared);
+        } else if let Some(parent) = project.parent() {
+            // Un chemin relatif déclaré (`../docs/x.png`) est relatif au
+            // projet, pas au répertoire courant du processus.
+            candidates.push(parent.join(declared));
+        }
     }
     if let Some(parent) = project.parent() {
         candidates.push(parent.join("docs").join(file_name));
@@ -620,6 +627,25 @@ mod tests {
             mask.coverage_ratio([100.0, 300.0, 200.0, 100.0], 6.0, 1080, 1920),
             0.0
         );
+    }
+
+    #[test]
+    fn relative_declared_path_is_resolved_from_the_project_folder() {
+        let dir = tempdir().unwrap();
+        let docs = dir.path().join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        write_png(&docs.join("logo.png"), 8, 8, &[(2, 3), (5, 6)]);
+        let projets = dir.path().join("projets");
+        fs::create_dir_all(&projets).unwrap();
+        let project_path = projets.join("clip_9x16.ecproj");
+        fs::write(
+            &project_path,
+            serde_json::to_vec(&project("logo.png", "../docs/logo.png", 100.0)).unwrap(),
+        )
+        .unwrap();
+        let mask = read_mask(&project_path).unwrap();
+        assert_eq!(mask.regions.len(), 1);
+        assert_eq!(mask.regions[0].bbox_xywh, [2.0, 3.0, 4.0, 4.0]);
     }
 
     #[cfg(unix)]

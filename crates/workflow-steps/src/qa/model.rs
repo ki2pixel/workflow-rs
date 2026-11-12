@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::vision::ModelInfo;
 
-pub const QA_SCHEMA_VERSION: &str = "1.3.0";
+pub const QA_SCHEMA_VERSION: &str = "1.4.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

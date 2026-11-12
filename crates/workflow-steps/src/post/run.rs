@@ -13,7 +13,7 @@ use crate::post::logo::LogoAnnotation;
 use crate::post::model::{
     now_iso, verdict, Action, AuditCheck, Decision, PostProjectOutcome, PostRunSummary, PostSummary,
 };
-use crate::post::{a1, a2, a3, a4, a6, detect, direct};
+use crate::post::{a1, a2, a3, a4, a6, a7, detect, direct};
 use crate::template::{Bypass, BypassMode};
 use crate::vision::frame::FrameCache;
 use crate::vision::logo_detector::{ExecutionDevice, Roi};
@@ -28,6 +28,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use workflow_core::fsutil::write_atomic;
+use workflow_core::mission::ClientMission;
 use workflow_schema::round::round_to;
 
 const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
@@ -80,6 +81,14 @@ pub struct PostOptions {
     /// Émet les marqueurs `POST_*` sur `stdout` (hook STEP8) au lieu de
     /// `stderr` (commande `post run` seule).
     pub emit_progress: bool,
+    /// A7 : insère les logos de mission dans le projet assisté.
+    pub mission_overlay: bool,
+    /// A7 : durée maximale d'un `.mov` interprété comme end-card.
+    pub mission_end_card_max_s: f64,
+    /// A2 : utilise les calques de mission comme masque.
+    pub a2_mission_mask: bool,
+    /// Missions résolues par la CLI pour les lots du run.
+    pub missions: Vec<ClientMission>,
 }
 
 impl Default for PostOptions {
@@ -119,6 +128,10 @@ impl Default for PostOptions {
             hardware_lock: PathBuf::from("/tmp/workflow-rs-hw.lock"),
             report_only: false,
             emit_progress: false,
+            mission_overlay: false,
+            mission_end_card_max_s: 5.0,
+            a2_mission_mask: false,
+            missions: Vec::new(),
         }
     }
 }
@@ -168,6 +181,10 @@ impl PostOptions {
             hardware_lock: config.hardware.lock_path.clone(),
             report_only: false,
             emit_progress: false,
+            mission_overlay: post.mission_overlay,
+            mission_end_card_max_s: post.mission_end_card_max_s,
+            a2_mission_mask: post.a2_mission_mask,
+            missions: Vec::new(),
         }
     }
 }
@@ -510,6 +527,10 @@ fn run_post_project_inner(
         }
     };
     let stem = project_stem(project, &segments);
+    let main_s = segments
+        .iter()
+        .map(|segment| segment.end)
+        .fold(0.0_f64, f64::max);
     let video = resolve_video(&docs, &segments, &stem);
     let specs =
         video
@@ -562,6 +583,24 @@ fn run_post_project_inner(
     };
     let mut a3_ms = 0.0;
     let mut a4_ms = 0.0;
+    let mut output_doc = doc.clone();
+    let mut mission_block: Option<Value> = None;
+    let mut tail_s = 0.0_f64;
+    let mut a7_ms = 0.0_f64;
+    let mut a7_pre_decisions = Vec::new();
+    // Hors A6, A7 passe avant A1/A2 : A2 voit ainsi le masque réel des
+    // logos mission. Le template A6 reste jugé sur le projet brut.
+    if template.eligible != Some(true) && !options.missions.is_empty() {
+        let started = Instant::now();
+        let outcome = run_a7(&output_doc, project, &docs, &stem, main_s, &meta, options);
+        a7_ms += started.elapsed().as_secs_f64() * 1000.0;
+        a7_pre_decisions = outcome.decisions;
+        if outcome.changed {
+            output_doc = outcome.doc;
+        }
+        mission_block = outcome.mission;
+        tail_s = outcome.tail_s;
+    }
     if template.eligible != Some(true) {
         let (source_width, source_height) = specs
             .as_ref()
@@ -595,8 +634,14 @@ fn run_post_project_inner(
         // Un logo caché par un habillage déclaré ne doit pas déclencher le
         // veto « logo seul » d'A2. Le masque n'est lu que si le prior est
         // actif : sans flag, aucun travail supplémentaire.
-        let overlay_mask = if options.a2_logo_prior {
-            crate::post::overlay::read_mask(project).ok()
+        let overlay_mask = if options.a2_logo_prior || options.a2_mission_mask {
+            if options.a2_mission_mask && mission_block.is_some() {
+                // A7 a déjà inséré les calques mission : A2 lit le document
+                // en mémoire pour couvrir aussi ces logos.
+                crate::post::overlay::mask_from_doc(&output_doc, project).ok()
+            } else {
+                crate::post::overlay::read_mask(project).ok()
+            }
         } else {
             None
         };
@@ -680,6 +725,7 @@ fn run_post_project_inner(
         a4_ms = start.elapsed().as_secs_f64() * 1000.0;
     }
     decisions.extend(a6_decisions);
+    decisions.extend(a7_pre_decisions);
     timings.insert("a1_ms".into(), json!(round_to(a1_ms, 1)));
     timings.insert("a2_ms".into(), json!(round_to(a2_ms, 1)));
     timings.insert(
@@ -731,9 +777,8 @@ fn run_post_project_inner(
         .cloned()
         .collect();
 
-    let mut output_doc = doc.clone();
     let mut transform_error = None;
-    let mut transformed = false;
+    let mut transformed = output_doc != doc;
     let mut template_applied = false;
     let mut output_layers = None;
     if a6_apply {
@@ -770,7 +815,29 @@ fn run_post_project_inner(
             transformed = true;
         }
     }
+    if template_applied && !options.missions.is_empty() {
+        let a7_start = Instant::now();
+        let outcome = run_a7(&output_doc, project, &docs, &stem, main_s, &meta, options);
+        a7_ms += a7_start.elapsed().as_secs_f64() * 1000.0;
+        decisions.extend(outcome.decisions);
+        if outcome.changed {
+            output_doc = outcome.doc;
+            transformed = true;
+        }
+        mission_block = outcome.mission;
+        tail_s = outcome.tail_s;
+    }
     timings.insert("a6_ms".into(), json!(round_to(a6_ms, 1)));
+    if !options.missions.is_empty() {
+        timings.insert("a7_ms".into(), json!(round_to(a7_ms, 1)));
+    }
+
+    let final_meta = comp_meta(&output_doc).unwrap_or_else(|_| meta.clone());
+    let mission_added = mission_block
+        .as_ref()
+        .and_then(|block| block.get("added"))
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
 
     let mut assist_written = options.report_only || (!options.report_only && assist.is_file());
     if !options.report_only && transformed && transform_error.is_none() {
@@ -780,6 +847,28 @@ fn run_post_project_inner(
         }) {
             Ok(()) => assist_written = true,
             Err(error) => transform_error = Some(format!("{error:#}")),
+        }
+    }
+    let mut sidecar_written = false;
+    if !options.report_only && transform_error.is_none() {
+        if let Some(block) = mission_block.as_ref() {
+            let sidecar = json!({
+                "schema": 1,
+                "generated_at": now_iso(),
+                "project": project.to_string_lossy(),
+                "project_stem": stem,
+                "lot": ClientMission::lot_from_folder(&project_folder(project)),
+                "mission": block,
+            });
+            let path = docs.join(format!("{stem}_mission.json"));
+            if let Err(error) = serde_json::to_vec_pretty(&sidecar)
+                .map_err(anyhow::Error::from)
+                .and_then(|bytes| write_atomic(&path, &bytes).map_err(anyhow::Error::from))
+            {
+                tracing::warn!("Post-traitement: sidecar mission non écrit: {error:#}");
+            } else {
+                sidecar_written = true;
+            }
         }
     }
     let assist_sha = if !options.report_only && assist.is_file() {
@@ -794,7 +883,8 @@ fn run_post_project_inner(
     summary.template_applied = template_applied;
     let mut checks = audit_checks(
         &segments,
-        &meta,
+        &final_meta,
+        tail_s,
         video.as_deref(),
         &decisions,
         &template,
@@ -810,18 +900,19 @@ fn run_post_project_inner(
                 4
             } else {
                 3
-            };
+            } + mission_added;
             if options.report_only {
                 checks.push(AuditCheck::pass(
                     "output_layers",
                     format!("{layers} calques calculés (report-only)"),
                 ));
             } else if transform_error.is_none() && assist.is_file() {
+                let total_layers = layers + mission_added;
                 checks.push(AuditCheck::pass(
                     "output_written",
-                    format!("{}, {layers} calques", assist.display()),
+                    format!("{}, {total_layers} calques", assist.display()),
                 ));
-                if layers == expected {
+                if total_layers == expected {
                     checks.push(AuditCheck::pass(
                         "output_layers",
                         format!("{expected} calques"),
@@ -829,7 +920,7 @@ fn run_post_project_inner(
                 } else {
                     checks.push(AuditCheck::warn(
                         "output_layers",
-                        format!("{layers} calques au lieu de {expected}"),
+                        format!("{total_layers} calques au lieu de {expected}"),
                     ));
                 }
                 if let Ok(output) = ecproj::load(&assist) {
@@ -846,6 +937,17 @@ fn run_post_project_inner(
                 }
             }
         }
+    }
+    if let Some(block) = mission_block.as_ref() {
+        append_mission_checks(
+            &mut checks,
+            block,
+            &segments,
+            &final_meta,
+            tail_s,
+            options.mission_overlay,
+            sidecar_written,
+        );
     }
     let audit_verdict = verdict(&checks).to_string();
     let video_hash = video
@@ -865,11 +967,12 @@ fn run_post_project_inner(
         ae.as_deref(),
         csv.as_deref(),
         specs.as_ref(),
-        &meta,
+        &final_meta,
         &template,
         &timings,
         &decisions,
         &summary,
+        mission_block.as_ref(),
         options.report_only,
     );
     let review = review_json(project, video.as_deref(), &decisions, &generated_at);
@@ -881,7 +984,7 @@ fn run_post_project_inner(
         video.as_deref(),
         video_hash.as_ref(),
         specs.as_ref(),
-        &meta,
+        &final_meta,
         &checks,
         &audit_verdict,
         &summary,
@@ -906,6 +1009,196 @@ fn run_post_project_inner(
         summary,
         audit_verdict,
         error: outcome_error,
+    }
+}
+
+fn run_a7(
+    doc: &Value,
+    project: &Path,
+    docs: &Path,
+    stem: &str,
+    main_s: f64,
+    meta: &CompMeta,
+    options: &PostOptions,
+) -> a7::A7Outcome {
+    let folder = project_folder(project);
+    let lot = ClientMission::lot_from_folder(&folder);
+    a7::apply(
+        doc,
+        &a7::A7Options {
+            project,
+            docs,
+            stem,
+            lot,
+            main_s,
+            meta,
+            missions: &options.missions,
+            overlay: options.mission_overlay,
+            end_card_max_s: options.mission_end_card_max_s,
+            ffprobe: &options.ffprobe,
+        },
+    )
+}
+
+fn project_folder(project: &Path) -> PathBuf {
+    let parent = project.parent().unwrap_or_else(|| Path::new("."));
+    if parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "projets" || name == "projets_extraits")
+    {
+        parent
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| parent.to_path_buf())
+    } else {
+        parent.to_path_buf()
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_mission_checks(
+    checks: &mut Vec<AuditCheck>,
+    block: &Value,
+    segments: &[Segment],
+    meta: &CompMeta,
+    tail_s: f64,
+    overlay: bool,
+    sidecar_written: bool,
+) {
+    let id = block.get("id").and_then(Value::as_str).unwrap_or("mission");
+    checks.push(AuditCheck::pass(
+        "mission_available",
+        format!("{id} résolue"),
+    ));
+    let missing = block
+        .get("missing")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if missing.is_empty() {
+        checks.push(AuditCheck::pass(
+            "mission_assets",
+            "tous les assets sont valides",
+        ));
+    } else {
+        let names: Vec<&str> = missing.iter().filter_map(Value::as_str).collect();
+        checks.push(AuditCheck::warn(
+            "mission_assets",
+            format!("assets manquants ou non conformes: {names:?}"),
+        ));
+    }
+    let added = block
+        .get("added")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let skipped = block
+        .get("skipped")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    checks.push(AuditCheck::pass(
+        "mission_layers",
+        if skipped.is_empty() {
+            format!("{} calque(s) de mission", added.len())
+        } else {
+            format!(
+                "{} calque(s) ajouté(s), {} déjà présent(s)",
+                added.len(),
+                skipped.len()
+            )
+        },
+    ));
+    let no_logo = block
+        .get("no_logo")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if no_logo {
+        if block
+            .get("reasons")
+            .and_then(Value::as_array)
+            .is_some_and(|reasons| {
+                reasons
+                    .iter()
+                    .any(|reason| reason.as_str() == Some("no_logo_conflict_a6"))
+            })
+        {
+            checks.push(AuditCheck::warn(
+                "mission_no_logo",
+                "Pas de logo respecté, mais A6 sdm.png reste présent (pas de suppression)",
+            ));
+        } else {
+            checks.push(AuditCheck::pass(
+                "mission_no_logo",
+                "Pas de logo, aucun calque mission",
+            ));
+        }
+    }
+    let reasons: Vec<&str> = block
+        .get("reasons")
+        .and_then(Value::as_array)
+        .map(|reasons| reasons.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    let review_reasons: Vec<&str> = reasons
+        .iter()
+        .copied()
+        .filter(|reason| !matches!(*reason, "no_logo" | "overlay_disabled"))
+        .collect();
+    if !review_reasons.is_empty() {
+        checks.push(AuditCheck::warn(
+            "mission_modes",
+            format!("décisions A7 en revue: {review_reasons:?}"),
+        ));
+    } else if reasons.contains(&"overlay_disabled") {
+        checks.push(AuditCheck::warn(
+            "mission_modes",
+            "insertion A7 désactivée (diagnostic)",
+        ));
+    } else {
+        checks.push(AuditCheck::pass(
+            "mission_modes",
+            "classification sans ambiguïté",
+        ));
+    }
+    if !overlay && !added.is_empty() {
+        checks.push(AuditCheck::warn(
+            "mission_overlay",
+            "insertion A7 désactivée mais calques annoncés",
+        ));
+    } else if !overlay {
+        checks.push(AuditCheck::warn(
+            "mission_overlay",
+            "mission résolue, insertion A7 désactivée",
+        ));
+    }
+    let sum: f64 = segments.iter().map(Segment::duration).sum();
+    let coherent = meta.duration <= 0.0
+        || (sum + tail_s - meta.duration).abs() <= 1.0_f64.max(0.01 * meta.duration);
+    checks.push(if coherent {
+        AuditCheck::pass(
+            "mission_tail",
+            format!(
+                "segments {sum:.2}s + queue {tail_s:.2}s = comp {:.2}s",
+                meta.duration
+            ),
+        )
+    } else {
+        AuditCheck::warn(
+            "mission_tail",
+            format!(
+                "segments {sum:.2}s + queue {tail_s:.2}s != comp {:.2}s",
+                meta.duration
+            ),
+        )
+    });
+    if sidecar_written {
+        checks.push(AuditCheck::pass("mission_sidecar", "sidecar QA écrit"));
+    } else {
+        checks.push(AuditCheck::warn(
+            "mission_sidecar",
+            "sidecar QA absent (rapport seul ou écriture impossible)",
+        ));
     }
 }
 
@@ -1130,6 +1423,7 @@ fn coverage_reviews(
 fn audit_checks(
     segments: &[Segment],
     meta: &CompMeta,
+    tail_s: f64,
     video: Option<&Path>,
     decisions: &[Decision],
     template: &a6::TemplateInfo,
@@ -1158,18 +1452,25 @@ fn audit_checks(
         ));
     }
     let duration: f64 = segments.iter().map(Segment::duration).sum();
-    if meta.duration > 0.0 && (duration - meta.duration).abs() > 1.0_f64.max(0.01 * meta.duration) {
+    let total_duration = duration + tail_s;
+    if meta.duration > 0.0
+        && (total_duration - meta.duration).abs() > 1.0_f64.max(0.01 * meta.duration)
+    {
         checks.push(AuditCheck::warn(
             "duration_coherent",
             format!(
-                "somme segments {duration:.2}s vs comp {:.2}s",
+                "somme segments {duration:.2}s + queue {tail_s:.2}s vs comp {:.2}s",
                 meta.duration
             ),
         ));
     } else {
         checks.push(AuditCheck::pass(
             "duration_coherent",
-            format!("{duration:.2}s"),
+            if tail_s > 0.001 {
+                format!("{duration:.2}s + {tail_s:.2}s")
+            } else {
+                format!("{duration:.2}s")
+            },
         ));
     }
     let mut anchors: Vec<i64> = segments
@@ -1382,6 +1683,7 @@ fn post_json(
     timings: &Map<String, Value>,
     decisions: &[Decision],
     summary: &PostSummary,
+    mission: Option<&Value>,
     report_only: bool,
 ) -> Value {
     let mut object = Map::new();
@@ -1418,6 +1720,9 @@ fn post_json(
         Value::Array(decisions.iter().map(Decision::to_json).collect()),
     );
     object.insert("summary".into(), json!(summary));
+    if let Some(mission) = mission {
+        object.insert("mission".into(), mission.clone());
+    }
     Value::Object(object)
 }
 

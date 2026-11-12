@@ -8,9 +8,9 @@ pont matériel Coral, le contrat d'environnement et le harnais de parité.
 Le lot 1 est terminé : le socle Rust, la configuration TOML, STEP5
 audio/vidéo, STEP6 (`_ae.json`), le pont After Effects (`cuts` et
 `analyze_manifest`), STEP7 (finalisation) et STEP8 (EffectCraft via
-`effectcraft-cli`) sont opérationnels. Le post-traitement A5/A6 est intégré
-après STEP8 : le projet brut reste intact et un second `_assist.ecproj` est
-toujours publié avec ses rapports.
+`effectcraft-cli`) sont opérationnels. Le post-traitement A5/A6/A7 est
+intégré après STEP8 : le projet brut reste intact et un second
+`_assist.ecproj` est toujours publié avec ses rapports.
 Le lot 2 ajoute STEP2 TransNetV2 en ONNX Runtime CUDA, avec un CSV identique à
 la production sur les quatre cas du corpus. Le lot 3 porte STEP4 sur Coral
 Edge TPU : BlazeFace, FaceMesh, blendshapes, EfficientDet, suivi et détection
@@ -94,6 +94,14 @@ Linux et le panneau CEP continue d'appeler Python.
   temporelle stricte puis animée et un cache de frames partagé avec le gate
   OCR complètent l'annotation, toujours sans effet sur les décisions ; le
   détecteur reste désactivé par défaut.
+- Depuis D-064, A7 associe les logos de mission des emails
+  (`email_proxy.php`) au projet assisté : cache SQLite dédié, validation
+  stricte 1080×1920 alpha, end-card `.mov` court avec PNG, plein durée pour un
+  MOV long, `review` sans placement deviné, `Pas de logo` sans suppression.
+  Actif seulement avec `email_proxy.enabled` et
+  `steps.step8.post.mission_overlay` ; sidecar
+  `<stem>_mission.json` et bloc `mission` additif. Détail dans
+  `docs/lots/LOT-12-A7-MISSIONS.md`.
 - Depuis D-056, A1 vise une marge de 1,015, A2 peut appliquer une bande basse
   partielle de 35–50 % confirmée par OCR, A3 filtre les revues sous 250 px /
   2 clés et signale la haute confiance, A4 tague les flashes probables et A5
@@ -177,6 +185,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-1-STEP7.md` : archivage, publication et manifeste STEP7.
 - `docs/lots/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
 - `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
+- `docs/lots/LOT-12-A7-MISSIONS.md` : logos de mission email A7, cache, sidecar et classification MOV.
 - `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj`, vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, `qa.json`, auto-approbation, seuils et limites v1.
 - `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.
@@ -285,6 +294,14 @@ cargo run -p workflow-cli -- step7 finalize --direct --work-dir /tmp/projets
 cargo run -p workflow-cli -- step8 run --direct --folder /tmp/projet
 cargo run -p workflow-cli -- post run --folder /tmp/projet --direct
 cargo run -p workflow-cli -- post run --project /tmp/projet/projets/video_9x16.ecproj --docs /tmp/projet/docs
+cargo run -p workflow-cli -- post run --folder /tmp/projet --no-email
+cargo run -p workflow-cli -- post run --folder /tmp/projet --no-mission-overlay
+
+cargo run -p workflow-cli -- email list --lot 136
+cargo run -p workflow-cli -- email show --lot 136
+cargo run -p workflow-cli -- email sync --limit 50
+cargo run -p workflow-cli -- email match --folder /tmp/projet --offline
+cargo run -p workflow-cli -- email import --dir /home/kidpixel/render_signal_server-main/debug/mails
 
 cargo run -p workflow-cli -- qa run \
   --video /tmp/projet/video_9x16.mp4 \

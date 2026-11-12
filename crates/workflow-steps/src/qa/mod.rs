@@ -378,7 +378,8 @@ pub fn run_qa(video: &Path, project: Option<&Path>, options: &QaOptions) -> Resu
             "contrôle OCR désactivé ou modèles OCR absents",
         ));
     } else if let Some(project_path) = project {
-        match read_mask(project_path) {
+        match crate::post::overlay::read_mask_with(project_path, &options.ffmpeg, &options.ffprobe)
+        {
             Ok(mask) if mask.regions.is_empty() && !mask.skipped.is_empty() => {
                 tracing::warn!(
                     skipped = mask.skipped.len(),

@@ -412,7 +412,10 @@ décision ne s'applique). Trois artefacts additifs sont écrits sous
 template), `review.json` (abstentions) et `audit.json` (contrôles, SHA-256 du
 brut et du projet assisté, hash échantillonné de la vidéo). Depuis D-064, un
 sidecar `<docs>/<stem>_mission.json` est écrit en plus lorsque le projet
-assisté est publié ; `post.json` ajoute alors un bloc `mission` **après**
+assisté est publié. Depuis le sous-lot 12.1, il est en `schema: 2` : chaque
+entrée `added` porte `requested` (token d'origine) et `source`
+(`local_docs` ou `central_fallback`), et le bloc `mission` expose
+`known_absent`. `post.json` ajoute alors un bloc `mission` **après**
 `summary`, sans changer l'ordre des clés existantes. A1/A2 ne déplacent
 jamais l'Anchor Point ; A3/A4 restent en revue et A5 en rapport ; A6 applique
 le template SDM si l'un des `template_prefixes` configurés correspond et si la
@@ -435,8 +438,8 @@ défaut ; l'ancien champ reste accepté comme alias Serde. Le préfixe réelleme
 matché est enregistré dans `template.prefix` du `post.json` et dans les détails
 de la décision A6. `config check` rejette les préfixes vides et les
 chevauchements entre préfixes de template et avec `archive_only_prefixes` ;
-`post run --template-prefix` est répétable et le cache QA est en version 11
-(liste de préfixes D-061, sidecar de mission D-064).
+`post run --template-prefix` est répétable et le cache QA est en version 12
+(liste de préfixes D-061, sidecar de mission D-064, masque MOV D-067).
 
 Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
 opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes
@@ -459,8 +462,41 @@ la frontière end-card/MOV ambigu. `a2_mission_mask` permet à A2 de lire les
 calques mission comme masque. `post run` et `step8 run` exposent `--no-email`
 (isolation réseau/cache) et `--no-mission-overlay` (audit sans insertion). Le
 QA découvre le sidecar et ajoute le contrôle `mission_overlays`
-(`QA_SCHEMA_VERSION = 1.4.0`, cache QA version 11). Détail :
-`docs/lots/LOT-12-A7-MISSIONS.md`.
+(`QA_SCHEMA_VERSION = 1.5.0`, cache QA version 12).
+
+Depuis D-065 (sous-lot 12.1), le parseur fusionne les lignes coupées (4
+lignes / 600 caractères), équilibre les parenthèses, déséchappe `\'`, accepte
+`Logo <nom>` et les listes d'assets nues, et applique une table d'alias fermée
+(`LRDLR`, `EM6`, `CEC`, `SI ON SE RENCONTRAIT`, etc.). `lphdf.png` et `edc.png`
+sont des `known_absent` neutres. Le mode `tail_overlay` place un MOV explicite
+de `max(0, main - d)` à `main`, sans prolonger la comp, audio coupé ; si
+`d > main + 1 ms`, A7 passe en revue (`short_video_for_tail_overlay`) sans
+rognage. Les huit MOV de la banque ont une politique explicite ; les bumpers
+de 19,72 s restent en revue. `workflow-cli email audit --json-dir <dir>
+--assets <dir> [--json]` audite un corpus hors ligne, sans réseau ni base.
+Le JSON expose `cohorts` (mois) et `format_cohorts` (mois × HTML seul/texte) ;
+`scripts/audit-a7-benchmark.py` consolide ces strates. Détail :
+`docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md`.
+
+Depuis D-066 (sous-lot 12.2), `paths.mission_overlays` (optionnel, vide par
+défaut) désigne la banque centrale de repli, déployée dans
+`assets/mission_overlays/`. A7 résout dans l'ordre : local exact → local
+normalisé → banque exacte → banque normalisée → extension implicite → alias →
+`known_absent` → revue. Un asset local valide reste prioritaire ; chaque asset
+central passe le même contrôle 1080×1920 alpha. Le sidecar expose
+`source: "local_docs"` ou `"central_fallback"`. `config check` échoue si le
+chemin configuré n'existe pas ; une banque absente au runtime est ignorée
+(repli local puis revue). Les PNG, `manifest.toml` et `README.md` sont
+versionnés ; les MOV (2,2 Go) sont gitignorés. Détail :
+`docs/lots/LOT-12.2-BANQUE-CENTRALE.md`.
+
+Depuis D-067 (sous-lot 12.3), le QA masque aussi les calques `.mov` porteurs
+d'alpha : 12 à 24 frames sont échantillonnées en rawvideo RGBA, les boîtes
+stables autour de la médiane sont fusionnées (`kind: "mov"`), et un MOV
+instable est ignoré avec un warning non bloquant. `QA_SCHEMA_VERSION =
+1.5.0`, cache QA version 12. Le benchmark du corpus complet et le canari de
+20 missions réelles sont documentés dans
+`docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md`.
 
 Depuis D-052, `steps.step8.post.a2_logo_prior` (défaut `false`) ajoute
 `details.source_logo` au candidat A2 à partir du catalogue

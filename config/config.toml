@@ -37,6 +37,9 @@ orphan_max_age_hours = 24
 [paths]
 base = "/home/kidpixel/workflow-rs/runtime"
 models = "/home/kidpixel/workflow-rs/assets/models"
+# Banque centrale de repli A7. Vide : seuls les assets de <projet>/docs sont utilisés.
+# Relatif au répertoire de lancement (workdir du serveur = racine du dépôt).
+mission_overlays = "assets/mission_overlays"
 projects = "/home/kidpixel/workflow-rs/runtime/projets_extraits"
 archives = "/home/kidpixel/workflow-rs/runtime/archives"
 logs = "/home/kidpixel/workflow-rs/runtime/logs"

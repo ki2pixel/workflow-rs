@@ -1,10 +1,14 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
-use workflow_core::mission::{ClientMission, VideoMatch};
+use workflow_core::mission::{
+    extract_lot, filename_key, html_to_text, ClientMission, LogoResolution, LogoResolver,
+    VideoMatch,
+};
 use workflow_core::Config;
 use workflow_ingest::download::Downloader;
 use workflow_ingest::email::{import_eml, EmailMissionStore, EmailProxyClient};
@@ -207,6 +211,18 @@ enum EmailCommand {
         /// Dossier contenant des `.eml`.
         #[arg(long)]
         dir: Option<PathBuf>,
+    },
+    /// Audite un corpus JSON d'emails hors ligne (parse + résolution).
+    Audit {
+        /// Dossier des emails `email_*.json` (format mbox-to-json).
+        #[arg(long)]
+        json_dir: PathBuf,
+        /// Banque d'assets pour mesurer la résolution des logos.
+        #[arg(long)]
+        assets: Option<PathBuf>,
+        /// Sortie JSON détaillée.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1036,6 +1052,258 @@ fn email_source_videos(folder: &Path) -> Result<Vec<PathBuf>> {
     Ok(videos)
 }
 
+#[derive(Default)]
+struct AuditCohort {
+    emails: usize,
+    html_only: usize,
+    instructions: usize,
+    no_logo: usize,
+    with_logos: usize,
+    unresolved: usize,
+    tokens: usize,
+    resolved: usize,
+    known_absent: usize,
+    missing: usize,
+    ambiguous: usize,
+}
+
+/// Audite un corpus JSON d'emails sans réseau, base ou écriture.
+fn audit_missions(json_dir: &Path, assets: Option<&Path>) -> Result<Value> {
+    let resolver = assets.map(LogoResolver::new);
+    let mut emails = 0usize;
+    let mut html_only = 0usize;
+    let mut instructions = 0usize;
+    let mut no_logo = 0usize;
+    let mut with_logos = 0usize;
+    let mut unresolved = 0usize;
+    let mut tokens = 0usize;
+    let mut resolved = 0usize;
+    let mut known_absent = 0usize;
+    let mut missing = 0usize;
+    let mut ambiguous = 0usize;
+    let mut lots = BTreeSet::new();
+    let mut cohorts: BTreeMap<String, AuditCohort> = BTreeMap::new();
+    let mut format_cohorts: BTreeMap<String, AuditCohort> = BTreeMap::new();
+    let mut top_missing: BTreeMap<String, usize> = BTreeMap::new();
+    let mut policies: BTreeMap<String, usize> = BTreeMap::new();
+    let mut failures: Vec<Value> = Vec::new();
+
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(json_dir)
+        .with_context(|| format!("lecture de {}", json_dir.display()))?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("email_") && name.ends_with(".json"))
+        })
+        .collect();
+    paths.sort();
+    if paths.is_empty() {
+        anyhow::bail!("aucun email_*.json dans {}", json_dir.display());
+    }
+
+    for path in paths {
+        let bytes =
+            std::fs::read(&path).with_context(|| format!("lecture de {}", path.display()))?;
+        let value: Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("JSON invalide: {}", path.display()))?;
+        let raw_body = value
+            .get("Body")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let subject = value
+            .get("Subject")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let date = value
+            .get("Date")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let body = audit_body(raw_body);
+        let is_html_only = !raw_body.contains("[text/plain]");
+        if is_html_only {
+            html_only += 1;
+        }
+        let lot = extract_lot(subject).unwrap_or(0);
+        if lot > 0 {
+            lots.insert(lot);
+        }
+        let id = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("audit");
+        let mission = ClientMission::from_body(id, lot, subject, &body);
+        emails += 1;
+        let cohort_key = audit_cohort(date);
+        let format_key = format!(
+            "{cohort_key}|{}",
+            if is_html_only {
+                "html_only"
+            } else {
+                "text_plain"
+            }
+        );
+        let cohort = cohorts.entry(cohort_key).or_default();
+        let format_cohort = format_cohorts.entry(format_key).or_default();
+        cohort.emails += 1;
+        format_cohort.emails += 1;
+        if is_html_only {
+            cohort.html_only += 1;
+            format_cohort.html_only += 1;
+        }
+
+        for video in &mission.videos {
+            instructions += 1;
+            cohort.instructions += 1;
+            format_cohort.instructions += 1;
+            if video.no_logo {
+                no_logo += 1;
+                cohort.no_logo += 1;
+                format_cohort.no_logo += 1;
+                continue;
+            }
+            if video.logo_unresolved {
+                unresolved += 1;
+                cohort.unresolved += 1;
+                format_cohort.unresolved += 1;
+                if failures.len() < 100 {
+                    failures.push(json!({
+                        "email": path.file_name().and_then(|name| name.to_str()),
+                        "line": video.line,
+                        "reason": "logo_unresolved",
+                        "video": video.filename,
+                    }));
+                }
+                continue;
+            }
+            with_logos += 1;
+            cohort.with_logos += 1;
+            format_cohort.with_logos += 1;
+            let mut index = 0usize;
+            let mut seen: Vec<String> = Vec::new();
+            while index < video.logos.len() {
+                let (resolution, requested, consumed) = match &resolver {
+                    Some(resolver) => resolver.resolve_sequence(&video.logos, index),
+                    None => (LogoResolution::Missing, video.logos[index].clone(), 1),
+                };
+                index += consumed;
+                let key = filename_key(&requested);
+                if key.is_empty() || seen.contains(&key) {
+                    continue;
+                }
+                seen.push(key);
+                tokens += 1;
+                cohort.tokens += 1;
+                format_cohort.tokens += 1;
+                if let Some(policy) = workflow_steps::post::a7::mov_policy(&requested) {
+                    *policies.entry(policy.as_str().to_string()).or_default() += 1;
+                }
+                if resolver.is_none() {
+                    continue;
+                }
+                match resolution {
+                    LogoResolution::Found(_) => {
+                        resolved += 1;
+                        cohort.resolved += 1;
+                        format_cohort.resolved += 1;
+                    }
+                    LogoResolution::KnownAbsent(_) => {
+                        known_absent += 1;
+                        cohort.known_absent += 1;
+                        format_cohort.known_absent += 1;
+                    }
+                    LogoResolution::Ambiguous(_) => {
+                        ambiguous += 1;
+                        cohort.ambiguous += 1;
+                        format_cohort.ambiguous += 1;
+                    }
+                    LogoResolution::Missing => {
+                        missing += 1;
+                        cohort.missing += 1;
+                        format_cohort.missing += 1;
+                        *top_missing.entry(requested.clone()).or_default() += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut top: Vec<(String, usize)> = top_missing.into_iter().collect();
+    top.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
+    let top_missing: Vec<Value> = top
+        .into_iter()
+        .take(20)
+        .map(|(name, count)| json!({"name": name, "count": count}))
+        .collect();
+    let cohorts: BTreeMap<String, Value> = cohorts
+        .into_iter()
+        .map(|(name, cohort)| (name, audit_cohort_json(cohort)))
+        .collect();
+    let format_cohorts: BTreeMap<String, Value> = format_cohorts
+        .into_iter()
+        .map(|(name, cohort)| (name, audit_cohort_json(cohort)))
+        .collect();
+    let policies: BTreeMap<String, usize> = policies.into_iter().collect();
+
+    Ok(json!({
+        "json_dir": json_dir,
+        "assets": assets,
+        "emails": emails,
+        "html_only": html_only,
+        "lots": lots.len(),
+        "instructions": instructions,
+        "no_logo": no_logo,
+        "with_logos": with_logos,
+        "logos_requis": with_logos,
+        "unresolved": unresolved,
+        "tokens": tokens,
+        "resolved": resolved,
+        "known_absent": known_absent,
+        "missing": missing,
+        "ambiguous": ambiguous,
+        "policies": policies,
+        "cohorts": cohorts,
+        "format_cohorts": format_cohorts,
+        "top_missing": top_missing,
+        "failures": failures,
+    }))
+}
+
+fn audit_cohort_json(cohort: AuditCohort) -> Value {
+    json!({
+        "emails": cohort.emails,
+        "html_only": cohort.html_only,
+        "instructions": cohort.instructions,
+        "no_logo": cohort.no_logo,
+        "with_logos": cohort.with_logos,
+        "unresolved": cohort.unresolved,
+        "tokens": cohort.tokens,
+        "resolved": cohort.resolved,
+        "known_absent": cohort.known_absent,
+        "missing": cohort.missing,
+        "ambiguous": cohort.ambiguous,
+    })
+}
+
+fn audit_body(raw: &str) -> String {
+    if let Some((_, rest)) = raw.split_once("[text/plain]:") {
+        if let Some((text, _)) = rest.split_once("[text/html]:") {
+            return text.to_string();
+        }
+        return rest.to_string();
+    }
+    html_to_text(raw)
+}
+
+fn audit_cohort(date: &str) -> String {
+    chrono::DateTime::parse_from_rfc2822(date)
+        .map(|date| date.format("%Y-%m").to_string())
+        .unwrap_or_else(|_| "unknown".into())
+}
+
 fn latest_step7_manifest(logs_dir: &Path) -> Option<PathBuf> {
     let step7_dir = logs_dir.join("step7");
     let mut candidates: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(step7_dir)
@@ -1577,6 +1845,50 @@ fn run() -> Result<()> {
                 );
                 if failures > 0 {
                     std::process::exit(1);
+                }
+            }
+            EmailCommand::Audit {
+                json_dir,
+                assets,
+                json,
+            } => {
+                let report = audit_missions(&json_dir, assets.as_deref())?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    let number = |key: &str| report.get(key).and_then(Value::as_u64).unwrap_or(0);
+                    println!(
+                        "emails={} html_only={} instructions={} no_logo={} logos_requis={} tokens={}",
+                        number("emails"),
+                        number("html_only"),
+                        number("instructions"),
+                        number("no_logo"),
+                        number("logos_requis"),
+                        number("tokens")
+                    );
+                    println!(
+                        "resolved={} known_absent={} missing={} ambiguous={} unresolved={}",
+                        number("resolved"),
+                        number("known_absent"),
+                        number("missing"),
+                        number("ambiguous"),
+                        number("unresolved")
+                    );
+                    if let Some(top) = report.get("top_missing").and_then(Value::as_array) {
+                        if !top.is_empty() {
+                            let names: Vec<String> = top
+                                .iter()
+                                .filter_map(|item| {
+                                    Some(format!(
+                                        "{} ({})",
+                                        item.get("name")?.as_str()?,
+                                        item.get("count")?.as_u64()?
+                                    ))
+                                })
+                                .collect();
+                            println!("top manquants: {}", names.join(", "));
+                        }
+                    }
                 }
             }
         },

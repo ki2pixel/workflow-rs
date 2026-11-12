@@ -294,6 +294,7 @@ mod tests {
             rust: ResolvedPaths {
                 base: rust_base.clone(),
                 models: rust_base.join("models"),
+                mission_overlays: None,
                 projects: rust_base.join("projets_extraits"),
                 archives: rust_base.join("archives"),
                 logs: rust_base.join("logs"),

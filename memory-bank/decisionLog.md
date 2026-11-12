@@ -8,6 +8,152 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 > début de la migration Rust (2026-10-22). Les décisions legacy antérieures
 > restent dans `/home/kidpixel/workflow_mediapipe/memory-bank/archives/`.
 
+## 2026-11-12 — D-067 : Lot 12.3 — benchmark, masque QA MOV et canari
+
+- **Contexte** : après D-066, la banque et la résolution étaient validées par
+  tests, mais il manquait un benchmark consolidé du corpus, le masque QA des
+  habillages `.mov` et une validation de bout en bout sur des missions réelles
+  récentes.
+- **Décision — benchmark** : `email audit --json` expose en plus un champ
+  additif `format_cohorts` (mois × `html_only`/`text_plain`). Le corpus de
+  932 emails donne 2 469 tokens, 2 228 résolus, 47 absences volontaires,
+  193 manquants, 1 ambigu et 39 instructions non résolues. Historique
+  (2025-03 → 2026-09) : 785 emails, 90,9 % de résolution hors absences ;
+  récent (2026-10/11) : 147 emails, 100 % hors absences, tous formats.
+  `scripts/audit-a7-benchmark.py` consolide ces strates sans réseau ni base.
+- **Décision — masque MOV** : le masque d'overlays lit aussi les calques
+  `.mov` porteurs d'alpha (une vidéo opaque reste du contenu). 12 à 24 frames
+  sont échantillonnées en une passe `ffmpeg` rawvideo RGBA entre le début et
+  la fin du calque ; la boîte alpha médiane sert de référence, les frames
+  d'IoU ≥ 0,70 sont fusionnées et au moins 75 % des frames visibles doivent
+  être stables. La région publiée porte `kind: "mov"` ; un MOV instable est
+  ignoré avec un warning non bloquant. La lecture de l'asset est ramenée au
+  temps source (un end-card de 3 s placé à 44 s est lu sur 0–3 s), sinon
+  `ffmpeg` ne renvoie aucune frame.
+- **Décision — contrat QA** : `OverlayRegion.kind` est ajouté en fin d'objet
+  avec `#[serde(default)]` (`image` pour les anciens rapports),
+  `QA_SCHEMA_VERSION` passe à **1.5.0** et `CACHE_VERSION` à **12**. Le masque
+  reste non bloquant : il écarte des détections, ne provoque ni `fail` ni
+  veto.
+- **Correctif parseur** : un email réel écrit `... trompe-l'œil .mp4` (espace
+  avant l'extension). `stem_key` est désormais `trim()`é après retrait de
+  l'extension ; le test `matches_filename_with_space_before_extension` couvre
+  le cas. Le lot 20 passe de `video_not_in_mission` à `apply`.
+- **Canari** : 20 missions réelles d'octobre–novembre 2026, une vidéo chacune,
+  rejouées sur des copies du projet brut 179 sous `/tmp/opencode` avec la
+  banque active, `a2_mission_mask = true`, `--report-only` et un store email
+  temporaire (proxy local injoignable). Résultat : 20/20 `apply`, 28 assets
+  ajoutés (18 `central_fallback`, 10 `local_docs`), 0 manquant, 0 doublon,
+  0 `_assist.ecproj` écrit, exit 0. Cinq cas limites contrôlés valident
+  `known_absent`, asset manquant, ambiguïté (`MSL1`), `tail_overlay`
+  (`MOTION_FIN_EM6_V03.mov`, `tail_s = 0`) et déduplication (`sdm.png` déjà
+  présent). Seul warning : masque A2 de `MSL1.mov` instable (7/24 frames),
+  ignoré sans bloquer la mission.
+- **Validation** : 18 tests `post::overlay`, 28 tests `mission`, suite
+  workspace **670 tests listés (668 exécutés + 2 ignorés)**, 0 échec ;
+  `fmt` et `clippy -D warnings` verts. Aucun `.ecproj`, `runtime/` ou
+  `/mnt/cache` modifié.
+- **Portée / rollback** : additif. Le bump de schéma invalide une fois le cache
+  QA ; le masque MOV privilégie le sous-masquage au sur-masquage sur un logo
+  animé. Retirer les calques MOV du masque revient à ignorer les
+  régions `kind: "mov"` sans toucher au reste du rapport.
+
+## 2026-11-12 — D-066 : Lot 12.2 — banque centrale de repli A7
+
+- **Contexte** : A7 (D-064/D-065) ne résolvait que les assets présents dans
+  `<projet>/docs`. Quand un email demandait un logo non joint par le client
+  mais présent dans la banque de référence Média Solution, la mission partait
+  en revue. Le repli devait rester optionnel et ne jamais bloquer le pipeline.
+- **Décision — configuration** : ajouter `paths.mission_overlays`
+  (`Option<PathBuf>`, vide/absent par défaut) dans `PathsConfig` et
+  `ResolvedPaths`. `config check` échoue si le chemin est configuré mais que
+  le répertoire n'existe pas ; une valeur vide désactive le repli. La
+  configuration de production utilise `assets/mission_overlays`, relatif au
+  workdir du serveur (racine du dépôt).
+- **Décision — banque** : déployer les 117 assets réels dans
+  `assets/mission_overlays/` pour obtenir des chemins `.ecproj` stables
+  (`../../assets/mission_overlays/...`). Les 109 PNG (5 Mo) sont versionnés ;
+  les 8 MOV ProRes (2,2 Go) sont gitignorés. `manifest.toml` fige dimensions,
+  durée, codec, pixel format, audio, taille et SHA-256 ; `README.md` documente
+  le déploiement et les limites.
+- **Décision — résolution** : ordre local exact → local normalisé → banque
+  exacte → banque normalisée → extension implicite (locale puis banque) →
+  alias → `known_absent` → revue. Un asset local valide gagne toujours ; une
+  ambiguïté locale (`MSL1` PNG+MOV) n'est pas masquée par la banque. Chaque
+  asset central repasse `probe_asset` (1080×1920 alpha, MOV compatible).
+- **Décision — provenance** : `LogoProvenance` (`local_docs` /
+  `central_fallback`) est portée par `LogoTarget`, `Asset`, `A7Added` et le
+  sidecar `schema: 2`. Un asset central non conforme reste en revue.
+- **Dégradation** : banque absente ou illisible au runtime = repli ignoré,
+  local puis `review` ; `config check` signale seulement la configuration
+  invalide. Aucun avertissement bloquant, exit 0.
+- **Validation** : 27 tests mission, 18 tests A7, 1 test de propagation
+  `PostOptions`, validation `paths.mission_overlays` ; banque seule
+  (`source: central_fallback`, chemin `../../assets/mission_overlays/...`),
+  priorité locale et banque absente → `review`. `config check` vert sur la
+  configuration réelle. Suite workspace : 661 tests listés (659 exécutés +
+  2 ignorés), `fmt` et clippy verts. Aucun
+  `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
+- **Portée / rollback** : additif. Retirer `mission_overlays` de la
+  configuration désactive le repli ; les chemins locaux et le sidecar restent
+  compatibles. Les MOV non versionnés doivent être recopiés après un checkout.
+
+## 2026-11-12 — D-065 : Lot 12.1 — parseur de missions, alias et `tail_overlay`
+
+- **Contexte** : A7 (D-064) était fragile sur le corpus client réel : 570 des
+  932 emails sont HTML-only, 569 contiennent `\'`, des noms de vidéos et des
+  listes de logos sont coupés sur plusieurs lignes, certaines parenthèses sont
+  déséquilibrées ou contiennent un titre, et les alias historiques
+  (`LRDLR`, `EM6`, `CEC`, `SI ON SE RENCONTRAIT`) n'étaient pas résolus. La
+  banque compte désormais 117 assets (109 PNG + 8 MOV), dont `eqa.png`,
+  `LRDLR.png`, `les invincibles.png`, `eqc.png`, `AVDP.png` et `em6.png`.
+- **Décision — parseur** : `logical_lines` fusionne jusqu'à 4 lignes
+  physiques / 600 caractères tant que l'instruction est incomplète (extension
+  vidéo absente, parenthèses non équilibrées, continuation `Logo …` ou `(`).
+  `split_parenthetical` ferme par équilibrage, `unescape_mission_text`
+  remplace `\'`, `parse_lenient_logos` accepte `Logo <nom>` et
+  `parse_bare_asset_list` accepte une parenthèse composée uniquement de tokens
+  d'assets (`(yaq.png)`). Un titre (`(2)`) ou une note libre n'est jamais
+  converti en logo.
+- **Décision — alias** : table `const` fermée dans `workflow-core::mission`
+  couvrant les 22 acronymes officiels et les variantes historiques. Résolution
+  ordonnée : exact, nom normalisé unique, extension implicite, puis alias.
+  `LRDLR.png` et `em6.png` priment sur leurs alias ; `MSL1` sans extension
+  reste ambigu (PNG + MOV) ; `lphdf.png` et `edc.png` sont des
+  `known_absent` neutres, pas des oublis client. Un token coupé peut être
+  recollé sur 2–3 tokens (virgule ou `et`) seulement si le nom reconstitué
+  existe.
+- **Décision — `tail_overlay`** : nouveau `PlacementMode::TailOverlay` pour un
+  MOV explicitement demandé. Calque de `max(0, main - d)` à `main`,
+  `tail_s = 0`, comp non prolongée, audio coupé. Si `d > main + 1 ms`, revue
+  `short_video_for_tail_overlay`, aucun rognage. Aucun déclenchement
+  automatique `stem_contains("EM6")` : `MOTION_FIN_EM6_V03.mov` n'a aucune
+  occurrence dans les 932 emails.
+- **Décision — registre MOV** : `const` dans `a7.rs`. `m6+.mov` = `end_card` ;
+  `MOTION_FIN_EM6_V03.mov` = `tail_overlay` ; `MSL1.mov`,
+  `9_16_RDV_PROGRAMME_EM6_V02_5MIN.mov`, `the power.mov`,
+  `hayu x below deck.mov` = `full_duration` ; `m6+max anime 1ep.mov` et
+  `W9_M6+MAX.mov` (19,72 s) = `review` jusqu'à arbitrage.
+- **Décision — artefacts** : sidecar `schema: 2` avec `requested` et `source`
+  (`local_docs` ; `central_fallback` au sous-lot 12.2) par entrée `added`, et
+  `known_absent` dans le bloc `mission`. `audit.json` ajoute
+  `mission_known_absent` et filtre les absences volontaires de
+  `mission_assets` ; le QA les traite en neutre.
+- **Décision — audit** : `workflow-cli email audit --json-dir <dir> --assets
+  <dir> [--json]`, hors ligne, sans base ni écriture ; rapport par cohorte
+  mensuelle et top des manquants.
+- **Validation** : 25 tests mission, 14 tests A7, 1 test QA ; suite workspace
+  654 listés (652 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts.
+  Audit réel : 932 emails, 2 477 instructions, 2 469 tokens, 2 228 résolus,
+  47 absences volontaires, 193 manquants, 39 non résolues ; octobre 2026
+  100 % hors absences, novembre 2026 100 %. Aucun `.ecproj`, `runtime/` ou
+  `/mnt/cache` modifié.
+- **Portée / rollback** : additif. Retour à D-064 = retirer
+  `TailOverlay`/`MovPolicy`, revenir au sidecar schéma 1 et supprimer
+  `email audit`. Les sidecars schéma 1 restent lisibles (champs additifs
+  absents). Banque centrale (12.2), benchmark complet et masque QA MOV (12.3)
+  restent à faire.
+
 ## 2026-11-12 — D-064 : logos de mission A7 (emails `email_proxy.php`)
 
 - **Contexte** : les emails Média Solution décrivent, par lot, les vidéos et

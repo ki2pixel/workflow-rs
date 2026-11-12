@@ -46,17 +46,22 @@ documentation map `docs/README.md`, and
 - `crates/workflow-tpu`: dynamic TFLite/Edge TPU FFI plus the spike binary.
 - `assets/web` is a copy of the legacy frontend; `assets/models/*` binaries and
   `vendor/*.so*` are gitignored. Only the model manifest/README are versioned.
+- `assets/mission_overlays` is the A7 central fallback bank: PNGs, manifest and
+  README are versioned, the 2.2 GB of MOVs are gitignored (D-066).
 
 ## Commands
 
 ```sh
-cargo test --workspace                                    # 636 listed (634 run + 2 ignored), no hardware
+cargo test --workspace                                    # 670 listed (668 run + 2 ignored), no hardware
 cargo test -p workflow-steps step6 --lib                  # filter one step/test
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build --release -p workflow-server -p workflow-cli  # required by launchers
 cargo run -p workflow-cli -- config check                 # no secrets needed
 cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
+cargo run -p workflow-cli -- email audit \
+  --json-dir <emails_json> --assets <logos_overlay> [--json] # offline corpus audit
+python3 scripts/audit-a7-benchmark.py <audit.json> [--split 2026-10] # Markdown
 ```
 
 - There is no CI; run fmt + clippy + tests manually before finishing.
@@ -142,6 +147,15 @@ cargo run -p workflow-cli -- post run --folder /tmp/projet  # A5/A6 only
 - Keep documented quirks, e.g. STEP1's scan ignores `.tar.gz`/`.tar.bz2`/
   `.tar.xz` (D-016), STEP3 no-audio exits 0 with no artifact (D-002), and STEP4
   requires `<stem>.csv` and `_audio.json` by default (D-004).
+- A7 mission sidecars are `schema: 2`; keep `requested`, `source` and
+  `known_absent` additive. `tail_overlay` never extends the composition
+  (`tail_s = 0`) and mutes the MOV audio; `d > main + 1 ms` is a review, never
+  a silent clamp (D-065).
+- A7 central fallback is `assets/mission_overlays`; local `docs/` always wins
+  and `source` is contractual (`local_docs` / `central_fallback`, D-066).
+- QA schema is `1.5.0` and cache version 12. The overlay mask covers `.mov`
+  layers with alpha (`kind: "mov"`), sampled at 12–24 frames; unstable MOVs are
+  skipped with a non-blocking warning (D-067).
 - `parity/` contains the Python baseline harness: it reruns **legacy Python**
   commands and compares them with frozen fixtures; it does not invoke the Rust
   binaries. Corpus/fixtures are gitignored and machine-local. Its venv is

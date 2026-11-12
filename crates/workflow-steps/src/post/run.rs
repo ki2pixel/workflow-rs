@@ -83,6 +83,8 @@ pub struct PostOptions {
     pub emit_progress: bool,
     /// A7 : insère les logos de mission dans le projet assisté.
     pub mission_overlay: bool,
+    /// A7 : banque centrale de repli pour les assets de mission.
+    pub mission_overlays: Option<PathBuf>,
     /// A7 : durée maximale d'un `.mov` interprété comme end-card.
     pub mission_end_card_max_s: f64,
     /// A2 : utilise les calques de mission comme masque.
@@ -129,6 +131,7 @@ impl Default for PostOptions {
             report_only: false,
             emit_progress: false,
             mission_overlay: false,
+            mission_overlays: None,
             mission_end_card_max_s: 5.0,
             a2_mission_mask: false,
             missions: Vec::new(),
@@ -182,6 +185,7 @@ impl PostOptions {
             report_only: false,
             emit_progress: false,
             mission_overlay: post.mission_overlay,
+            mission_overlays: config.paths.resolve().mission_overlays,
             mission_end_card_max_s: post.mission_end_card_max_s,
             a2_mission_mask: post.a2_mission_mask,
             missions: Vec::new(),
@@ -638,9 +642,16 @@ fn run_post_project_inner(
             if options.a2_mission_mask && mission_block.is_some() {
                 // A7 a déjà inséré les calques mission : A2 lit le document
                 // en mémoire pour couvrir aussi ces logos.
-                crate::post::overlay::mask_from_doc(&output_doc, project).ok()
+                crate::post::overlay::mask_from_doc_with(
+                    &output_doc,
+                    project,
+                    &options.ffmpeg,
+                    &options.ffprobe,
+                )
+                .ok()
             } else {
-                crate::post::overlay::read_mask(project).ok()
+                crate::post::overlay::read_mask_with(project, &options.ffmpeg, &options.ffprobe)
+                    .ok()
             }
         } else {
             None
@@ -853,7 +864,7 @@ fn run_post_project_inner(
     if !options.report_only && transform_error.is_none() {
         if let Some(block) = mission_block.as_ref() {
             let sidecar = json!({
-                "schema": 1,
+                "schema": 2,
                 "generated_at": now_iso(),
                 "project": project.to_string_lossy(),
                 "project_stem": stem,
@@ -1034,6 +1045,7 @@ fn run_a7(
             meta,
             missions: &options.missions,
             overlay: options.mission_overlay,
+            mission_overlays: options.mission_overlays.as_deref(),
             end_card_max_s: options.mission_end_card_max_s,
             ffprobe: &options.ffprobe,
         },
@@ -1076,16 +1088,48 @@ fn append_mission_checks(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    let known_absent: Vec<&str> = block
+        .get("known_absent")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("name").and_then(Value::as_str))
+                .collect()
+        })
+        .unwrap_or_default();
     if missing.is_empty() {
         checks.push(AuditCheck::pass(
             "mission_assets",
             "tous les assets sont valides",
         ));
     } else {
-        let names: Vec<&str> = missing.iter().filter_map(Value::as_str).collect();
-        checks.push(AuditCheck::warn(
-            "mission_assets",
-            format!("assets manquants ou non conformes: {names:?}"),
+        let names: Vec<&str> = missing
+            .iter()
+            .filter_map(Value::as_str)
+            .filter(|name| !known_absent.contains(name))
+            .collect();
+        if names.is_empty() {
+            checks.push(AuditCheck::pass(
+                "mission_assets",
+                "aucun asset manquant hors absences volontaires",
+            ));
+        } else {
+            checks.push(AuditCheck::warn(
+                "mission_assets",
+                format!("assets manquants ou non conformes: {names:?}"),
+            ));
+        }
+    }
+    if known_absent.is_empty() {
+        checks.push(AuditCheck::pass(
+            "mission_known_absent",
+            "aucune absence volontaire demandée",
+        ));
+    } else {
+        checks.push(AuditCheck::pass(
+            "mission_known_absent",
+            format!("assets volontairement absents: {known_absent:?}"),
         ));
     }
     let added = block
@@ -1143,7 +1187,7 @@ fn append_mission_checks(
     let review_reasons: Vec<&str> = reasons
         .iter()
         .copied()
-        .filter(|reason| !matches!(*reason, "no_logo" | "overlay_disabled"))
+        .filter(|reason| !matches!(*reason, "no_logo" | "overlay_disabled" | "known_absent"))
         .collect();
     if !review_reasons.is_empty() {
         checks.push(AuditCheck::warn(
@@ -1154,6 +1198,11 @@ fn append_mission_checks(
         checks.push(AuditCheck::warn(
             "mission_modes",
             "insertion A7 désactivée (diagnostic)",
+        ));
+    } else if reasons.contains(&"known_absent") {
+        checks.push(AuditCheck::pass(
+            "mission_modes",
+            "absences volontaires uniquement",
         ));
     } else {
         checks.push(AuditCheck::pass(
@@ -1913,6 +1962,22 @@ fn failure_outcome(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn post_options_carry_mission_overlays_from_config() {
+        let mut config = workflow_core::Config::default();
+        config.paths.mission_overlays = Some(PathBuf::from("assets/mission_overlays"));
+        let options = PostOptions::from_config(&config, "docs");
+        assert_eq!(
+            options.mission_overlays,
+            Some(PathBuf::from("assets/mission_overlays"))
+        );
+        config.paths.mission_overlays = Some(PathBuf::new());
+        assert_eq!(
+            PostOptions::from_config(&config, "docs").mission_overlays,
+            None
+        );
+    }
 
     fn project_doc() -> Value {
         json!({

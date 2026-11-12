@@ -86,6 +86,9 @@ Le contrat est complété par [`../parity/DRIFT.md`](../parity/DRIFT.md) pour le
 | A5/A6, bypass direct SDM/archive-only, template SDM multi-préfixes (D-061) et gate OCR A2 opt-in (post-STEP8) | [`lots/LOT-9-POST-STEP8.md`](lots/LOT-9-POST-STEP8.md) | Lot 9 | Référence |
 | A1 — veto latéral des sources pillarboxées (D-063) | [`lots/LOT-11-A1-VETO-LATERAL.md`](lots/LOT-11-A1-VETO-LATERAL.md) | Lot 11 | Référence |
 | A7 — logos de mission depuis les emails (`email_proxy.php`, D-064) | [`lots/LOT-12-A7-MISSIONS.md`](lots/LOT-12-A7-MISSIONS.md) | Lot 12 | Référence |
+| A7 — parseur, alias et `tail_overlay` (D-065) | [`lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md`](lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md) | Lot 12.1 | Référence |
+| A7 — banque centrale de repli et provenance (D-066) | [`lots/LOT-12.2-BANQUE-CENTRALE.md`](lots/LOT-12.2-BANQUE-CENTRALE.md) | Lot 12.2 | Référence |
+| A7 — benchmark stratifié, masque QA MOV et canari (D-067) | [`lots/LOT-12.3-BENCHMARK-QA-MOV.md`](lots/LOT-12.3-BENCHMARK-QA-MOV.md) | Lot 12.3 | Référence |
 
 La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 `LOT-4-STEP3` sont volontairement dans cet ordre historique.
@@ -100,7 +103,7 @@ La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
 | [`lots/LOT-7-INTEGRATION.md`](lots/LOT-7-INTEGRATION.md) | Séquence réelle STEP2 → STEP8 et rollback contrôlé. | Référence |
 | [`lots/LOT-8-INGESTION.md`](lots/LOT-8-INGESTION.md) | Webhook, normalisation d'URL, historique SQLite, cooldown et téléchargement R2/Dropbox. | Référence |
 | [`lots/STEP2-WINDOWS.md`](lots/STEP2-WINDOWS.md) | Protocole de validation STEP2 CUDA sous Windows, différé et non exécuté (D-022). | Historique |
-| [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) | Contrôle QA read-only après export humain : Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj`, vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, sidecar de mission A7 (D-064), `qa.json` séparé et auto-approbation conditionnelle. | Référence |
+| [`lots/LOT-10-QA.md`](lots/LOT-10-QA.md) | Contrôle QA read-only après export humain : Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj` (PNG et MOV alpha, D-067), vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, sidecar de mission A7 (D-064), `qa.json` séparé et auto-approbation conditionnelle. | Référence |
 
 ## 5. Exploitation
 

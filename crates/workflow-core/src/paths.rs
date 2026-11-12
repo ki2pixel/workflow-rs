@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub struct ResolvedPaths {
     pub base: PathBuf,
     pub models: PathBuf,
+    pub mission_overlays: Option<PathBuf>,
     pub projects: PathBuf,
     pub archives: PathBuf,
     pub logs: PathBuf,
@@ -61,6 +62,10 @@ impl PathsConfig {
         let base = self.base.clone();
         ResolvedPaths {
             models: self.models.clone(),
+            mission_overlays: self
+                .mission_overlays
+                .clone()
+                .filter(|path| !path.as_os_str().is_empty()),
             projects: self
                 .projects
                 .clone()

@@ -1676,6 +1676,7 @@ mod tests {
                 end_s: 10.0,
                 bbox_xywh: [160.0, 1520.0, 380.0, 330.0],
                 opaque_pixels: 1000,
+                kind: "image".into(),
             }],
             skipped: Vec::new(),
         };
@@ -1707,6 +1708,7 @@ mod tests {
                 end_s: 10.0,
                 bbox_xywh: [160.0, 1520.0, 380.0, 330.0],
                 opaque_pixels: 1000,
+                kind: "image".into(),
             }],
             skipped: Vec::new(),
         };

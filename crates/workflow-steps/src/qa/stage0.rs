@@ -216,6 +216,16 @@ fn check_mission(sidecar: Option<&Path>, project: Option<&Path>) -> Vec<QaCheck>
         .and_then(serde_json::Value::as_array)
         .cloned()
         .unwrap_or_default();
+    let known_absent: Vec<&str> = mission
+        .get("known_absent")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
+                .collect()
+        })
+        .unwrap_or_default();
     let skipped = mission
         .get("skipped")
         .and_then(serde_json::Value::as_array)
@@ -236,7 +246,14 @@ fn check_mission(sidecar: Option<&Path>, project: Option<&Path>) -> Vec<QaCheck>
         let names: Vec<&str> = missing
             .iter()
             .filter_map(serde_json::Value::as_str)
+            .filter(|name| !known_absent.contains(name))
             .collect();
+        if names.is_empty() {
+            return vec![QaCheck::pass(
+                "mission_overlays",
+                format!("absences volontaires uniquement: {known_absent:?}"),
+            )];
+        }
         return vec![QaCheck::warn(
             "mission_overlays",
             format!("assets de mission manquants: {names:?}"),
@@ -1181,6 +1198,31 @@ mod tests {
         let checks = check_mission(Some(&sidecar), None);
         assert_eq!(checks[0].status, QaStatus::Review);
         assert!(checks[0].detail.contains("teva.png"));
+    }
+
+    #[test]
+    fn mission_known_absent_is_neutral() {
+        let dir = tempdir().unwrap();
+        let sidecar = dir.path().join("clip_mission.json");
+        fs::write(
+            &sidecar,
+            serde_json::to_vec(&json!({
+                "project_stem": "clip",
+                "mission": {
+                    "decision": "review",
+                    "no_logo": false,
+                    "added": [],
+                    "missing": ["lphdf.png"],
+                    "known_absent": [{"name": "lphdf.png", "note": "retiré volontairement"}],
+                    "reasons": ["known_absent"]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let checks = check_mission(Some(&sidecar), None);
+        assert_eq!(checks[0].status, QaStatus::Pass);
+        assert!(checks[0].detail.contains("lphdf.png"));
     }
 
     #[test]

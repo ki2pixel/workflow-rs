@@ -2,6 +2,66 @@
 
 ## Tâche en cours
 
+**Lot 12.3 — benchmark, masque QA MOV et canari (2026-11-12, implémenté et
+validé, D-067).**
+Le benchmark consolidé du corpus (932 emails, 319 lots) distingue l'historique
+2025–2026 (785 emails, 90,9 % de résolution hors absences) du récent
+oct.–nov. 2026 (147 emails, 100 %) et les formats HTML seul/texte.
+`email audit --json` expose `format_cohorts` ; `scripts/audit-a7-benchmark.py`
+produit les tableaux. Le masque QA couvre désormais les calques `.mov` alpha :
+12–24 frames échantillonnées en rawvideo RGBA, boîtes stables autour de la
+médiane fusionnées (`kind: "mov"`), MOV instable ignoré avec warning non
+bloquant. La fenêtre est ramenée au temps source pour un end-card placé tard ;
+`QA_SCHEMA_VERSION = 1.5.0`, `CACHE_VERSION = 12`. Le canari de 20 missions
+réelles récentes sous `/tmp/opencode` donne 20/20 `apply`, 28 assets (18
+`central_fallback`, 10 `local_docs`), 0 doublon, 0 `_assist` écrit. Cas
+limites validés : `known_absent`, manquant, ambigu, `tail_overlay`,
+déduplication. Correctif : `stem_key` est `trim()`é après retrait de
+l'extension (espace avant `.mp4`, lot 20). Suite workspace : 670 tests listés
+(668 exécutés + 2 ignorés), `fmt` et clippy verts. Détail :
+`docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` ; décision D-067. Aucun `.ecproj`,
+`runtime/` ou `/mnt/cache` modifié.
+
+**Lot 12.2 — banque centrale de repli A7 (2026-11-12, implémenté et validé,
+D-066).**
+`paths.mission_overlays` (`Option<PathBuf>`, vide par défaut) active une banque
+centrale déployée dans `assets/mission_overlays/` : 109 PNG 1080×1920 RGBA
+versionnés, 8 MOV ProRes 4444 (2,2 Go) gitignorés, `manifest.toml` avec
+dimensions/durée/codec/pix_fmt/audio/taille/SHA-256 et `README.md`. A7 résout
+local exact → local normalisé → banque exacte → banque normalisée → extension
+implicite → alias → `known_absent` → revue ; un asset local valide gagne
+toujours et chaque asset central repasse `probe_asset`. Le sidecar expose
+`source: local_docs|central_fallback` et le chemin `.ecproj` reste portable
+(`../../assets/mission_overlays/...`). `config check` échoue si le chemin est
+configuré mais absent ; au runtime une banque indisponible est ignorée. Tests :
+27 mission, 18 A7, propagation `PostOptions`, banque seule, priorité locale et
+banque absente → `review`. Suite workspace, `fmt` et clippy verts. Détail :
+`docs/lots/LOT-12.2-BANQUE-CENTRALE.md` ; décision D-066. Aucun `.ecproj`,
+`runtime/` ou `/mnt/cache` modifié. Sous-lot 12.3 clos par D-067
+(benchmark, masque QA MOV, canari).
+
+**Lot 12.1 — parseur de missions, alias et `tail_overlay` (2026-11-12,
+implémenté et validé, D-065).**
+Le parseur A7 fusionne désormais les instructions coupées (4 lignes / 600
+caractères), équilibre les parenthèses, déséchappe `\'`, accepte `Logo <nom>`
+et les listes d'assets nues, et applique une table d'alias fermée (22
+acronymes + variantes historiques). `lphdf.png` et `edc.png` sont des
+`known_absent` neutres, `LRDLR.png`/`em6.png` priment sur leurs alias et
+`MSL1` sans extension reste ambigu. Le moteur A7 ajoute
+`PlacementMode::TailOverlay` (calque `max(0, main - d)` à `main`, `tail_s = 0`,
+audio coupé, revue si `d > main + 1 ms`, aucun déclenchement automatique) et un
+registre `MovPolicy` pour les 8 MOV ; les bumpers de 19,72 s restent en revue.
+Sidecar `schema: 2` (`requested`, `source`, `known_absent`), audit
+`mission_known_absent` et QA neutre pour les absences volontaires. Nouvelle
+commande hors ligne `workflow-cli email audit --json-dir … --assets …`.
+Audit réel : 932 emails, 2 477 instructions, 2 469 tokens, 2 228 résolus,
+47 absences volontaires, 193 manquants, 39 non résolues ; octobre 2026 100 %
+hors absences, novembre 2026 100 %. Suite workspace : 654 tests listés
+(652 exécutés + 2 ignorés), `fmt` et clippy verts. Documentation :
+`docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md` ; décision D-065. Aucun `.ecproj`,
+`runtime/` ou `/mnt/cache` modifié. Canari de 20 lots en
+`post run --report-only` avant toute écriture réelle.
+
 **Lot 12 — logos de mission A7 (2026-11-12, implémenté et validé, D-064).**
 A7 résout les missions `email_proxy.php` par lot, valide les assets
 1080×1920 avec alpha et insère les logos dans le seul `_assist.ecproj` :

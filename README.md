@@ -100,8 +100,21 @@ Linux et le panneau CEP continue d'appeler Python.
   MOV long, `review` sans placement deviné, `Pas de logo` sans suppression.
   Actif seulement avec `email_proxy.enabled` et
   `steps.step8.post.mission_overlay` ; sidecar
-  `<stem>_mission.json` et bloc `mission` additif. Détail dans
-  `docs/lots/LOT-12-A7-MISSIONS.md`.
+  `<stem>_mission.json` et bloc `mission` additif. Depuis D-065, le parseur
+  fusionne les lignes coupées, résout les alias historiques, accepte
+  `Logo <nom>`/`(yaq.png)`, traite `lphdf.png` en `known_absent`, ajoute
+  `tail_overlay` (comp non prolongée, audio coupé, revue si trop court) et
+  passe le sidecar en `schema: 2`. Depuis D-066, la banque centrale
+  `assets/mission_overlays/` sert de repli après `docs/` : local exact →
+  local normalisé → banque exacte → banque normalisée → alias → revue, avec
+  `source: local_docs|central_fallback`. Depuis D-067, le QA masque aussi les
+  habillages `.mov` alpha (échantillonnage 12–24 frames, `kind: "mov"`,
+  schéma QA `1.5.0`, cache 12) et le corpus complet est benchmarké par
+  période et format. Détail dans
+  `docs/lots/LOT-12-A7-MISSIONS.md`,
+  `docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md`,
+  `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` et
+  `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md`.
 - Depuis D-056, A1 vise une marge de 1,015, A2 peut appliquer une bande basse
   partielle de 35–50 % confirmée par OCR, A3 filtre les revues sous 250 px /
   2 clés et signale la haute confiance, A4 tague les flashes probables et A5
@@ -186,6 +199,10 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-1-STEP8.md` : pilotage headless EffectCraft, gate scripting, timeout, annulation et hook A5/A6.
 - `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
 - `docs/lots/LOT-12-A7-MISSIONS.md` : logos de mission email A7, cache, sidecar et classification MOV.
+- `docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md` : parseur (lignes coupées, parenthèses, `\'`), alias, `known_absent`, `tail_overlay` et sidecar `schema: 2`.
+- `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` : banque centrale `assets/mission_overlays`, ordre de résolution local/banque, provenance et validation 1080×1920.
+- `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` : benchmark stratifié du corpus, masque QA des MOV alpha (`kind: "mov"`, schéma 1.5.0/cache 12) et canari de 20 missions réelles.
+- `scripts/audit-a7-benchmark.py` : consolidation Markdown d'un audit `email audit --json` par période et format.
 - `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj`, vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, `qa.json`, auto-approbation, seuils et limites v1.
 - `docs/lots/LOT-2-STEP2.md` : moteur TransNetV2 ONNX Runtime, parité et mesures STEP2.
 - `docs/lots/LOT-3-STEP4.md` : cascade Coral STEP4, parité, performance, backend CPU de test et limites.

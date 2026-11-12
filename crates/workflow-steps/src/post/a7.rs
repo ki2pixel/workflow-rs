@@ -21,7 +21,10 @@ use serde_json::{json, Map, Value};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
-use workflow_core::mission::{filename_key, ClientMission, VideoInstruction, VideoMatch};
+use workflow_core::mission::{
+    filename_key, ClientMission, LogoProvenance, LogoResolver, LogoTarget, VideoInstruction,
+    VideoMatch,
+};
 use workflow_schema::round::round_to;
 
 const COMP_WIDTH: u32 = 1080;
@@ -34,6 +37,7 @@ static LAYER_TEMPLATE: OnceLock<Value> = OnceLock::new();
 pub enum PlacementMode {
     Static,
     EndCard,
+    TailOverlay,
     FullDuration,
 }
 
@@ -42,9 +46,69 @@ impl PlacementMode {
         match self {
             Self::Static => "static",
             Self::EndCard => "end_card",
+            Self::TailOverlay => "tail_overlay",
             Self::FullDuration => "full_duration",
         }
     }
+}
+
+/// Politique explicite d'un `.mov` de la banque de mission.
+///
+/// La table est fermée en 12.1 : elle fige les huit MOV vérifiés du corpus.
+/// Les bumpers de 19,72 s restent en revue tant qu'ils n'ont pas été arbitrés.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovPolicy {
+    EndCard,
+    TailOverlay,
+    FullDuration,
+    Review(&'static str),
+}
+
+impl MovPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::EndCard => "end_card",
+            Self::TailOverlay => "tail_overlay",
+            Self::FullDuration => "full_duration",
+            Self::Review(_) => "review",
+        }
+    }
+
+    pub fn reason(self) -> Option<&'static str> {
+        match self {
+            Self::Review(reason) => Some(reason),
+            _ => None,
+        }
+    }
+}
+
+const MOV_POLICIES: &[(&str, MovPolicy)] = &[
+    ("m6+.mov", MovPolicy::EndCard),
+    ("MOTION_FIN_EM6_V03.mov", MovPolicy::TailOverlay),
+    ("MSL1.mov", MovPolicy::FullDuration),
+    (
+        "9_16_RDV_PROGRAMME_EM6_V02_5MIN.mov",
+        MovPolicy::FullDuration,
+    ),
+    ("the power.mov", MovPolicy::FullDuration),
+    ("hayu x below deck.mov", MovPolicy::FullDuration),
+    (
+        "m6+max anime 1ep.mov",
+        MovPolicy::Review("bumper de 19,72 s non arbitré (end-card ou tail overlay)"),
+    ),
+    (
+        "W9_M6+MAX.mov",
+        MovPolicy::Review("bumper de 19,72 s non arbitré (end-card ou tail overlay)"),
+    ),
+];
+
+/// Politique déclarée pour un `.mov`, ou `None` si l'asset est inconnu.
+pub fn mov_policy(name: &str) -> Option<MovPolicy> {
+    let key = filename_key(name);
+    MOV_POLICIES
+        .iter()
+        .find(|(candidate, _)| filename_key(candidate) == key)
+        .map(|(_, policy)| *policy)
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +122,8 @@ pub struct A7Options<'a> {
     pub missions: &'a [ClientMission],
     /// Insère réellement les calques. Faux : résolution et audit seulement.
     pub overlay: bool,
+    /// Banque centrale de repli, optionnelle.
+    pub mission_overlays: Option<&'a Path>,
     pub end_card_max_s: f64,
     pub ffprobe: &'a Path,
 }
@@ -65,9 +131,13 @@ pub struct A7Options<'a> {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct A7Added {
     pub name: String,
+    /// Token tel qu'écrit dans l'email (ou nom recollé après découpage).
+    pub requested: String,
     pub mode: String,
     pub start_s: f64,
     pub end_s: f64,
+    /// `local_docs` ou `central_fallback`.
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -89,7 +159,11 @@ enum AssetKind {
 #[derive(Debug, Clone)]
 struct Asset {
     name: String,
+    /// Token d'origine dans l'email, conservé pour la traçabilité.
+    requested: String,
     path: PathBuf,
+    /// `local_docs` ou `central_fallback`.
+    provenance: LogoProvenance,
     kind: AssetKind,
     width: u32,
     height: u32,
@@ -265,18 +339,26 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
 
     let (assets, missing) = resolve_assets(options, &instruction);
     let mut reasons: Vec<String> = Vec::new();
-    if !missing.is_empty() {
+    if missing.iter().any(|reason| reason.code != "known_absent") {
         reasons.push("missing_asset".into());
+    }
+    if missing.iter().any(|reason| reason.code == "known_absent") {
+        reasons.push("known_absent".into());
     }
     let mut decisions = Vec::new();
     for reason in &missing {
+        let severity = if reason.code == "known_absent" {
+            "medium"
+        } else {
+            "high"
+        };
         decisions.push(Decision::review(
             "A7",
             reason.name.clone(),
             reason.detail.clone(),
             0.2,
             json!({
-                "severity": "high",
+                "severity": severity,
                 "reason": reason.code,
                 "asset": reason.name,
             }),
@@ -299,10 +381,7 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
             vec!["overlay_disabled"],
             0.0,
             &[],
-            &missing
-                .iter()
-                .map(|reason| reason.name.clone())
-                .collect::<Vec<_>>(),
+            &missing,
             &[],
         ));
         return outcome;
@@ -321,10 +400,7 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
             reasons,
             0.0,
             &[],
-            &missing
-                .iter()
-                .map(|reason| reason.name.clone())
-                .collect::<Vec<_>>(),
+            &missing,
             &[],
         ));
         return outcome;
@@ -358,10 +434,7 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
                 reasons,
                 outcome.tail_s,
                 &added,
-                &missing
-                    .iter()
-                    .map(|reason| reason.name.clone())
-                    .collect::<Vec<_>>(),
+                &missing,
                 &skipped,
             ));
             if !added.is_empty() {
@@ -403,10 +476,7 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
                 vec!["insert_failed"],
                 0.0,
                 &[],
-                &missing
-                    .iter()
-                    .map(|reason| reason.name.clone())
-                    .collect::<Vec<_>>(),
+                &missing,
                 &[],
             ));
         }
@@ -428,20 +498,62 @@ fn resolve_assets(
     let mut assets = Vec::new();
     let mut missing = Vec::new();
     let mut seen = Vec::new();
-    for name in &instruction.logos {
-        let key = filename_key(name);
-        if seen.contains(&key) {
+    let mut seen_paths: Vec<PathBuf> = Vec::new();
+    let mut resolver = LogoResolver::new(options.docs);
+    if let Some(bank) = options
+        .mission_overlays
+        .and_then(|path| path.canonicalize().ok())
+    {
+        if bank.is_dir() {
+            resolver = resolver.with_fallback(LogoResolver::new(bank));
+        }
+    }
+    let logos = &instruction.logos;
+    let mut index = 0usize;
+    while index < logos.len() {
+        let (target, requested, consumed) = resolver.resolve_sequence_target(logos, index);
+        index += consumed;
+        let key = filename_key(&requested);
+        if key.is_empty() || seen.contains(&key) {
             continue;
         }
         seen.push(key);
-        let Some(path) = resolve_asset(options.docs, name) else {
-            missing.push(MissingAsset {
-                name: name.clone(),
-                code: "missing_asset",
-                detail: format!("asset absent de {}", options.docs.display()),
-            });
-            continue;
+        let (path, provenance) = match target {
+            LogoTarget::Found { path, provenance } => (path, provenance),
+            LogoTarget::KnownAbsent(note) => {
+                missing.push(MissingAsset {
+                    name: requested,
+                    code: "known_absent",
+                    detail: note.to_string(),
+                });
+                continue;
+            }
+            LogoTarget::Ambiguous(note) => {
+                missing.push(MissingAsset {
+                    name: requested,
+                    code: "ambiguous_alias",
+                    detail: note.to_string(),
+                });
+                continue;
+            }
+            LogoTarget::Missing => {
+                let mut detail = format!("asset absent de {}", options.docs.display());
+                if let Some(bank) = options.mission_overlays {
+                    detail.push_str(&format!(" et de {}", bank.display()));
+                }
+                missing.push(MissingAsset {
+                    name: requested,
+                    code: "missing_asset",
+                    detail,
+                });
+                continue;
+            }
         };
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+        if seen_paths.contains(&canonical) {
+            continue;
+        }
+        seen_paths.push(canonical);
         let kind = match path
             .extension()
             .and_then(|extension| extension.to_str())
@@ -452,7 +564,7 @@ fn resolve_assets(
             Some("mov") => AssetKind::Mov,
             Some(other) => {
                 missing.push(MissingAsset {
-                    name: name.clone(),
+                    name: requested,
                     code: "unsupported_asset",
                     detail: format!("extension .{other} non supportée par A7"),
                 });
@@ -460,7 +572,7 @@ fn resolve_assets(
             }
             None => {
                 missing.push(MissingAsset {
-                    name: name.clone(),
+                    name: requested,
                     code: "unsupported_asset",
                     detail: "asset sans extension".into(),
                 });
@@ -468,10 +580,10 @@ fn resolve_assets(
             }
         };
         match probe_asset(&path, kind, options.ffprobe) {
-            Ok(asset) => {
+            Ok(mut asset) => {
                 if asset.width != COMP_WIDTH || asset.height != COMP_HEIGHT {
                     missing.push(MissingAsset {
-                        name: name.clone(),
+                        name: requested,
                         code: "asset_dimensions",
                         detail: format!(
                             "{}×{} au lieu de {}×{}",
@@ -480,40 +592,18 @@ fn resolve_assets(
                     });
                     continue;
                 }
+                asset.requested = requested;
+                asset.provenance = provenance;
                 assets.push(asset);
             }
             Err(error) => missing.push(MissingAsset {
-                name: name.clone(),
+                name: requested,
                 code: "asset_unreadable",
                 detail: format!("sonde impossible: {error:#}"),
             }),
         }
     }
     (assets, missing)
-}
-
-/// Résout un asset exact, puis insensible à la casse et aux accents si unique.
-fn resolve_asset(docs: &Path, name: &str) -> Option<PathBuf> {
-    let direct = docs.join(name);
-    if direct.is_file() {
-        return Some(direct);
-    }
-    let key = filename_key(name);
-    let mut matches = Vec::new();
-    let entries = std::fs::read_dir(docs).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let Some(filename) = path.file_name().and_then(|value| value.to_str()) else {
-            continue;
-        };
-        if filename_key(filename) == key {
-            matches.push(path);
-        }
-    }
-    (matches.len() == 1).then(|| matches.remove(0))
 }
 
 fn probe_asset(path: &Path, kind: AssetKind, ffprobe: &Path) -> Result<Asset> {
@@ -542,7 +632,9 @@ fn probe_png(path: &Path) -> Result<Asset> {
             .and_then(|name| name.to_str())
             .unwrap_or_default()
             .to_string(),
+        requested: String::new(),
         path: path.to_path_buf(),
+        provenance: LogoProvenance::LocalDocs,
         kind: AssetKind::Png,
         width: info.width,
         height: info.height,
@@ -611,7 +703,9 @@ fn probe_mov(path: &Path, ffprobe: &Path) -> Result<Asset> {
             .and_then(|name| name.to_str())
             .unwrap_or_default()
             .to_string(),
+        requested: String::new(),
         path: path.to_path_buf(),
+        provenance: LogoProvenance::LocalDocs,
         kind: AssetKind::Mov,
         width,
         height,
@@ -659,6 +753,7 @@ struct Addition {
     mode: PlacementMode,
     start_s: f64,
     end_s: f64,
+    requested: String,
 }
 
 #[derive(Debug, Default)]
@@ -691,6 +786,7 @@ fn plan_assets(assets: &[Asset], main_s: f64, end_card_max_s: f64) -> (Plan, Vec
             mode: PlacementMode::Static,
             start_s: 0.0,
             end_s: main_s,
+            requested: asset.requested.clone(),
         });
     }
 
@@ -713,49 +809,190 @@ fn plan_assets(assets: &[Asset], main_s: f64, end_card_max_s: f64) -> (Plan, Vec
 
     if let Some(mov) = movs.first() {
         let duration = mov.duration_s.unwrap_or(0.0);
-        if duration >= main_s - 0.001 {
-            plan.additions.push(Addition {
-                asset: (*mov).clone(),
-                mode: PlacementMode::FullDuration,
-                start_s: 0.0,
-                end_s: main_s,
-            });
-            plan.additions.extend(png_additions);
-        } else if duration <= end_card_max_s + 0.001 && !pngs.is_empty() {
-            // End-card au-dessus des PNG, comme la vérité terrain du lot 136.
-            let mut additions = vec![Addition {
-                asset: (*mov).clone(),
-                mode: PlacementMode::EndCard,
-                start_s: main_s,
-                end_s: main_s + duration,
-            }];
-            additions.extend(png_additions);
-            plan.additions = additions;
-            plan.tail_s = duration;
-        } else {
-            let reason = if duration <= end_card_max_s + 0.001 {
-                "short_mov_without_png"
-            } else {
-                "intermediate_mov"
-            };
-            plan.reasons.push(reason.into());
-            decisions.push(Decision::review(
-                "A7",
-                mov.name.clone(),
-                format!(
-                    ".mov de {duration:.3}s avec main={main_s:.3}s et {} PNG : insertion refusée",
-                    pngs.len()
-                ),
-                0.3,
-                json!({
-                    "severity": if reason == "intermediate_mov" { "high" } else { "medium" },
-                    "reason": reason,
-                    "mov_duration_s": round_to(duration, 3),
-                    "main_s": round_to(main_s, 3),
-                    "has_png": !pngs.is_empty(),
-                }),
-            ));
-            plan.additions = png_additions;
+        let policy = mov_policy(&mov.name);
+        match policy {
+            Some(MovPolicy::TailOverlay) => {
+                if main_s <= 0.0 {
+                    plan.reasons.push("main_duration_missing".into());
+                    plan.additions = png_additions;
+                } else if duration <= 0.0 {
+                    plan.reasons.push("invalid_mov_duration".into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        "tail overlay avec durée nulle".to_string(),
+                        0.3,
+                        json!({
+                            "severity": "high",
+                            "reason": "invalid_mov_duration",
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                } else if duration > main_s + 0.001 {
+                    plan.reasons.push("short_video_for_tail_overlay".into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        format!(
+                            ".mov de {duration:.3}s ne tient pas dans les {main_s:.3}s de la vidéo"
+                        ),
+                        0.3,
+                        json!({
+                            "severity": "high",
+                            "reason": "short_video_for_tail_overlay",
+                            "mov_duration_s": round_to(duration, 3),
+                            "main_s": round_to(main_s, 3),
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                } else {
+                    plan.additions.push(Addition {
+                        asset: (*mov).clone(),
+                        mode: PlacementMode::TailOverlay,
+                        start_s: (main_s - duration).max(0.0),
+                        end_s: main_s,
+                        requested: mov.requested.clone(),
+                    });
+                    plan.additions.extend(png_additions);
+                }
+            }
+            Some(MovPolicy::EndCard) => {
+                if pngs.is_empty() {
+                    plan.reasons.push("short_mov_without_png".into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        "end-card déclarée sans PNG valide dans la mission".to_string(),
+                        0.3,
+                        json!({
+                            "severity": "medium",
+                            "reason": "short_mov_without_png",
+                            "mov_duration_s": round_to(duration, 3),
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                } else if duration <= 0.0 {
+                    plan.reasons.push("invalid_mov_duration".into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        "end-card avec durée nulle".to_string(),
+                        0.3,
+                        json!({
+                            "severity": "high",
+                            "reason": "invalid_mov_duration",
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                } else {
+                    let mut additions = vec![Addition {
+                        asset: (*mov).clone(),
+                        mode: PlacementMode::EndCard,
+                        start_s: main_s,
+                        end_s: main_s + duration,
+                        requested: mov.requested.clone(),
+                    }];
+                    additions.extend(png_additions);
+                    plan.additions = additions;
+                    plan.tail_s = duration;
+                }
+            }
+            Some(MovPolicy::FullDuration) => {
+                if main_s <= 0.0 {
+                    plan.reasons.push("main_duration_missing".into());
+                    plan.additions = png_additions;
+                } else if duration + 0.001 < main_s {
+                    plan.reasons.push("full_duration_too_short".into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        format!(
+                            "habillage de {duration:.3}s plus court que la vidéo ({main_s:.3}s)"
+                        ),
+                        0.3,
+                        json!({
+                            "severity": "high",
+                            "reason": "full_duration_too_short",
+                            "mov_duration_s": round_to(duration, 3),
+                            "main_s": round_to(main_s, 3),
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                } else {
+                    plan.additions.push(Addition {
+                        asset: (*mov).clone(),
+                        mode: PlacementMode::FullDuration,
+                        start_s: 0.0,
+                        end_s: main_s,
+                        requested: mov.requested.clone(),
+                    });
+                    plan.additions.extend(png_additions);
+                }
+            }
+            Some(MovPolicy::Review(reason)) => {
+                plan.reasons.push("policy_review".into());
+                decisions.push(Decision::review(
+                    "A7",
+                    mov.name.clone(),
+                    reason.to_string(),
+                    0.3,
+                    json!({
+                        "severity": "medium",
+                        "reason": "policy_review",
+                        "detail": reason,
+                        "mov_duration_s": round_to(duration, 3),
+                    }),
+                ));
+                plan.additions = png_additions;
+            }
+            None => {
+                if duration >= main_s - 0.001 {
+                    plan.additions.push(Addition {
+                        asset: (*mov).clone(),
+                        mode: PlacementMode::FullDuration,
+                        start_s: 0.0,
+                        end_s: main_s,
+                        requested: mov.requested.clone(),
+                    });
+                    plan.additions.extend(png_additions);
+                } else if duration <= end_card_max_s + 0.001 && !pngs.is_empty() {
+                    // End-card au-dessus des PNG, comme la vérité terrain du lot 136.
+                    let mut additions = vec![Addition {
+                        asset: (*mov).clone(),
+                        mode: PlacementMode::EndCard,
+                        start_s: main_s,
+                        end_s: main_s + duration,
+                        requested: mov.requested.clone(),
+                    }];
+                    additions.extend(png_additions);
+                    plan.additions = additions;
+                    plan.tail_s = duration;
+                } else {
+                    let reason = if duration <= end_card_max_s + 0.001 {
+                        "short_mov_without_png"
+                    } else {
+                        "intermediate_mov"
+                    };
+                    plan.reasons.push(reason.into());
+                    decisions.push(Decision::review(
+                        "A7",
+                        mov.name.clone(),
+                        format!(
+                            ".mov de {duration:.3}s avec main={main_s:.3}s et {} PNG : insertion refusée",
+                            pngs.len()
+                        ),
+                        0.3,
+                        json!({
+                            "severity": if reason == "intermediate_mov" { "high" } else { "medium" },
+                            "reason": reason,
+                            "mov_duration_s": round_to(duration, 3),
+                            "main_s": round_to(main_s, 3),
+                            "has_png": !pngs.is_empty(),
+                        }),
+                    ));
+                    plan.additions = png_additions;
+                }
+            }
         }
     } else {
         plan.additions = png_additions;
@@ -829,15 +1066,20 @@ fn insert_assets(
         layer["start_time"] = json!(ticks_start);
         layer["in_point"] = json!(ticks_start);
         layer["out_point"] = json!(ticks_end);
-        layer["switches"]["audio"] =
-            json!(addition.asset.kind == AssetKind::Mov && addition.asset.has_audio);
+        layer["switches"]["audio"] = json!(
+            addition.asset.kind == AssetKind::Mov
+                && addition.asset.has_audio
+                && addition.mode != PlacementMode::TailOverlay
+        );
         layer["props"]["name"] = json!(addition.asset.name);
         layer_names.push(asset_key);
         added.push(A7Added {
             name: addition.asset.name.clone(),
+            requested: addition.requested.clone(),
             mode: addition.mode.as_str().into(),
             start_s: round_to(addition.start_s, 3),
             end_s: round_to(addition.end_s, 3),
+            source: addition.asset.provenance.as_str().into(),
         });
         layers.push(layer);
         index += 1;
@@ -993,7 +1235,7 @@ fn mission_block<R>(
     reasons: R,
     tail_s: f64,
     added: &[A7Added],
-    missing: &[String],
+    missing: &[MissingAsset],
     skipped: &[String],
 ) -> Value
 where
@@ -1020,7 +1262,21 @@ where
             .unwrap_or_default()),
     );
     object.insert("added".into(), json!(added));
-    object.insert("missing".into(), json!(missing));
+    object.insert(
+        "missing".into(),
+        json!(missing
+            .iter()
+            .map(|reason| reason.name.clone())
+            .collect::<Vec<_>>()),
+    );
+    object.insert(
+        "known_absent".into(),
+        json!(missing
+            .iter()
+            .filter(|reason| reason.code == "known_absent")
+            .map(|reason| json!({"name": reason.name, "note": reason.detail}))
+            .collect::<Vec<_>>()),
+    );
     object.insert("skipped".into(), json!(skipped));
     object.insert("tail_s".into(), json!(round_to(tail_s, 3)));
     object.insert("decision".into(), json!(decision));
@@ -1068,6 +1324,21 @@ mod tests {
         ClientMission::from_body("recadrage_lot_1_20260101", 1, "Lot 1", body)
     }
 
+    fn write_test_png(path: &Path) {
+        write_test_png_at(path, COMP_WIDTH, COMP_HEIGHT);
+    }
+
+    fn write_test_png_at(path: &Path, width: u32, height: u32) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut encoder = png::Encoder::new(std::io::BufWriter::new(file), width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer
+            .write_image_data(&vec![0u8; (width * height * 4) as usize])
+            .unwrap();
+    }
+
     fn options<'a>(
         project: &'a Path,
         docs: &'a Path,
@@ -1083,6 +1354,7 @@ mod tests {
             meta,
             missions,
             overlay: true,
+            mission_overlays: None,
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
         }
@@ -1148,7 +1420,9 @@ mod tests {
         let additions = vec![Addition {
             asset: Asset {
                 name: "sdm.png".into(),
+                requested: "sdm.png".into(),
                 path: docs.join("sdm.png"),
+                provenance: LogoProvenance::LocalDocs,
                 kind: AssetKind::Png,
                 width: 1080,
                 height: 1920,
@@ -1159,6 +1433,7 @@ mod tests {
             mode: PlacementMode::Static,
             start_s: 0.0,
             end_s: 10.0,
+            requested: "sdm.png".into(),
         }];
         let (output, added, skipped) = insert_assets(&doc, &additions, &options).unwrap();
         assert_eq!(output, doc);
@@ -1201,7 +1476,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let png = Asset {
             name: "a.png".into(),
+            requested: "a.png".into(),
             path: dir.path().join("a.png"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Png,
             width: 1080,
             height: 1920,
@@ -1211,7 +1488,9 @@ mod tests {
         };
         let mov = Asset {
             name: "a.mov".into(),
+            requested: "a.mov".into(),
             path: dir.path().join("a.mov"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Mov,
             width: 1080,
             height: 1920,
@@ -1241,7 +1520,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mov = Asset {
             name: "a.mov".into(),
+            requested: "a.mov".into(),
             path: dir.path().join("a.mov"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Mov,
             width: 1080,
             height: 1920,
@@ -1267,7 +1548,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let png = Asset {
             name: "a.png".into(),
+            requested: "a.png".into(),
             path: dir.path().join("a.png"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Png,
             width: 1080,
             height: 1920,
@@ -1277,7 +1560,9 @@ mod tests {
         };
         let first = Asset {
             name: "a.mov".into(),
+            requested: "a.mov".into(),
             path: dir.path().join("a.mov"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Mov,
             width: 1080,
             height: 1920,
@@ -1287,7 +1572,9 @@ mod tests {
         };
         let second = Asset {
             name: "b.mov".into(),
+            requested: "b.mov".into(),
             path: dir.path().join("b.mov"),
+            provenance: LogoProvenance::LocalDocs,
             kind: AssetKind::Mov,
             width: 1080,
             height: 1920,
@@ -1309,6 +1596,322 @@ mod tests {
         )
         .unwrap();
         assert_eq!(path, PathBuf::from("../docs/m6+.png"));
+    }
+
+    #[test]
+    fn central_fallback_adds_layer_with_portable_path() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        write_test_png(&bank.join("central.png"));
+        let missions = vec![mission_with(&["central.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "apply");
+        assert_eq!(block["added"][0]["source"], "central_fallback");
+        assert_eq!(block["added"][0]["requested"], "central.png");
+        let layer = &outcome.doc["items"]["2"]["kind"]["layers"][0];
+        assert_eq!(layer["name"], "central.png");
+        let item_id = layer["source"]["item"].as_i64().unwrap().to_string();
+        let item = outcome.doc["items"].get(&item_id).unwrap();
+        assert_eq!(
+            item["kind"]["path"],
+            "../../assets/mission_overlays/central.png"
+        );
+    }
+
+    #[test]
+    fn local_docs_wins_over_central_fallback() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        write_test_png(&docs.join("both.png"));
+        write_test_png(&bank.join("both.png"));
+        let missions = vec![mission_with(&["both.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["added"][0]["source"], "local_docs");
+        let layer = &outcome.doc["items"]["2"]["kind"]["layers"][0];
+        let item_id = layer["source"]["item"].as_i64().unwrap().to_string();
+        let item = outcome.doc["items"].get(&item_id).unwrap();
+        assert_eq!(item["kind"]["path"], "../docs/both.png");
+    }
+
+    #[test]
+    fn central_fallback_rejects_invalid_profile() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        write_test_png_at(&bank.join("petit.png"), 8, 8);
+        let missions = vec![mission_with(&["petit.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "review");
+        assert_eq!(block["added"], json!([]));
+        assert_eq!(block["reasons"], json!(["missing_asset"]));
+        assert!(outcome
+            .decisions
+            .iter()
+            .any(|decision| decision.details["reason"] == "asset_dimensions"));
+    }
+
+    #[test]
+    fn missing_central_bank_degrades_to_review() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let bank = dir.path().join("banque-absente");
+        let missions = vec![mission_with(&["absent.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "review");
+        assert_eq!(block["reasons"], json!(["missing_asset"]));
+        assert_eq!(block["added"], json!([]));
+        assert_eq!(block["missing"], json!(["absent.png"]));
+    }
+
+    #[test]
+    fn mov_policy_is_explicit_for_known_assets() {
+        assert_eq!(mov_policy("m6+.mov"), Some(MovPolicy::EndCard));
+        assert_eq!(
+            mov_policy("MOTION_FIN_EM6_V03.mov"),
+            Some(MovPolicy::TailOverlay)
+        );
+        assert_eq!(mov_policy("MSL1.mov"), Some(MovPolicy::FullDuration));
+        assert!(matches!(
+            mov_policy("m6+max anime 1ep.mov"),
+            Some(MovPolicy::Review(_))
+        ));
+        assert_eq!(mov_policy("inconnu.mov"), None);
+    }
+
+    #[test]
+    fn tail_overlay_keeps_composition_duration() {
+        let dir = tempfile::tempdir().unwrap();
+        let png = Asset {
+            name: "a.png".into(),
+            requested: "a.png".into(),
+            path: dir.path().join("a.png"),
+            provenance: LogoProvenance::LocalDocs,
+            kind: AssetKind::Png,
+            width: 1080,
+            height: 1920,
+            duration_s: None,
+            has_audio: false,
+            codec: "PNG".into(),
+        };
+        let mov = Asset {
+            name: "MOTION_FIN_EM6_V03.mov".into(),
+            requested: "MOTION_FIN_EM6_V03.mov".into(),
+            path: dir.path().join("MOTION_FIN_EM6_V03.mov"),
+            provenance: LogoProvenance::LocalDocs,
+            kind: AssetKind::Mov,
+            width: 1080,
+            height: 1920,
+            duration_s: Some(12.0),
+            has_audio: false,
+            codec: "ProRes".into(),
+        };
+        let (plan, decisions) = plan_assets(&[png, mov], 60.0, 5.0);
+        assert!(decisions.is_empty());
+        assert_eq!(plan.tail_s, 0.0);
+        assert_eq!(plan.additions[0].mode, PlacementMode::TailOverlay);
+        assert_eq!(plan.additions[0].start_s, 48.0);
+        assert_eq!(plan.additions[0].end_s, 60.0);
+        assert_eq!(plan.additions[1].mode, PlacementMode::Static);
+    }
+
+    #[test]
+    fn tail_overlay_rejects_short_video() {
+        let dir = tempfile::tempdir().unwrap();
+        let mov = Asset {
+            name: "MOTION_FIN_EM6_V03.mov".into(),
+            requested: "MOTION_FIN_EM6_V03.mov".into(),
+            path: dir.path().join("MOTION_FIN_EM6_V03.mov"),
+            provenance: LogoProvenance::LocalDocs,
+            kind: AssetKind::Mov,
+            width: 1080,
+            height: 1920,
+            duration_s: Some(12.0),
+            has_audio: false,
+            codec: "ProRes".into(),
+        };
+        let (plan, decisions) = plan_assets(&[mov], 8.0, 5.0);
+        assert!(plan.additions.is_empty());
+        assert_eq!(plan.tail_s, 0.0);
+        assert_eq!(
+            decisions[0].details["reason"],
+            "short_video_for_tail_overlay"
+        );
+    }
+
+    #[test]
+    fn tail_overlay_rejects_zero_duration() {
+        let dir = tempfile::tempdir().unwrap();
+        let mov = Asset {
+            name: "MOTION_FIN_EM6_V03.mov".into(),
+            requested: "MOTION_FIN_EM6_V03.mov".into(),
+            path: dir.path().join("MOTION_FIN_EM6_V03.mov"),
+            provenance: LogoProvenance::LocalDocs,
+            kind: AssetKind::Mov,
+            width: 1080,
+            height: 1920,
+            duration_s: Some(0.0),
+            has_audio: false,
+            codec: "ProRes".into(),
+        };
+        let (plan, decisions) = plan_assets(&[mov], 60.0, 5.0);
+        assert!(plan.additions.is_empty());
+        assert_eq!(decisions[0].details["reason"], "invalid_mov_duration");
+    }
+
+    #[test]
+    fn tail_overlay_insertion_does_not_extend_the_comp_and_mutes_audio() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let docs = dir.path().join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let mov = Asset {
+            name: "MOTION_FIN_EM6_V03.mov".into(),
+            requested: "MOTION_FIN_EM6_V03.mov".into(),
+            path: docs.join("MOTION_FIN_EM6_V03.mov"),
+            provenance: LogoProvenance::LocalDocs,
+            kind: AssetKind::Mov,
+            width: 1080,
+            height: 1920,
+            duration_s: Some(12.0),
+            has_audio: true,
+            codec: "ProRes".into(),
+        };
+        let (plan, decisions) = plan_assets(&[mov], 60.0, 5.0);
+        assert!(decisions.is_empty());
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 60.0,
+            meta: &meta,
+            missions: &[],
+            overlay: true,
+            mission_overlays: None,
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let (output, added, _) = insert_assets(&doc, &plan.additions, &options).unwrap();
+        assert_eq!(added.len(), 1);
+        assert_eq!(added[0].mode, "tail_overlay");
+        assert_eq!(added[0].source, "local_docs");
+        assert_eq!(added[0].requested, "MOTION_FIN_EM6_V03.mov");
+        assert_eq!(added[0].start_s, 48.0);
+        assert_eq!(added[0].end_s, 60.0);
+        let comp = comp(&output).unwrap();
+        assert_eq!(
+            comp.get("duration").and_then(Value::as_i64),
+            Some(seconds_to_ticks(60.0))
+        );
+        let layer = comp
+            .get("layers")
+            .and_then(Value::as_array)
+            .and_then(|layers| layers.first())
+            .unwrap();
+        assert_eq!(layer["switches"]["audio"], json!(false));
+        assert_eq!(layer["out_point"], json!(seconds_to_ticks(60.0)));
+    }
+
+    #[test]
+    fn known_absent_is_reported_without_missing_asset_noise() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let docs = dir.path().join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let mission = mission_with(&["lphdf.png"]);
+        let missions = vec![mission];
+        let options = options(&project, &docs, &meta, &missions);
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.unwrap();
+        assert_eq!(block["decision"], json!("review"));
+        assert_eq!(block["reasons"], json!(["known_absent"]));
+        assert_eq!(block["known_absent"][0]["name"], json!("lphdf.png"));
+        assert!(block["missing"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value.as_str() == Some("lphdf.png")));
     }
 
     fn comp_meta(doc: &Value) -> Result<CompMeta> {

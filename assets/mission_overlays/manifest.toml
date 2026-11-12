@@ -1,0 +1,1196 @@
+# Manifeste de la banque centrale d'overlays de mission (A7).
+# Les .mov sont ignorés par git (2,2 Go) ; les PNG et ce manifeste sont versionnés.
+
+version = 1
+source_root = "/media/kidpixel/WORK/Backup/CLIENTS/Média Solution/mbox-to-json-2.0.0/logos_overlay"
+generated_at = "2026-11-12"
+profile = "1080x1920 RGBA ; MOV ProRes 4444 yuva444p12le"
+asset_count = 117
+png_count = 109
+mov_count = 8
+
+[[asset]]
+name = "14 jours pour aller mieux.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 30540
+sha256 = "2b51786e3bb31ee82b9663898a1cd52b1ff2a6b3fae093812fc756b8b4268695"
+
+[[asset]]
+name = "20H10.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 52664
+sha256 = "567c4540e491bdd73e5055b7fbcb14026664860bd1f8ded683987d725ebfb007"
+
+[[asset]]
+name = "6ter.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 30134
+sha256 = "8fde746f251279535aa88c382e4206452c199f7440575a3a28786393d4528012"
+
+[[asset]]
+name = "9_16_RDV_PROGRAMME_EM6_V02_5MIN.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 300.0
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = false
+size = 488442180
+sha256 = "cb55cd44bf91366e74b3e8733f3b3f2bc8da1d20afe774ccdb1e026b33db65d8"
+
+[[asset]]
+name = "AVDP.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 40872
+sha256 = "f608d7b9c6ddb638af9553f74bcf9f1aa56f1da7c87ba727295e41d125f25e91"
+
+[[asset]]
+name = "Capital.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31847
+sha256 = "05b65613fab51240d7412b64ab23b2fe13f528f01ca616600bcab14117b6a234"
+
+[[asset]]
+name = "IDLT BILAN.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 77987
+sha256 = "5263a78576e141b24ab14ea378aae419b7e95538b2946497c69254ed676b9ece"
+
+[[asset]]
+name = "IDLT.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47815
+sha256 = "ce7597577285d1b105237437b348d6b6cb6f55304821d4c3ad9d9ae057b8ea0d"
+
+[[asset]]
+name = "LACAS.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 42931
+sha256 = "66ce07df241b96434e9958a0ae34ae0b8b24e433efb8d26e717a774290940d72"
+
+[[asset]]
+name = "LFAUIT.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 35582
+sha256 = "cc9a036f50e7372b56f8762f4fc70397d856883acb2458f843a7d1f0f4d4e10a"
+
+[[asset]]
+name = "LRDLR.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47233
+sha256 = "7753d275bf5f398b079015a019eb616e3b5f2d0b36f425b1cd437f32563d2ddd"
+
+[[asset]]
+name = "La robe de ma vie.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 37588
+sha256 = "03a7483ffbee408c1f75d419126459f22027c45dfda0fb98c6fed03b34c61f32"
+
+[[asset]]
+name = "Les reines de la route.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47233
+sha256 = "7753d275bf5f398b079015a019eb616e3b5f2d0b36f425b1cd437f32563d2ddd"
+
+[[asset]]
+name = "MOTION_FIN_EM6_V03.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 12.0
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = false
+size = 43494340
+sha256 = "0331bd949fa90b04874af3fad5c4f6b425ee8ec985923b0c8bc618e47785765e"
+
+[[asset]]
+name = "MSL1.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 150.0
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = true
+size = 512998340
+sha256 = "0f97abab56d8366b7852a47eb4201ce65059e73167fda25a7ba34f68a3fc6cc5"
+
+[[asset]]
+name = "Maries au premier regard.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 38545
+sha256 = "59d077e598b88a23a5caa39250146dec2737cf9c5ed2b5e3fb82dff130123b04"
+
+[[asset]]
+name = "OCLC.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 88949
+sha256 = "94571c473b5f0adc7a60cc5b7290e2609a607afbbb96212020f44191a2a98269"
+
+[[asset]]
+name = "QVEMF.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 78322
+sha256 = "8eebadf59975b7f7a8c68d8c79ab18a83bbc13c9cc0f83352056eff124f363a4"
+
+[[asset]]
+name = "W9_M6+MAX.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 19.72
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = false
+size = 42316212
+sha256 = "cd9be81148f5be3bf5b1f1c200705db0a43219f4941bba209ff996ae2c5ea880"
+
+[[asset]]
+name = "adp.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 38895
+sha256 = "b4aa33089a3edbcfca58b3ce9a2b58fc4201293da63dfa4c993a8d7084e22a7d"
+
+[[asset]]
+name = "bienvenue chez les bodins.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 62345
+sha256 = "d8d1e7a0d1ce3352b92e151b030f6d57ffbfc21089d18fedc73d5ab1dd4ee68a"
+
+[[asset]]
+name = "body of proof.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 20702
+sha256 = "1a6c3214a1abe7b6a88c5c3c3cf8da172a1d7a84b29aae136377c55e4b9d6f54"
+
+[[asset]]
+name = "brice 3.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 23350
+sha256 = "fad102009b73fa4e1a3861a767d4febda0155da22edf3fa9ea8d77666495a22a"
+
+[[asset]]
+name = "c'est du propre.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 30722
+sha256 = "7eb7321411e3cfa30467680025ac818b5349417330f578f18fbf473f825d72a0"
+
+[[asset]]
+name = "c'est la famille.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 37492
+sha256 = "c4667491389baa548a5977031fd3376151e16240f0c234c3f4094144832833a8"
+
+[[asset]]
+name = "call me by your name.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 56869
+sha256 = "bf3f469607c5d8ca30fde88efd81ca391c6dab3fa879e422f57c4b4d64ecb537"
+
+[[asset]]
+name = "cauchemar en cuisine.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 34555
+sha256 = "d758a0473b1620775d202d0f1a755d8801ef66419cc6b0e9388ec6eda4118f98"
+
+[[asset]]
+name = "clf.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 37492
+sha256 = "c4667491389baa548a5977031fd3376151e16240f0c234c3f4094144832833a8"
+
+[[asset]]
+name = "cougar island.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 49803
+sha256 = "cd587e22b21bd00a66a18c86b587669ddd329def04e823dd69a4ea02c8a5ace5"
+
+[[asset]]
+name = "e=m6.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 32275
+sha256 = "121ae1e0a04b7f53327030e5ee92cee5aa75b003bedc7d42b1ec58b508bf3146"
+
+[[asset]]
+name = "em6.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 32275
+sha256 = "121ae1e0a04b7f53327030e5ee92cee5aa75b003bedc7d42b1ec58b508bf3146"
+
+[[asset]]
+name = "eqa.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 35686
+sha256 = "b48a127a4fe74ac86bba21940af8480a6aced63bcdc92b2866478f337e2f04fb"
+
+[[asset]]
+name = "eqc.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 34276
+sha256 = "5eab265378605123c0d3a5a9d9faccd54ace12e89bc93fe2565eaa1f08509543"
+
+[[asset]]
+name = "et si on se rencontrait.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 35741
+sha256 = "365ee166ba5948f0ab4de81edbcfa1d75e545876148974511701d74bbcd736b6"
+
+[[asset]]
+name = "frequenstar.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 23069
+sha256 = "1bf6b4290910953fc52e2d843e4fea97ff4321441a2cf2b9da440ac7ae364b8c"
+
+[[asset]]
+name = "gulli.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 40634
+sha256 = "bd92f0ae73168106908ffd4ed50034431b15d9880f766243eec24e84399c9c93"
+
+[[asset]]
+name = "gulliprime.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 36834
+sha256 = "44289df61e15016e2f7261c4ea4c5f73a7743177b59d2825bae7e9417cf72296"
+
+[[asset]]
+name = "halal police d'etat.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 75486
+sha256 = "e16bac1e1cf02e32e4ef84b1bb99a9672d0b9c7894b645810356774dea592336"
+
+[[asset]]
+name = "hayu x below deck.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 356.08
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = false
+size = 500244964
+sha256 = "735acb3630f9e5385bb49ba6a0985735432f6b26121ed264bb405273f8be5aec"
+
+[[asset]]
+name = "ile de la tentation.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47815
+sha256 = "ce7597577285d1b105237437b348d6b6cb6f55304821d4c3ad9d9ae057b8ea0d"
+
+[[asset]]
+name = "jane the virgin.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 75518
+sha256 = "e53dec865127168ea2be6e5ea926eea05426f1720565e8c40afa4cf24b3750a2"
+
+[[asset]]
+name = "jet de luxe.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 54626
+sha256 = "f64a3f60a97484f1982fbfc0a443ecf5904cd7ff9be44efa9371d619a49b77d7"
+
+[[asset]]
+name = "julien + manon.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 40057
+sha256 = "646b630563c43b97c3a1634a8dbb930dcd56dd622afc4fd3465aa24b1f104c09"
+
+[[asset]]
+name = "l'ile de la tentation.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47815
+sha256 = "ce7597577285d1b105237437b348d6b6cb6f55304821d4c3ad9d9ae057b8ea0d"
+
+[[asset]]
+name = "la grosse rigolade.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 78457
+sha256 = "b8cc3d0c61e4916d65290984e558fa128e26a4dda3f6086f76e424283e524929"
+
+[[asset]]
+name = "laa9.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 68188
+sha256 = "17b24070af53d1e197a3b0342cc40b7a5db8dedd85c3b3e58d66acbb8009e161"
+
+[[asset]]
+name = "laura + niko.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 42842
+sha256 = "a9492b90f9130ede5711fe86f99ddb0a10533417e34590ecf02244f0c5b92f59"
+
+[[asset]]
+name = "le 20h10.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 52664
+sha256 = "567c4540e491bdd73e5055b7fbcb14026664860bd1f8ded683987d725ebfb007"
+
+[[asset]]
+name = "le cross.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 26094
+sha256 = "dde37bf0e2869379cc1b545a8a60ebf48253c218a5ad08781728a31bac6ed0d9"
+
+[[asset]]
+name = "le maillon faible.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 52462
+sha256 = "eb73e0e536fd06f408f4272618c38853c6592517c9091ed50230e6b041ca8ca5"
+
+[[asset]]
+name = "le reste du monde.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 64297
+sha256 = "07ec2b092b3a4be0bd539eb92c77d286616a7cdb5de8255e78f3f8178ca84ef6"
+
+[[asset]]
+name = "le seigneur des anneaux les anneaux de pouvoir.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 55306
+sha256 = "074a58252a02896295ef3cf0e03dc2a6500a17950d617cddfb7d49973d2f0c9f"
+
+[[asset]]
+name = "les 100.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 20630
+sha256 = "a2868762cc2d42a7c8f6b867071f9df6833ee54cdb075dccb6019a36a972effc"
+
+[[asset]]
+name = "les 3 mousquetaires.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 24522
+sha256 = "83e8804829c7fae0f89934dc76d27e37e4afcfadec005dee350859a3ae659b57"
+
+[[asset]]
+name = "les 50.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 35107
+sha256 = "64e6cb8265c2033d0e68e38b8132ce6f51190a2c8f0601402a8543e804022e12"
+
+[[asset]]
+name = "les ch'tis dans la jet set.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 97387
+sha256 = "ec565a2c29669307cee0deafc39c37c792501971082b7679ff9e73634a9cf9e7"
+
+[[asset]]
+name = "les ch'tis.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 97387
+sha256 = "ec565a2c29669307cee0deafc39c37c792501971082b7679ff9e73634a9cf9e7"
+
+[[asset]]
+name = "les indestructibles 2.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 55754
+sha256 = "c589eb1f6a59bfcf4a3994ae370625e693aca3c507dbbee66c4acce7f556a355"
+
+[[asset]]
+name = "les invincibles.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 29232
+sha256 = "5ac4e9a11c43b70133159df4c257d37c2dc75bec6a51889523e291f13c744827"
+
+[[asset]]
+name = "les mamans.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 34182
+sha256 = "28257eac1d6a3b200c3725083ca43a44d210db5bc30ba0e2c5ea396294aa0910"
+
+[[asset]]
+name = "les marseillais.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 80995
+sha256 = "edd6c9570e4a531233faad2db7743e4af03738a6318854d3044e455d14fb324c"
+
+[[asset]]
+name = "les reines.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 47233
+sha256 = "7753d275bf5f398b079015a019eb616e3b5f2d0b36f425b1cd437f32563d2ddd"
+
+[[asset]]
+name = "les segpa au ski.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 78706
+sha256 = "50b48afcfa9a7c52a3a94fd86e415110950c28de549037785250289a03d299db"
+
+[[asset]]
+name = "les segpa.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 77659
+sha256 = "623ac93e250db822f4c839c86fe2f94e2787e27aa96d3c7f549b966a66e3c56c"
+
+[[asset]]
+name = "les traitres.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 59233
+sha256 = "8f07a2cb5873899af5876188a91582cab33368be5fa355db175145bbbfb5f9ea"
+
+[[asset]]
+name = "lfauit exceptionnel.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 44846
+sha256 = "09782ee78e969771e00451286f344abcb51b121c2ee121a6fdcc00f5b33a7403"
+
+[[asset]]
+name = "lmbf.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31368
+sha256 = "1250d49a0c6828762ae9d79ddfd70d1d1fa95da431c4f5aae3bac723750bbb11"
+
+[[asset]]
+name = "lmcr.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 40133
+sha256 = "eb2fc0baa43f93dc73019ca893578de553eb2390a53e1c4f8a4f467e17acead2"
+
+[[asset]]
+name = "lmf.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 52462
+sha256 = "eb73e0e536fd06f408f4272618c38853c6592517c9091ed50230e6b041ca8ca5"
+
+[[asset]]
+name = "lmp.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 42465
+sha256 = "13c490d39e1c106501010c977214fa17dda2b9c87217fd5ca2970ed7f44255a5"
+
+[[asset]]
+name = "lorie, derrière la positive attitude.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 18409
+sha256 = "b79c3734cb57221188f2e71ef81115de4e646478a99a42c859681ae7733d6594"
+
+[[asset]]
+name = "lrdlf.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 44405
+sha256 = "b0e10b3841a3afbf6200a625a571dabb130bc0d2dfe9897e860046dc1e328644"
+
+[[asset]]
+name = "luther.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 76024
+sha256 = "9cb0a3b4357e4c45e6156fd13fdde8437a840a1708c3814adae8f94dd3881f31"
+
+[[asset]]
+name = "m6+.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 3.0
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = true
+size = 35208340
+sha256 = "09735a4f18ea90d24a654ec56f5ecbc88b585c5189ba1f880025fb22bd4e7296"
+
+[[asset]]
+name = "m6+.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 22047
+sha256 = "dbd004f4f3303c49528b241346bc5c68a969aea3e1cf7a199375b573742f3cdd"
+
+[[asset]]
+name = "m6+max anime 1ep.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 19.72
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = false
+size = 42316212
+sha256 = "cd9be81148f5be3bf5b1f1c200705db0a43219f4941bba209ff996ae2c5ea880"
+
+[[asset]]
+name = "m6+max.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 29307
+sha256 = "e845ab5559613feb0ea6cc87c21afc2cc4cb77d2cd009150e6266a08f9dc3c00"
+
+[[asset]]
+name = "m6.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31621
+sha256 = "751482931b115cfaa38d71952f65218ef10e39d8cae9910b301b04c5f1f927e9"
+
+[[asset]]
+name = "ma super ligue 1.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 71797
+sha256 = "82211dd78913f99ecdd6f8e015cbb8e278b9de031292fc2f97f3058421f04ae1"
+
+[[asset]]
+name = "maman j'ai encore raté l'avion (2).png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 29631
+sha256 = "954187b969f63692204e3b566977b666817218e90849d50a1afca3759be9110c"
+
+[[asset]]
+name = "mapr nouveau rdv avec l'amour.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 39474
+sha256 = "0a31063f6b8fa73ebe85a49fa7ab65712130513937c20dc9f5197284801b266e"
+
+[[asset]]
+name = "mapr.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 38545
+sha256 = "59d077e598b88a23a5caa39250146dec2737cf9c5ed2b5e3fb82dff130123b04"
+
+[[asset]]
+name = "mission travaux.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31629
+sha256 = "cde422b6da91d890de3a2e6f3d0335824988bfc58d416eba898ed562cad4a290"
+
+[[asset]]
+name = "msl1.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 71797
+sha256 = "82211dd78913f99ecdd6f8e015cbb8e278b9de031292fc2f97f3058421f04ae1"
+
+[[asset]]
+name = "nanny mcphee et le bb.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 91512
+sha256 = "cd24b8e72b90bdeba2dc272f7340d05d870b809464714e70e3e071dab8e07994"
+
+[[asset]]
+name = "objectif maison.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 81938
+sha256 = "b67d3144d57af0cfff7d9634d3baa58097a6fcb707779d45a1f5f26416f74b23"
+
+[[asset]]
+name = "on connait la chanson.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 27828
+sha256 = "d8cbee8fd5e5ebc020cc5d22b95caa9518b0f544566db94714813ea8e718d618"
+
+[[asset]]
+name = "pandore.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 65911
+sha256 = "25c97b5b3950eabb6c6741dbf334011ca8033a267a1f2b4aa36978d1021c7cfb"
+
+[[asset]]
+name = "patron incognito.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 39138
+sha256 = "cfe0aa0679884269bced363d6349d1275bf800d56f1a966c43f9a01b2984fecb"
+
+[[asset]]
+name = "pekin express.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 38235
+sha256 = "dc4a814ba70431c03170fa94f04b67d5f2ae3f971929e9b9b7c75735cede7fd2"
+
+[[asset]]
+name = "pp.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 35421
+sha256 = "2c2a6bf58d9708f4123e694f2889bd1916aa40030086954ef9e352372497a48c"
+
+[[asset]]
+name = "pretty little liars.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 23712
+sha256 = "d058b4196b433f0bad7dd51802806d7b50fc64efb000c011eda0fe5566acffec"
+
+[[asset]]
+name = "qui veut epouser mon fils.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 88735
+sha256 = "2de3299866ea05d662c9dccceaf9ecd7025d762bfb1d76127f8f4b782b2aa8cb"
+
+[[asset]]
+name = "qvema.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 52356
+sha256 = "dfce0bfee9e5d163fc12fc7c330a46fd3f8694028512c92b8c3dbafd87137aee"
+
+[[asset]]
+name = "sdm.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 39024
+sha256 = "42835fa469f867a3af432e455b0d05c2b6e67aab45d96da86bcd5ff2c5eb7965"
+
+[[asset]]
+name = "skins.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 29345
+sha256 = "30a17f1c4a736e7900ef14e94c34d398e1198d8eb244cc5ea6f038aee7b86f0c"
+
+[[asset]]
+name = "smallville.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 18799
+sha256 = "d0995d7f17d7fa5ac45e69bc4bab804aa6fff8c15810616939bff1a2ae9eb180"
+
+[[asset]]
+name = "taboo.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 53142
+sha256 = "1cabf9a6382c4ffd1e7a68f90469590d9766e16ad1780527656c178e64c224e8"
+
+[[asset]]
+name = "teen wolf.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 19046
+sha256 = "6c33b0d8c433290b0ec22819c1aa52c4cc9cd77b04fc6a63332e665e2a68de93"
+
+[[asset]]
+name = "teva.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 33503
+sha256 = "f83962fa1dfb976738ffd784fc54e7fc8c77d623269193ac090ced5ff57e2253"
+
+[[asset]]
+name = "the 100.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 20630
+sha256 = "a2868762cc2d42a7c8f6b867071f9df6833ee54cdb075dccb6019a36a972effc"
+
+[[asset]]
+name = "the cerveau.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 66361
+sha256 = "5fb230ba6cc5cd7ac9ab0190fdc028d010cdc983793726ede72e5a7503738d34"
+
+[[asset]]
+name = "the good fight.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 55201
+sha256 = "aebf12e355cea280c0bc055b2d1abb70f0b3b126d9e7cf3bca4519d4492bccbb"
+
+[[asset]]
+name = "the good wife.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 51921
+sha256 = "769233db2e884d41cd9e680d07413545d7c1168d0062a1dd769a584360ce8833"
+
+[[asset]]
+name = "the power.mov"
+kind = "mov"
+width = 1080
+height = 1920
+duration_s = 300.0
+codec = "prores"
+pix_fmt = "yuva444p12le"
+has_audio = true
+size = 682859941
+sha256 = "3b3f775154cb871e2ea0af14e473c0120d707edfebb820ece2d8050c31390d00"
+
+[[asset]]
+name = "the power.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 39614
+sha256 = "b76c3ccff1e964049d3d62a5672d071ee2d4bd470c229f79b0174f01d1264c13"
+
+[[asset]]
+name = "top chef.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31005
+sha256 = "e53e93fcbbe0954af833e7c822d876415c96e96595221f7c34ee87e7fdb7169f"
+
+[[asset]]
+name = "traitres.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 59233
+sha256 = "8f07a2cb5873899af5876188a91582cab33368be5fa355db175145bbbfb5f9ea"
+
+[[asset]]
+name = "truman show.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 56542
+sha256 = "e6c85f3e2587e48601f56f63b8ed29ca65ad8fb8db2a74f3d2637e8b33cd92b0"
+
+[[asset]]
+name = "turbo.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 33266
+sha256 = "aa7fe881d0a82e1550f8c54bacac8055d46f1d5470d6c92b95cb8601d0c5c921"
+
+[[asset]]
+name = "un dos tres.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 50444
+sha256 = "a1d854147098d420961a30550826b3e918c85912e5ffc759a7d8b5878306f549"
+
+[[asset]]
+name = "veto and co.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 26988
+sha256 = "6518e404c3d394a769c5d094f85adf6e59b6f95430d37e5cbaf357cad868cddd"
+
+[[asset]]
+name = "veto&co.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 26988
+sha256 = "6518e404c3d394a769c5d094f85adf6e59b6f95430d37e5cbaf357cad868cddd"
+
+[[asset]]
+name = "w9.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 50272
+sha256 = "aebde459793decec88f658e3df6600a2f06e5dd89b1433cda160a8d5a7cc8eae"
+
+[[asset]]
+name = "wanted.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 29683
+sha256 = "e0610d9866fb016a6db03c32fb321278dfb5e358fc24a6c15fbea230c49ecece"
+
+[[asset]]
+name = "yaq.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 31357
+sha256 = "7a23e5de13325f22d81e90e06f7f69de9029344f39e36540bb9ba0a66babe29b"
+
+[[asset]]
+name = "younger – extrait 1.png"
+kind = "png"
+width = 1080
+height = 1920
+bit_depth = 8
+color_type = 6
+size = 40660
+sha256 = "8034230672b3dda706825974bd8d7606be3da4430e4074f1ecaab324b9f6f2b2"

@@ -7,8 +7,8 @@
 > Décision : scénario B de `docs/etudes/Architecture_QA_Vidéo_Locale.md`.
 > Passage en production le 2026-11-02 : auto-approbation conditionnelle et
 > DINOv2 en opt-out (D-049).
-> Depuis D-064 : sidecar `<stem>_mission.json`, contrôle `mission_overlays`,
-> schéma `1.4.0` et cache version 11.
+> Depuis D-064 : sidecar `<stem>_mission.json`, contrôle `mission_overlays`.
+> Depuis D-067 : masque des habillages MOV, schéma `1.5.0` et cache version 12.
 > Code : `crates/workflow-steps/src/qa/`, commande `workflow-cli qa run`.
 
 ## Problème
@@ -149,15 +149,23 @@ quadrilatères retournés sur ce corpus.
 | Recouvrement | détection écartée si ≥ 50 % de sa surface est dans un overlay actif |
 | Sévérité | `low` à 50–79 %, `medium` à partir de 80 % |
 
-Le masque lit les calques image du `.ecproj` (`png`, `jpg`, `jpeg`, `webp`),
-résout l'asset dans `docs/` à côté de `projets/` et applique les
-transformations statiques (ancre, position, échelle). Le projet est
-canonicalisé : un lien symbolique ne casse pas la résolution. Un calque
-animé, pivoté, sans PNG ou sans canal alpha est listé dans `overlays_skipped`
-(une image opaque masquerait la frame entière) ; si aucun overlay
-n'est exploitable, le contrôle passe `not_applicable` au lieu de produire des
-faux positifs. Sans `.ecproj`, il est aussi `not_applicable` : un OCR de bande
-haute seul confond logo de chaîne et habillage éditorial.
+Le masque lit les calques image du `.ecproj` (`png`, `jpg`, `jpeg`, `webp`) et,
+depuis D-067, les calques vidéo `.mov` porteurs d'alpha. Il résout l'asset dans
+`docs/` à côté de `projets/` et applique les transformations statiques (ancre,
+position, échelle). Le projet est canonicalisé : un lien symbolique ne casse
+pas la résolution. Un calque animé, pivoté, sans asset ou sans canal alpha est
+listé dans `overlays_skipped` (une image opaque masquerait la frame entière) ;
+si aucun overlay n'est exploitable, le contrôle passe `not_applicable` au lieu
+de produire des faux positifs. Sans `.ecproj`, il est aussi `not_applicable` :
+un OCR de bande haute seul confond logo de chaîne et habillage éditorial.
+
+Pour un MOV, 12 à 24 frames sont échantillonnées entre le début et la fin du
+calque via `ffmpeg` rawvideo RGBA. Les boîtes alpha proches de la médiane
+(IoU ≥ 0,70) sont fusionnées ; au moins 75 % des frames visibles doivent être
+stables, sinon le MOV est ignoré avec un warning non bloquant. La fenêtre de
+lecture est ramenée au temps source (un end-card de 3 s placé à 44 s est lu
+sur 0–3 s). La région publiée porte `kind: "mov"` ; les images conservent
+`kind: "image"`. Un ancien `qa.json` sans `kind` se relit comme `image`.
 
 ### Vérificateur visuel DINOv2 (actif par défaut)
 
@@ -350,7 +358,7 @@ workflow-cli qa run \
 
 ## Schéma `qa.json`
 
-Champs principaux : `schema_version` (1.4.0), `generated_at`, `video_id`,
+Champs principaux : `schema_version` (1.5.0), `generated_at`, `video_id`,
 `folder_id`, `split`, `video`, `export_sha256`, `project`, `specs`,
 `project_meta`,
 `project_structure`, `checks`, `findings`, `stage0_evidence`,
@@ -383,6 +391,10 @@ check `mission_overlays`. Il vérifie les assets manquants, le cas
 dans l'empreinte du cache (version 11) : une modification de mission invalide
 le `qa.json` en cache.
 
+Depuis le schéma 1.5.0 (D-067), le masque couvre aussi les calques `.mov`
+alpha ; le cache QA passe en version 12 et les régions MOV portent
+`kind: "mov"`. Un MOV instable est ignoré sans bloquer le rapport.
+
 Depuis le schéma 1.3.0, l'agrégation OCR regroupe les détections par **boîte
 stable**, et non plus par moyenne de tous les blocs de l'échantillon. Un
 cluster devient un finding à partir de trois échantillons si sa dérive
@@ -399,7 +411,9 @@ interdit l'auto-approbation.
 `samples_with_text`, `detections_total`, `masked_total`, `findings_total`,
 `frame_errors`, `persistence_min`, `top_end`, `overlays_total`, la liste
 `overlays` (nom, intervalle, bbox dans la composition, pixels opaques) et
-`overlays_skipped`. `timings_ms` ajoute `stage1_logo_ms`.
+`overlays_skipped`. Chaque région porte `name`, `layer_id`, `start_s`,
+`end_s`, `bbox_xywh`, `opaque_pixels` et `kind` (`image` ou `mov`).
+`timings_ms` ajoute `stage1_logo_ms`.
 
 `stage1_logo_visual_evidence` contient le modèle DINOv2, `samples_total`,
 `candidates_total`, `candidates_scored`, `detections_total`, `findings_total`,

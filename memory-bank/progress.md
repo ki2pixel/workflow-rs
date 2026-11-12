@@ -2,6 +2,42 @@
 
 ## Statut actuel
 
+- **Lot 12.3 — benchmark, masque QA MOV et canari (2026-11-12, D-067)** :
+  benchmark stratifié du corpus (932 emails, 2 469 tokens, 2 228 résolus ;
+  historique 90,9 % hors absences, récent 100 %), `format_cohorts` et
+  `scripts/audit-a7-benchmark.py`. Masque QA des MOV alpha : 12–24 frames
+  rawvideo RGBA, fusion des boîtes stables (`kind: "mov"`), MOV instable
+  ignoré sans veto ; `QA_SCHEMA_VERSION = 1.5.0`, `CACHE_VERSION = 12`.
+  Canari 20 missions réelles : 20/20 `apply`, 28 assets (18
+  `central_fallback`, 10 `local_docs`), 0 doublon, 0 `_assist` écrit ;
+  cas limites `known_absent`/manquant/ambigu/`tail_overlay`/déduplication.
+  Correctif `stem_key` (espace avant `.mp4`). 670 tests listés (668 exécutés
+  + 2 ignorés), fmt et clippy verts. Ticket
+  `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` clos. Aucun `.ecproj`, `runtime/`
+  ou `/mnt/cache` modifié.
+- **Lot 12.2 — banque centrale de repli A7 (2026-11-12, D-066)** : 117 assets
+  déployés dans `assets/mission_overlays/` (109 PNG versionnés, 8 MOV
+  gitignorés), manifeste avec SHA-256 et métadonnées, README. A7 résout local
+  exact → local normalisé → banque exacte → banque normalisée → extension →
+  alias → `known_absent` → revue ; provenance `local_docs` /
+  `central_fallback`. `config check` valide le chemin, banque absente ignorée
+  au runtime. Tests : 27 mission, 18 A7, propagation `PostOptions`, banque
+  seule, priorité locale, banque absente → `review`. Suite, fmt et clippy
+  verts. Ticket `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` clos. Aucun `.ecproj`,
+  `runtime/` ou `/mnt/cache` modifié.
+- **Lot 12.1 — parseur de missions, alias et `tail_overlay` (2026-11-12,
+  D-065)** : lignes logiques (4 lignes / 600 caractères), parenthèses
+  équilibrées, `\'` déséchappé, formes `Logo <nom>` et `(yaq.png)`, table
+  d'alias fermée, `known_absent` (`lphdf.png`, `edc.png`), recollage
+  asset-aware. A7 ajoute `TailOverlay` (comp non prolongée, audio coupé,
+  `review` si `d > main + 1 ms`) et le registre `MovPolicy` des 8 MOV ; les
+  bumpers de 19,72 s restent en revue. Sidecar `schema: 2`, audit
+  `mission_known_absent`, QA neutre. Commande `email audit` hors ligne.
+  Audit réel : 932 emails, 2 477 instructions, 2 469 tokens, 2 228 résolus,
+  193 manquants, 39 non résolues ; octobre 2026 100 % hors absences,
+  novembre 2026 100 %. 654 tests listés (652 exécutés + 2 ignorés), fmt et
+  clippy verts. Ticket `docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md` clos.
+  Aucun `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
 - **Lot 12 — logos de mission A7 (2026-11-12, D-064)** : résolution des
   missions `email_proxy.php` par lot dans un cache SQLite dédié, validation
   stricte des assets 1080×1920 alpha et insertion des logos dans le seul

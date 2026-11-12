@@ -170,6 +170,19 @@ impl Config {
                 "email_proxy.timeout_s et email_proxy.index_limit doivent être > 0".into(),
             ));
         }
+        if let Some(overlays) = self
+            .paths
+            .mission_overlays
+            .as_ref()
+            .filter(|path| !path.as_os_str().is_empty())
+        {
+            if !overlays.is_dir() {
+                return Err(ConfigError::Invalid(format!(
+                    "paths.mission_overlays est configuré mais le répertoire est introuvable: {}",
+                    overlays.display()
+                )));
+            }
+        }
         if !(0.0..=60.0).contains(&self.steps.step8.post.mission_end_card_max_s) {
             return Err(ConfigError::Invalid(
                 "steps.step8.post.mission_end_card_max_s doit être dans [0, 60]".into(),
@@ -599,6 +612,9 @@ impl Default for ServerConfig {
 pub struct PathsConfig {
     pub base: PathBuf,
     pub models: PathBuf,
+    /// Banque centrale de repli pour les overlays de mission A7.
+    /// Vide : aucun repli, seuls les assets de `<projet>/docs` sont utilisés.
+    pub mission_overlays: Option<PathBuf>,
     pub projects: Option<PathBuf>,
     pub archives: Option<PathBuf>,
     pub logs: Option<PathBuf>,
@@ -615,6 +631,7 @@ impl Default for PathsConfig {
         Self {
             base: PathBuf::from("."),
             models: PathBuf::from("assets/models"),
+            mission_overlays: None,
             projects: None,
             archives: None,
             logs: None,
@@ -1329,6 +1346,31 @@ mod tests {
     fn defaults_are_valid() {
         let config = Config::default();
         config.validate_common().expect("defaults valides");
+    }
+
+    #[test]
+    fn mission_overlays_path_is_optional_and_validated() {
+        assert_eq!(PathsConfig::default().mission_overlays, None);
+        let config =
+            Config::from_toml("[paths]\nmission_overlays = \"assets/mission_overlays\"\n").unwrap();
+        assert_eq!(
+            config.paths.mission_overlays,
+            Some(PathBuf::from("assets/mission_overlays"))
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.paths.mission_overlays = Some(dir.path().join("absent"));
+        assert!(config.validate_common().is_err());
+        config.paths.mission_overlays = Some(dir.path().to_path_buf());
+        assert!(config.validate_common().is_ok());
+        assert_eq!(
+            config.paths.resolve().mission_overlays,
+            Some(dir.path().to_path_buf())
+        );
+        config.paths.mission_overlays = Some(PathBuf::new());
+        assert!(config.validate_common().is_ok());
+        assert_eq!(config.paths.resolve().mission_overlays, None);
     }
 
     #[test]

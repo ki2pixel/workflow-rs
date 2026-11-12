@@ -11,12 +11,17 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use unicode_normalization::char::is_combining_mark;
 use unicode_normalization::UnicodeNormalization;
 
 /// Extensions vidéo reconnues dans une ligne d'instruction.
-pub const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "m4v", "avi", "mkv", "webm"];
+pub const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "m4v", "avi", "mkv", "webm", "mxf", "wmv"];
+
+/// Nombre maximal de lignes physiques fusionnées en une instruction logique.
+const MAX_LOGICAL_LINES: usize = 4;
+/// Longueur maximale d'une instruction logique fusionnée.
+const MAX_LOGICAL_CHARS: usize = 600;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MissionLink {
@@ -340,21 +345,12 @@ impl ClientMission {
 
 /// Parse un corps d'email en instructions vidéo.
 pub fn parse_body(body: &str) -> (Vec<VideoInstruction>, Vec<MissionWarning>) {
+    let body = unescape_mission_text(body);
     let mut videos: Vec<VideoInstruction> = Vec::new();
     let mut warnings = Vec::new();
     let mut section = Section::default();
 
-    for (index, raw_line) in body
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
-        .split('\n')
-        .enumerate()
-    {
-        let line_number = index + 1;
-        let line = normalize_text(raw_line.trim().trim_start_matches('\u{feff}'));
-        if line.is_empty() {
-            continue;
-        }
+    for (line_number, line) in logical_lines(&body) {
         if is_section_header(&line) {
             section = Section::from_header(&line);
             continue;
@@ -404,6 +400,101 @@ pub fn parse_body(body: &str) -> (Vec<VideoInstruction>, Vec<MissionWarning>) {
     (videos, warnings)
 }
 
+/// Neutralise les échappements introduits par les exports mbox (`l\'ile`).
+///
+/// Les clients mail actuels n'échappent pas les apostrophes ; ce nettoyage
+/// n'agit que sur les corpus historiques et reste sans effet sur un nom
+/// légitime, aucun asset de production ne contenant de barre oblique inverse.
+fn unescape_mission_text(input: &str) -> String {
+    input.replace("\\'", "'")
+}
+
+/// Regroupe les lignes physiques d'une instruction coupée par le client mail.
+///
+/// Un email peut couper le nom de la vidéo (`…première \nrencontre.mp4`) ou
+/// la liste des logos (`(Logos \nrequis: …)`). On ne fusionne que tant que
+/// l'instruction est incomplète : extension vidéo absente ou parenthèses non
+/// équilibrées. Les notes qui suivent une instruction complète restent des
+/// lignes séparées pour le traitement `is_logo_note`.
+fn logical_lines(body: &str) -> Vec<(usize, String)> {
+    let mut output = Vec::new();
+    let mut current: Option<(usize, String)> = None;
+    let mut current_lines = 0usize;
+    let body = body.replace("\r\n", "\n").replace('\r', "\n");
+
+    for (index, raw_line) in body.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = normalize_text(raw_line.trim().trim_start_matches('\u{feff}'));
+        if line.is_empty() {
+            if let Some(item) = current.take() {
+                output.push(item);
+            }
+            current_lines = 0;
+            continue;
+        }
+        if is_section_header(&line) {
+            if let Some(item) = current.take() {
+                output.push(item);
+            }
+            output.push((line_number, line));
+            current_lines = 0;
+            continue;
+        }
+        if strip_bullet(&line).is_some() {
+            if let Some(item) = current.take() {
+                output.push(item);
+            }
+            current = Some((line_number, line));
+            current_lines = 1;
+            continue;
+        }
+        if let Some((_, text)) = current.as_mut() {
+            let logo_continuation = filename_key(&line).starts_with("logo") && !text.contains('(');
+            let paren_continuation = line.starts_with('(') && !text.contains('(');
+            if current_lines < MAX_LOGICAL_LINES
+                && text.chars().count() < MAX_LOGICAL_CHARS
+                && (instruction_incomplete(text) || logo_continuation || paren_continuation)
+            {
+                text.push(' ');
+                text.push_str(&line);
+                current_lines += 1;
+                continue;
+            }
+            if let Some(item) = current.take() {
+                output.push(item);
+            }
+            current_lines = 0;
+        }
+        output.push((line_number, line));
+    }
+    if let Some(item) = current.take() {
+        output.push(item);
+    }
+    output
+}
+
+/// Vrai tant que l'instruction n'a pas son nom de vidéo et ses parenthèses.
+fn instruction_incomplete(line: &str) -> bool {
+    split_video_filename(line).is_none() || !parentheses_balanced(line)
+}
+
+fn parentheses_balanced(input: &str) -> bool {
+    let mut depth = 0i32;
+    for character in input.chars() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0
+}
+
 #[derive(Debug, Clone, Default)]
 struct Section {
     deadline: String,
@@ -436,7 +527,7 @@ fn parse_instruction(
         .and_then(|extension| extension.to_str())
         .unwrap_or_default()
         .to_lowercase();
-    let stem_key = strip_video_extension(&file_key).to_string();
+    let stem_key = strip_video_extension(&file_key).trim().to_string();
     let mut instruction = VideoInstruction {
         filename: normalized,
         filename_normalized: normalize_text(&filename),
@@ -469,6 +560,32 @@ fn parse_instruction(
         instruction.notes.push(trailing);
     }
     let Some(parenthetical) = parenthetical else {
+        // Forme sans parenthèses : `Logo chaîne : gulli.png` sur une ligne
+        // de continuation, ou `Logo les marseillais`.
+        let bare_key = filename_key(rest);
+        if bare_key.contains("logo") {
+            let bare_logos = parse_logos(rest);
+            if !bare_logos.is_empty() {
+                instruction.logos = bare_logos;
+                warnings.push(MissionWarning::new(
+                    "logo_form_inferred",
+                    line_number,
+                    format!("{}: {}", instruction.filename, rest),
+                ));
+                return Some(instruction);
+            }
+        }
+        if let Some(logos) = parse_lenient_logos(rest) {
+            if !logos.is_empty() {
+                instruction.logos = logos;
+                warnings.push(MissionWarning::new(
+                    "logo_form_inferred",
+                    line_number,
+                    format!("{}: {}", instruction.filename, rest),
+                ));
+                return Some(instruction);
+            }
+        }
         instruction.notes.push(rest.to_string());
         instruction.logo_unresolved = true;
         warnings.push(MissionWarning::new(
@@ -501,6 +618,24 @@ fn parse_instruction(
             || instruction_key.contains("improviser"))
     {
         instruction.logo_unresolved = true;
+    } else if let Some(logos) = parse_bare_asset_list(&parenthetical) {
+        instruction.logos = logos;
+        warnings.push(MissionWarning::new(
+            "logo_form_inferred",
+            line_number,
+            format!("{}: {}", instruction.filename, parenthetical),
+        ));
+    } else if let Some(logos) = parse_lenient_logos(&parenthetical) {
+        if logos.is_empty() {
+            instruction.logo_unresolved = true;
+        } else {
+            instruction.logos = logos;
+            warnings.push(MissionWarning::new(
+                "logo_form_inferred",
+                line_number,
+                format!("{}: {}", instruction.filename, parenthetical),
+            ));
+        }
     } else {
         instruction.logo_unresolved = true;
         instruction.notes.push(parenthetical.clone());
@@ -511,6 +646,75 @@ fn parse_instruction(
         ));
     }
     Some(instruction)
+}
+
+/// Forme nue `(yaq.png)` ou `(a.png, b.mov)`, sans libellé.
+///
+/// On n'accepte que des tokens en forme d'asset : un titre entre parenthèses
+/// (`(2)`) ou une note libre reste une note, jamais un logo deviné.
+fn parse_bare_asset_list(parenthetical: &str) -> Option<Vec<String>> {
+    let tokens = split_logo_tokens(parenthetical);
+    if tokens.is_empty() {
+        return None;
+    }
+    let all_assets = tokens.iter().all(|token| {
+        let key = filename_key(token);
+        !key.contains("logo")
+            && !token.contains([':', '='])
+            && Path::new(token)
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    matches!(
+                        extension.to_lowercase().as_str(),
+                        "png" | "mov" | "jpg" | "jpeg" | "webp"
+                    )
+                })
+    });
+    all_assets.then_some(tokens)
+}
+
+/// Forme libre `Logo <nom>`, `Logo chaîne : <nom>`, sans « requis ».
+///
+/// Le token est ensuite résolu comme les autres : s'il ne correspond à aucun
+/// asset, A7 part en revue. On ne devine jamais un asset à partir du programme.
+fn parse_lenient_logos(parenthetical: &str) -> Option<Vec<String>> {
+    let normalized = normalize_text(parenthetical);
+    let key = filename_key(&normalized);
+    if !key.starts_with("logo") || key.contains("pas de logo") {
+        return None;
+    }
+    let lower = normalized.to_lowercase();
+    let prefix_len = if lower.starts_with("logos") {
+        5
+    } else if lower.starts_with("logo") {
+        4
+    } else {
+        return None;
+    };
+    let mut rest = normalized.get(prefix_len..)?.trim();
+    for label in [
+        "chaîne",
+        "chaine",
+        "émission",
+        "emission",
+        "programme",
+        "demandé",
+        "demande",
+        "animé",
+        "anime",
+    ] {
+        let lower = rest.to_lowercase();
+        if lower.starts_with(label) {
+            rest = rest.get(label.len()..).unwrap_or_default().trim();
+            break;
+        }
+    }
+    rest = rest.trim_start_matches([':', '=']).trim();
+    if rest.is_empty() {
+        return None;
+    }
+    Some(split_logo_tokens(rest))
 }
 
 /// Extrait le nom de fichier vidéo et le reste de la ligne.
@@ -542,17 +746,36 @@ fn split_video_filename(line: &str) -> Option<(String, String)> {
 }
 
 /// Sépare `(...)` du texte qui le suit.
+///
+/// La fermeture est trouvée par équilibrage : un titre peut contenir des
+/// parenthèses (`…l'avion (2).png`) et une note peut suivre la liste
+/// (`(Logos requis: …) (inclure signature…)`).
 fn split_parenthetical(rest: &str) -> (Option<String>, Option<String>) {
     let rest = rest.trim();
     let Some(open) = rest.find('(') else {
         return (None, None);
     };
-    let Some(close) = rest.rfind(')') else {
+    let mut depth = 0usize;
+    let mut close = None;
+    for (offset, character) in rest[open..].char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(open + offset);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let Some(close) = close else {
         return (None, Some(rest.to_string()));
     };
-    if close < open {
-        return (None, Some(rest.to_string()));
-    }
     let parenthetical = rest[open + 1..close].trim().to_string();
     let trailing = rest[close + 1..].trim();
     (
@@ -571,7 +794,10 @@ pub fn parse_logos(parenthetical: &str) -> Vec<String> {
     else {
         return Vec::new();
     };
-    let list = &original[separator + 1..];
+    split_logo_tokens(&original[separator + 1..])
+}
+
+fn split_logo_tokens(list: &str) -> Vec<String> {
     let mut logos = Vec::new();
     let mut seen = Vec::new();
     for token in list.split([',', ';']) {
@@ -595,6 +821,468 @@ pub fn parse_logos(parenthetical: &str) -> Vec<String> {
         }
     }
     logos
+}
+
+/// Résout un logo de mission sur disque, alias et extension implicite compris.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogoResolution {
+    Found(PathBuf),
+    KnownAbsent(&'static str),
+    Ambiguous(&'static str),
+    Missing,
+}
+
+/// Résolution d'acronyme vers un nom de fichier canonique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AliasResolution {
+    Alias(&'static str),
+    KnownAbsent(&'static str),
+    Ambiguous(&'static str),
+}
+
+struct AliasEntry {
+    /// Clé normalisée, sans extension (ex. `lrdlr`, `m6+max anime 1ep`).
+    key: &'static str,
+    /// Cibles canoniques. Vide = asset volontairement absent.
+    targets: &'static [&'static str],
+    /// Motif lisible pour l'audit.
+    note: &'static str,
+}
+
+/// Table fermée des acronymes officiels et des variantes historiques.
+///
+/// Les entrées exactes sont documentaires : la résolution locale les trouve
+/// avant l'alias. Les entrées sans cible sont des absences volontaires, pas des
+/// oublis client.
+const ALIASES: &[AliasEntry] = &[
+    AliasEntry {
+        key: "pp",
+        targets: &["pp.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "laa9",
+        targets: &["laa9.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lacas",
+        targets: &["LACAS.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lrdlf",
+        targets: &["lrdlf.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lmcr",
+        targets: &["lmcr.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lmbf",
+        targets: &["lmbf.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lmf",
+        targets: &["lmf.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lmp",
+        targets: &["lmp.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "adp",
+        targets: &["adp.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "clf",
+        targets: &["c'est la famille.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "idlt",
+        targets: &["IDLT.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "idlt bilan",
+        targets: &["IDLT BILAN.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "mapr",
+        targets: &["mapr.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "mapr nouveau rdv",
+        targets: &["mapr nouveau rdv avec l'amour.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "msl1",
+        targets: &["msl1.png", "MSL1.mov"],
+        note: "PNG ou MOV selon l'extension demandée",
+    },
+    AliasEntry {
+        key: "qvema",
+        targets: &["qvema.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "qvemf",
+        targets: &["QVEMF.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "lrdlr",
+        targets: &["Les reines de la route.png"],
+        note: "alias historique, LRDLR.png prioritaire s'il existe",
+    },
+    AliasEntry {
+        key: "lfauit",
+        targets: &["LFAUIT.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "sdm",
+        targets: &["sdm.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "yaq",
+        targets: &["yaq.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "oclc",
+        targets: &["OCLC.png"],
+        note: "",
+    },
+    AliasEntry {
+        key: "cec",
+        targets: &["cauchemar en cuisine.png"],
+        note: "alias historique (CEC)",
+    },
+    AliasEntry {
+        key: "em6",
+        targets: &["e=m6.png"],
+        note: "alias historique, em6.png prioritaire s'il existe",
+    },
+    AliasEntry {
+        key: "enquete d'action",
+        targets: &["eqa.png"],
+        note: "alias historique (Enquête d'action)",
+    },
+    AliasEntry {
+        key: "enquetes criminelles",
+        targets: &["eqc.png"],
+        note: "alias historique (Enquêtes criminelles)",
+    },
+    AliasEntry {
+        key: "si on se rencontrait",
+        targets: &["et si on se rencontrait.png"],
+        note: "titre court de l'émission",
+    },
+    AliasEntry {
+        key: "m6+max",
+        targets: &["m6+max.png"],
+        note: "offre M6+ MAX",
+    },
+    AliasEntry {
+        key: "m6+max anime",
+        targets: &["m6+max anime 1ep.mov"],
+        note: "bumper M6+ MAX Anime",
+    },
+    AliasEntry {
+        key: "m6+max anime 1ep",
+        targets: &["m6+max anime 1ep.mov"],
+        note: "bumper M6+ MAX Anime",
+    },
+    AliasEntry {
+        key: "lphdf",
+        targets: &[],
+        note: "asset retiré volontairement de la banque (La Petite Histoire de France)",
+    },
+    AliasEntry {
+        key: "edc",
+        targets: &[],
+        note: "asset non fourni par le client (État de choc)",
+    },
+];
+
+fn alias_key(name: &str) -> String {
+    let key = filename_key(name);
+    for extension in ["png", "mov", "jpg", "jpeg", "webp"] {
+        let suffix = format!(".{extension}");
+        if key.ends_with(&suffix) {
+            return key[..key.len() - suffix.len()].to_string();
+        }
+    }
+    key
+}
+
+/// Résout un acronyme ou une variante historique.
+pub fn resolve_alias(name: &str) -> Option<AliasResolution> {
+    let key = alias_key(name);
+    let entry = ALIASES.iter().find(|entry| entry.key == key)?;
+    if entry.targets.is_empty() {
+        return Some(AliasResolution::KnownAbsent(entry.note));
+    }
+    if entry.targets.len() == 1 {
+        return Some(AliasResolution::Alias(entry.targets[0]));
+    }
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_lowercase);
+    if let Some(extension) = extension {
+        let suffix = format!(".{extension}");
+        if let Some(target) = entry
+            .targets
+            .iter()
+            .find(|target| target.to_lowercase().ends_with(&suffix))
+        {
+            return Some(AliasResolution::Alias(target));
+        }
+    }
+    Some(AliasResolution::Ambiguous(entry.note))
+}
+
+/// Provenance d'un asset de mission résolu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogoProvenance {
+    /// Fichier présent dans le dossier local du projet (`docs/`).
+    LocalDocs,
+    /// Repli depuis la banque centrale `paths.mission_overlays`.
+    CentralFallback,
+}
+
+impl LogoProvenance {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LocalDocs => "local_docs",
+            Self::CentralFallback => "central_fallback",
+        }
+    }
+}
+
+/// Résolution d'un asset avec sa provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogoTarget {
+    Found {
+        path: PathBuf,
+        provenance: LogoProvenance,
+    },
+    KnownAbsent(&'static str),
+    Ambiguous(&'static str),
+    Missing,
+}
+
+impl LogoTarget {
+    pub fn into_resolution(self) -> LogoResolution {
+        match self {
+            Self::Found { path, .. } => LogoResolution::Found(path),
+            Self::KnownAbsent(note) => LogoResolution::KnownAbsent(note),
+            Self::Ambiguous(note) => LogoResolution::Ambiguous(note),
+            Self::Missing => LogoResolution::Missing,
+        }
+    }
+}
+
+/// Résolveur d'assets avec cache du dossier pour les audits de corpus.
+///
+/// Le repli central est optionnel : il n'est consulté qu'après l'échec des
+/// recherches locales. La provenance est portée par `LogoTarget`.
+pub struct LogoResolver {
+    docs: PathBuf,
+    entries: Vec<(String, PathBuf)>,
+    fallback: Option<Box<LogoResolver>>,
+}
+
+impl LogoResolver {
+    pub fn new(docs: impl Into<PathBuf>) -> Self {
+        let docs = docs.into();
+        let entries = std::fs::read_dir(&docs)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .filter_map(|entry| {
+                        let path = entry.path();
+                        if !path.is_file() {
+                            return None;
+                        }
+                        let name = path.file_name()?.to_str()?.to_string();
+                        Some((filename_key(&name), path))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self {
+            docs,
+            entries,
+            fallback: None,
+        }
+    }
+
+    /// Ajoute une banque de repli, consultée après le dossier local.
+    pub fn with_fallback(mut self, fallback: LogoResolver) -> Self {
+        self.fallback = Some(Box::new(fallback));
+        self
+    }
+
+    fn find(&self, name: &str) -> Option<PathBuf> {
+        let direct = self.docs.join(name);
+        if direct.is_file() {
+            return Some(direct);
+        }
+        let key = filename_key(name);
+        if key.is_empty() {
+            return None;
+        }
+        let mut matches = self
+            .entries
+            .iter()
+            .filter(|(candidate, _)| *candidate == key)
+            .map(|(_, path)| path.clone());
+        let first = matches.next()?;
+        matches.next().is_none().then_some(first)
+    }
+
+    fn find_fallback(&self, name: &str) -> Option<PathBuf> {
+        self.fallback.as_ref()?.find(name)
+    }
+
+    fn extension_candidates(&self, name: &str) -> Vec<PathBuf> {
+        let mut candidates = Vec::new();
+        for extension in ["png", "mov"] {
+            if let Some(path) = self.find(&format!("{name}.{extension}")) {
+                candidates.push(path);
+            }
+        }
+        candidates
+    }
+
+    /// Résout un token, puis tente des recollages de 2 ou 3 tokens.
+    ///
+    /// Un titre client peut contenir une virgule (`lorie, derrière la positive
+    /// attitude.png`) ou une conjonction : le découpage initial produit alors
+    /// plusieurs tokens. On ne recolle que si le nom reconstitué existe
+    /// vraiment. Retourne la résolution, le token demandé et le nombre de
+    /// tokens consommés.
+    pub fn resolve_sequence_target(
+        &self,
+        logos: &[String],
+        index: usize,
+    ) -> (LogoTarget, String, usize) {
+        let first = &logos[index];
+        let first_resolution = self.resolve_target(first);
+        if !matches!(first_resolution, LogoTarget::Missing) {
+            return (first_resolution, first.clone(), 1);
+        }
+        for span in 2..=3 {
+            if index + span > logos.len() {
+                break;
+            }
+            for separator in [", ", " et "] {
+                let joined = logos[index..index + span].join(separator);
+                let resolution = self.resolve_target(&joined);
+                if !matches!(resolution, LogoTarget::Missing) {
+                    return (resolution, joined, span);
+                }
+            }
+        }
+        (first_resolution, first.clone(), 1)
+    }
+
+    /// Variante sans provenance, conservée pour les audits locaux.
+    pub fn resolve_sequence(
+        &self,
+        logos: &[String],
+        index: usize,
+    ) -> (LogoResolution, String, usize) {
+        let (target, requested, consumed) = self.resolve_sequence_target(logos, index);
+        (target.into_resolution(), requested, consumed)
+    }
+
+    /// Résout un token : local exact/normalisé, banque exacte/normalisée,
+    /// extension implicite, puis alias.
+    pub fn resolve_target(&self, name: &str) -> LogoTarget {
+        if let Some(path) = self.find(name) {
+            return LogoTarget::Found {
+                path,
+                provenance: LogoProvenance::LocalDocs,
+            };
+        }
+        if let Some(path) = self.find_fallback(name) {
+            return LogoTarget::Found {
+                path,
+                provenance: LogoProvenance::CentralFallback,
+            };
+        }
+        if Path::new(name).extension().is_none() {
+            let local = self.extension_candidates(name);
+            match local.len() {
+                1 => {
+                    return LogoTarget::Found {
+                        path: local.into_iter().next().unwrap_or_default(),
+                        provenance: LogoProvenance::LocalDocs,
+                    };
+                }
+                0 => {}
+                _ => return LogoTarget::Ambiguous("plusieurs formats pour ce nom"),
+            }
+            if let Some(fallback) = &self.fallback {
+                let central = fallback.extension_candidates(name);
+                match central.len() {
+                    1 => {
+                        return LogoTarget::Found {
+                            path: central.into_iter().next().unwrap_or_default(),
+                            provenance: LogoProvenance::CentralFallback,
+                        };
+                    }
+                    0 => {}
+                    _ => return LogoTarget::Ambiguous("plusieurs formats pour ce nom"),
+                }
+            }
+        }
+        match resolve_alias(name) {
+            Some(AliasResolution::Alias(target)) => {
+                if let Some(path) = self.find(target) {
+                    return LogoTarget::Found {
+                        path,
+                        provenance: LogoProvenance::LocalDocs,
+                    };
+                }
+                if let Some(path) = self.find_fallback(target) {
+                    return LogoTarget::Found {
+                        path,
+                        provenance: LogoProvenance::CentralFallback,
+                    };
+                }
+                LogoTarget::Missing
+            }
+            Some(AliasResolution::KnownAbsent(note)) => LogoTarget::KnownAbsent(note),
+            Some(AliasResolution::Ambiguous(note)) => LogoTarget::Ambiguous(note),
+            None => LogoTarget::Missing,
+        }
+    }
+
+    /// Résout un token sans provenance (audits locaux).
+    pub fn resolve(&self, name: &str) -> LogoResolution {
+        self.resolve_target(name).into_resolution()
+    }
+}
+
+/// Résout un logo avec un dossier ponctuel (wrapper sans cache).
+pub fn resolve_logo_file(docs: &Path, name: &str) -> LogoResolution {
+    LogoResolver::new(docs).resolve(name)
 }
 
 fn is_section_header(line: &str) -> bool {
@@ -1065,6 +1753,26 @@ mod tests {
     }
 
     #[test]
+    fn matches_filename_with_space_before_extension() {
+        let body = "Recadrage 9:16 standard à faire pour 16h10 :\n\
+                    - Saurez-vous trouver les 3 trompe-l'œil .mp4 (Logos requis: m6+.png)";
+        let mission = ClientMission::from_body("x", 20, "Lot 20", body);
+        assert_eq!(mission.videos.len(), 1);
+        assert_eq!(
+            mission.videos[0].stem_key,
+            "saurez-vous trouver les 3 trompe-l'œil"
+        );
+        assert!(matches!(
+            mission.match_video("Saurez-vous trouver les 3 trompe-l'œil"),
+            VideoMatch::Matched(_)
+        ));
+        assert!(matches!(
+            mission.match_video("Saurez-vous trouver les 3 trompe-l'œil .mp4"),
+            VideoMatch::Matched(_)
+        ));
+    }
+
+    #[test]
     fn does_not_pick_a_mission_by_recency() {
         let mission = ClientMission::from_body("x", 136, "Lot 136", LOT_136);
         assert_eq!(
@@ -1158,5 +1866,271 @@ mod tests {
             vec!["a.png", "b.mov", "c.png"]
         );
         assert!(parse_logos("Logos requis: ").is_empty());
+    }
+
+    #[test]
+    fn parses_crlf_bodies_without_losing_lines() {
+        let body = "Recadrage à faire pour 10h00 :\r\n\
+                    - premier.mp4 (Logos requis: a.png)\r\n\
+                    - second.mp4 (Logos requis: b.png)\r\n";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 2);
+        assert_eq!(mission.videos[0].logos, vec!["a.png"]);
+        assert_eq!(mission.videos[1].logos, vec!["b.png"]);
+    }
+
+    #[test]
+    fn joins_wrapped_video_filename_and_logo_list() {
+        let body = "Recadrage 9:16 standard à faire pour 10h00 :\n\
+                    - Ça clashe entre Hillary et Jérémie lors de leur première \n\
+                    rencontre.mp4 (Logos \n\
+                    requis: les ch'tis.png)";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 1);
+        assert!(mission.videos[0].filename.ends_with("rencontre.mp4"));
+        assert_eq!(mission.videos[0].logos, vec!["les ch'tis.png"]);
+        assert!(!mission.videos[0].logo_unresolved);
+    }
+
+    #[test]
+    fn keeps_title_parentheses_and_trailing_note() {
+        let body = "Recadrage à faire pour 10h00 :\n\
+                    - Maman j'ai encore raté l'avion (2).mp4 (Logos requis: m6+.png) \
+                    (inclure signature animée en .mov de la chaine à la fin)\n\
+                    - autre.mp4 (Logos requis: sdm.png)\n\
+                    Merci !";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 2);
+        assert_eq!(
+            mission.videos[0].filename,
+            "Maman j'ai encore raté l'avion (2).mp4"
+        );
+        assert_eq!(mission.videos[0].logos, vec!["m6+.png"]);
+        assert!(mission.videos[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("signature animée")));
+        assert_eq!(mission.videos[1].logos, vec!["sdm.png"]);
+        assert!(mission
+            .videos
+            .iter()
+            .all(|video| !video.notes.iter().any(|note| note == "Merci !")));
+    }
+
+    #[test]
+    fn unescapes_mbox_apostrophes() {
+        let body = "Recadrage à faire pour 10h00 :\n\
+                    - l\\'ile de la tentation.mp4 (Logos requis: c\\'est la famille.png)";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 1);
+        assert_eq!(mission.videos[0].filename, "l'ile de la tentation.mp4");
+        assert_eq!(mission.videos[0].logos, vec!["c'est la famille.png"]);
+    }
+
+    #[test]
+    fn parses_lenient_logo_form() {
+        let body = "Recadrage à faire pour 10h00 :\n\
+                    - premier.mp4 (Logo les marseillais)\n\
+                    - second.mp4 (Logo chaîne : gulli.png)";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 2);
+        assert_eq!(mission.videos[0].logos, vec!["les marseillais"]);
+        assert_eq!(mission.videos[1].logos, vec!["gulli.png"]);
+        assert!(mission
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "logo_form_inferred"));
+    }
+
+    #[test]
+    fn parses_bare_asset_parenthetical() {
+        let body = "Recadrage à faire pour 10h00 :\n\
+                    - EXTRAIT PREDIFF 1 – Il est étonné de voir sa fille derrière le rideau .mp4 (yaq.png)\n\
+                    - PP - Laisser aller - Scène culte.mp4 (Logos requis: pp.png)";
+        let mission = ClientMission::from_body("x", 151, "Lot 151", body);
+        assert_eq!(mission.videos.len(), 2);
+        assert_eq!(mission.videos[0].logos, vec!["yaq.png"]);
+        assert_eq!(mission.videos[1].logos, vec!["pp.png"]);
+        assert!(mission
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "logo_form_inferred"));
+    }
+
+    #[test]
+    fn joins_logo_instruction_on_continuation_line() {
+        let body = "Recadrage à faire pour 17h49 :\n\
+                    - Aladdin - Il lui sauve la vie.mp4\n\
+                        Logo chaîne : gulli.png\n\
+                    - SOs fantome - Il s'est fait tout engluer.mp4\n\
+                        Logo chaîne : teva.png";
+        let mission = ClientMission::from_body("x", 91, "Lot 91", body);
+        assert_eq!(mission.videos.len(), 2);
+        assert_eq!(mission.videos[0].logos, vec!["gulli.png"]);
+        assert_eq!(mission.videos[1].logos, vec!["teva.png"]);
+        assert!(mission.videos.iter().all(|video| !video.logo_unresolved));
+    }
+
+    #[test]
+    fn joins_parenthetical_on_continuation_line() {
+        let body = "Recadrage à faire pour 11h59 :\n\
+                    - Le chef goûte une crêpe fois gras chocolat et n'aime pas du tout.mp4 \n\
+                    (Logos requis: cauchemar en cuisine.png)";
+        let mission = ClientMission::from_body("x", 82, "Lot 82", body);
+        assert_eq!(mission.videos.len(), 1);
+        assert_eq!(mission.videos[0].logos, vec!["cauchemar en cuisine.png"]);
+        assert!(!mission.videos[0].logo_unresolved);
+    }
+
+    #[test]
+    fn alias_table_is_unique_and_covers_acronyms() {
+        let mut keys = Vec::new();
+        for entry in ALIASES {
+            assert!(
+                !keys.contains(&entry.key),
+                "clé d'alias dupliquée: {}",
+                entry.key
+            );
+            keys.push(entry.key);
+        }
+        assert_eq!(
+            resolve_alias("IDLT.png"),
+            Some(AliasResolution::Alias("IDLT.png"))
+        );
+        assert_eq!(
+            resolve_alias("LRDLR.png"),
+            Some(AliasResolution::Alias("Les reines de la route.png"))
+        );
+        assert_eq!(
+            resolve_alias("MSL1.mov"),
+            Some(AliasResolution::Alias("MSL1.mov"))
+        );
+        assert_eq!(
+            resolve_alias("MSL1.png"),
+            Some(AliasResolution::Alias("msl1.png"))
+        );
+        assert!(matches!(
+            resolve_alias("MSL1"),
+            Some(AliasResolution::Ambiguous(_))
+        ));
+        assert!(matches!(
+            resolve_alias("lphdf.png"),
+            Some(AliasResolution::KnownAbsent(_))
+        ));
+    }
+
+    #[test]
+    fn resolver_rejoins_asset_names_split_on_commas() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("lorie, derrière la positive attitude.png"),
+            b"x",
+        )
+        .unwrap();
+        let resolver = LogoResolver::new(dir.path());
+        let logos = vec![
+            "lorie".to_string(),
+            "derrière la positive attitude.png".to_string(),
+        ];
+        let (resolution, requested, consumed) = resolver.resolve_sequence(&logos, 0);
+        assert_eq!(consumed, 2);
+        assert_eq!(requested, "lorie, derrière la positive attitude.png");
+        assert!(matches!(resolution, LogoResolution::Found(_)));
+    }
+
+    #[test]
+    fn fallback_resolver_keeps_local_priority_and_reports_provenance() {
+        let local = tempfile::tempdir().unwrap();
+        let bank = tempfile::tempdir().unwrap();
+        for name in ["local.png", "both.png"] {
+            std::fs::write(local.path().join(name), b"x").unwrap();
+        }
+        for name in ["both.png", "central.png", "Les reines de la route.png"] {
+            std::fs::write(bank.path().join(name), b"x").unwrap();
+        }
+        let resolver =
+            LogoResolver::new(local.path()).with_fallback(LogoResolver::new(bank.path()));
+
+        assert_eq!(
+            resolver.resolve_target("local.png"),
+            LogoTarget::Found {
+                path: local.path().join("local.png"),
+                provenance: LogoProvenance::LocalDocs,
+            }
+        );
+        assert_eq!(
+            resolver.resolve_target("central.png"),
+            LogoTarget::Found {
+                path: bank.path().join("central.png"),
+                provenance: LogoProvenance::CentralFallback,
+            }
+        );
+        assert_eq!(
+            resolver.resolve_target("CENTRAL"),
+            LogoTarget::Found {
+                path: bank.path().join("central.png"),
+                provenance: LogoProvenance::CentralFallback,
+            }
+        );
+        assert_eq!(
+            resolver.resolve_target("both.png"),
+            LogoTarget::Found {
+                path: local.path().join("both.png"),
+                provenance: LogoProvenance::LocalDocs,
+            }
+        );
+        assert_eq!(
+            resolver.resolve_target("lrdlr"),
+            LogoTarget::Found {
+                path: bank.path().join("Les reines de la route.png"),
+                provenance: LogoProvenance::CentralFallback,
+            }
+        );
+        assert!(matches!(
+            resolver.resolve_target("lphdf.png"),
+            LogoTarget::KnownAbsent(_)
+        ));
+        assert_eq!(resolver.resolve_target("inconnu.png"), LogoTarget::Missing);
+    }
+
+    #[test]
+    fn logo_resolver_prefers_exact_then_alias_and_infers_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [
+            "LRDLR.png",
+            "Les reines de la route.png",
+            "gulli.png",
+            "msl1.png",
+            "MSL1.mov",
+        ] {
+            std::fs::write(dir.path().join(name), b"x").unwrap();
+        }
+        let resolver = LogoResolver::new(dir.path());
+        assert_eq!(
+            resolver.resolve("LRDLR.png"),
+            LogoResolution::Found(dir.path().join("LRDLR.png"))
+        );
+        assert_eq!(
+            resolver.resolve("gulli"),
+            LogoResolution::Found(dir.path().join("gulli.png"))
+        );
+        assert!(matches!(
+            resolver.resolve("MSL1"),
+            LogoResolution::Ambiguous(_)
+        ));
+        assert!(matches!(
+            resolver.resolve("lphdf.png"),
+            LogoResolution::KnownAbsent(_)
+        ));
+        assert_eq!(resolver.resolve("inconnu.png"), LogoResolution::Missing);
+
+        // Alias de repli quand le fichier exact n'existe pas.
+        let alias_dir = tempfile::tempdir().unwrap();
+        std::fs::write(alias_dir.path().join("Les reines de la route.png"), b"x").unwrap();
+        let alias_resolver = LogoResolver::new(alias_dir.path());
+        assert_eq!(
+            alias_resolver.resolve("lrdlr"),
+            LogoResolution::Found(alias_dir.path().join("Les reines de la route.png"))
+        );
     }
 }

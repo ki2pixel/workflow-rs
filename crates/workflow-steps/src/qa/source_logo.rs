@@ -360,6 +360,7 @@ aliases = ["66M -"]
                 end_s: 10.0,
                 bbox_xywh: [0.0, 1500.0, 1080.0, 400.0],
                 opaque_pixels: 1000,
+                kind: "image".into(),
             }],
             skipped: Vec::new(),
         };

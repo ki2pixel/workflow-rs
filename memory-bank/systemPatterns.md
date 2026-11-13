@@ -112,7 +112,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 670 tests listés (668 exécutés + 2 ignorés).
+- `cargo test --workspace` : 675 tests listés (673 exécutés + 2 ignorés).
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.

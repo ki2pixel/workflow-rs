@@ -22,8 +22,8 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 use workflow_core::mission::{
-    filename_key, ClientMission, LogoProvenance, LogoResolver, LogoTarget, VideoInstruction,
-    VideoMatch,
+    filename_key, ClientMission, LogoProvenance, LogoResolver, LogoTarget, MissionWarning,
+    VideoInstruction, VideoMatch,
 };
 use workflow_schema::round::round_to;
 
@@ -337,7 +337,16 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
         return outcome;
     }
 
-    let (assets, missing) = resolve_assets(options, &instruction);
+    let (assets, missing, asset_warnings) = resolve_assets(options, &instruction);
+    // Un repli central sur asset local corrompu est un incident non bloquant :
+    // il est consigné dans `warnings` sans modifier `reasons` ni la décision.
+    let mut mission_with_asset_warnings = None;
+    if !asset_warnings.is_empty() {
+        let mut copy = mission.clone();
+        copy.warnings.extend(asset_warnings);
+        mission_with_asset_warnings = Some(copy);
+    }
+    let mission = mission_with_asset_warnings.as_ref().unwrap_or(mission);
     let mut reasons: Vec<String> = Vec::new();
     if missing.iter().any(|reason| reason.code != "known_absent") {
         reasons.push("missing_asset".into());
@@ -494,11 +503,13 @@ struct MissingAsset {
 fn resolve_assets(
     options: &A7Options<'_>,
     instruction: &VideoInstruction,
-) -> (Vec<Asset>, Vec<MissingAsset>) {
+) -> (Vec<Asset>, Vec<MissingAsset>, Vec<MissionWarning>) {
     let mut assets = Vec::new();
     let mut missing = Vec::new();
+    let mut warnings = Vec::new();
     let mut seen = Vec::new();
     let mut seen_paths: Vec<PathBuf> = Vec::new();
+    let mut retained_paths: Vec<PathBuf> = Vec::new();
     let mut resolver = LogoResolver::new(options.docs);
     if let Some(bank) = options
         .mission_overlays
@@ -553,57 +564,138 @@ fn resolve_assets(
         if seen_paths.contains(&canonical) {
             continue;
         }
-        seen_paths.push(canonical);
-        let kind = match path
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .map(str::to_lowercase)
-            .as_deref()
-        {
-            Some("png") => AssetKind::Png,
-            Some("mov") => AssetKind::Mov,
-            Some(other) => {
-                missing.push(MissingAsset {
-                    name: requested,
-                    code: "unsupported_asset",
-                    detail: format!("extension .{other} non supportée par A7"),
-                });
-                continue;
-            }
-            None => {
-                missing.push(MissingAsset {
-                    name: requested,
-                    code: "unsupported_asset",
-                    detail: "asset sans extension".into(),
-                });
+        seen_paths.push(canonical.clone());
+        let kind = match asset_kind(&requested, &path) {
+            Ok(kind) => kind,
+            Err(reason) => {
+                missing.push(reason);
                 continue;
             }
         };
-        match probe_asset(&path, kind, options.ffprobe) {
+        match probe_checked(&requested, &path, kind, options.ffprobe) {
             Ok(mut asset) => {
-                if asset.width != COMP_WIDTH || asset.height != COMP_HEIGHT {
-                    missing.push(MissingAsset {
-                        name: requested,
-                        code: "asset_dimensions",
-                        detail: format!(
-                            "{}×{} au lieu de {}×{}",
-                            asset.width, asset.height, COMP_WIDTH, COMP_HEIGHT
-                        ),
-                    });
-                    continue;
-                }
+                retained_paths.push(canonical);
                 asset.requested = requested;
                 asset.provenance = provenance;
                 assets.push(asset);
             }
-            Err(error) => missing.push(MissingAsset {
-                name: requested,
-                code: "asset_unreadable",
-                detail: format!("sonde impossible: {error:#}"),
-            }),
+            Err(local_error) => {
+                // Un asset local présent mais illisible (tronqué, corrompu)
+                // ou hors profil ne doit jamais masquer son homologue sain de
+                // la banque centrale (D-069).
+                let mut failure = local_error;
+                let mut recovered = false;
+                if provenance == LogoProvenance::LocalDocs {
+                    if let LogoTarget::Found {
+                        path: fallback_path,
+                        ..
+                    } = resolver.resolve_fallback_target(&requested)
+                    {
+                        let fallback_canonical = fallback_path
+                            .canonicalize()
+                            .unwrap_or_else(|_| fallback_path.clone());
+                        if fallback_canonical == canonical {
+                            // `mission_overlays` confondu avec `docs/` : la
+                            // banque renvoie le même fichier invalide.
+                        } else if retained_paths.contains(&fallback_canonical) {
+                            // Asset déjà retenu pour un autre token : la
+                            // mission reste satisfaite sans doublon.
+                            recovered = true;
+                        } else if let Ok(fallback_kind) = asset_kind(&requested, &fallback_path) {
+                            match probe_checked(
+                                &requested,
+                                &fallback_path,
+                                fallback_kind,
+                                options.ffprobe,
+                            ) {
+                                Ok(mut asset) => {
+                                    seen_paths.push(fallback_canonical.clone());
+                                    retained_paths.push(fallback_canonical);
+                                    asset.requested = requested.clone();
+                                    asset.provenance = LogoProvenance::CentralFallback;
+                                    warnings.push(MissionWarning {
+                                        code: "local_asset_corrupted_fallback_used".into(),
+                                        line: instruction.line,
+                                        detail: format!(
+                                            "{}: {} ; repli sur la banque centrale ({})",
+                                            requested, failure.detail, asset.name
+                                        ),
+                                    });
+                                    assets.push(asset);
+                                    recovered = true;
+                                }
+                                Err(fallback_error) => {
+                                    let detail = format!(
+                                        "{} ; repli central {} non exploitable: {}",
+                                        failure.detail,
+                                        fallback_path.display(),
+                                        fallback_error.detail
+                                    );
+                                    failure = MissingAsset {
+                                        name: requested.clone(),
+                                        code: failure.code,
+                                        detail,
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+                if !recovered {
+                    missing.push(failure);
+                }
+            }
         }
     }
-    (assets, missing)
+    (assets, missing, warnings)
+}
+
+/// Détermine le type A7 à partir de l'extension, sans ouvrir le fichier.
+fn asset_kind(name: &str, path: &Path) -> Result<AssetKind, MissingAsset> {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_lowercase)
+        .as_deref()
+    {
+        Some("png") => Ok(AssetKind::Png),
+        Some("mov") => Ok(AssetKind::Mov),
+        Some(other) => Err(MissingAsset {
+            name: name.to_string(),
+            code: "unsupported_asset",
+            detail: format!("extension .{other} non supportée par A7"),
+        }),
+        None => Err(MissingAsset {
+            name: name.to_string(),
+            code: "unsupported_asset",
+            detail: "asset sans extension".into(),
+        }),
+    }
+}
+
+/// Sonde un asset et vérifie le profil 1080×1920 imposé par A7.
+fn probe_checked(
+    name: &str,
+    path: &Path,
+    kind: AssetKind,
+    ffprobe: &Path,
+) -> Result<Asset, MissingAsset> {
+    let asset = probe_asset(path, kind, ffprobe).map_err(|error| MissingAsset {
+        name: name.to_string(),
+        code: "asset_unreadable",
+        detail: format!("sonde impossible: {error:#}"),
+    })?;
+    if asset.width != COMP_WIDTH || asset.height != COMP_HEIGHT {
+        return Err(MissingAsset {
+            name: name.to_string(),
+            code: "asset_dimensions",
+            detail: format!(
+                "{}×{} au lieu de {}×{}",
+                asset.width, asset.height, COMP_WIDTH, COMP_HEIGHT
+            ),
+        });
+    }
+    Ok(asset)
 }
 
 fn probe_asset(path: &Path, kind: AssetKind, ffprobe: &Path) -> Result<Asset> {
@@ -1707,6 +1799,189 @@ mod tests {
             .decisions
             .iter()
             .any(|decision| decision.details["reason"] == "asset_dimensions"));
+    }
+
+    #[test]
+    fn corrupt_local_asset_falls_back_to_central_bank() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        // Cas réel du lot 183 : 15 octets ASCII sans signature PNG.
+        std::fs::write(docs.join("LFAUIT.png"), b"logo de la base").unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        write_test_png(&bank.join("LFAUIT.png"));
+        let missions = vec![mission_with(&["LFAUIT.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "apply");
+        assert_eq!(block["reasons"], json!([]));
+        assert_eq!(block["missing"], json!([]));
+        assert_eq!(block["added"][0]["name"], "LFAUIT.png");
+        assert_eq!(block["added"][0]["requested"], "LFAUIT.png");
+        assert_eq!(block["added"][0]["source"], "central_fallback");
+        assert!(block["warnings"].as_array().unwrap().iter().any(|warning| {
+            warning["code"] == "local_asset_corrupted_fallback_used"
+                && warning["detail"]
+                    .as_str()
+                    .is_some_and(|detail| detail.contains("LFAUIT.png"))
+        }));
+        let layer = &outcome.doc["items"]["2"]["kind"]["layers"][0];
+        assert_eq!(layer["name"], "LFAUIT.png");
+        let item_id = layer["source"]["item"].as_i64().unwrap().to_string();
+        let item = outcome.doc["items"].get(&item_id).unwrap();
+        assert_eq!(
+            item["kind"]["path"],
+            "../../assets/mission_overlays/LFAUIT.png"
+        );
+        assert!(outcome.changed);
+    }
+
+    #[test]
+    fn invalid_local_profile_falls_back_to_central_bank() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        write_test_png_at(&docs.join("petit.png"), 8, 8);
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        write_test_png(&bank.join("petit.png"));
+        let missions = vec![mission_with(&["petit.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "apply");
+        assert_eq!(block["added"][0]["source"], "central_fallback");
+        assert!(block["warnings"].as_array().unwrap().iter().any(|warning| {
+            warning["code"] == "local_asset_corrupted_fallback_used"
+                && warning["detail"]
+                    .as_str()
+                    .is_some_and(|detail| detail.contains("8×8"))
+        }));
+    }
+
+    #[test]
+    fn corrupt_local_asset_without_fallback_degrades_to_review() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::write(docs.join("LFAUIT.png"), b"logo de la base").unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        let missions = vec![mission_with(&["LFAUIT.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "review");
+        assert_eq!(block["reasons"], json!(["missing_asset"]));
+        assert_eq!(block["added"], json!([]));
+        assert_eq!(block["missing"], json!(["LFAUIT.png"]));
+        assert!(block["warnings"].as_array().unwrap().is_empty());
+        assert!(outcome
+            .decisions
+            .iter()
+            .any(|decision| decision.details["reason"] == "asset_unreadable"));
+        assert!(!outcome.changed);
+
+        // Banque désactivée : même dégradation gracieuse, sans warning.
+        let disabled = A7Options {
+            mission_overlays: None,
+            ..options.clone()
+        };
+        let disabled_outcome = apply(&doc, &disabled);
+        let disabled_block = disabled_outcome.mission.as_ref().unwrap();
+        assert_eq!(disabled_block["decision"], "review");
+        assert_eq!(disabled_block["reasons"], json!(["missing_asset"]));
+        assert_eq!(disabled_block["added"], json!([]));
+        assert_eq!(disabled_block["missing"], json!(["LFAUIT.png"]));
+        assert!(disabled_block["warnings"].as_array().unwrap().is_empty());
+        assert!(!disabled_outcome.changed);
+    }
+
+    #[test]
+    fn corrupt_fallback_keeps_local_error_and_reviews() {
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lot/projets/clip_assist.ecproj");
+        let docs = dir.path().join("lot/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::write(docs.join("LFAUIT.png"), b"logo de la base").unwrap();
+        let bank = dir.path().join("assets/mission_overlays");
+        std::fs::create_dir_all(&bank).unwrap();
+        std::fs::write(bank.join("LFAUIT.png"), b"logo central corrompu").unwrap();
+        let missions = vec![mission_with(&["LFAUIT.png"])];
+        let options = A7Options {
+            project: &project,
+            docs: &docs,
+            stem: "clip",
+            lot: Some(1),
+            main_s: 10.0,
+            meta: &meta,
+            missions: &missions,
+            overlay: true,
+            mission_overlays: Some(&bank),
+            end_card_max_s: 5.0,
+            ffprobe: Path::new("ffprobe"),
+        };
+        let outcome = apply(&doc, &options);
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "review");
+        assert_eq!(block["reasons"], json!(["missing_asset"]));
+        assert_eq!(block["added"], json!([]));
+        assert_eq!(block["missing"], json!(["LFAUIT.png"]));
+        assert!(block["warnings"].as_array().unwrap().is_empty());
+        assert!(outcome.decisions.iter().any(|decision| {
+            decision.details["reason"] == "asset_unreadable"
+                && decision.reason.contains("repli central")
+        }));
+        assert!(!outcome.changed);
     }
 
     #[test]

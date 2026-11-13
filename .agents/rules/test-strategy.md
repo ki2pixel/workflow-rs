@@ -82,7 +82,7 @@ cargo test -p workflow-ingest --lib
 cargo test -p workflow-sync --lib
 ```
 
-- La suite compte 670 tests listés (668 exécutés + 2 ignorés).
+- La suite compte 675 tests listés (673 exécutés + 2 ignorés).
 - Pas de CI : exécuter la suite manuellement avant de terminer.
 - La couverture n'est pas instrumentée par défaut. Si `cargo-llvm-cov` est
   disponible, documenter la commande et le résultat ; sinon, l'indiquer.

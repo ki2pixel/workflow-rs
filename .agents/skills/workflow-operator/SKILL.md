@@ -147,7 +147,7 @@ la sync, démarre le serveur et ouvre Firefox. Pour un usage agent, préférer
 
 ## 7. Tests et docs
 
-- `cargo test --workspace` (670 tests listés, 668 exécutés + 2 ignorés, sans
+- `cargo test --workspace` (675 tests listés, 673 exécutés + 2 ignorés, sans
   matériel).
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`.
 - Parité : `scripts/shadow-step56.py`, `scripts/validate-lot5.py`,

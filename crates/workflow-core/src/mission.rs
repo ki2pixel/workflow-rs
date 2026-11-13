@@ -1159,6 +1159,28 @@ impl LogoResolver {
         self.fallback.as_ref()?.find(name)
     }
 
+    /// Résout un token exclusivement dans la banque de repli.
+    ///
+    /// A7 l'utilise quand un asset local a été trouvé mais que sa sonde échoue
+    /// (fichier tronqué, corrompu ou profil invalide) : la banque est alors
+    /// réinterrogée avec la même sémantique que `resolve_target`
+    /// (normalisation, extension implicite, alias) sans jamais retomber sur
+    /// `docs/`. La provenance renvoyée est toujours `CentralFallback`.
+    pub fn resolve_fallback_target(&self, name: &str) -> LogoTarget {
+        let Some(fallback) = &self.fallback else {
+            return LogoTarget::Missing;
+        };
+        match fallback.resolve_target(name) {
+            LogoTarget::Found { path, .. } => LogoTarget::Found {
+                path,
+                provenance: LogoProvenance::CentralFallback,
+            },
+            LogoTarget::KnownAbsent(note) => LogoTarget::KnownAbsent(note),
+            LogoTarget::Ambiguous(note) => LogoTarget::Ambiguous(note),
+            LogoTarget::Missing => LogoTarget::Missing,
+        }
+    }
+
     fn extension_candidates(&self, name: &str) -> Vec<PathBuf> {
         let mut candidates = Vec::new();
         for extension in ["png", "mov"] {
@@ -2091,6 +2113,44 @@ mod tests {
             LogoTarget::KnownAbsent(_)
         ));
         assert_eq!(resolver.resolve_target("inconnu.png"), LogoTarget::Missing);
+    }
+
+    #[test]
+    fn fallback_target_bypasses_a_corrupt_local_asset() {
+        let local = tempfile::tempdir().unwrap();
+        let bank = tempfile::tempdir().unwrap();
+        std::fs::write(local.path().join("LFAUIT.png"), b"logo de la base").unwrap();
+        std::fs::write(bank.path().join("LFAUIT.png"), b"png sain").unwrap();
+        let resolver =
+            LogoResolver::new(local.path()).with_fallback(LogoResolver::new(bank.path()));
+        assert_eq!(
+            resolver.resolve_target("LFAUIT.png"),
+            LogoTarget::Found {
+                path: local.path().join("LFAUIT.png"),
+                provenance: LogoProvenance::LocalDocs,
+            }
+        );
+        assert_eq!(
+            resolver.resolve_fallback_target("LFAUIT.png"),
+            LogoTarget::Found {
+                path: bank.path().join("LFAUIT.png"),
+                provenance: LogoProvenance::CentralFallback,
+            }
+        );
+        // Le repli conserve la sémantique des alias et de l'extension
+        // implicite : `lfauit` retrouve l'asset canonique de la banque.
+        assert_eq!(
+            resolver.resolve_fallback_target("lfauit"),
+            LogoTarget::Found {
+                path: bank.path().join("LFAUIT.png"),
+                provenance: LogoProvenance::CentralFallback,
+            }
+        );
+        let isolated = LogoResolver::new(local.path());
+        assert_eq!(
+            isolated.resolve_fallback_target("LFAUIT.png"),
+            LogoTarget::Missing
+        );
     }
 
     #[test]

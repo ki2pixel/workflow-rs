@@ -56,6 +56,14 @@ MOV ProRes compatible. La provenance est écrite dans le sidecar
 `<stem>_mission.json` : `source = "local_docs"` ou
 `source = "central_fallback"`.
 
+Depuis D-069, un fichier local présent mais illisible (corrompu, tronqué) ou
+hors profil déclenche une re-sonde de la banque avec la même sémantique de
+résolution. Si l'asset central est sain, il est inséré en
+`central_fallback` et le sidecar porte le warning
+`local_asset_corrupted_fallback_used` ; si la banque n'a pas d'homologue
+exploitable, la mission reste en `review`. Le brut, les assets de `docs/` et
+`MediaSolution.jsx` ne sont jamais modifiés ; seul le sidecar A7 est ajouté.
+
 ## Chemins dans les `.ecproj`
 
 La banque est déployée dans le dépôt pour que les projets sous `/mnt/cache`
@@ -87,6 +95,10 @@ régénérer le manifeste (mêmes champs, ordre alphabétique) et mettre à jour
 
 - Les MOV ne sont pas versionnés : sans copie locale, un logo MOV demandé en
   repli part en `review` (`missing_asset`), sans bloquer le pipeline.
+- La sonde PNG lit l'en-tête, les dimensions et l'alpha ; un PNG dont l'en-tête
+  est valide mais dont les données IDAT sont tronquées peut passer la sonde.
+- Le projet brut et `docs/` ne sont pas réparés : le repli D-069 ne concerne
+  que `_assist.ecproj` et son sidecar.
 - Une banque absente ou illisible est ignorée à l'exécution ; le repli local
   puis la revue restent actifs. Seul `config check` signale une configuration
   invalide.

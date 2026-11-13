@@ -87,7 +87,7 @@ Le contrat est complété par [`../parity/DRIFT.md`](../parity/DRIFT.md) pour le
 | A1 — veto latéral des sources pillarboxées (D-063) | [`lots/LOT-11-A1-VETO-LATERAL.md`](lots/LOT-11-A1-VETO-LATERAL.md) | Lot 11 | Référence |
 | A7 — logos de mission depuis les emails (`email_proxy.php`, D-064) | [`lots/LOT-12-A7-MISSIONS.md`](lots/LOT-12-A7-MISSIONS.md) | Lot 12 | Référence |
 | A7 — parseur, alias et `tail_overlay` (D-065) | [`lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md`](lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md) | Lot 12.1 | Référence |
-| A7 — banque centrale de repli et provenance (D-066) | [`lots/LOT-12.2-BANQUE-CENTRALE.md`](lots/LOT-12.2-BANQUE-CENTRALE.md) | Lot 12.2 | Référence |
+| A7 — banque centrale de repli et provenance (D-066), reprise sur asset local corrompu (D-069) | [`lots/LOT-12.2-BANQUE-CENTRALE.md`](lots/LOT-12.2-BANQUE-CENTRALE.md) | Lot 12.2 | Référence |
 | A7 — benchmark stratifié, masque QA MOV et canari (D-067) | [`lots/LOT-12.3-BENCHMARK-QA-MOV.md`](lots/LOT-12.3-BENCHMARK-QA-MOV.md) | Lot 12.3 | Référence |
 
 La numérotation des lots ne suit pas celle des étapes : `LOT-3-STEP4` et
@@ -129,7 +129,7 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans
 [`../memory-bank/decisionLog.md`](../memory-bank/decisionLog.md). Les décisions
-D-063 à D-067 (lots 11 à 12.3) sont consignées dans le journal des décisions et
+D-063 à D-069 (lots 11 à 12.3) sont consignées dans le journal des décisions et
 dans les fiches `lots/` correspondantes ; elles n'ont pas d'ADR séparé.
 
 ## 7. Études

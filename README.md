@@ -109,7 +109,11 @@ Linux et le panneau CEP continue d'appeler Python.
   passe le sidecar en `schema: 2`. Depuis D-066, la banque centrale
   `assets/mission_overlays/` sert de repli après `docs/` : local exact →
   local normalisé → banque exacte → banque normalisée → alias → revue, avec
-  `source: local_docs|central_fallback`. Depuis D-067, le QA masque aussi les
+  `source: local_docs|central_fallback`. Depuis D-069, un asset local présent
+  mais corrompu ou hors profil déclenche une re-sonde de la banque : si
+  l'homologue central est sain, l'asset est inséré en `central_fallback` avec
+  le warning `local_asset_corrupted_fallback_used` ; sinon la mission reste en
+  `review` sans régression. Depuis D-067, le QA masque aussi les
   habillages `.mov` alpha (échantillonnage 12–24 frames, `kind: "mov"`,
   schéma QA `1.5.0`, cache 12) et le corpus complet est benchmarké par
   période et format. Détail dans
@@ -209,7 +213,7 @@ Linux et le panneau CEP continue d'appeler Python.
 - `docs/lots/LOT-9-POST-STEP8.md` : post-traitement A5/A6, projet `_assist`, artefacts, template SDM et validations.
 - `docs/lots/LOT-12-A7-MISSIONS.md` : logos de mission email A7, cache, sidecar et classification MOV.
 - `docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md` : parseur (lignes coupées, parenthèses, `\'`), alias, `known_absent`, `tail_overlay` et sidecar `schema: 2`.
-- `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` : banque centrale `assets/mission_overlays`, ordre de résolution local/banque, provenance et validation 1080×1920.
+- `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` : banque centrale `assets/mission_overlays`, ordre de résolution local/banque, provenance, reprise sur asset local corrompu (D-069) et validation 1080×1920.
 - `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` : benchmark stratifié du corpus, masque QA des MOV alpha (`kind: "mov"`, schéma 1.5.0/cache 12) et canari de 20 missions réelles.
 - `scripts/audit-a7-benchmark.py` : consolidation Markdown d'un audit `email audit --json` par période et format.
 - `docs/lots/LOT-10-QA.md` : contrôle QA read-only, Stage 0, OCR PP-OCRv6, logos avec masque `.ecproj`, vérificateur DINOv2 actif par défaut (opt-out), visage YuNet, `qa.json`, auto-approbation, seuils et limites v1.

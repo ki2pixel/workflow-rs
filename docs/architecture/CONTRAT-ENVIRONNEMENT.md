@@ -490,6 +490,16 @@ chemin configuré n'existe pas ; une banque absente au runtime est ignorée
 versionnés ; les MOV (2,2 Go) sont gitignorés. Détail :
 `docs/lots/LOT-12.2-BANQUE-CENTRALE.md`.
 
+Depuis D-069, un asset `local_docs` présent mais illisible (`asset_unreadable`)
+ou hors profil (`asset_dimensions`) déclenche une re-sonde de la banque via
+`LogoResolver::resolve_fallback_target`. Si l'homologue central est sain, A7
+l'insère avec `source: "central_fallback"` et ajoute un warning additif
+`local_asset_corrupted_fallback_used` dans `warnings` du sidecar ; la décision
+reste `apply`. Si le repli échoue, l'erreur locale initiale est conservée et la
+mission reste en `review`. Le brut, les assets de `docs/` et
+`MediaSolution.jsx` ne sont pas modifiés ; seul le sidecar A7 est ajouté.
+Détail : `docs/lots/LOT-12.2-BANQUE-CENTRALE.md`.
+
 Depuis D-067 (sous-lot 12.3), le QA masque aussi les calques `.mov` porteurs
 d'alpha : 12 à 24 frames sont échantillonnées en rawvideo RGBA, les boîtes
 stables autour de la médiane sont fusionnées (`kind: "mov"`), et un MOV

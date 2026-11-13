@@ -4,10 +4,11 @@
 > (parseur, alias, `tail_overlay`, sidecar 2) validé le 2026-11-12 (D-065) ;
 > sous-lot 12.2 (banque centrale de repli) validé le 2026-11-12 (D-066) ;
 > sous-lot 12.3 (benchmark, masque QA MOV, canari) validé le 2026-11-12
-> (D-067).
+> (D-067) ; résilience des assets locaux corrompus validée le 2026-11-13
+> (D-069).
 > Date : 2026-11-12.
-> Décisions liées : D-064, D-065, D-066, D-067, D-041 (masque des overlays
-> `.ecproj`), D-052 (registre des logos source), D-061 (template SDM
+> Décisions liées : D-064, D-065, D-066, D-067, D-069, D-041 (masque des
+> overlays `.ecproj`), D-052 (registre des logos source), D-061 (template SDM
 > multi-préfixes).
 > Code visé : `crates/workflow-core/src/mission.rs`,
 > `crates/workflow-ingest/src/email.rs`,
@@ -90,6 +91,15 @@ gitignorés, les PNG, `manifest.toml` et `README.md` sont versionnés. Détail :
 `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` et
 `docs/lots/LOT-12.1-PARSEUR-ALIAS-TAIL.md`.
 
+Depuis D-069, un asset local présent mais illisible (corrompu, tronqué) ou
+hors profil ne masque plus la banque : A7 re-sonde l'homologue central via
+`LogoResolver::resolve_fallback_target`. Si le repli est sain, l'asset est
+inséré en `central_fallback` et un warning additif
+`local_asset_corrupted_fallback_used` est écrit dans le sidecar ; la décision
+reste `apply`. Si le repli échoue aussi, l'erreur locale initiale est
+conservée et la mission reste en `review`. Le brut, les assets de `docs/` et
+`MediaSolution.jsx` ne sont jamais modifiés ; seul le sidecar A7 est ajouté.
+
 ### Classification des `.mov`
 
 Pour une durée `d`, `main` = fin du dernier segment :
@@ -133,7 +143,10 @@ reste actif.
   `generated_at`, `project`, `project_stem`, `lot` et `mission` ; chaque entrée
   de `added` expose `requested` (token d'origine) et `source`
   (`local_docs` ou `central_fallback`). Les sidecars
-  schéma 1 restent lisibles.
+  schéma 1 restent lisibles. Depuis D-069, `warnings` peut contenir en plus un
+  avertissement `local_asset_corrupted_fallback_used` (même forme
+  `code`/`line`/`detail` que les avertissements du parseur) ; aucune clé
+  existante n'est renommée ou supprimée.
 - `audit.json` ajoute les contrôles `mission_available`, `mission_assets`,
   `mission_known_absent`, `mission_layers`, `mission_no_logo`, `mission_modes`,
   `mission_overlay`, `mission_tail` et `mission_sidecar`.
@@ -151,6 +164,8 @@ reste actif.
   sous-lot 12.1 : lignes logiques (4 lignes / 600 caractères), parenthèses
   équilibrées, `\'` non échappé, formes `Logo <nom>` et `(yaq.png)`, table
   d'alias, `known_absent`, `LogoResolver` avec cache et recollage asset-aware.
+  Depuis D-069 : `resolve_fallback_target` pour réinterroger la seule banque
+  après l'échec d'une sonde locale.
 - `workflow-ingest/src/email.rs` : client HTTP index/détail, store SQLite
   `email_missions` (WAL, purge de rétention), matching, import `.eml` MIME
   minimal (multipart, quoted-printable, base64).
@@ -160,7 +175,9 @@ reste actif.
 - `workflow-steps/src/post/a7.rs` : validation PNG/MOV, classification,
   planification, insertion, bloc `mission`. Depuis le sous-lot 12.1 :
   `PlacementMode::TailOverlay`, registre `MovPolicy` des huit MOV, `A7Added`
-  avec `requested`/`source`, audio coupé en `tail_overlay`.
+  avec `requested`/`source`, audio coupé en `tail_overlay`. Depuis D-069 :
+  reprise sur la banque quand un asset `LocalDocs` échoue à `probe_asset`
+  (`asset_unreadable` / `asset_dimensions`).
 - `workflow-steps/src/post/run.rs` : A7 avant A1/A2 hors template (pour que le
   masque A2 voie les calques), après A6 pour un template éligible ; écriture
   du sidecar `schema: 2`, du bloc `mission` et des contrôles d'audit, dont
@@ -276,12 +293,38 @@ médias de production n'ont pas été modifiés.
   `fmt` et clippy verts. Aucun `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
 - Détail et limites : `docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md`.
 
+### Résilience asset local corrompu (2026-11-13, D-069)
+
+- **Cas réel** : `docs/LFAUIT.png` de `183 Camille_brut.zip`, 15 octets ASCII
+  sans signature PNG. Avant correctif : sonde `asset_unreadable`, sidecar
+  `review` / `missing_asset`, aucun logo. Après correctif : repli sur
+  `assets/mission_overlays/LFAUIT.png` (35 582 octets, SHA-256 conforme au
+  manifeste), `decision: apply`, `added[0].source: central_fallback`, warning
+  `local_asset_corrupted_fallback_used`, calque et item insérés avec le chemin
+  `../../assets/mission_overlays/LFAUIT.png`.
+- **Dégradation** : même PNG corrompu et banque vide/désactivée → `review`,
+  `reasons: ["missing_asset"]`, `missing: ["LFAUIT.png"]`, décision
+  `asset_unreadable`, aucun calque, exit 0.
+- **Tests** : `fallback_target_bypasses_a_corrupt_local_asset`,
+  `corrupt_local_asset_falls_back_to_central_bank`,
+  `invalid_local_profile_falls_back_to_central_bank`,
+  `corrupt_local_asset_without_fallback_degrades_to_review`,
+  `corrupt_fallback_keeps_local_error_and_reviews`.
+- **Suite Rust** : 675 tests listés (673 exécutés + 2 ignorés), 0 échec ;
+  `fmt` et `clippy -D warnings` verts. Aucun `.ecproj`, `runtime/` ou
+  `/mnt/cache` modifié.
+- Détail : `docs/lots/LOT-12.2-BANQUE-CENTRALE.md`.
+
 ## Critères d'acceptation
 
 - Endpoint indisponible, 5xx ou `[]` : pipeline identique, exit 0, aucune
   requête si `email_proxy.enabled = false`.
 - `--no-email` : aucun accès réseau, aucun sidecar, aucun bloc `mission`.
 - Asset non conforme ou absent : `review`, `warn` d'audit, exit 0.
+- Asset local corrompu ou hors profil avec homologue central sain :
+  `apply`, `source: central_fallback`, warning
+  `local_asset_corrupted_fallback_used`, calque inséré ; sans repli
+  exploitable : `review`, aucune régression.
 - `.mov` classé sans ambiguïté, ou `review` explicite ; jamais de MOV deviné.
 - `Pas de logo` : aucun calque mission, aucune suppression.
 - Sidecar uniquement si l'assist est publié, `post.json` avec `mission` en

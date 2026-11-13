@@ -2,28 +2,43 @@
 
 ## Tâche en cours
 
-**Lot 12.3 — benchmark, masque QA MOV et canari (2026-11-12, implémenté et
-validé, D-067).**
-Le benchmark consolidé du corpus (932 emails, 319 lots) distingue l'historique
-2025–2026 (785 emails, 90,9 % de résolution hors absences) du récent
-oct.–nov. 2026 (147 emails, 100 %) et les formats HTML seul/texte.
-`email audit --json` expose `format_cohorts` ; `scripts/audit-a7-benchmark.py`
-produit les tableaux. Le masque QA couvre désormais les calques `.mov` alpha :
-12–24 frames échantillonnées en rawvideo RGBA, boîtes stables autour de la
-médiane fusionnées (`kind: "mov"`), MOV instable ignoré avec warning non
-bloquant. La fenêtre est ramenée au temps source pour un end-card placé tard ;
-`QA_SCHEMA_VERSION = 1.5.0`, `CACHE_VERSION = 12`. Le canari de 20 missions
-réelles récentes sous `/tmp/opencode` donne 20/20 `apply`, 28 assets (18
-`central_fallback`, 10 `local_docs`), 0 doublon, 0 `_assist` écrit. Cas
-limites validés : `known_absent`, manquant, ambigu, `tail_overlay`,
-déduplication. Correctif : `stem_key` est `trim()`é après retrait de
-l'extension (espace avant `.mp4`, lot 20). Suite workspace : 670 tests listés
-(668 exécutés + 2 ignorés), `fmt` et clippy verts. Détail :
-`docs/lots/LOT-12.3-BENCHMARK-QA-MOV.md` ; décision D-067. Aucun `.ecproj`,
-`runtime/` ou `/mnt/cache` modifié.
+**Résilience A7 sur asset local corrompu (2026-11-13, implémenté et validé,
+D-069).**
+Un logo présent dans `docs/` mais illisible ne masque plus la banque centrale.
+Cas réel : `183`/`186 Camille`, `docs/LFAUIT.png` de 15 octets ASCII sans
+signature PNG. `LogoResolver::resolve_fallback_target` réinterroge la seule
+banque ; si l'homologue central passe la sonde, A7 l'insère en
+`central_fallback` et le sidecar `schema: 2` reçoit le warning additif
+`local_asset_corrupted_fallback_used` (`decision: apply`). Si le repli échoue,
+l'erreur locale `asset_unreadable` / `asset_dimensions` est conservée et la
+mission reste en `review`. Le brut, les assets de `docs/` et
+`MediaSolution.jsx` ne sont pas modifiés ; seul le sidecar A7 est ajouté.
+Suite workspace : 675 tests listés (673 exécutés + 2 ignorés),
+`fmt` et clippy verts. Détail : `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` ;
+décision D-069. Aucun `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
 
 ## Dernière session
 
+- [2026-11-13] **Repli A7 sur asset local corrompu (D-069)** :
+  - `LogoResolver::resolve_fallback_target` (workflow-core) et reprise de
+    `resolve_assets` (a7) après `asset_unreadable` / `asset_dimensions` ;
+  - warning `local_asset_corrupted_fallback_used` dans `warnings` du sidecar,
+    sans changer `reasons`, `missing`, ni `source: central_fallback` ;
+  - échantillon réel de `183 Camille_brut.zip` sous `/tmp/opencode` (15 octets,
+    SHA-256 `52ce014e…b063a4`) ; banque `LFAUIT.png` vérifiée 35 582 octets,
+    SHA-256 `cc9a036f…d4e10a` ;
+  - 5 tests ajoutés (1 mission, 4 A7), suite 675 listés (673 + 2 ignorés),
+    `fmt` et clippy verts ;
+  - aucun code JSX, `.ecproj`, `runtime/`, `config/config.toml` ni `/mnt/cache`
+    modifié.
+- [2026-11-12] **Benchmark, masque QA MOV et canari (D-067)** :
+  - corpus 932 emails, 319 lots ; historique 785 emails (90,9 % hors absences),
+    récent 147 emails (100 %) ; `format_cohorts` dans `email audit --json` ;
+  - masque QA des `.mov` alpha (12–24 frames, `kind: "mov"`, MOV instable
+    ignoré), `QA_SCHEMA_VERSION = 1.5.0`, `CACHE_VERSION = 12` ;
+  - canari 20 missions réelles sous `/tmp/opencode` : 20/20 `apply`, 28 assets,
+    0 doublon, 0 `_assist` écrit ;
+  - correctif `stem_key` (espace avant `.mp4`).
 - [2026-11-12] **Archivage de la memory-bank (D-068)** :
   - `memory-bank/archives/` créé ; `sessions-2026-10-to-11.md`,
     `decisionLog-archive-2026-10.md` et `progress-archive-2026-10.md`
@@ -33,8 +48,7 @@ l'extension (espace avant `.mp4`, lot 20). Suite workspace : 670 tests listés
     `progress.md` 649 → 76 ; aucune ligne source supprimée sans être
     présente à l'identique dans une archive (contrôle automatique) ;
   - index ajouté en tête du journal des décisions ; D-059 signalé comme
-    numéro réservé (option C A1, non ouverte) ; compteur de tests porté à
-    670 (668 exécutés + 2 ignorés) ;
+    numéro réservé (option C A1, non ouverte) ;
   - aucun code, `.ecproj`, `runtime/`, `config/config.toml` ni `/mnt/cache`
     modifié ; aucun commit.
 - [2026-11-12] **Synchronisation documentaire post-D-067** : README, AGENTS,
@@ -50,7 +64,7 @@ l'extension (espace avant `.mp4`, lot 20). Suite workspace : 670 tests listés
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 670 tests unitaires listés (668 exécutés + 2 ignorés) ; pas de CI.
+- 674 tests unitaires listés (672 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

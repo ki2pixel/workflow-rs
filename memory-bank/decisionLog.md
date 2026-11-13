@@ -4,7 +4,7 @@ Ce document enregistre les décisions architecturales et techniques durables de
 workflow-rs. Les écarts de comportement legacy sont détaillés dans
 `parity/DRIFT.md`.
 
-> **Politique de conservation** : les décisions actives D-041 → D-068 restent
+> **Politique de conservation** : les décisions actives D-041 → D-069 restent
 > en texte intégral. L'historique de bootstrap, les audits d'octobre 2026, les
 > décisions fondatrices D-028 → D-040 et les brouillons D-058 sont conservés
 > dans
@@ -17,13 +17,72 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-068 → D-060 | ci-dessous |
+| Journal actif récent | D-069 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
 | Écarts legacy | D-027 → D-001 | tableau ci-dessous ; détail `parity/DRIFT.md` |
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
+
+## 2026-11-13 — D-069 : A7 — repli central sur asset local corrompu
+
+- **Contexte** : les lots 183 et 186 Camille contiennent un `docs/LFAUIT.png`
+  factice de 15 octets (`logo de la base`, sans signature PNG). `resolve_target`
+  le trouvait sur disque et renvoyait `LocalDocs` ; la sonde A7 échouait ensuite
+  (`asset_unreadable`), mais le repli central n'était jamais retenté. Le sidecar
+  sortait en `review` (`missing_asset`, `added: []`) alors que
+  `assets/mission_overlays/LFAUIT.png` est un PNG 1080×1920 sain, au SHA-256
+  conforme au manifeste.
+- **Décision — niveau d'intervention** : le correctif reste dans A7
+  (`workflow-core::mission` + `workflow-steps::post::a7`). Le projet brut
+  `.ecproj`, les assets clients de `docs/` et `MediaSolution.jsx` ne sont pas
+  modifiés (seul le sidecar A7 est ajouté à `docs/`) : D-064 impose un brut
+  immuable, D-022 fige le JSX et aucun fichier de `/mnt/cache` ne doit être
+  assaini par le pipeline. Le projet brut conserve donc l'échec d'import
+  d'`effectcraft-cli` ; seul `_assist.ecproj` est réparé, ce qui reste le rôle
+  de l'assistance A7.
+- **Décision — résolution** : `LogoResolver::resolve_fallback_target` interroge
+  la banque avec la même sémantique que `resolve_target` (exact, normalisé,
+  extension implicite, alias) sans jamais retomber sur `docs/`, et force la
+  provenance `central_fallback`.
+- **Décision — reprise A7** : quand un asset `LocalDocs` échoue à la sonde
+  (`asset_unreadable` ou `asset_dimensions`), A7 sonde immédiatement son
+  homologue central. En cas de succès, l'asset est retenu pour le chutier et la
+  composition avec `source = "central_fallback"` ; le sidecar reste `schema: 2`
+  et reçoit un avertissement additif
+  `local_asset_corrupted_fallback_used` dans `warnings` (même forme
+  `code`/`line`/`detail` que les avertissements du parseur). La décision reste
+  `apply` si aucun autre asset ne manque : un asset officiel de la banque
+  satisfait la mission.
+- **Dégradation** : banque absente, désactivée, ou asset central illisible =
+  `MissingAsset` local initial conservé, détail enrichi de l'échec du repli ;
+  sidecar `review` (`missing_asset`), exit 0, aucun calque. Aucun panic, aucune
+  boucle : le repli n'est tenté que depuis `LocalDocs`, jamais depuis
+  `CentralFallback`.
+- **Conséquences** : un asset local corrompu, tronqué ou hors profil ne masque
+  plus un asset central sain. Les sidecars produits restent lisibles par les
+  consommateurs schéma 2 ; les anciens ignorent simplement le warning additif.
+  Aucun changement de contrat JSON, de clé de sidecar ni de chemin `.ecproj`.
+- **Validation** : échantillon réel extrait de `183 Camille_brut.zip` sous
+  `/tmp/opencode` (15 octets, SHA-256 `52ce014e…b063a4`) ; banque `LFAUIT.png`
+  vérifiée 35 582 octets, SHA-256 `cc9a036f…d4e10a`. Tests :
+  `fallback_target_bypasses_a_corrupt_local_asset`,
+  `corrupt_local_asset_falls_back_to_central_bank`,
+  `invalid_local_profile_falls_back_to_central_bank`,
+  `corrupt_local_asset_without_fallback_degrades_to_review`,
+  `corrupt_fallback_keeps_local_error_and_reviews`. Suite workspace :
+  675 tests listés (673 exécutés + 2 ignorés), 0 échec ; `fmt` et
+  `clippy -D warnings` verts. Aucun `.ecproj`, `runtime/` ou `/mnt/cache`
+  modifié.
+- **Portée / rollback** : additif. Retirer `resolve_fallback_target` et la
+  reprise de `resolve_assets` restaure le comportement D-066 (asset local
+  invalide → revue). Les warnings supplémentaires n'affectent ni `reasons`, ni
+  `missing`, ni les décisions d'audit.
+- **Références** : D-064, D-065, D-066, D-067,
+  `docs/lots/LOT-12-A7-MISSIONS.md`,
+  `docs/lots/LOT-12.2-BANQUE-CENTRALE.md`,
+  `assets/mission_overlays/README.md`.
 
 ## 2026-11-12 — D-068 : archivage de la memory-bank et fenêtre de rétention
 

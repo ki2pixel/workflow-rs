@@ -2,16 +2,16 @@
 
 ## Statut actuel
 
-| Composant | État au 2026-11-12 | Référence |
+| Composant | État au 2026-11-13 | Référence |
 | --- | --- | --- |
 | Pipeline STEP1 → STEP8 | Huit étapes portées et validées ; STEP7 publie et archive, STEP8 est headless (`effectcraft-cli`). | `docs/lots/LOT-*.md`, `parity/DRIFT.md` |
-| Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale et le masque QA MOV (D-064 → D-067). Brut jamais modifié ; `_assist.ecproj` toujours publié. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
+| Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` toujours publié. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
 | Bypass SDM/LPHDF | Bascule directe opt-in pour les profils 1920×1080 25 fps H.264 ; préfixes `M6 - SDM - `, `SDM - ` et `W9 - LPHDF`. | D-034, D-035, D-061 |
 | Ingestion | Webhook Rust, normalisation d'URL, historique SQLite, téléchargements R2/Dropbox ; un seul moniteur actif. | `docs/lots/LOT-8-INGESTION.md` |
 | Serveur `:5004` | axum, une étape à la fois (409), arrêt `stopping` puis SIGTERM/SIGKILL ; Python `:5003` arrêté, rollback disponible. | `docs/lots/LOT-5-ORCHESTRATOR.md` |
 | QA read-only | Schéma `1.5.0`, cache 12, masque des `.mov` alpha (12–24 frames), DINOv2 opt-in. | D-049, D-051, D-067 |
 | Parité | STEP2/3/4 à `1e-6`, shadow `162/162`, CSV/JSON contractuels préservés. | `parity/DRIFT.md`, `docs/validation/VALIDATION-STEP1-8.md` |
-| Tests et outillage | 670 tests listés (668 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
+| Tests et outillage | 675 tests listés (673 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
 
 - Backend de production : Rust `:5004` headless via `scripts/switch-rust.sh` ;
   interface web legacy `assets/web` uniquement (D-028).
@@ -37,7 +37,7 @@
 | 11 | 2026-11-11 | Veto latéral A1 (pillarbox) | `LOT-11-A1-VETO-LATERAL.md` | D-063 |
 | 12 | 2026-11-12 | Logos de mission A7 | `LOT-12-A7-MISSIONS.md` | D-064 |
 | 12.1 | 2026-11-12 | Parseur, alias, `tail_overlay` | `LOT-12.1-PARSEUR-ALIAS-TAIL.md` | D-065 |
-| 12.2 | 2026-11-12 | Banque centrale de repli A7 | `LOT-12.2-BANQUE-CENTRALE.md` | D-066 |
+| 12.2 | 2026-11-12 → 2026-11-13 | Banque centrale de repli A7, reprise sur asset local corrompu (D-069) | `LOT-12.2-BANQUE-CENTRALE.md` | D-066, D-069 |
 | 12.3 | 2026-11-12 | Benchmark, masque QA MOV, canari | `LOT-12.3-BENCHMARK-QA-MOV.md` | D-067 |
 
 Études hors lots : YOLO/ONNX B0 → B2.1 (`docs/etudes/ETUDE-YOLO-ONNX-A2.md`,

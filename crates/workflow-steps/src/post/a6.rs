@@ -14,6 +14,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::sync::OnceLock;
+use workflow_core::mission::SdmTemplateMatch;
 
 /// Nommages SDM reconnus par défaut : le préfixe historique `M6 - SDM - ` et
 /// la variante livrée par la production `SDM - `.
@@ -38,6 +39,10 @@ pub struct TemplateInfo {
     pub executor: &'static str,
     pub profile: Value,
     pub details: Value,
+    /// `name`, `mission` ou `none` (D-080), ajouté en fin de contrat.
+    pub trigger: &'static str,
+    /// Identifiant de la mission quand le déclencheur est `mission`.
+    pub mission: Option<String>,
 }
 
 pub fn profile() -> Value {
@@ -82,11 +87,20 @@ pub fn validate(
     meta: &CompMeta,
     stem: &str,
     prefixes: &[String],
+    mission: Option<&SdmTemplateMatch>,
 ) -> (Vec<Decision>, TemplateInfo) {
     let matched_prefix = prefixes
         .iter()
-        .find(|prefix| !prefix.is_empty() && stem.starts_with(prefix.as_str()));
-    let Some(matched_prefix) = matched_prefix else {
+        .find(|prefix| !prefix.is_empty() && stem.starts_with(prefix.as_str()))
+        .map(String::as_str);
+    // Le nom reste prioritaire. Une mission n'est consultée que si aucun
+    // préfixe ne matche (D-080).
+    let mission_match = if matched_prefix.is_none() {
+        mission
+    } else {
+        None
+    };
+    if matched_prefix.is_none() && mission_match.is_none() {
         let details = json!({
             "checks": [{"id": "prefix_match", "status": "pass", "detail": "projet hors template SDM"}],
             "valid": true,
@@ -104,9 +118,18 @@ pub fn validate(
                 executor: "post",
                 profile: profile(),
                 details,
+                trigger: "none",
+                mission: None,
             },
         );
+    }
+    let trigger = if matched_prefix.is_some() {
+        "name"
+    } else {
+        "mission"
     };
+    let matched_prefix = matched_prefix.unwrap_or_default();
+    let mission_id = mission_match.map(|matched| matched.mission_id.as_str());
 
     let mut checks = Vec::new();
     let mut valid = true;
@@ -269,7 +292,9 @@ pub fn validate(
         "valid": valid,
         "prefix": matched_prefix,
         "stem": stem,
-        "logo": if logo_available { "available" } else { "missing" }
+        "logo": if logo_available { "available" } else { "missing" },
+        "trigger": trigger,
+        "mission": mission_id
     });
     let action = if valid {
         Decision::apply(
@@ -284,14 +309,16 @@ pub fn validate(
                 "valid": valid,
                 "executor": "post",
                 "logo": details["logo"].clone(),
-                "checks": details["checks"].clone()
+                "checks": details["checks"].clone(),
+                "trigger": trigger,
+                "mission": mission_id
             }),
         )
     } else {
         Decision::review(
             "A6",
             "comp",
-            "préfixe SDM mais structure incompatible (voir audit)",
+            "template SDM demandé mais structure incompatible (voir audit)",
             0.4,
             json!({
                 "prefix": matched_prefix,
@@ -300,7 +327,9 @@ pub fn validate(
                 "valid": valid,
                 "executor": "post",
                 "logo": details["logo"].clone(),
-                "checks": details["checks"].clone()
+                "checks": details["checks"].clone(),
+                "trigger": trigger,
+                "mission": mission_id
             }),
         )
     };
@@ -315,6 +344,8 @@ pub fn validate(
             executor: "post",
             profile: profile(),
             details,
+            trigger,
+            mission: mission_id.map(str::to_string),
         },
     )
 }
@@ -688,12 +719,14 @@ mod tests {
             &meta(),
             "M6 - SDM - test",
             &default_prefixes(),
+            None,
         );
         assert!(info.matched);
         assert_eq!(info.eligible, Some(true));
         assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
 
-        let (decisions, info) = validate(&doc, &segments, &meta(), "autre", &default_prefixes());
+        let (decisions, info) =
+            validate(&doc, &segments, &meta(), "autre", &default_prefixes(), None);
         assert!(!info.matched);
         assert!(decisions.is_empty());
     }
@@ -710,23 +743,105 @@ mod tests {
             ("M6 - SDM - Leslie et Léo", "M6 - SDM - "),
             ("SDM - Liliane et josé", "SDM - "),
         ] {
-            let (decisions, info) = validate(&doc, &segments, &meta(), stem, &prefixes);
+            let (decisions, info) = validate(&doc, &segments, &meta(), stem, &prefixes, None);
             assert!(info.matched);
             assert_eq!(info.prefix, expected);
             assert_eq!(info.eligible, Some(true));
             assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
         }
-        let (decisions, info) = validate(&doc, &segments, &meta(), "Autre projet", &prefixes);
+        let (decisions, info) = validate(&doc, &segments, &meta(), "Autre projet", &prefixes, None);
         assert!(!info.matched);
         assert!(info.prefix.is_empty());
         assert!(decisions.is_empty());
     }
 
     #[test]
+    fn validates_mission_trigger_without_prefix() {
+        // Given: un projet A6 valide et une mission qui demande sdm.png.
+        // When:  aucun préfixe de nommage ne matche.
+        // Then:  A6 applique le template et trace le déclencheur mission.
+        let doc = doc();
+        let segments = ecproj::segments(&doc).unwrap();
+        let mission = SdmTemplateMatch {
+            mission_id: "recadrage_lot_216_20261116".into(),
+            video: "Alice et Sofiane.mp4".into(),
+        };
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "Alice et Sofiane",
+            &default_prefixes(),
+            Some(&mission),
+        );
+        assert!(info.matched);
+        assert_eq!(info.eligible, Some(true));
+        assert_eq!(info.trigger, "mission");
+        assert_eq!(info.prefix, "");
+        assert_eq!(info.mission.as_deref(), Some("recadrage_lot_216_20261116"));
+        assert_eq!(info.details["trigger"], serde_json::json!("mission"));
+        assert_eq!(decisions[0].action, crate::post::model::Action::Apply);
+        assert_eq!(
+            decisions[0].details["mission"],
+            serde_json::json!("recadrage_lot_216_20261116")
+        );
+    }
+
+    #[test]
+    fn name_prefix_wins_over_mission_trigger() {
+        // Given: un nom préfixé ET une mission sdm.png.
+        // When:  A6 valide le projet.
+        // Then:  le déclencheur reste le nom historique.
+        let doc = doc();
+        let segments = ecproj::segments(&doc).unwrap();
+        let mission = SdmTemplateMatch {
+            mission_id: "recadrage_lot_216_20261116".into(),
+            video: "Alice et Sofiane.mp4".into(),
+        };
+        let (_, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "SDM - Alice et Sofiane",
+            &default_prefixes(),
+            Some(&mission),
+        );
+        assert_eq!(info.trigger, "name");
+        assert_eq!(info.prefix, "SDM - ");
+        assert!(info.mission.is_none());
+    }
+
+    #[test]
+    fn mission_trigger_with_incompatible_structure_is_reviewed() {
+        // Given: une mission sdm.png sur un projet multi-segment.
+        // When:  A6 valide la structure.
+        // Then:  la décision est une revue, jamais une application.
+        let mut doc = doc();
+        let comp = comp_mut(&mut doc).unwrap();
+        let layer = comp["layers"].as_array().unwrap()[1].clone();
+        comp["layers"].as_array_mut().unwrap().push(layer);
+        let segments = ecproj::segments(&doc).unwrap();
+        let mission = SdmTemplateMatch {
+            mission_id: "recadrage_lot_216_20261116".into(),
+            video: "Alice et Sofiane.mp4".into(),
+        };
+        let (decisions, info) = validate(
+            &doc,
+            &segments,
+            &meta(),
+            "Alice et Sofiane",
+            &default_prefixes(),
+            Some(&mission),
+        );
+        assert_eq!(info.eligible, Some(false));
+        assert_eq!(decisions[0].action, crate::post::model::Action::Review);
+    }
+
+    #[test]
     fn empty_prefix_list_is_not_matched() {
         let doc = doc();
         let segments = ecproj::segments(&doc).unwrap();
-        let (decisions, info) = validate(&doc, &segments, &meta(), "M6 - SDM - test", &[]);
+        let (decisions, info) = validate(&doc, &segments, &meta(), "M6 - SDM - test", &[], None);
         assert!(!info.matched);
         assert!(decisions.is_empty());
     }
@@ -748,6 +863,7 @@ mod tests {
             &meta(),
             "M6 - SDM - test",
             &default_prefixes(),
+            None,
         );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
@@ -773,6 +889,7 @@ mod tests {
             &meta(),
             "M6 - SDM - test",
             &default_prefixes(),
+            None,
         );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
@@ -793,6 +910,7 @@ mod tests {
             &meta(),
             "M6 - SDM - test",
             &default_prefixes(),
+            None,
         );
         assert_eq!(info.eligible, Some(false));
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);

@@ -418,8 +418,9 @@ entrée `added` porte `requested` (token d'origine) et `source`
 `known_absent`. `post.json` ajoute alors un bloc `mission` **après**
 `summary`, sans changer l'ordre des clés existantes. A1/A2 ne déplacent
 jamais l'Anchor Point ; A3/A4 restent en revue et A5 en rapport ; A6 applique
-le template SDM si l'un des `template_prefixes` configurés correspond et si la
-structure est mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
+le template SDM si l'un des `template_prefixes` configurés correspond, ou si
+une mission unique demande exclusivement `sdm.png` (D-080), et si la structure
+est mono-segment sans keyframe. La configuration est `[steps.step8.post]` ; le hook est désactivable
 avec `workflow-cli step8 run --no-post`, et le post-traitement seul se lance
 avec `workflow-cli post run`. Sa progression (`POST_*`) prolonge la barre
 STEP8 et publie `progress_phase = "post"`. Depuis D-034,
@@ -440,6 +441,14 @@ de la décision A6. `config check` rejette les préfixes vides et les
 chevauchements entre préfixes de template et avec `archive_only_prefixes` ;
 `post run --template-prefix` est répétable et le cache QA est en version 12
 (liste de préfixes D-061, sidecar de mission D-064, masque MOV D-067).
+
+Depuis D-080, `steps.step8.post.mission_template` (défaut `false`, activé dans
+la configuration de production) ajoute un déclencheur de repli : une mission
+unique du lot qui demande **exclusivement** `sdm.png` rend la vidéo éligible
+au template direct et à A6, même sans préfixe. Le nom reste prioritaire, un
+lot ambigu ou un cache mission absent conserve le comportement historique, et
+`template.trigger` / `template.mission` sont ajoutés au `post.json` sans
+modifier `template.prefix` (vide pour un déclenchement mission).
 
 Depuis D-051, `steps.step8.post.a2_ocr` (défaut `false`) active un gate OCR
 opt-in du candidat A2 : 12 frames, PP-OCRv6 det/rec CPU, fusion des boîtes

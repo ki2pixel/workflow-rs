@@ -13,7 +13,7 @@ pub use error::ConfigError;
 pub use isolation::validate_isolation;
 pub use lock::HardwareLock;
 pub use mission::{
-    ClientMission, MissionIndexEntry, MissionLink, MissionWarning, VideoInstruction, VideoMatch,
-    VIDEO_EXTENSIONS,
+    ClientMission, MissionIndexEntry, MissionLink, MissionWarning, SdmTemplateIndex,
+    SdmTemplateMatch, VideoInstruction, VideoMatch, VIDEO_EXTENSIONS,
 };
 pub use paths::{ResolvedLegacyPaths, ResolvedPaths};

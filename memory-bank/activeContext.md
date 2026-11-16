@@ -2,17 +2,36 @@
 
 ## Tâche en cours
 
-**Correctif 6 de l'audit frontend : ARIA de l'overlay de logs et assainissement
-CSS (2026-11-16, terminé).** Remédiation d'AUD-FE-12 et d'AUD-FE-10 (D-079) :
-`#logs-column-global` déclare `role="dialog"`, `aria-modal="true"` et
-`aria-labelledby="log-panel-title"`, sans changement JS ; `layout.css` perd les
-règles mortes de `.local-downloads-section` et le grid compact `.steps-column`,
-`controls.css` perd les règles écrasées de `#run-all-steps-button`. Les feuilles
-`downloads.css`, `steps.css` et `workflow-buttons.css` deviennent les sources
-uniques, avec les deux déclarations encore effectives déplacées pour conserver
-les styles calculés. Les douze constats AUD-FE-01 → AUD-FE-12 sont clos.
+**Déclenchement du template SDM par mission (2026-11-16, terminé).** Le lot 216
+(`Alice et Sofiane.mp4`, `Liliane et José.mp4`) a été livré sans préfixe
+`SDM - ` mais avec une mission unique demandant exclusivement `sdm.png` ; le
+pipeline lourd s'est exécuté et A7 a posé un logo statique. D-080 ajoute
+`steps.step8.post.mission_template` (activé en production) : `SdmTemplateIndex`
+résout le couple lot/vidéo, `template::Bypass` et A6 partagent ce match, STEP2
+synchronise le cache email une fois, STEP3–STEP7 le relisent. Le nom reste
+prioritaire, un lot ambigu ou une mission avec un autre logo conserve le
+comportement historique. `template.trigger` et `template.mission` sont
+additifs ; `template.prefix` reste vide pour une mission.
 
 ## Dernière session
+
+- [2026-11-16] **Template SDM par mission (D-080)** :
+  - `workflow-core/src/mission.rs` : `SdmTemplateIndex`, `SdmTemplateMatch`,
+    `sdm_template_instruction` ; règle stricte `sdm.png` exclusif, lot unique,
+    rejet des lots ambigus ;
+  - `workflow-steps/src/template.rs` : `Bypass` accepte les missions et le
+    drapeau `mission_template` ; `probe` garde le profil 1920×1080 25 fps ;
+  - `workflow-steps/src/post/a6.rs` : déclencheur mission après échec des
+    préfixes, champs `trigger` / `mission` additifs ;
+  - `workflow-steps/src/post/{run,direct}.rs` : index construit depuis les
+    missions CLI, A7 dédupliqué comme avant ;
+  - `workflow-cli/src/main.rs` : cache local STEP3–STEP7, synchronisation
+    unique STEP2, `template_bypass` partagé ;
+  - configuration : `mission_template = true` dans `config/config.toml` ;
+  - tests : index mission, ambiguïté, logos multiples, profil 30 fps, A6
+    mission, drapeau désactivé, génération directe ;
+  - documentation : D-080, `LOT-9-POST-STEP8.md`,
+    `CONTRAT-ENVIRONNEMENT.md`, `pipeline-standards.md`, `progress.md`.
 
 - [2026-11-16] **Audit frontend Rust — Correctif 6 (D-079)** :
   - `assets/web/templates/index_new.html` : `#logs-column-global` reçoit

@@ -17,13 +17,82 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-079 → D-060 | ci-dessous |
+| Journal actif récent | D-080 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
 | Écarts legacy | D-027 → D-001 | tableau ci-dessous ; détail `parity/DRIFT.md` |
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
+
+## 2026-11-16 — D-080 : déclenchement du template SDM par mission `sdm.png`
+
+- **Contexte** : `/mnt/cache/216 Camille/docs/Alice et Sofiane.mp4` et
+  `Liliane et José.mp4` ont été livrés sans préfixe `SDM - `. Leur mission
+  `recadrage_lot_216_20261116` demande pourtant uniquement `sdm.png`. Le
+  prédicat historique (`template_prefixes` + `starts_with`) n'a déclenché ni
+  le bypass STEP2–STEP6 ni A6 : les deux vidéos ont traversé TransNetV2,
+  YAMNet/ECAPA, BlazeFace/FaceMesh/EfficientDet, STEP5/6 et le panneau
+  `MediaSolution.jsx`, puis A7 a ajouté `sdm.png` en calque statique. Le
+  `post.json` du lot porte `template: null` et `a6_eligible: 0`.
+- **Décision** :
+  1. `steps.step8.post.mission_template` (défaut `false`, activé dans
+     `config/config.toml`) autorise un second déclencheur, sans remplacer le
+     nommage. Le préfixe reste prioritaire ; la mission n'est consultée
+     qu'après échec de tous les `template_prefixes`.
+  2. Règle stricte : une **mission unique** pour le lot, une instruction vidéo
+     résolue, ni `Pas de logo`, ni `logo_unresolved`, et **exclusivement**
+     `sdm.png` après normalisation (`filename_key`, accents/casse). Un logo
+     supplémentaire (`sdm.png` + sponsor) reste un habillage A7 standard.
+  3. `workflow_core::mission::SdmTemplateIndex` précalcule les couples
+     lot/vidéo éligibles. Un lot porteur de plusieurs missions est exclu en
+     bloc, comme la règle d'ambiguïté A7 : aucun choix « le plus récent ».
+  4. `template::Bypass` consulte l'index (`mode_for_name`, `probe`) et
+     `a6::validate` reçoit le match explicite. Les deux partagent la même
+     source de vérité ; le profil FFprobe 1920×1080 25 fps H.264 reste
+     obligatoire pour STEP2–STEP7, et les contrôles structurels A6 restent
+     inchangés.
+  5. STEP2 synchronise une fois le cache `email_missions` quand le drapeau est
+     actif ; STEP3 à STEP7 relisent le cache local sans réseau. Base absente,
+     cache illisible ou mission non résolue : repli silencieux sur le nommage
+     historique, aucune erreur bloquante.
+  6. `template.trigger` (`name`, `mission`, `none`) et `template.mission`
+     (identifiant) sont ajoutés de façon additive à `post.json`, `audit.json`
+     et aux détails A6. Pour un déclenchement mission, `template.prefix` reste
+     vide, conformément au contrat D-061. A7 conserve sa déduplication : le
+     `sdm.png` inséré par A6 devient `skipped`, jamais dupliqué.
+  7. Arbitrage du précédent lot 131 (`Raymond.mp4`, `sdm.png` sans préfixe) :
+     la règle mission s'applique aussi aux rejeux futurs, car l'intention
+     client est identique. Aucun artefact historique n'est réécrit et aucun
+     seuil de lot n'est codé en dur ; les sorties déjà publiées restent la
+     référence de leur lot. Un rejeu de 131 produirait désormais A6 pour
+     `Raymond`, ce qui est le comportement attendu par la mission.
+- **Validation** : `cargo test --workspace` = 704 tests listés (702 exécutés +
+  2 ignorés, 0 échec), `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts, build release
+  `workflow-server` + `workflow-cli` vert. Rejeu isolé sous
+  `/tmp/opencode/test-lot216` (copie de `216 Camille`, cache email copié,
+  réseau neutralisé) : `post run --direct` crée les deux bruts, A6 applique
+  4 calques (logo, panneau secondaire, panneau principal, fond 180 %), A7
+  déduplique `sdm.png` (`added: []`, `skipped: ["sdm.png"]`),
+  `template.trigger = "mission"`, audit `pass` pour les deux projets.
+  `step7 finalize` avec CSV source retiré synthétise deux `_scenes.csv`
+  mono-segment (`Alice` 1087 frames, `Liliane` 1236 frames),
+  `scenes_origin = "template"`, et les copie en `.csv` dans la sortie
+  finalisée. Un rejeu `post run` sur les bruts panneau déjà présents laisse
+  `Liliane` en revue A6 (segment 49,36 s contre comp 49,44 s) : le correctif ne
+  réécrit jamais un brut existant, la régénération passe par le chemin direct.
+- **Portée / rollback** : additif et opt-in. `mission_template = false`
+  restaure exactement le déclenchement par nommage. Aucun champ existant n'est
+  renommé ni réordonné ; `trigger` et `mission` sont ajoutés en fin de bloc.
+  Les chemins, l'immutabilité du brut et les décisions A1–A5 sont inchangés.
+- **Références** : D-034, D-035, D-061, D-064, D-065, D-066,
+  `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12-A7-MISSIONS.md`,
+  `crates/workflow-core/src/mission.rs`,
+  `crates/workflow-steps/src/template.rs`,
+  `crates/workflow-steps/src/post/a6.rs`,
+  `crates/workflow-steps/src/post/direct.rs`,
+  `crates/workflow-cli/src/main.rs`.
 
 ## 2026-11-16 — D-079 : sémantique modale de l'overlay de logs et assainissement CSS (AUD-FE-10, AUD-FE-12)
 

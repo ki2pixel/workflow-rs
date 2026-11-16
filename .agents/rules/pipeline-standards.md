@@ -21,11 +21,13 @@ Complément technique à `.agents/rules/codingstandards.md` détaillant les inva
 - **STEP7 (Finalisation)** : archive par SHA-256 vidéo vers `paths.finalized`, manifeste `finalized_projects_<ts>.json`, suppression source (`--no-delete`/`--dry-run` en test).
 - **STEP8 (EffectCraft headless)** : `effectcraft-cli run prefs.set … file.runScript` (`scripting.allowScriptsWriteFiles` activé), panel `MediaSolution.jsx` + driver, signaux `MS_BATCH_*`, SIGTERM vers groupe enfant.
 
-## 3. Template direct et bypass (D-034, D-035, D-061)
+## 3. Template direct et bypass (D-034, D-035, D-061, D-080)
 
 - Profil strict : MP4 H.264 1920×1080, pixel aspect 1, 25 fps (±0,1). Requiert `ffprobe`.
 - `template_prefixes` (`M6 - SDM - `, `SDM - `) : saute STEP2–6, STEP7 synthétise un `_scenes.csv` mono-segment, STEP8 génère brut puis assist A6.
-- `archive_only_prefixes` (`W9 - LPHDF`) : STEP7 archive le CSV, STEP8 ignore la vidéo sans `.ecproj`. Préfixes vides ou chevauchants interdits.
+- `mission_template = true` : second déclencheur, consulté seulement après échec des préfixes. Une mission unique du lot doit demander exclusivement `sdm.png` (ni `Pas de logo`, ni logo non résolu, ni second logo). Lot ambigu, cache absent ou vidéo hors profil : repli sur le nommage et pipeline normal.
+- `archive_only_prefixes` (`W9 - LPHDF`) : STEP7 archive le CSV, STEP8 ignore la vidéo sans `.ecproj`. Le mode archive-only reste strictement basé sur le nom. Préfixes vides ou chevauchants interdits.
+- A6 trace `template.trigger` (`name` / `mission` / `none`) et `template.mission` ; `template.prefix` reste vide pour un déclenchement mission.
 
 ## 4. Post-traitement A5/A6/A7 (D-030 → D-069)
 

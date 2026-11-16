@@ -1192,6 +1192,10 @@ pub struct PostConfig {
     /// Préfixes des vidéos qui ne produisent aucun `.ecproj` : STEP2 à STEP6
     /// sont sautés et STEP7 n'archive que le CSV de scènes.
     pub archive_only_prefixes: Vec<String>,
+    /// Déclenche le template SDM par mission email quand la vidéo ne porte
+    /// aucun préfixe : une mission unique du lot doit demander exclusivement
+    /// `sdm.png` (D-080). Désactivé par défaut.
+    pub mission_template: bool,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
     /// Marge de sécurité A1 (D-056) : 1,015, plage recommandée 1,01–1,02.
@@ -1260,6 +1264,7 @@ impl Default for PostConfig {
             artifacts_subfolder: "post".into(),
             template_prefixes: vec!["M6 - SDM - ".into(), "SDM - ".into()],
             archive_only_prefixes: Vec::new(),
+            mission_template: false,
             ffmpeg: PathBuf::from("ffmpeg"),
             ffprobe: PathBuf::from("ffprobe"),
             a1_margin: 1.015,
@@ -1411,6 +1416,17 @@ mod tests {
         assert_eq!(post.a2_logo_detector_min_persistence, 0.70);
         assert_eq!(post.a2_logo_detector_roi, "full");
         assert_eq!(post.a2_logo_detector_device, "cuda");
+        assert!(!post.mission_template);
+    }
+
+    #[test]
+    fn mission_template_flag_is_typed_and_opt_in() {
+        // Given: un TOML explicite avec le déclenchement mission.
+        // When:  la configuration est chargée.
+        // Then:  le champ est typé et reste désactivé par défaut.
+        let config = Config::from_toml("[steps.step8.post]\nmission_template = true\n").unwrap();
+        assert!(config.steps.step8.post.mission_template);
+        assert!(!PostConfig::default().mission_template);
     }
 
     #[test]

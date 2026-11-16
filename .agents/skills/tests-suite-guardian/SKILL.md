@@ -7,7 +7,7 @@ description: Maintenir et exécuter la suite de tests Rust de workflow-rs (tests
 
 ## Portée
 
-- **689 tests listés** : 687 exécutés + 2 ignorés (laboratoire B2), sans
+- **704 tests listés** : 702 exécutés + 2 ignorés (laboratoire B2), sans
   matériel.
 - Tests **inline** dans les modules, sous `#[cfg(test)]`. Il n'y a pas de
   dossier `tests/` d'intégration.

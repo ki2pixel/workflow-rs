@@ -227,6 +227,10 @@ artifacts_subfolder = "post"
 template_prefixes = ["M6 - SDM - ", "SDM - "]
 # Familles sans `.ecproj` : CSV de scènes archivé uniquement.
 archive_only_prefixes = ["W9 - LPHDF"]
+# Déclenchement du template SDM par mission email (D-080) : une mission
+# unique du lot qui demande exclusivement `sdm.png` suffit, même sans
+# préfixe dans le nom (lot 216). Le nommage reste prioritaire.
+mission_template = true
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 # Marge A1 D-056 : médiane humaine 1,0125, 51/65 cas <= 1,015.

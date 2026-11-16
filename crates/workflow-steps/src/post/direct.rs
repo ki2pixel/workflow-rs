@@ -104,7 +104,7 @@ pub fn ensure_for_folders(
     if !options.direct {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
+    let bypass = options.bypass();
     if bypass.is_empty() {
         return summary;
     }
@@ -370,6 +370,46 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
             .join("SDM - Liliane et josé_9x16.ecproj")
             .is_file());
         assert!(!docs.join("SDM - Liliane et josé.csv").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ensure_folder_creates_raw_for_mission_template() {
+        // Given: une mission unique sdm.png et une vidéo sans préfixe.
+        // When:  le dossier est préparé en direct.
+        // Then:  le brut SDM est créé et la vidéo entre dans videoSkipNames.
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("216 Camille");
+        let docs = folder.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("Alice et Sofiane.mp4"), b"video").unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"1088","duration":"43.520000"}]}'
+"#,
+        );
+        let mission = workflow_core::mission::ClientMission::from_body(
+            "recadrage_lot_216_20261116",
+            216,
+            "Lot 216",
+            "Voici les missions pour le lot 216.\n- Alice et Sofiane.mp4 (Logos requis: sdm.png)\n",
+        );
+        let bypass = Bypass::new(&[], &[])
+            .with_mission_template(true)
+            .with_missions(&[mission]);
+        let first = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
+        assert_eq!(first.templates, 1);
+        assert_eq!(first.created, 1);
+        assert_eq!(first.names, vec!["Alice et Sofiane.mp4"]);
+        assert!(folder
+            .join("projets")
+            .join("Alice et Sofiane_9x16.ecproj")
+            .is_file());
+        let second = ensure_folder(&folder, "docs", "projets", &ffprobe, &bypass, false);
+        assert_eq!(second.created, 0);
+        assert_eq!(second.existing, 1);
     }
 
     #[test]

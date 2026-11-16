@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use unicode_normalization::char::is_combining_mark;
 use unicode_normalization::UnicodeNormalization;
@@ -341,6 +341,131 @@ impl ClientMission {
             .file_name()
             .and_then(|name| name.to_str())
             .and_then(extract_lot)
+    }
+}
+
+/// Logo qui identifie une mission de template SDM (D-080).
+pub const SDM_TEMPLATE_LOGO: &str = "sdm.png";
+
+/// Instruction dont la seule demande est le logo `sdm.png`.
+///
+/// La règle est volontairement stricte : `sdm.png` accompagné d'un autre logo
+/// reste un habillage A7 standard, et une mission `Pas de logo` ou non résolue
+/// ne déclenche jamais le template.
+pub fn sdm_template_instruction(instruction: &VideoInstruction) -> bool {
+    if instruction.no_logo || instruction.logo_unresolved {
+        return false;
+    }
+    let mut keys: Vec<String> = instruction
+        .logos
+        .iter()
+        .map(|logo| {
+            Path::new(logo)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(filename_key)
+                .unwrap_or_default()
+        })
+        .filter(|key| !key.is_empty())
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys.len() == 1 && keys[0] == SDM_TEMPLATE_LOGO
+}
+
+/// Mission unique qui demande le template SDM pour une vidéo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdmTemplateMatch {
+    pub mission_id: String,
+    /// Nom de la vidéo tel qu'écrit dans l'email.
+    pub video: String,
+}
+
+#[derive(Debug, Clone)]
+struct SdmTemplateEntry {
+    lot: u32,
+    mission_id: String,
+    video: String,
+    stem_key: String,
+}
+
+/// Index des instructions `sdm.png` par lot.
+///
+/// Un lot porteur de plusieurs missions est entièrement exclu : le pipeline ne
+/// choisit jamais « la mission la plus récente » (même règle que A7). L'index
+/// ne conserve que les couples lot/vidéo sans ambiguïté, ce qui rend le
+/// déclenchement déterministe et sans dépendance au corps complet des emails.
+#[derive(Debug, Clone, Default)]
+pub struct SdmTemplateIndex {
+    entries: Vec<SdmTemplateEntry>,
+}
+
+impl SdmTemplateIndex {
+    pub fn new(missions: &[ClientMission]) -> Self {
+        let mut counts: HashMap<u32, usize> = HashMap::new();
+        for mission in missions {
+            *counts.entry(mission.lot).or_default() += 1;
+        }
+        let mut entries = Vec::new();
+        for mission in missions {
+            if mission.lot == 0 || counts.get(&mission.lot).copied().unwrap_or(0) != 1 {
+                continue;
+            }
+            for instruction in &mission.videos {
+                if !sdm_template_instruction(instruction) {
+                    continue;
+                }
+                entries.push(SdmTemplateEntry {
+                    lot: mission.lot,
+                    mission_id: mission.id.clone(),
+                    video: instruction.filename.clone(),
+                    stem_key: instruction.stem_key.clone(),
+                });
+            }
+        }
+        Self { entries }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Associe un stem (ou un nom de fichier) à une mission SDM unique.
+    pub fn match_stem(&self, lot: Option<u32>, name: &str) -> Option<SdmTemplateMatch> {
+        let lot = lot?;
+        let candidate = filename_key(name);
+        if candidate.is_empty() {
+            return None;
+        }
+        let candidate_stem = strip_video_extension(&candidate);
+        let mut matches: Vec<&SdmTemplateEntry> = self
+            .entries
+            .iter()
+            .filter(|entry| {
+                entry.lot == lot
+                    && (entry.stem_key == candidate || entry.stem_key == candidate_stem)
+            })
+            .collect();
+        matches.dedup_by(|left, right| {
+            left.mission_id == right.mission_id && left.video == right.video
+        });
+        match matches.as_slice() {
+            [entry] => Some(SdmTemplateMatch {
+                mission_id: entry.mission_id.clone(),
+                video: entry.video.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Associe un fichier vidéo en déduisant le lot de ses dossiers parents.
+    pub fn match_path(&self, path: &Path) -> Option<SdmTemplateMatch> {
+        let lot = path
+            .ancestors()
+            .filter_map(ClientMission::lot_from_folder)
+            .next()?;
+        let name = path.file_stem().and_then(|stem| stem.to_str())?;
+        self.match_stem(Some(lot), name)
     }
 }
 
@@ -2240,5 +2365,102 @@ mod tests {
             alias_resolver.resolve("lrdlr"),
             LogoResolution::Found(alias_dir.path().join("Les reines de la route.png"))
         );
+    }
+
+    #[test]
+    fn sdm_template_instruction_requires_sdm_png_alone() {
+        // Given: plusieurs instructions de logo.
+        // When:  la règle de déclenchement SDM est appliquée.
+        // Then:  seul « sdm.png » exclusif est retenu.
+        let instruction = |logos: &[&str]| VideoInstruction {
+            logos: logos.iter().map(|logo| (*logo).to_string()).collect(),
+            ..VideoInstruction::default()
+        };
+        assert!(sdm_template_instruction(&instruction(&["sdm.png"])));
+        assert!(sdm_template_instruction(&instruction(&["SDM.PNG"])));
+        assert!(!sdm_template_instruction(&instruction(&[
+            "sdm.png",
+            "sponsor.png"
+        ])));
+        assert!(!sdm_template_instruction(&instruction(&[])));
+        assert!(!sdm_template_instruction(&instruction(&["sponsor.png"])));
+        let no_logo = VideoInstruction {
+            no_logo: true,
+            ..instruction(&["sdm.png"])
+        };
+        assert!(!sdm_template_instruction(&no_logo));
+        let unresolved = VideoInstruction {
+            logo_unresolved: true,
+            ..instruction(&["sdm.png"])
+        };
+        assert!(!sdm_template_instruction(&unresolved));
+    }
+
+    #[test]
+    fn mission_template_index_matches_a_single_unambiguous_mission() {
+        // Given: une mission unique qui demande sdm.png pour deux vidéos.
+        // When:  l'index associe un stem sans préfixe de nommage.
+        // Then:  le match porte l'identifiant de mission et le nom email.
+        let mission = ClientMission::from_body("recadrage_lot_131", 131, "Lot 131", LOT_131);
+        let index = SdmTemplateIndex::new(&[mission]);
+        let matched = index
+            .match_stem(Some(131), "Raymond")
+            .expect("Raymond doit être reconnu par la mission");
+        assert_eq!(matched.mission_id, "recadrage_lot_131");
+        assert_eq!(matched.video, "Raymond.mp4");
+        assert!(index.match_stem(Some(131), "SDM - Leslie et Léo").is_some());
+    }
+
+    #[test]
+    fn mission_template_index_rejects_ambiguous_lot() {
+        // Given: deux missions pour le même lot.
+        // When:  l'index est construit.
+        // Then:  aucune vidéo du lot ne déclenche le template.
+        let first = ClientMission::from_body("mission-a", 216, "Lot 216", LOT_131);
+        let second = ClientMission::from_body("mission-b", 216, "Lot 216 bis", LOT_131);
+        let index = SdmTemplateIndex::new(&[first, second]);
+        assert!(index.is_empty());
+        assert!(index.match_stem(Some(216), "Raymond").is_none());
+    }
+
+    #[test]
+    fn mission_template_index_requires_lot_and_known_video() {
+        // Given: une mission SDM unique.
+        // When:  le lot est absent ou la vidéo est inconnue.
+        // Then:  aucun match n'est produit.
+        let mission = ClientMission::from_body("recadrage_lot_131", 131, "Lot 131", LOT_131);
+        let index = SdmTemplateIndex::new(&[mission]);
+        assert!(index.match_stem(None, "Raymond").is_none());
+        assert!(index.match_stem(Some(132), "Raymond").is_none());
+        assert!(index.match_stem(Some(131), "Autre vidéo").is_none());
+    }
+
+    #[test]
+    fn mission_template_index_matches_path_from_lot_ancestor() {
+        // Given: un fichier sous un dossier de lot.
+        // When:  le chemin est résolu sans préfixe de nommage.
+        // Then:  le lot est trouvé dans les ancêtres et la mission est associée.
+        let mission = ClientMission::from_body("recadrage_lot_131", 131, "Lot 131", LOT_131);
+        let index = SdmTemplateIndex::new(&[mission]);
+        let matched = index
+            .match_path(Path::new("/tmp/131 Camille/docs/Raymond.mp4"))
+            .expect("le chemin doit être reconnu");
+        assert_eq!(matched.mission_id, "recadrage_lot_131");
+    }
+
+    #[test]
+    fn mission_template_index_ignores_sdm_with_other_logos() {
+        // Given: une mission qui demande sdm.png et un sponsor.
+        // When:  l'index est construit.
+        // Then:  la vidéo reste hors template direct.
+        let mission = ClientMission::from_body(
+            "recadrage_lot_216",
+            216,
+            "Lot 216",
+            "- Alice et Sofiane.mp4 (Logos requis: sdm.png, sponsor.png)\n",
+        );
+        let index = SdmTemplateIndex::new(&[mission]);
+        assert!(index.is_empty());
+        assert!(index.match_stem(Some(216), "Alice et Sofiane").is_none());
     }
 }

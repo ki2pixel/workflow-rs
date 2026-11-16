@@ -11,6 +11,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use workflow_core::mission::{ClientMission, SdmTemplateIndex, SdmTemplateMatch};
 use workflow_schema::round::round_to;
 
 pub const SOURCE_WIDTH: u32 = 1920;
@@ -89,9 +90,15 @@ pub enum BypassMode {
 }
 
 /// Préfixes actifs du bypass direct, résolus vers leur mode.
+///
+/// Le nom reste la source prioritaire. Depuis D-080, une mission unique peut
+/// aussi déclencher le template SDM quand elle demande exclusivement
+/// `sdm.png` ; le mode archive-only reste strictement basé sur le nom.
 #[derive(Debug, Clone, Default)]
 pub struct Bypass {
     entries: Vec<(String, BypassMode)>,
+    missions: SdmTemplateIndex,
+    mission_template: bool,
 }
 
 impl Bypass {
@@ -107,15 +114,32 @@ impl Bypass {
                 entries.push((prefix.clone(), BypassMode::ArchiveOnly));
             }
         }
-        Self { entries }
+        Self {
+            entries,
+            missions: SdmTemplateIndex::default(),
+            mission_template: false,
+        }
     }
 
     pub fn from_config(post: &workflow_core::config::PostConfig) -> Self {
         Self::new(&post.template_prefixes, &post.archive_only_prefixes)
+            .with_mission_template(post.mission_template)
+    }
+
+    /// Attache les missions déjà résolues par la CLI. Sans le drapeau
+    /// `mission_template`, l'index est conservé mais jamais consulté.
+    pub fn with_missions(mut self, missions: &[ClientMission]) -> Self {
+        self.missions = SdmTemplateIndex::new(missions);
+        self
+    }
+
+    pub fn with_mission_template(mut self, enabled: bool) -> Self {
+        self.mission_template = enabled;
+        self
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.entries.is_empty() && (!self.mission_template || self.missions.is_empty())
     }
 
     fn entry_for_name(&self, path: &Path) -> Option<(&str, BypassMode)> {
@@ -125,22 +149,42 @@ impl Bypass {
             .map(|(prefix, mode)| (prefix.as_str(), *mode))
     }
 
-    /// Mode associé au nom, sans sonde ffprobe.
-    pub fn mode_for_name(&self, path: &Path) -> Option<BypassMode> {
-        self.entry_for_name(path).map(|(_, mode)| mode)
+    /// Mission SDM associée au chemin, si le déclenchement mission est actif.
+    pub fn mission_match(&self, path: &Path) -> Option<SdmTemplateMatch> {
+        if !self.mission_template {
+            return None;
+        }
+        self.missions.match_path(path)
     }
 
-    /// Sonde la vidéo si son nom relève d'un préfixe actif et que le profil
-    /// 1920x1080 25 fps est valide.
+    /// Mode associé au nom ou à la mission, sans sonde ffprobe.
+    pub fn mode_for_name(&self, path: &Path) -> Option<BypassMode> {
+        if let Some((_, mode)) = self.entry_for_name(path) {
+            return Some(mode);
+        }
+        self.mission_match(path).map(|_| BypassMode::Template)
+    }
+
+    /// Sonde la vidéo si son nom ou sa mission relève du bypass actif et que
+    /// le profil 1920x1080 25 fps est valide.
     pub fn probe(
         &self,
         ffprobe: &Path,
         video: &Path,
     ) -> Result<Option<(BypassMode, TemplateProbe)>> {
-        let Some((prefix, mode)) = self.entry_for_name(video) else {
+        let mode = if let Some((_, mode)) = self.entry_for_name(video) {
+            mode
+        } else if self.mission_match(video).is_some() {
+            BypassMode::Template
+        } else {
             return Ok(None);
         };
-        Ok(probe_direct(ffprobe, video, prefix)?.map(|probe| (mode, probe)))
+        let probe = probe(ffprobe, video)?;
+        if probe.matches_profile(video) {
+            Ok(Some((mode, probe)))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -578,6 +622,97 @@ printf '%s' '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,
         assert_eq!(bypass.mode_for_name(Path::new("Autre.mp4")), None);
         assert!(Bypass::default().is_empty());
         assert!(Bypass::new(&[], &[]).is_empty());
+    }
+
+    fn lot_216_mission(logos: &str) -> ClientMission {
+        ClientMission::from_body(
+            "recadrage_lot_216_20261116",
+            216,
+            "Média Solution - Missions Recadrage - Lot 216",
+            format!(
+                "Voici les missions pour le lot 216.\n\n\
+                 Recadrage 9:16 standard à faire pour 22h35 (aujourd'hui 16/11) :\n\
+                 - Alice et Sofiane.mp4 (Logos requis: {logos})\n"
+            ),
+        )
+    }
+
+    #[test]
+    fn bypass_accepts_mission_template_without_prefix() {
+        // Given: une mission unique qui demande exclusivement sdm.png.
+        // When:  le déclenchement mission est actif.
+        // Then:  la vidéo sans préfixe est traitée comme template SDM.
+        let missions = vec![lot_216_mission("sdm.png")];
+        let path = Path::new("/tmp/216 Camille/docs/Alice et Sofiane.mp4");
+        let bypass = Bypass::new(&["SDM - ".to_string()], &[])
+            .with_mission_template(true)
+            .with_missions(&missions);
+        assert_eq!(bypass.mode_for_name(path), Some(BypassMode::Template));
+        assert!(bypass.mission_match(path).is_some());
+        assert!(!bypass.is_empty());
+
+        // Given: le drapeau est désactivé.
+        // When:  le même chemin est évalué.
+        // Then:  le nom seul décide et aucun bypass n'est appliqué.
+        let disabled = Bypass::new(&["SDM - ".to_string()], &[]).with_missions(&missions);
+        assert_eq!(disabled.mode_for_name(path), None);
+        assert!(disabled.mission_match(path).is_none());
+    }
+
+    #[test]
+    fn bypass_rejects_mission_with_additional_logo() {
+        // Given: une mission qui demande sdm.png et un autre logo.
+        // When:  la mission est indexée.
+        // Then:  le template direct n'est pas déclenché (TC-SDM-03).
+        let missions = vec![lot_216_mission("sdm.png, sponsor.png")];
+        let path = Path::new("/tmp/216 Camille/docs/Alice et Sofiane.mp4");
+        let bypass = Bypass::new(&[], &[])
+            .with_mission_template(true)
+            .with_missions(&missions);
+        assert_eq!(bypass.mode_for_name(path), None);
+        assert!(bypass.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bypass_probes_mission_template_and_keeps_profile_guard() {
+        // Given: une mission SDM et une sonde ffprobe à deux profils.
+        // When:  la vidéo est sondée par son chemin de lot.
+        // Then:  le profil 1920x1080 25 fps déclenche, le 30 fps non (TC-SDM-04).
+        let dir = tempfile::tempdir().unwrap();
+        let docs = dir.path().join("216 Camille/docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let ffprobe = dir.path().join("ffprobe");
+        crate::test_support::write_executable(
+            &ffprobe,
+            r#"#!/bin/sh
+case "$*" in
+  *30fps*) rate="30/1" ;;
+  *) rate="25/1" ;;
+esac
+printf '{"streams":[{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"sample_aspect_ratio":"1:1","avg_frame_rate":"%s","r_frame_rate":"%s","nb_frames":"531","duration":"21.240000"}]}' "$rate" "$rate"
+"#,
+        );
+        let missions = vec![lot_216_mission("sdm.png")];
+        let bypass = Bypass::new(&[], &[])
+            .with_mission_template(true)
+            .with_missions(&missions);
+        let video = docs.join("Alice et Sofiane.mp4");
+        std::fs::write(&video, b"video").unwrap();
+        assert!(bypass.probe(&ffprobe, &video).unwrap().is_some());
+
+        let out_of_profile = docs.join("Liliane et José 30fps.mp4");
+        std::fs::write(&out_of_profile, b"video").unwrap();
+        let other = vec![ClientMission::from_body(
+            "recadrage_lot_216_20261116",
+            216,
+            "Lot 216",
+            "Voici les missions pour le lot 216.\n- Liliane et José 30fps.mp4 (Logos requis: sdm.png)\n",
+        )];
+        let bypass = Bypass::new(&[], &[])
+            .with_mission_template(true)
+            .with_missions(&other);
+        assert!(bypass.probe(&ffprobe, &out_of_profile).unwrap().is_none());
     }
 
     #[cfg(unix)]

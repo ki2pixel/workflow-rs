@@ -29,7 +29,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use workflow_core::fsutil::write_atomic;
-use workflow_core::mission::ClientMission;
+use workflow_core::mission::{ClientMission, SdmTemplateIndex};
 use workflow_schema::round::round_to;
 
 const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
@@ -47,6 +47,9 @@ pub struct PostOptions {
     pub artifacts_subfolder: String,
     pub template_prefixes: Vec<String>,
     pub archive_only_prefixes: Vec<String>,
+    /// Déclenche le template SDM par mission unique demandant `sdm.png`
+    /// (D-080), même sans préfixe de nommage.
+    pub mission_template: bool,
     pub a1_margin: f64,
     /// R2 : diffère A1 en revue sur candidat A3 fort. Désactivé par défaut.
     pub a1_defer_on_a3: bool,
@@ -107,6 +110,7 @@ impl Default for PostOptions {
             artifacts_subfolder: "post".into(),
             template_prefixes: a6::default_prefixes(),
             archive_only_prefixes: Vec::new(),
+            mission_template: false,
             a1_margin: 1.015,
             a1_defer_on_a3: false,
             a1_refine_native: false,
@@ -141,6 +145,13 @@ impl Default for PostOptions {
 }
 
 impl PostOptions {
+    /// Bypass direct cohérent avec les missions déjà chargées par la CLI.
+    pub fn bypass(&self) -> Bypass {
+        Bypass::new(&self.template_prefixes, &self.archive_only_prefixes)
+            .with_mission_template(self.mission_template)
+            .with_missions(&self.missions)
+    }
+
     pub fn from_config(config: &workflow_core::config::Config, docs_subfolder: &str) -> Self {
         let post = &config.steps.step8.post;
         Self {
@@ -154,6 +165,7 @@ impl PostOptions {
             artifacts_subfolder: post.artifacts_subfolder.clone(),
             template_prefixes: post.template_prefixes.clone(),
             archive_only_prefixes: post.archive_only_prefixes.clone(),
+            mission_template: post.mission_template,
             a1_margin: post.a1_margin,
             a1_defer_on_a3: post.a1_defer_on_a3,
             a1_refine_native: post.a1_refine_native,
@@ -207,7 +219,7 @@ pub fn run_post_for_folders(folders: &[String], options: &PostOptions) -> PostRu
     if !options.enabled {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
+    let bypass = options.bypass();
     // Pré-scan de tous les dossiers : le total A5/A6/A7 est publié avant le
     // premier projet pour que la barre STEP8 couvre aussi cette phase.
     let mut projects = Vec::new();
@@ -238,7 +250,7 @@ pub fn run_post_dir(options: &PostOptions, folder: &Path) -> PostRunSummary {
     if !options.enabled {
         return summary;
     }
-    let bypass = Bypass::new(&options.template_prefixes, &options.archive_only_prefixes);
+    let bypass = options.bypass();
     prepare_direct(options, folder, &bypass, &mut summary);
     let projects = discover_projects(options, folder, &bypass);
     if projects.is_empty() {
@@ -563,8 +575,24 @@ fn run_post_project_inner(
     timings.insert("read_specs_ms".into(), json!(round_to(read_specs_ms, 1)));
 
     let a6_start = Instant::now();
-    let (a6_decisions, template) =
-        a6::validate(&doc, &segments, &meta, &stem, &options.template_prefixes);
+    // Le déclenchement mission est évalué sur le stem du projet, sans jamais
+    // consulter le contenu de la vidéo (D-080). Un lot ambigu ne matche pas.
+    let mission_template = if options.mission_template {
+        SdmTemplateIndex::new(&options.missions).match_stem(
+            ClientMission::lot_from_folder(&project_folder(project)),
+            &stem,
+        )
+    } else {
+        None
+    };
+    let (a6_decisions, template) = a6::validate(
+        &doc,
+        &segments,
+        &meta,
+        &stem,
+        &options.template_prefixes,
+        mission_template.as_ref(),
+    );
     let mut decisions = Vec::new();
     let mut a6_ms = a6_start.elapsed().as_secs_f64() * 1000.0;
     let mut a1_ms = 0.0;
@@ -1680,15 +1708,23 @@ fn audit_checks(
     if !template.matched {
         checks.push(AuditCheck::pass("a6_template", "aucun template demandé"));
     } else if template.eligible == Some(true) {
+        let trigger = match (template.trigger, template.mission.as_deref()) {
+            ("mission", Some(mission)) => format!(" via mission {mission}"),
+            _ => String::new(),
+        };
         checks.push(AuditCheck::pass(
             "a6_template",
-            format!("template {} éligible", template.name),
+            format!("template {} éligible{trigger}", template.name),
         ));
     } else {
+        let trigger = match (template.trigger, template.mission.as_deref()) {
+            ("mission", Some(mission)) => format!(" via mission {mission}"),
+            _ => String::new(),
+        };
         checks.push(AuditCheck::warn(
             "a6_template",
             format!(
-                "template {} détecté mais structure incompatible",
+                "template {} détecté{trigger} mais structure incompatible",
                 template.name
             ),
         ));
@@ -2000,6 +2036,7 @@ mod tests {
                                 "in_point": 0,
                                 "out_point": 2540160000000_i64,
                                 "source": {"type": "Footage", "item": 1},
+                                "switches": {"audio": true},
                                 "props": {"children": [
                                     {"name": "Effects", "children": []},
                                     {"name": "Transform", "children": [
@@ -2131,6 +2168,20 @@ mod tests {
     }
 
     #[test]
+    fn mission_template_flag_is_propagated_from_config() {
+        // Given: un TOML avec le déclenchement mission.
+        // When:  les options de post-traitement sont construites.
+        // Then:  le drapeau est propagé et le défaut reste désactivé.
+        let config = workflow_core::config::Config::from_toml(
+            "[steps.step8.post]\nmission_template = true\n",
+        )
+        .unwrap();
+        let options = PostOptions::from_config(&config, "docs");
+        assert!(options.mission_template);
+        assert!(!PostOptions::default().mission_template);
+    }
+
+    #[test]
     fn always_publishes_an_assist_copy_even_without_media() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("projet");
@@ -2202,6 +2253,74 @@ mod tests {
             .join("projets")
             .join("clip_9x16_assist.ecproj")
             .exists());
+    }
+
+    #[test]
+    fn mission_template_triggers_a6_without_name_prefix() {
+        // Given: un projet mono-segment et une mission unique sdm.png.
+        // When:  le projet ne porte aucun préfixe SDM.
+        // Then:  A6 s'applique et le brut reste intact (TC-SDM-02).
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("216 Camille");
+        fs::create_dir_all(root.join("projets")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let project = root.join("projets").join("clip_9x16.ecproj");
+        let raw = serde_json::to_vec(&project_doc()).unwrap();
+        fs::write(&project, &raw).unwrap();
+        let mission = ClientMission::from_body(
+            "recadrage_lot_216_20261116",
+            216,
+            "Lot 216",
+            "Voici les missions pour le lot 216.\n- clip.mp4 (Logos requis: sdm.png)\n",
+        );
+        let options = PostOptions {
+            direct: true,
+            mission_template: true,
+            missions: vec![mission],
+            ..PostOptions::default()
+        };
+        let outcome = run_post_project(&options, &project, None);
+        assert!(outcome.error.is_none(), "{:?}", outcome.error);
+        assert!(outcome.summary.template_applied);
+        assert_eq!(outcome.summary.a6_eligible, 1);
+        assert_eq!(fs::read(&project).unwrap(), raw);
+        let assist = root.join("projets").join("clip_9x16_assist.ecproj");
+        let assist_doc: Value = serde_json::from_slice(&fs::read(assist).unwrap()).unwrap();
+        assert_eq!(
+            assist_doc["items"]["2"]["kind"]["layers"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+    }
+
+    #[test]
+    fn mission_template_flag_off_keeps_a7_path() {
+        // Given: la même mission sdm.png mais le drapeau D-080 désactivé.
+        // When:  A6 valide le projet.
+        // Then:  aucun template n'est appliqué (repli historique).
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("216 Camille");
+        fs::create_dir_all(root.join("projets")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let project = root.join("projets").join("clip_9x16.ecproj");
+        fs::write(&project, serde_json::to_vec(&project_doc()).unwrap()).unwrap();
+        let mission = ClientMission::from_body(
+            "recadrage_lot_216_20261116",
+            216,
+            "Lot 216",
+            "Voici les missions pour le lot 216.\n- clip.mp4 (Logos requis: sdm.png)\n",
+        );
+        let options = PostOptions {
+            mission_template: false,
+            missions: vec![mission],
+            ..PostOptions::default()
+        };
+        let outcome = run_post_project(&options, &project, None);
+        assert!(outcome.error.is_none());
+        assert!(!outcome.summary.template_applied);
+        assert_eq!(outcome.summary.a6_eligible, 0);
     }
 
     #[test]

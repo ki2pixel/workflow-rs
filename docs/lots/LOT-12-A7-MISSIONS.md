@@ -216,6 +216,9 @@ médias de production n'ont pas été modifiés.
   `0–28.16 s`. `SDM - Leslie et Léo` est éligible A6 ; A6 ajoute `sdm.png`,
   A7 le voit déjà présent, `added: []`, `skipped: ["sdm.png"]`, décision
   `noop`, aucun doublon (4 calques).
+  Depuis D-080, un rejeu futur avec `mission_template = true` déclencherait
+  aussi A6 pour `Raymond` (mission unique `sdm.png`) ; les artefacts du lot 131
+  déjà publiés restent inchangés et ne sont jamais réécrits.
 - **158 — `Pas de logo` réel** : 3 projets, 0 calque mission, sidecars écrits,
   audit `pass` (un `warn` de durée préexistant sur `CABINE`, sans lien A7).
   La variante live du lot 158 qui demande `teva.png` (asset absent) suit le

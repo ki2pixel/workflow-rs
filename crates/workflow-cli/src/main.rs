@@ -1473,6 +1473,105 @@ fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<Client
     missions
 }
 
+/// Applique le même filtre d'expéditeur que `load_missions_for_folders`, pour
+/// que le bypass d'étape et le post-traitement voient la même mission.
+fn filter_media_solution_missions(
+    config: &Config,
+    missions: Vec<ClientMission>,
+) -> Vec<ClientMission> {
+    missions
+        .into_iter()
+        .filter(|mission| {
+            !config.email_proxy.require_media_solution
+                || mission.sender_masked.is_empty()
+                || mission.sender_masked.ends_with("@media-solution.fr")
+        })
+        .collect()
+}
+
+/// Missions du cache local, sans réseau. Utilisé par STEP2 à STEP7 pour le
+/// déclenchement SDM par mission (D-080). Une base absente ou illisible donne
+/// un vecteur vide : le nommage reste le seul déclencheur, sans régression.
+fn load_cached_missions(config: &Config) -> Vec<ClientMission> {
+    if !config.email_proxy.enabled {
+        return Vec::new();
+    }
+    let path = email_db_path(config);
+    if !path.is_file() {
+        return Vec::new();
+    }
+    let store = match EmailMissionStore::open(&path) {
+        Ok(store) => store,
+        Err(error) => {
+            tracing::warn!("email: cache local indisponible: {error:#}");
+            return Vec::new();
+        }
+    };
+    match store.list(1000) {
+        Ok(missions) => filter_media_solution_missions(config, missions),
+        Err(error) => {
+            tracing::warn!("email: lecture du cache local impossible: {error:#}");
+            Vec::new()
+        }
+    }
+}
+
+/// Missions utiles au bypass STEP2 à STEP7. `sync` n'est activé que pour
+/// STEP2, premier maillon de la chaîne : les étapes suivantes relisent le
+/// cache rempli une seule fois.
+fn load_template_missions(config: &Config, sync: bool) -> Vec<ClientMission> {
+    if !config.steps.step8.post.mission_template || !config.email_proxy.enabled {
+        return Vec::new();
+    }
+    if !sync {
+        return load_cached_missions(config);
+    }
+    let store = match open_email_store(config) {
+        Ok(store) => store,
+        Err(error) => {
+            tracing::warn!("email: cache indisponible: {error:#}");
+            return Vec::new();
+        }
+    };
+    match EmailProxyClient::new(&config.email_proxy) {
+        Ok(client) => {
+            match block_on_cli_result(client.sync(&store, config.email_proxy.index_limit, false)) {
+                Ok(report) => tracing::info!(
+                    "email: {} entrée(s), {} détail(s), {} erreur(s)",
+                    report.index_entries,
+                    report.fetched,
+                    report.errors.len()
+                ),
+                Err(error) => {
+                    tracing::warn!("email: synchronisation impossible: {error:#}");
+                }
+            }
+        }
+        Err(error) => tracing::warn!("email: client indisponible: {error:#}"),
+    }
+    filter_media_solution_missions(config, store.list(1000).unwrap_or_default())
+}
+
+/// Bypass direct configuré, enrichi des missions locales quand D-080 est actif.
+fn template_bypass(config: &Config, sync_missions: bool) -> workflow_steps::template::Bypass {
+    template_bypass_with(config, sync_missions, false)
+}
+
+fn template_bypass_with(
+    config: &Config,
+    sync_missions: bool,
+    force: bool,
+) -> workflow_steps::template::Bypass {
+    if !(force || config.steps.step8.post.direct) {
+        return workflow_steps::template::Bypass::default();
+    }
+    let bypass = workflow_steps::template::Bypass::from_config(&config.steps.step8.post);
+    if !config.steps.step8.post.mission_template {
+        return bypass;
+    }
+    bypass.with_missions(&load_template_missions(config, sync_missions))
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("error: {error:#}");
@@ -1978,6 +2077,7 @@ fn run() -> Result<()> {
                 ffmpeg_threads,
             } => {
                 let mut options = Step2Options::from_config(&config, input_dir)?;
+                options.bypass = template_bypass(&config, true);
                 options.force = force;
                 if let Some(model) = model {
                     options.model = model;
@@ -2037,6 +2137,7 @@ fn run() -> Result<()> {
                 logs_dir,
             } => {
                 let mut options = Step3Options::from_config(&config, input_dir)?;
+                options.bypass = template_bypass(&config, false);
                 options.force = force;
                 if let Some(value) = device {
                     options.device = workflow_steps::step3::Step3Device::parse(&value)?;
@@ -2088,6 +2189,7 @@ fn run() -> Result<()> {
                 allow_partial_speaking,
             } => {
                 let mut options = Step4Options::from_config(&config, input_dir)?;
+                options.bypass = template_bypass(&config, false);
                 options.allow_partial_speaking = allow_partial_speaking;
                 if let Some(path) = tflite {
                     options.models.tflite = path;
@@ -2141,11 +2243,7 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
-                    bypass: if config.steps.step8.post.direct {
-                        workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
-                    } else {
-                        workflow_steps::template::Bypass::default()
-                    },
+                    bypass: template_bypass(&config, false),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -2203,11 +2301,7 @@ fn run() -> Result<()> {
                         config.steps.step1.preserved_mov_names.clone()
                     },
                     ffprobe: config.steps.step2.ffprobe.clone(),
-                    bypass: if config.steps.step8.post.direct {
-                        workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
-                    } else {
-                        workflow_steps::template::Bypass::default()
-                    },
+                    bypass: template_bypass(&config, false),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 if !report.success() {
@@ -2264,7 +2358,7 @@ fn run() -> Result<()> {
                     .map_err(|error| anyhow::anyhow!(error))?;
 
                 let bypass = if direct || config.steps.step8.post.direct {
-                    workflow_steps::template::Bypass::from_config(&config.steps.step8.post)
+                    template_bypass_with(&config, false, true)
                 } else {
                     workflow_steps::template::Bypass::default()
                 };

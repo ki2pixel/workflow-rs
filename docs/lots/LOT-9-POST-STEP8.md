@@ -436,6 +436,46 @@ sert jamais à deviner le template ; le préfixe effectivement matché est
 enregistré dans `template.prefix` (`post.json`) et dans les détails de la
 décision A6.
 
+### Déclenchement par mission (D-080)
+
+Depuis le lot 216, le client peut livrer un fichier sans préfixe tout en
+demandant `sdm.png` dans la mission email. Quand
+`steps.step8.post.mission_template = true`, A6 accepte un second déclencheur,
+strictement encadré :
+
+- une seule mission doit exister pour le lot (l'ambiguïté ne choisit jamais
+  « la plus récente ») ;
+- l'instruction doit résoudre la vidéo (même clé insensible aux accents et à
+  la casse que le nom du fichier ou le stem du projet) ;
+- elle doit demander **exclusivement** `sdm.png`, sans `Pas de logo`, sans
+  logo non résolu et sans second logo. `sdm.png, sponsor.png` reste un
+  habillage A7 standard ;
+- le nom préfixé reste prioritaire ; la mission n'est consultée qu'en repli ;
+- STEP2 synchronise le cache email une fois quand le drapeau est actif ;
+  STEP3 à STEP7 relisent le cache local sans réseau ;
+- sans cache mission lisible, le comportement historique est conservé.
+
+Le match est enregistré dans `template.trigger = "mission"` et
+`template.mission = "<id>"` ; `template.prefix` reste vide. A7 s'exécute
+ensuite après A6 et voit `sdm.png` déjà présent : `added: []`,
+`skipped: ["sdm.png"]`, aucun doublon (D-065/D-066).
+
+Le précédent du lot 131 (`Raymond.mp4`, `sdm.png` sans préfixe) est arbitré :
+un rejeu futur appliquerait A6, car l'intention de mission est identique. Les
+artefacts historiques ne sont pas réécrits et aucun seuil de lot n'est codé
+en dur.
+
+#### Matrice de perspectives
+
+| Case ID | Entrée / Précondition | Perspective | Résultat attendu | Notes |
+|---|---|---|---|---|
+| TC-SDM-01 | Nom `M6 - SDM - ` ou `SDM - `, profil conforme | Équivalence — nominal | Bypass STEP2–6, brut direct, assist A6 | Existant D-034/D-061 |
+| TC-SDM-02 | Nom sans préfixe, mission unique `sdm.png` | Équivalence — nouveau nominal | Bypass et A6 si `mission_template = true` ; A7 déduplique | Lot 216 |
+| TC-SDM-03 | Mission `sdm.png` + sponsor | Borne — logos multiples | Pas de template direct ; A7 standard | `sdm_template_instruction` |
+| TC-SDM-04 | Vidéo 4K ou 30 fps, préfixe ou mission SDM | Borne — profil hors norme | Repli pipeline lourd, aucune panique | `probe` + `matches_profile` |
+| TC-SDM-05 | Mission absente, base SQLite absente ou lot ambigu | Borne — repli | Déclenchement par nom uniquement | Aucune erreur bloquante |
+| TC-SDM-06 | Préfixe ET mission `sdm.png` | Équivalence — priorité | `template.trigger = "name"` | Pas de double décision |
+
 Contrôles structurels : un seul segment, aucune keyframe, composition
 1080×1920, segment couvrant toute la composition, parent Null absent ou
 statique, source 1920×1080. Le logo `sdm.png` est optionnel.
@@ -464,9 +504,10 @@ vidéos SDM n'ont donc pas besoin de STEP2 (cuts), STEP3 (audio), STEP4
 `steps.step8.post.direct = true`, une vidéo SDM valide est court-circuitée.
 
 Prédicat volontairement conservateur : nom préfixé par l'un des
-`template_prefixes`, `.mp4`, H.264, 1920×1080, SAR 1:1, 25 fps CFR, durée de
-flux et `nb_frames` valides. Un nom SDM qui ne respecte pas ce profil repart
-dans le pipeline normal.
+`template_prefixes`, ou mission unique demandant exclusivement `sdm.png` quand
+`mission_template = true` (D-080), puis `.mp4`, H.264, 1920×1080, SAR 1:1,
+25 fps CFR, durée de flux et `nb_frames` valides. Un nom SDM ou une mission
+SDM qui ne respecte pas ce profil repart dans le pipeline normal.
 
 - **STEP2 à STEP6** : `SKIP_TEMPLATE` est appliqué avant le chargement des
   modèles et le verrou matériel. Les rapports exposent `skipped_template`.
@@ -489,6 +530,11 @@ dans le pipeline normal.
   normalement.
 - **Post seul** : `workflow-cli post run --direct` crée le brut pour un
   lancement manuel, mais pas en `--report-only`.
+- **Lot déjà traité** : un brut existant n'est jamais écrasé. Pour régénérer un
+  lot livré sans préfixe mais éligible par mission (cas 216), sauvegarder le
+  brut panneau hors de `projets/`, puis relancer `post run --direct` afin que
+  le brut template soit créé et qu'A6 s'applique. Un `post run` seul sur un
+  brut panneau incompatible laisse A6 en revue, sans modification.
 
 Validation :
 
@@ -499,6 +545,7 @@ Validation :
 | Lot mixte 303 + 340 | non-SDM `.ecproj` et `_assist.ecproj` identiques octet pour octet à l'ancien pipeline (chemins normalisés) ; rendu identique à 10/60 s ; SDM `apply` A6, audit `pass` |
 | 116 Camille, nom `SDM - Liliane et josé` (2026-11-09) | rejeu réel sous `/tmp/test-sdm` : préfixe `SDM - ` reconnu, brut + assist, 4 calques A6 (180 %, 84,3497774862575 %, 56,294573830734535 %, logo 100 %), `template.prefix = "SDM - "`, audit `pass`, aucune décision A1–A4 |
 | 116 Camille renommé `M6 - SDM - Liliane et josé` | même résultat avec `template.prefix = "M6 - SDM - "`, aucune régression |
+| 216 Camille, noms sans préfixe, mission unique `sdm.png` (2026-11-16) | rejeu réel sous `/tmp/opencode/test-lot216` : `Bypass` mission détecte les deux vidéos, `post run --direct` crée les bruts, A6 applique 4 calques (`trigger = "mission"`, `prefix = ""`), A7 déduplique `sdm.png` (`skipped`), audit `pass` ; `step7 finalize` synthétise deux `_scenes.csv` mono-segment (`scenes_origin = "template"`) |
 
 ## Bypass archive-only (LPHDF)
 
@@ -546,6 +593,8 @@ artifacts_subfolder = "post"
 template_prefixes = ["M6 - SDM - ", "SDM - "]
 # Familles sans `.ecproj` : CSV de scènes archivé uniquement.
 archive_only_prefixes = ["W9 - LPHDF"]
+# Déclenchement SDM par mission unique demandant exclusivement `sdm.png` (D-080).
+mission_template = true
 ffmpeg = "ffmpeg"
 ffprobe = "ffprobe"
 # Marge A1 D-056 : médiane humaine 1,0125, 51/65 cas <= 1,015.
@@ -571,7 +620,8 @@ a2_logo_catalog = "qa/source_logos.toml"
 `template_prefixes` remplace le champ scalaire `template_prefix`, encore
 accepté comme alias Serde pour les configurations existantes. `config check`
 refuse un préfixe vide et tout chevauchement entre préfixes de template ou
-avec `archive_only_prefixes`.
+avec `archive_only_prefixes`. `mission_template = false` désactive le second
+déclencheur et restaure le comportement strictement basé sur le nom (D-080).
 
 Le timeout `steps.step8.timeout_s` couvre EffectCraft **et** le
 post-traitement lorsque STEP8 est lancé par le serveur. Le coût mesuré du

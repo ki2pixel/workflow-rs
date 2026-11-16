@@ -35,7 +35,8 @@ utilisant les outils disponibles.
 ## Phase 1 : Compréhension du contexte
 1. Lire `memory-bank/activeContext.md`.
 2. Vérifier l'état des tâches avec `list_tasks`.
-3. Lire `AGENTS.md` et `.agents/rules/codingstandards.md`.
+3. Lire `AGENTS.md`, `.agents/rules/codingstandards.md`,
+   `.agents/rules/pipeline-standards.md` et `.agents/rules/test-strategy.md`.
 
 ## Phase 2 : Planification avec Shrimp Task Manager
 1. Créer le brief dans le répertoire de travail du serveur Shrimp (pas dans le
@@ -72,6 +73,8 @@ utilisant les outils disponibles.
 
 # CONTRAINTES
 - Respecter `.agents/rules/codingstandards.md`.
+- Respecter `.agents/rules/pipeline-standards.md`.
+- Respecter `.agents/rules/test-strategy.md`.
 - Ne pas casser l'architecture existante.
 - Ne pas modifier `/home/kidpixel/workflow_mediapipe`.
 - Ne pas écrire dans `/mnt/cache` depuis un test.

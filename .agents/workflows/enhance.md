@@ -21,8 +21,9 @@ transformer une demande brute en spécification technique structurée
 2. Analyser la demande brute (`{{{ input }}}`).
 3. Identifier les skills pertinents dans `.agents/skills/` et lire uniquement
    les `SKILL.md` nécessaires.
-4. Vérifier `AGENTS.md`, `config/config.toml` et les docs de lot si la demande
-   touche une étape.
+4. Vérifier `AGENTS.md`, `.agents/rules/pipeline-standards.md`,
+   `.agents/rules/test-strategy.md`, `config/config.toml` et les docs de lot si
+   la demande touche une étape ou des tests.
 5. Synthétiser dans le format ci-dessous.
 
 ## Format de sortie obligatoire
@@ -42,6 +43,8 @@ vérification des invariants, implémentation, tests, parité]
 
 # CONTRAINTES
 - Respecter `.agents/rules/codingstandards.md`.
+- Respecter `.agents/rules/pipeline-standards.md`.
+- Respecter `.agents/rules/test-strategy.md`.
 - Ne pas casser l'architecture existante.
 - Ne pas modifier `/home/kidpixel/workflow_mediapipe`.
 - Ne pas écrire dans `/mnt/cache` depuis un test.

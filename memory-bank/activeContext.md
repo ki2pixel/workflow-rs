@@ -11,7 +11,8 @@ création de `.antigravityignore` à la racine (exclusion de `target/`, `runtime
 - [2026-11-16] **Modularisation règles Antigravity & ignore (D-073)** :
   - Création de `.antigravityignore` pour filtrer les répertoires volumineux du contexte ;
   - Densification générale de l'ensemble des règles (`pipeline-standards.md` à 4,0 Ko, `v5.md` à 2,9 Ko, `prompt-injection-guard.md` à 3,2 Ko, `codingstandards.md` à 4,8 Ko) ;
-  - 100 % des règles du dépôt sont désormais strictement sous 5,4 Ko, éliminant les alertes IDE de limite de tokens.
+  - 100 % des règles du dépôt sont désormais strictement sous 5,4 Ko, éliminant les alertes IDE de limite de tokens ;
+  - Alignement des workflows `/enhance` et `/enhance_complex` pour référencer systématiquement `pipeline-standards.md` et `test-strategy.md` en plus de `codingstandards.md`.
 - [2026-11-16] **Alignement du standard de codage (D-072)** :
   - §2 : `workflow-steps` expose `template`, `post/`, `qa/`, `vision/` ;
     `workflow-cli` documente `step1`…`step8`, `post`, `qa`, `retention`, `sync`,

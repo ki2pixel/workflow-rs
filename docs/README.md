@@ -4,7 +4,7 @@
 | --- | --- |
 | Type | Index |
 | Statut | Actif |
-| Date | 2026-11-12 |
+| Date | 2026-11-13 |
 | Portée | Navigation, taxonomie et règles de maintenance de `docs/` |
 | Voir aussi | `../README.md`, `../AGENTS.md`, `../parity/DRIFT.md`, `../memory-bank/activeContext.md` |
 
@@ -129,8 +129,10 @@ Ordre de lecture pour une bascule : `SYNC-BACKENDS` → `SWITCH-PUBLIC` →
 Toute nouvelle décision durable suit la convention
 `decisions/DECISION-<SUJET>.md`, avec une entrée datée dans
 [`../memory-bank/decisionLog.md`](../memory-bank/decisionLog.md). Les décisions
-D-063 à D-069 (lots 11 à 12.3) sont consignées dans le journal des décisions et
-dans les fiches `lots/` correspondantes ; elles n'ont pas d'ADR séparé.
+D-063 à D-067 et D-069 (lots 11 à 12.3) sont consignées dans le journal des
+décisions et dans les fiches `lots/` correspondantes ; elles n'ont pas d'ADR
+séparé. D-068 (archivage de la memory-bank) est documentée dans le journal des
+décisions.
 
 ## 7. Études
 

@@ -17,9 +17,9 @@ documentation map `docs/README.md`, and
 - Workflows: `.agents/workflows/`.
 - Project memory: `memory-bank/`; read `activeContext.md` first.
 - Memory-bank protocol: use absolute paths under
-  `/home/kidpixel/workflow-rs/memory-bank/`; relative `memory-bank/...` paths
-  resolve under the `fast-filesystem` MCP root (`/home/kidpixel/kimi-proxy`),
-  outside this repository.
+  `/home/kidpixel/workflow-rs/memory-bank/`. Relative paths such as
+  `memory-bank/...`, `.` or `..` are forbidden for `fast_*` tools: the shared
+  daemon would resolve them against its own cwd, not this repository.
 
 ## Layout
 
@@ -203,3 +203,11 @@ python3 scripts/audit-a7-benchmark.py <audit.json> [--split 2026-10] # Markdown
   and server command mapping in `crates/workflow-server/src/catalog.rs`.
 - Read the relevant `docs/lots/LOT-*.md` before changing a step; it records the
   validated scope, limits and parity evidence.
+
+## MCP fast-filesystem — absolute paths required
+
+- **All `fast_*` tools** (`fast_read_file`, `fast_search_files`, `fast_get_directory_tree`, `fast_list_directory`, `fast_read_multiple_files`, `fast_write_file`) require an **absolute path** under `/home/kidpixel/`.
+- **Forbidden**: `"."`, `"./..."`, `"../..."`, or any relative path. The `fast-filesystem` daemon is shared across projects; a relative path is resolved against its own `cwd`, not this repository, and may silently read another project.
+- **Targeted edits**: use `filesystem-agent.edit_file` (a separate server), not `fast-filesystem`, with an absolute path.
+- **Sanity check**: if a `fast_*` result appears to come from another repository, stop, inspect the `path` field, and retry with an absolute path.
+- **Expected errors**: `-32602 RELATIVE_PATH_UNSUPPORTED`, `-32602 RELATIVE_PATH_ESCAPES_WORKSPACE`, `-32000 PATH_OUTSIDE_ALLOWED_ROOT`.

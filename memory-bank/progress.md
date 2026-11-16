@@ -2,7 +2,7 @@
 
 ## Statut actuel
 
-| Composant | État au 2026-11-13 | Référence |
+| Composant | État au 2026-11-16 | Référence |
 | --- | --- | --- |
 | Pipeline STEP1 → STEP8 | Huit étapes portées et validées ; STEP7 publie et archive, STEP8 est headless (`effectcraft-cli`). | `docs/lots/LOT-*.md`, `parity/DRIFT.md` |
 | Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` toujours publié. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
@@ -19,6 +19,9 @@
   si le serveur est démarré.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock` ; runtime `runtime/`, sortie
   finalisée `/mnt/cache`.
+- 2026-11-16 : synchronisation documentaire post-D-069 (contrat `1.9`,
+  `docs/README.md`, `activeContext` et ce fichier) ; aucun changement de code,
+  de configuration ou de production.
 
 ## Synthèse des Lots
 

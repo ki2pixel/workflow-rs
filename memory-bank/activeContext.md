@@ -2,23 +2,23 @@
 
 ## Tâche en cours
 
-**Résilience A7 sur asset local corrompu (2026-11-13, implémenté et validé,
-D-069).**
-Un logo présent dans `docs/` mais illisible ne masque plus la banque centrale.
-Cas réel : `183`/`186 Camille`, `docs/LFAUIT.png` de 15 octets ASCII sans
-signature PNG. `LogoResolver::resolve_fallback_target` réinterroge la seule
-banque ; si l'homologue central passe la sonde, A7 l'insère en
-`central_fallback` et le sidecar `schema: 2` reçoit le warning additif
-`local_asset_corrupted_fallback_used` (`decision: apply`). Si le repli échoue,
-l'erreur locale `asset_unreadable` / `asset_dimensions` est conservée et la
-mission reste en `review`. Le brut, les assets de `docs/` et
-`MediaSolution.jsx` ne sont pas modifiés ; seul le sidecar A7 est ajouté.
-Suite workspace : 675 tests listés (673 exécutés + 2 ignorés),
-`fmt` et clippy verts. Détail : `docs/lots/LOT-12.2-BANQUE-CENTRALE.md` ;
-décision D-069. Aucun `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
+**Synchronisation documentaire post-D-069 (2026-11-16, terminé).**
+Le contrat passe en version 1.9 : la section D-069 sur le repli central d'un
+asset local corrompu était présente depuis le 2026-11-13 sans bump de version.
+`docs/README.md` reprend la date de la dernière révision et distingue D-068
+(archivage de la memory-bank) des décisions de lot. Le décompte de tests de
+`activeContext` est aligné sur la mesure réelle : 675 tests listés
+(673 exécutés + 2 ignorés). Aucun code, `.ecproj`, `runtime/`,
+`config/config.toml` ni `/mnt/cache` modifié.
 
 ## Dernière session
 
+- [2026-11-16] **Synchronisation documentaire post-D-069** :
+  - contrat `1.8` → `1.9`, date `2026-11-13` ; contenu D-069 déjà présent ;
+  - `docs/README.md` daté `2026-11-13`, renvoi D-068 clarifié ;
+  - `activeContext` et `progress.md` alignés sur 675 tests ; `fmt`, clippy et
+    `cargo test --workspace -- --list` vérifiés ;
+  - aucun fichier de production modifié.
 - [2026-11-13] **Repli A7 sur asset local corrompu (D-069)** :
   - `LogoResolver::resolve_fallback_target` (workflow-core) et reprise de
     `resolve_assets` (a7) après `asset_unreadable` / `asset_dimensions` ;
@@ -64,7 +64,7 @@ décision D-069. Aucun `.ecproj`, `runtime/` ou `/mnt/cache` modifié.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 674 tests unitaires listés (672 exécutés + 2 ignorés) ; pas de CI.
+- 675 tests unitaires listés (673 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.

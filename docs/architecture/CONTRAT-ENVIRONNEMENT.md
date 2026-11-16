@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.8 |
-| Date | 2026-11-12 |
+| Version | 1.9 |
+| Date | 2026-11-13 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 

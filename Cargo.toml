@@ -38,6 +38,7 @@ png = "0.18"
 rustfft = "6.2"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 percent-encoding = "2"
+url = "2"
 reqwest = { version = "0.12", default-features = false, features = ["native-tls", "stream", "json", "charset", "http2"] }
 ctrlc = { version = "3", features = ["termination"] }
 libc = "0.2"

@@ -162,12 +162,97 @@ fn is_public_ipv4(address: Ipv4Addr) -> bool {
         || cgnat)
 }
 
+/// Refuse une URL dont l'hôte est une IP littérale non publique.
+///
+/// `PublicOnlyResolver` ne voit que les noms de domaine : hyper se connecte
+/// directement à une IP littérale sans passer par le résolveur DNS. Cette
+/// validation couvre donc l'URL initiale et chaque cible de redirection.
+fn validate_url_host(
+    url: &reqwest::Url,
+    allow_private: bool,
+) -> std::result::Result<(), io::Error> {
+    if allow_private {
+        return Ok(());
+    }
+    match url.host() {
+        Some(url::Host::Ipv4(ip)) if !is_public_ipv4(ip) => Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!("IP littérale non publique refusée: {ip}"),
+        )),
+        Some(url::Host::Ipv6(ip)) if !is_public_ip(IpAddr::V6(ip)) => Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!("IPv6 littérale non publique refusée: {ip}"),
+        )),
+        Some(_) => Ok(()),
+        None => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "hôte absent de l'URL",
+        )),
+    }
+}
+
+fn validate_request_url(raw_url: &str, allow_private: bool) -> std::result::Result<(), io::Error> {
+    let url = reqwest::Url::parse(raw_url).map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("URL invalide: {error}"),
+        )
+    })?;
+    validate_url_host(&url, allow_private)
+}
+
+/// Politique de redirection bornée qui réapplique le filtre anti-SSRF à
+/// chaque saut. `previous()` inclut l'URL initiale : `> 3` autorise donc
+/// exactement trois redirections, comme l'ancien `Policy::limited(3)`.
+fn redirect_policy(allow_private: bool) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        if attempt.previous().len() > 3 {
+            return attempt.error(io::Error::new(
+                io::ErrorKind::TooManyLinks,
+                "plus de trois redirections",
+            ));
+        }
+        match validate_url_host(attempt.url(), allow_private) {
+            Ok(()) => attempt.follow(),
+            Err(error) => attempt.error(error),
+        }
+    })
+}
+
+fn refused_url_result(
+    download_id: String,
+    filename: String,
+    url: String,
+    error: &io::Error,
+    progress: Option<&ProgressCallback>,
+) -> DownloadResult {
+    let message = format!("URL refusée: {error}");
+    if let Some(callback) = progress {
+        callback("failed", 0, &message);
+    }
+    DownloadResult {
+        success: false,
+        download_id,
+        filename,
+        filepath: None,
+        size_bytes: 0,
+        message,
+        status: "failed".into(),
+        status_code: None,
+        error_kind: Some(ErrorKind::Auth),
+        bytes_downloaded: 0,
+        attempts: 0,
+        resumed_from: 0,
+        url: Some(url),
+    }
+}
+
 impl Downloader {
     pub fn new(config: &DownloadConfig) -> Result<Self> {
         let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(config.connect_timeout_s.max(1)))
             .read_timeout(Duration::from_secs(config.chunk_timeout_s.max(1)))
-            .redirect(reqwest::redirect::Policy::limited(3))
+            .redirect(redirect_policy(config.allow_private_hosts))
             .user_agent(USER_AGENT);
         if !config.allow_private_hosts {
             builder = builder.dns_resolver(Arc::new(PublicOnlyResolver));
@@ -200,6 +285,18 @@ impl Downloader {
         let mut modified_url = normalized.replace("dl=0", "dl=1");
         tracing::info!("DOWNLOAD [{job_label} ID: {download_id}]: départ depuis {modified_url}");
 
+        if let Err(error) = validate_request_url(&modified_url, self.config.allow_private_hosts) {
+            tracing::error!("DOWNLOAD [{job_label}]: {error}");
+            let filename = resolve_target_filename(forced_filename, "", timestamp, &modified_url);
+            return refused_url_result(
+                download_id,
+                filename,
+                modified_url,
+                &error,
+                progress.as_ref(),
+            );
+        }
+
         let probe = self.probe(&modified_url).await;
         tracing::debug!(
             "DOWNLOAD [{job_label}]: HEAD status={:?} type='{}' length={:?} range={}",
@@ -217,6 +314,20 @@ impl Downloader {
         {
             let alternative = rewrite_dropbox_to_dl_host(&modified_url);
             if alternative != modified_url {
+                if let Err(error) =
+                    validate_request_url(&alternative, self.config.allow_private_hosts)
+                {
+                    tracing::error!("DOWNLOAD [{job_label}]: {error}");
+                    let filename =
+                        resolve_target_filename(forced_filename, "", timestamp, &alternative);
+                    return refused_url_result(
+                        download_id,
+                        filename,
+                        alternative,
+                        &error,
+                        progress.as_ref(),
+                    );
+                }
                 tracing::info!("DOWNLOAD [{job_label}]: essai dl.dropboxusercontent.com");
                 modified_url = alternative;
             }
@@ -373,6 +484,10 @@ impl Downloader {
     }
 
     async fn probe(&self, url: &str) -> ProbeResult {
+        if let Err(error) = validate_request_url(url, self.config.allow_private_hosts) {
+            tracing::warn!("DOWNLOAD: HEAD refusé ({error})");
+            return ProbeResult::default();
+        }
         let request = self
             .client
             .head(url)
@@ -538,6 +653,12 @@ impl Downloader {
         if let Err(error) = file.flush().await {
             return local_io_failure(error, effective_offset + written);
         }
+        // Le renommage final ne suffit pas : sans fsync, une coupure peut
+        // laisser un .zip tronqué alors que l'historique SQLite a déjà
+        // enregistré l'URL comme téléchargée.
+        if let Err(error) = file.sync_all().await {
+            return local_io_failure(error, effective_offset + written);
+        }
 
         let total_on_disk = effective_offset + written;
         if let Some(expected) = expected_total {
@@ -635,6 +756,9 @@ impl Downloader {
                 ),
             );
         }
+        // Le fichier est déjà synchronisé ; l'échec de fsync du répertoire
+        // reste non bloquant, comme dans `fsutil::publish`.
+        workflow_core::fsutil::sync_parent(target_path);
         (true, ErrorKind::Internal, String::new())
     }
 
@@ -1147,6 +1271,99 @@ mod tests {
         assert!(PublicOnlyResolver.resolve(name).await.is_err());
     }
 
+    #[tokio::test]
+    async fn refuses_private_literal_ip_before_any_network_call() {
+        let config = DownloadConfig {
+            allow_private_hosts: false,
+            backoff_s: 0.0,
+            max_attempts: 1,
+            ..DownloadConfig::default()
+        };
+        let downloader = Downloader::new(&config).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        for url in [
+            "http://127.0.0.1:5003/fichier.zip",
+            "http://192.168.1.5/fichier.zip",
+            "http://10.0.0.1/fichier.zip",
+        ] {
+            let result = downloader
+                .download(
+                    url,
+                    "2026-11-16 10:00:00",
+                    dir.path(),
+                    Some("refuse.zip"),
+                    None,
+                )
+                .await;
+            assert!(!result.success, "{url}");
+            assert_eq!(result.error_kind, Some(ErrorKind::Auth), "{url}");
+            assert_eq!(result.status_code, None, "{url}");
+            assert_eq!(result.attempts, 0, "{url}");
+            assert!(!dir.path().join("refuse.zip").exists(), "{url}");
+            assert!(!dir.path().join("refuse.zip.part").exists(), "{url}");
+        }
+        for url in [
+            "http://127.0.0.1:5003/fichier.zip",
+            "http://192.168.1.5/fichier.zip",
+        ] {
+            let parsed = reqwest::Url::parse(url).unwrap();
+            assert!(validate_url_host(&parsed, true).is_ok(), "{url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn refuses_redirect_to_private_literal_ip() {
+        async fn redirect() -> Response {
+            Response::builder()
+                .status(AxumStatus::FOUND)
+                .header("location", "http://192.168.1.5/fichier.zip")
+                .body(Body::empty())
+                .unwrap()
+        }
+        let app = Router::new().route("/redirect", get(redirect).head(redirect));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let config = DownloadConfig {
+            allow_private_hosts: false,
+            backoff_s: 0.0,
+            max_attempts: 1,
+            ..DownloadConfig::default()
+        };
+        // Le nom public est résolu vers le mock local : l'URL initiale passe
+        // le filtre, seule la cible de la redirection doit être refusée.
+        let client = Client::builder()
+            .redirect(redirect_policy(false))
+            .resolve("public.example", address)
+            .no_proxy()
+            .build()
+            .unwrap();
+        let downloader = Downloader { client, config };
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("http://public.example:{}/redirect", address.port());
+        let result = downloader
+            .download(
+                &url,
+                "2026-11-16 10:00:00",
+                dir.path(),
+                Some("redirige.zip"),
+                None,
+            )
+            .await;
+        handle.abort();
+        assert!(!result.success);
+        assert_eq!(
+            result.error_kind,
+            Some(ErrorKind::Network),
+            "{}",
+            result.message
+        );
+        assert!(!dir.path().join("redirige.zip").exists());
+        assert!(!dir.path().join("redirige.zip.part").exists());
+    }
+
     #[test]
     fn sanitizes_and_extracts_filenames() {
         assert_eq!(sanitize_filename("61 Camille.zip", 230), "61_Camille.zip");
@@ -1366,6 +1583,27 @@ mod tests {
         assert_eq!(result.error_kind, Some(ErrorKind::NotFound));
         assert_eq!(result.status_code, Some(404));
         assert_eq!(result.attempts, 1);
+    }
+
+    #[tokio::test]
+    async fn finalizes_download_with_file_and_parent_sync() {
+        let payload = zip_bytes(1024);
+        let dir = tempfile::tempdir().unwrap();
+        let part = dir.path().join("archive.zip.part");
+        let target = dir.path().join("archive.zip");
+        std::fs::write(&part, &payload).unwrap();
+        let (finalized, kind, message) = downloader()
+            .finalize_download(
+                &part,
+                &target,
+                "application/zip",
+                "https://server.kidpixel.workers.dev/dropbox/a/b/archive.zip",
+                Some(payload.len() as u64),
+            )
+            .await;
+        assert!(finalized, "{kind:?}: {message}");
+        assert_eq!(std::fs::read(&target).unwrap(), payload);
+        assert!(!part.exists());
     }
 
     #[tokio::test]

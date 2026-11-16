@@ -2698,6 +2698,7 @@ dependencies = [
  "axum",
  "chrono",
  "futures-util",
+ "parking_lot",
  "percent-encoding",
  "regex",
  "reqwest",
@@ -2708,6 +2709,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "url",
  "workflow-core",
  "zip",
 ]

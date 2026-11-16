@@ -4,7 +4,7 @@ Ce document enregistre les décisions architecturales et techniques durables de
 workflow-rs. Les écarts de comportement legacy sont détaillés dans
 `parity/DRIFT.md`.
 
-> **Politique de conservation** : les décisions actives D-041 → D-069 restent
+> **Politique de conservation** : les décisions actives D-041 → D-070 restent
 > en texte intégral. L'historique de bootstrap, les audits d'octobre 2026, les
 > décisions fondatrices D-028 → D-040 et les brouillons D-058 sont conservés
 > dans
@@ -17,13 +17,59 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-069 → D-060 | ci-dessous |
+| Journal actif récent | D-070 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
 | Écarts legacy | D-027 → D-001 | tableau ci-dessous ; détail `parity/DRIFT.md` |
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
+
+## 2026-11-16 — D-070 : durcissement P1 de workflow-ingest
+
+- **Contexte** : l'audit de robustesse du backend Rust
+  (`docs/audits/2026-11-16-audit-backend-rust.md`) identifie trois constats P1
+  dans `workflow-ingest` : contournement du filtre anti-SSRF par IP littérale
+  (AUD-01), `std::sync::Mutex` avec `.expect()` et SQLite bloquant dans un
+  contexte async (AUD-02), absence de `fsync` avant et après le renommage
+  final (AUD-03).
+- **Décision — anti-SSRF (AUD-01)** : `validate_url_host` refuse toute IP
+  littérale non publique (`is_public_ipv4` / `is_public_ip`) sur l'URL
+  initiale, avant `probe` et avant `GET`. La politique
+  `reqwest::redirect::Policy::custom` réapplique le même filtre à chaque saut
+  et conserve la borne de trois redirections de l'ancien `limited(3)`.
+  `allow_private_hosts = true` reste l'échappatoire explicite des tests locaux
+  et des déploiements internes ; un refus produit `ErrorKind::Auth` sans
+  contacter le réseau ni créer de `.part`.
+- **Décision — verrous et async (AUD-02)** : `HistoryRepository`,
+  `EmailMissionStore` et le cache d'index de `EmailProxyClient` passent à
+  `parking_lot::Mutex`, qui ne s'empoisonne pas : les `.expect("... verrouillé")`
+  disparaissent. Dans `EmailProxyClient::sync`, `needs_detail` et `upsert`
+  sont exécutés par `tokio::task::spawn_blocking` ; un `JoinError` est converti
+  en `IngestError::Message` et remonte dans `report.errors`, sans bloquer un
+  worker Tokio pendant le `busy_timeout` de 30 s.
+- **Décision — durabilité (AUD-03)** : `stream_to_part` exécute
+  `file.sync_all().await` après `flush` ; une erreur reste un
+  `ErrorKind::LocalIo` avec l'offset courant. `finalize_download` appelle
+  `workflow_core::fsutil::sync_parent(target_path)` juste après le `rename`
+  atomique ; l'échec de fsync du répertoire reste non bloquant, comme dans
+  `fsutil::publish`.
+- **Conséquences** : aucune signature publique hors `workflow-ingest` ne
+  change. `url = "2"` devient une dépendance directe du crate (déjà
+  verrouillée dans `Cargo.lock` via `reqwest`) pour nommer `url::Host`. Les
+  tests du service d'ingestion activent explicitement
+  `allow_private_hosts = true` pour leurs mocks sur `127.0.0.1` ; les tests de
+  téléchargement couvrent le refus direct, le refus de redirection et la
+  finalisation durable.
+- **Validation** : `cargo test -p workflow-ingest` 55/55 ; suite workspace
+  678 tests listés (676 exécutés + 2 ignorés), 0 échec ; `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts. Aucun
+  fichier de `runtime/`, `/mnt/cache` ou du dépôt Python legacy modifié.
+- **Portée / rollback** : correctifs additifs et locaux au crate. Retirer
+  `validate_url_host`/`redirect_policy` et revenir à `Policy::limited(3)`
+  rétablit le comportement AUD-01 ; revenir à `std::sync::Mutex` et aux appels
+  directs dans `sync` rétablit AUD-02 ; supprimer les deux synchronisations
+  rétablit AUD-03.
 
 ## 2026-11-13 — D-069 : A7 — repli central sur asset local corrompu
 

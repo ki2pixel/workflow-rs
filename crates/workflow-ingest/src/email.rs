@@ -8,12 +8,13 @@
 
 use crate::error::{IngestError, IngestResult};
 use chrono::{DateTime, Duration, Local, Utc};
+use parking_lot::Mutex;
 use reqwest::Client;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant};
 use workflow_core::config::EmailProxyConfig;
 use workflow_core::mission::{
@@ -119,7 +120,9 @@ impl EmailMissionStore {
         &self,
         action: impl FnOnce(&Connection) -> rusqlite::Result<T>,
     ) -> IngestResult<T> {
-        let connection = self.connection.lock().expect("base email verrouillée");
+        // `parking_lot` ne s'empoisonne pas : une panique sous verrou ne doit
+        // pas condamner le cache de missions pour le reste du processus.
+        let connection = self.connection.lock();
         action(&connection).map_err(|error| IngestError::Message(format!("SQLite email: {error}")))
     }
 
@@ -325,6 +328,20 @@ fn parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
         })
 }
 
+/// Exécute une opération SQLite sous verrou sur le pool bloquant.
+///
+/// `busy_timeout` vaut 30 s : l'appeler directement depuis un worker Tokio
+/// immobiliserait un thread de l'exécuteur pendant toute la contention.
+async fn run_store_task<T, F>(action: F) -> IngestResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> IngestResult<T> + Send + 'static,
+{
+    tokio::task::spawn_blocking(action)
+        .await
+        .map_err(|error| IngestError::Message(format!("tâche SQLite email interrompue: {error}")))?
+}
+
 /// Client du proxy d'emails.
 pub struct EmailProxyClient {
     url: String,
@@ -356,7 +373,7 @@ impl EmailProxyClient {
     pub async fn index(&self, limit: usize) -> IngestResult<Vec<MissionIndexEntry>> {
         let limit = limit.clamp(1, MAX_INDEX_LIMIT);
         {
-            let cache = self.index_cache.lock().expect("cache email verrouillé");
+            let cache = self.index_cache.lock();
             if let Some((fetched_at, entries)) = cache.as_ref() {
                 if fetched_at.elapsed() < self.cache_ttl {
                     return Ok(entries.iter().take(limit).cloned().collect());
@@ -378,7 +395,7 @@ impl EmailProxyClient {
             )));
         }
         let entries = parse_index_text(&text)?;
-        let mut cache = self.index_cache.lock().expect("cache email verrouillé");
+        let mut cache = self.index_cache.lock();
         *cache = Some((Instant::now(), entries.clone()));
         Ok(entries)
     }
@@ -428,7 +445,9 @@ impl EmailProxyClient {
                 report.skipped += 1;
                 continue;
             }
-            match store.needs_detail(entry) {
+            let store_task = store.clone();
+            let entry_task = entry.clone();
+            match run_store_task(move || store_task.needs_detail(&entry_task)).await {
                 Ok(false) if !force => {
                     report.skipped += 1;
                     continue;
@@ -453,14 +472,18 @@ impl EmailProxyClient {
                     if mission.lot == 0 {
                         mission.lot = entry.lot;
                     }
-                    match store.upsert(&mission, &now) {
+                    let store_task = store.clone();
+                    let now_task = now.clone();
+                    match run_store_task(move || store_task.upsert(&mission, &now_task)).await {
                         Ok(updated) => {
                             report.fetched += 1;
                             if updated {
                                 report.updated += 1;
                             }
                         }
-                        Err(error) => report.errors.push(format!("{}: {error}", entry.id)),
+                        Err(error) => {
+                            report.errors.push(format!("{}: {error}", entry.id));
+                        }
                     }
                 }
                 Err(error) => report.errors.push(format!("{}: {error}", entry.id)),

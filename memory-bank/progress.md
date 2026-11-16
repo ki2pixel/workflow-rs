@@ -7,11 +7,11 @@
 | Pipeline STEP1 → STEP8 | Huit étapes portées et validées ; STEP7 publie et archive, STEP8 est headless (`effectcraft-cli`). | `docs/lots/LOT-*.md`, `parity/DRIFT.md` |
 | Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` toujours publié. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
 | Bypass SDM/LPHDF | Bascule directe opt-in pour les profils 1920×1080 25 fps H.264 ; préfixes `M6 - SDM - `, `SDM - ` et `W9 - LPHDF`. | D-034, D-035, D-061 |
-| Ingestion | Webhook Rust, normalisation d'URL, historique SQLite, téléchargements R2/Dropbox ; un seul moniteur actif. | `docs/lots/LOT-8-INGESTION.md` |
+| Ingestion | Webhook Rust, normalisation d'URL, historique SQLite, téléchargements R2/Dropbox ; un seul moniteur actif. Audit P1 remédié (D-070) : anti-SSRF sur IP littérales et redirections, `parking_lot`, SQLite hors workers Tokio, `fsync` des archives. | `docs/lots/LOT-8-INGESTION.md`, `docs/audits/2026-11-16-audit-backend-rust.md` |
 | Serveur `:5004` | axum, une étape à la fois (409), arrêt `stopping` puis SIGTERM/SIGKILL ; Python `:5003` arrêté, rollback disponible. | `docs/lots/LOT-5-ORCHESTRATOR.md` |
 | QA read-only | Schéma `1.5.0`, cache 12, masque des `.mov` alpha (12–24 frames), DINOv2 opt-in. | D-049, D-051, D-067 |
 | Parité | STEP2/3/4 à `1e-6`, shadow `162/162`, CSV/JSON contractuels préservés. | `parity/DRIFT.md`, `docs/validation/VALIDATION-STEP1-8.md` |
-| Tests et outillage | 675 tests listés (673 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
+| Tests et outillage | 678 tests listés (676 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
 
 - Backend de production : Rust `:5004` headless via `scripts/switch-rust.sh` ;
   interface web legacy `assets/web` uniquement (D-028).
@@ -19,6 +19,11 @@
   si le serveur est démarré.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock` ; runtime `runtime/`, sortie
   finalisée `/mnt/cache`.
+- 2026-11-16 : remédiation des constats P1 de l'audit backend Rust (D-070) —
+  anti-SSRF sur IP littérales et chaîne de redirections, `parking_lot::Mutex`
+  sans empoisonnement, SQLite déporté hors des workers Tokio dans
+  `EmailProxyClient::sync`, `sync_all`/`sync_parent` des archives. Suite
+  workspace : 678 tests listés (676 exécutés + 2 ignorés), 0 échec.
 - 2026-11-16 : synchronisation documentaire post-D-069 (contrat `1.9`,
   `docs/README.md`, `activeContext` et ce fichier) ; aucun changement de code,
   de configuration ou de production.

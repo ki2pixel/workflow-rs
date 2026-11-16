@@ -7,11 +7,12 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, NaiveDateTime};
+use parking_lot::Mutex;
 use rusqlite::{params, Connection, OpenFlags};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct FailureRecord {
@@ -90,7 +91,9 @@ impl HistoryRepository {
     }
 
     pub fn with_connection<T>(&self, action: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        let connection = self.connection.lock().expect("base verrouillée");
+        // `parking_lot` ne s'empoisonne pas : une panique d'un lecteur ne doit
+        // pas rendre l'historique définitivement inaccessible au moniteur.
+        let connection = self.connection.lock();
         action(&connection)
     }
 

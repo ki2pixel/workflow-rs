@@ -580,6 +580,9 @@ mod tests {
         config.webhook.interval_s = 15;
         config.webhook.cache_ttl_s = 0;
         config.download.backoff_s = 0.0;
+        // Les mocks écoutent sur 127.0.0.1 : le filtre anti-SSRF doit être
+        // explicitement désactivé pour ces tests d'intégration locaux.
+        config.download.allow_private_hosts = true;
         config
     }
 

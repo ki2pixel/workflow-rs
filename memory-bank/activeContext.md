@@ -2,16 +2,28 @@
 
 ## Tâche en cours
 
-**Synchronisation documentaire post-D-069 (2026-11-16, terminé).**
-Le contrat passe en version 1.9 : la section D-069 sur le repli central d'un
-asset local corrompu était présente depuis le 2026-11-13 sans bump de version.
-`docs/README.md` reprend la date de la dernière révision et distingue D-068
-(archivage de la memory-bank) des décisions de lot. Le décompte de tests de
-`activeContext` est aligné sur la mesure réelle : 675 tests listés
-(673 exécutés + 2 ignorés). Aucun code, `.ecproj`, `runtime/`,
-`config/config.toml` ni `/mnt/cache` modifié.
+**Remédiation des constats P1 de l'audit backend Rust (2026-11-16, terminé).**
+Les trois actions immédiates de `docs/audits/2026-11-16-audit-backend-rust.md`
+sont implémentées dans `workflow-ingest` (D-070) : validation anti-SSRF des IP
+littérales sur l'URL initiale et chaque redirection, `parking_lot::Mutex` sans
+empoisonnement avec SQLite déporté hors des workers Tokio dans
+`EmailProxyClient::sync`, et `sync_all`/`sync_parent` des archives
+téléchargées. Suite workspace : 678 tests listés (676 exécutés + 2 ignorés).
+Aucun `.ecproj`, `runtime/`, `config/config.toml` ni `/mnt/cache` modifié.
 
 ## Dernière session
+
+- [2026-11-16] **Audit backend Rust — actions P1 (D-070)** :
+  - `download.rs` : `validate_url_host` sur l'URL initiale, `probe` et
+    `redirect_policy` personnalisée (3 sauts) ; refus typé `ErrorKind::Auth` ;
+  - `history.rs`/`email.rs` : `parking_lot::Mutex`, suppression des
+    `.expect("... verrouillé")`, `spawn_blocking` pour `needs_detail`/`upsert` ;
+  - `download.rs` : `file.sync_all()` après `flush`, `sync_parent` après
+    `rename` ;
+  - 3 tests ajoutés (refus direct, refus de redirection, finalisation
+    durable) ; 55 tests `workflow-ingest`, 678 listés au workspace ;
+  - `fmt`, clippy et `cargo test --workspace` verts ; aucun fichier de
+    production modifié.
 
 - [2026-11-16] **Synchronisation documentaire post-D-069** :
   - contrat `1.8` → `1.9`, date `2026-11-13` ; contenu D-069 déjà présent ;
@@ -64,9 +76,11 @@ asset local corrompu était présente depuis le 2026-11-13 sans bump de version.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 675 tests unitaires listés (673 exécutés + 2 ignorés) ; pas de CI.
+- 678 tests unitaires listés (676 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
+- Audit backend du 2026-11-16 : actions P1 (AUD-01, AUD-02, AUD-03) remédiées
+  et testées (D-070) ; constats P2/P3 ouverts.
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock`.
 - Runtime : `runtime/` ; sortie finalisée : `/mnt/cache`.

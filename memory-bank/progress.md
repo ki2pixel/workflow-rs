@@ -20,6 +20,66 @@
   si le serveur est démarré.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock` ; runtime `runtime/`, sortie
   finalisée `/mnt/cache`.
+- 2026-11-16 : audit frontend Rust, Correctif 6 (AUD-FE-10, AUD-FE-12,
+  D-079) — `#logs-column-global` porte `role="dialog"`, `aria-modal="true"` et
+  `aria-labelledby="log-panel-title"`, sans modification de `popupManager.js`
+  ni de `uiUpdater.js`. `layout.css` perd les règles mortes de
+  `.local-downloads-section` et le grid compact `.steps-column` ;
+  `controls.css` perd les règles écrasées de `#run-all-steps-button`.
+  `components/downloads.css`, `components/steps.css` et
+  `components/workflow-buttons.css` deviennent les sources uniques, avec
+  `transition: opacity` (mode compact) et `min-height: var(--touch-target-min)`
+  déplacées pour conserver les styles calculés. A/B Firefox 158 headless à
+  1400 px et 700 px : styles et tailles identiques, seuls quatre longhands grid
+  inertes diffèrent sous `display: flex` ; `tinycss2` 0 erreur, assertions ARIA
+  dans le test de rendu Minijinja, tests serveur ciblés,
+  `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés), `fmt`,
+  clippy et `git diff --check` verts. Les douze constats AUD-FE-01 → AUD-FE-12
+  sont clos.
+- 2026-11-16 : audit frontend Rust, Correctif 5 (AUD-FE-07, AUD-FE-09,
+  AUD-FE-11, D-078) — `WorkerManager` résout `null` sur une réponse périmée
+  (chemin Worker et fallback synchrone) au lieu de rejeter, donc
+  `unhandledrejection` n'affiche plus d'erreur pendant les rafraîchissements
+  rapides de logs ; `destroy()` est attaché à `beforeunload` ;
+  `updateSpecificLogUI`/`updateMainLogOutputUI` ignorent `null`. Les sept
+  imports de `PollingManager.js` perdent le suffixe `?v=20261025a` (Axum force
+  déjà la revalidation). L'aperçu CSV affiche les huit étapes canoniques et
+  « étapes 1-8 ». `node --check` sur neuf modules, harnais Node 6/6 et 5/5,
+  tests serveur ciblés, `cargo test --workspace`, `fmt`, clippy et
+  `git diff --check` verts ; contrats HTTP/JSON/CSV et zéro-build inchangés.
+- 2026-11-16 : audit frontend Rust, Correctif 4 (AUD-FE-08, D-077) — les six
+  `box-shadow` de `steps.css` (survol, focus, sélection, statut `running`) et
+  de `csv-workflow-prompt.css` (`.workflow-launch-btn` et son survol) passent
+  de `rgba(var(--*-rgb), <alpha>)` à `rgb(var(--*-rgb) / <alpha>)`. La première
+  forme se résout en `rgba(121 134 203, 0.3)`, invalide en CSS Color 4 et donc
+  ignorée par le moteur ; les ombres sont désormais rendues. Aucune valeur
+  d'alpha, aucun sélecteur, aucun contrat HTTP/JSON/CSV modifié, aucun
+  préprocesseur ajouté. `grep` résiduel vide, `tinycss2` sans erreur, A/B
+  Chromium sur les six déclarations, tests serveur ciblés,
+  `cargo test --workspace`, `fmt` et clippy verts.
+- 2026-11-16 : audit frontend Rust, Correctif 3 (AUD-FE-03, AUD-FE-04,
+  AUD-FE-11, D-076) — `subscribeToProperty()` compare via `_areValuesEqual`
+  (fin des notifications de `csvDownloads` à chaque tick `processInfo`) ;
+  `getStateProperty()` clone profondément les lectures, avec préservation des
+  références hôtes (nœud DOM du focus) ; `reset()` remplace l'état complet et
+  vide réellement `processInfo`, `stepTimers` et `pollingIntervals`, avec 11
+  clés `ui` et `theme: 'dark-pro'`. Harnais Node 15/15, `node --check`, tests
+  serveur ciblés, `cargo test --workspace`, `fmt` et clippy verts ; contrats
+  HTTP/JSON/CSV et architecture zéro-build inchangés.
+- 2026-11-16 : audit frontend Rust, Correctif 2 (AUD-FE-02, AUD-FE-05,
+  D-075) — `generatePerformanceReport()` appelle `errorHandler.getErrorStats()`
+  (fin du `TypeError` périodique) ; `perf-memory-usage`,
+  `perf-periodic-reporting` et `perf-optimizer-stats` passent
+  `{ pauseWhenHidden: true }` ; `sendPerformanceReport()` utilise
+  `this.originalFetch` et transporte `X-Worker-Token`, donc la télémétrie ne
+  pollue plus `metrics.apiCalls`. Payload et handler serveur inchangés ; tests
+  serveur ciblés, `cargo test --workspace`, `fmt` et clippy verts.
+- 2026-11-16 : audit frontend Rust, Correctif 1 (AUD-FE-01, AUD-FE-06,
+  D-074) — `DOMUpdateUtils.escapeHtml` échappe `&`, `<`, `>`, `"` et `'` par
+  remplacements de chaînes sans allocation DOM ; `handleStepFailure` échappe
+  `errorMessage` avant `updateMainLogOutputUI`. Aucun changement des sélecteurs
+  DOM ni des contrats HTTP/JSON/CSV, aucune dépendance Node/npm. Tests serveur
+  ciblés, `cargo test --workspace`, `fmt` et clippy verts.
 - 2026-11-16 : alignement du standard de codage (D-072) — §2 structure des
   crates et sous-commandes, §3 `thiserror`/`anyhow` et sorties contractuelles,
   §4/§8 isolation `paths.base` et exposition réseau, §5 template direct,

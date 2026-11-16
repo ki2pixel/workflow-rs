@@ -52,7 +52,7 @@ class AppState {
                 sequenceAutoScroll: true,
                 soundEnabled: true,
                 soundVolume: 1.0,
-                theme: 'dark',
+                theme: 'dark-pro',
                 localDownloadsAlertedOnce: false
             },
             
@@ -97,9 +97,13 @@ class AppState {
     getStateProperty(path) {
         if (this.isDestroyed) return undefined;
         
-        return path.split('.').reduce((obj, key) => {
+        const value = path.split('.').reduce((obj, key) => {
             return obj && obj[key] !== undefined ? obj[key] : undefined;
         }, this.state);
+
+        // Clone systématique : une mutation par l'appelant ne doit jamais
+        // atteindre this.state sans passer par setState().
+        return this._deepClone(value);
     }
     
     setState(updates, source = 'unknown') {
@@ -147,7 +151,10 @@ class AppState {
             const newValue = this._getPropertyByPath(newState, path);
             const oldValue = this._getPropertyByPath(oldState, path);
             
-            if (newValue !== oldValue) {
+            // Comparaison structurelle : setState() clone l'arbre à chaque appel,
+            // donc les objets et tableaux ont toujours une nouvelle référence.
+            // Une comparaison stricte notifierait les abonnés à chaque tick.
+            if (!this._areValuesEqual(newValue, oldValue)) {
                 listener(newValue, oldValue);
             }
         };
@@ -176,6 +183,15 @@ class AppState {
     }
     
     reset() {
+        if (this.isDestroyed) {
+            console.warn('[AppState] Attempted to reset destroyed state');
+            return;
+        }
+
+        // État initial exhaustif : toutes les clés de this.state figurent ici.
+        // _mergeDeep conserve les clés absentes de la source ; reset() doit donc
+        // remplacer l'état au lieu de le fusionner, sinon processInfo,
+        // stepTimers et pollingIntervals gardent leurs entrées obsolètes.
         const initialState = {
             pollingIntervals: {},
             activeStepKeyForLogsPanel: null,
@@ -186,7 +202,13 @@ class AppState {
                 autoOpenLogOverlay: false,
                 localDownloadsVisible: true,
                 systemMonitorMinimized: false,
-                settingsOpen: false
+                settingsOpen: false,
+                autoScroll: true,
+                sequenceAutoScroll: true,
+                soundEnabled: true,
+                soundVolume: 1.0,
+                theme: 'dark-pro',
+                localDownloadsAlertedOnce: false
             },
             stepTimers: {},
             selectedStepsOrder: [],
@@ -203,9 +225,18 @@ class AppState {
                 hitRate: 0
             }
         };
-        
-        this.setState(initialState, 'reset');
-        console.info('[AppState] State reset to initial values');
+
+        const oldState = this._deepClone(this.state);
+        const newState = this._deepClone(initialState);
+
+        if (this._stateChanged(oldState, newState)) {
+            this.state = newState;
+            this.stateChangeCount++;
+            this.lastStateChange = Date.now();
+            console.info('[AppState] State reset to initial values');
+            this._persistStateChanges(oldState, newState);
+            this._notifyListeners(newState, oldState, 'reset');
+        }
         
         // When resetting, we should also clear the persisted state
         try {
@@ -236,20 +267,27 @@ class AppState {
     }
     
     _deepClone(obj) {
-        if (typeof structuredClone === 'function') {
-            try {
-                return structuredClone(obj);
-            } catch (error) {
-                console.warn('[AppState] structuredClone failed, falling back to manual clone:', error);
-            }
-        }
-
         if (obj === null || typeof obj !== 'object') {
             return obj;
         }
 
         if (obj instanceof Date) {
             return new Date(obj.getTime());
+        }
+
+        // Objets hôtes non clonables (nœud DOM, Map, Set…) : conserver la
+        // référence. focus() doit rester appelable sur l'élément mémorisé.
+        if (!Array.isArray(obj) && !this._isPlainObject(obj)) {
+            return obj;
+        }
+
+        if (typeof structuredClone === 'function') {
+            try {
+                return structuredClone(obj);
+            } catch (error) {
+                // Clone contenant une valeur non clonable : repli manuel.
+                console.debug('[AppState] structuredClone failed, falling back to manual clone:', error);
+            }
         }
 
         if (Array.isArray(obj)) {
@@ -264,16 +302,28 @@ class AppState {
         }
         return cloned;
     }
+
+    _isPlainObject(value) {
+        if (value === null || typeof value !== 'object') {
+            return false;
+        }
+        const prototype = Object.getPrototypeOf(value);
+        return prototype === Object.prototype || prototype === null;
+    }
     
     _mergeDeep(target, source) {
         const result = this._deepClone(target);
         
         for (const key in source) {
             if (Object.hasOwn(source, key)) {
-                if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-                    result[key] = this._mergeDeep(result[key] || {}, source[key]);
+                const sourceValue = source[key];
+                if (this._isPlainObject(sourceValue)) {
+                    result[key] = this._mergeDeep(result[key] || {}, sourceValue);
                 } else {
-                    result[key] = source[key];
+                    // Valeur feuille (primitive, tableau, objet hôte) : clonée
+                    // pour couper tout alias avec l'appelant. Les références
+                    // hôtes (nœud DOM) traversent le clone à l'identique.
+                    result[key] = this._deepClone(sourceValue);
                 }
             }
         }
@@ -300,6 +350,25 @@ class AppState {
 
         if (typeof a !== 'object') {
             return false;
+        }
+
+        if (a instanceof Date || b instanceof Date) {
+            return a instanceof Date && b instanceof Date && a.getTime() === b.getTime();
+        }
+
+        const aIsArray = Array.isArray(a);
+        if (aIsArray !== Array.isArray(b)) {
+            return false;
+        }
+
+        if (!aIsArray) {
+            const aIsPlain = this._isPlainObject(a);
+            const bIsPlain = this._isPlainObject(b);
+            if (!aIsPlain || !bIsPlain) {
+                // Objets hôtes (nœud DOM, Map, Set…) : aucune clé énumérable
+                // fiable, donc seules les références identiques sont égales.
+                return false;
+            }
         }
 
         if (visited.has(a) && visited.get(a) === b) {

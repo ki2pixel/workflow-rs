@@ -260,14 +260,20 @@ class DOMUpdateUtils {
     }
     
     /**
-     * Escape HTML characters.
-     * @param {string} text - Text to escape
+     * Escape HTML characters without any DOM allocation.
+     * Couvre le texte et les contextes d'attribut (guillemets doubles et
+     * apostrophes), contrairement à un aller-retour par div.innerHTML.
+     * @param {*} text - Text to escape
      * @returns {string} Escaped text
      */
     static escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
     
     /**

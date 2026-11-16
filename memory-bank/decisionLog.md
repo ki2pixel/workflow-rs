@@ -4,7 +4,7 @@ Ce document enregistre les décisions architecturales et techniques durables de
 workflow-rs. Les écarts de comportement legacy sont détaillés dans
 `parity/DRIFT.md`.
 
-> **Politique de conservation** : les décisions actives D-041 → D-072 restent
+> **Politique de conservation** : les décisions actives D-041 → D-079 restent
 > en texte intégral. L'historique de bootstrap, les audits d'octobre 2026, les
 > décisions fondatrices D-028 → D-040 et les brouillons D-058 sont conservés
 > dans
@@ -17,13 +17,356 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-073 → D-060 | ci-dessous |
+| Journal actif récent | D-079 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
 | Écarts legacy | D-027 → D-001 | tableau ci-dessous ; détail `parity/DRIFT.md` |
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
+
+## 2026-11-16 — D-079 : sémantique modale de l'overlay de logs et assainissement CSS (AUD-FE-10, AUD-FE-12)
+
+- **Contexte** : l'audit frontend du 2026-11-16 laissait deux constats ouverts.
+  `#logs-column-global` ne portait que `aria-hidden`, piloté par
+  `popupManager.js`, sans `role="dialog"` ni `aria-modal="true"`, contrairement
+  aux popups de séquence et au prompt CSV. Trois conflits CSS opposaient par
+  ailleurs des feuilles chargées dans un ordre précis : `.local-downloads-section`
+  était animé à la fois par `layout.css` (`opacity: 0` + classe obsolète
+  `.downloads-visible`) et par `components/downloads.css` (`opacity: 1` +
+  `[data-visible]`) ; `.workflow-wrapper.compact-mode .steps-column` était défini
+  en `display: grid` dans `layout.css` puis écrasé en `display: flex` dans
+  `components/steps.css` ; `#run-all-steps-button` était stylisé dans
+  `components/controls.css` avant d'être intégralement réécrit dans
+  `components/workflow-buttons.css`. Le rendu dépendait donc de l'ordre
+  d'inclusion et le CSS mort s'accumulait.
+- **Décision — ARIA** : le template `assets/web/templates/index_new.html`
+  déclare `role="dialog" aria-modal="true" aria-labelledby="log-panel-title"`
+  sur `#logs-column-global`. `#log-panel-title` porte déjà le titre « Logs ».
+  Aucun module JS n'est modifié : `openPopupUI`/`closePopupUI` continuent de
+  piloter `aria-hidden`, le focus trap, `Escape` et la restauration du focus par
+  l'ID ; `openLogPanelUI`/`closeLogPanelUI` et `uiUpdater.js` sont inchangés.
+  L'overlay suit désormais le même contrat sémantique que
+  `#sequence-summary-popup-overlay` et `#custom-sequence-confirm-popup-overlay`.
+- **Décision — propriété CSS unique** : chaque composant a une seule feuille
+  autoritaire. `components/downloads.css` conserve l'intégralité de
+  `.local-downloads-section` (base, `[data-visible="true"|"false"]`, animation
+  GPU et `prefers-reduced-motion`) ; `layout.css` ne garde que le layout générique
+  (`.workflow-wrapper`, scrollbar, base `.steps-column`).
+  `components/steps.css` reste l'unique source du mode compact (`display: flex`,
+  `flex-direction: column`, `align-items: center`, `gap`) ; la règle grid et son
+  media query 1200 px quittent `layout.css`. `components/workflow-buttons.css`
+  porte tout `#run-all-steps-button` (base, shine, survol, actif, désactivé,
+  dégradé) ; les règles de base et de survol de `components/controls.css` sont
+  supprimées. `features/responsive.css` conserve ses surcharges mobiles
+  (padding, rayon, ombre) : c'est une couche de breakpoint légitime, pas un
+  doublon.
+- **Décision — préservation des déclarations effectives** : deux déclarations
+  présentes dans les blocs supprimés n'étaient pas réellement mortes, car la
+  feuille gagnante ne les définissait pas. `transition: opacity 0.5s ease-in-out`
+  (mode compact) est déplacée dans `components/steps.css`, et
+  `min-height: var(--touch-target-min)` (cible tactile de 44 px) dans la règle de
+  base de `components/workflow-buttons.css`. Les styles calculés restent donc
+  identiques, y compris pour les tailles de boîte.
+- **Portée / invariants** : aucun changement de `main.js`
+  (`setupLocalDownloadsToggle`, `applyLocalDownloadsVisibility`),
+  `popupManager.js`, `uiUpdater.js`, des sélecteurs contractuels
+  (`#logs-column-global`, `#log-panel-title`, `#close-log-panel`,
+  `#run-all-steps-button`, `.local-downloads-section`, `.compact-mode`,
+  `.steps-column`), des contrats HTTP/JSON/CSV ni du prétraitement Minijinja.
+  Aucun package npm, bundler ou préprocesseur introduit. Le dépôt Python legacy
+  n'est pas modifié et rien n'est écrit dans `runtime/` ou `/mnt/cache`.
+- **Validation** : arbre pré-changement reconstruit à l'identique depuis `HEAD`
+  pour l'A/B ; `tinycss2` 1.4.0 : 0 erreur sur les cinq feuilles, accolades et
+  parenthèses équilibrées ; A/B Firefox 158 headless + geckodriver (1400 px et
+  700 px, feuilles chargées dans l'ordre de `index_new.html`) : styles calculés
+  et tailles identiques pour `.local-downloads-section` visible et masqué,
+  `.steps-column` compact et `#run-all-steps-button` (base et survol) ; seuls
+  quatre longhands grid inertes diffèrent (`grid-template-columns`,
+  `grid-auto-flow`, `align-content`, `justify-items`) alors que `display` calcule
+  `flex` dans les deux variantes et que la taille reste 1356 × 503,2 px (desktop)
+  et 656 × 553,4 px (mobile) ; `grep` : aucune occurrence de
+  `downloads-visible`, `#run-all-steps-button` uniquement dans
+  `workflow-buttons.css` + `responsive.css`, `.compact-mode .steps-column`
+  uniquement dans `steps.css` ; assertions ARIA ajoutées à
+  `real_index_template_renders_with_existing_frontend_syntax` ;
+  `cargo test -p workflow-server --lib` (46 tests), les deux tests de rendu
+  Minijinja, `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés,
+  0 échec), `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings` et `git diff --check`
+  verts.
+- **Rollback** : un revert de `index_new.html`, `layout.css`, `controls.css`,
+  `steps.css` et `workflow-buttons.css` restaure la cascade précédente. Aucune
+  migration de données ni de configuration n'est nécessaire.
+
+## 2026-11-16 — D-078 : réponses Worker obsolètes, cache-busting ES Modules et aperçu CSV à 8 étapes (AUD-FE-07, AUD-FE-09, AUD-FE-11)
+
+- **Contexte** : l'audit frontend du 2026-11-16 laissait ouverts trois
+  constats. `WorkerManager._executeTask` rejetait la promesse d'une requête
+  dont la réponse arrivait après qu'une requête plus récente avait été émise
+  sur le même canal ; ce rejet bénin pouvait atteindre le listener global
+  `unhandledrejection` d'`ErrorHandler.js` et afficher une notification
+  d'erreur pendant un défilement ou un rafraîchissement rapide des logs. Le
+  singleton n'était pas non plus détruit sur `beforeunload`, contrairement à
+  `appState`, `domBatcher` et `pollingManager`. Sept modules importaient en
+  outre `PollingManager.js?v=20261025a`, seul query parameter de version du
+  frontend ; un import ultérieur sans ce suffixe exact aurait instancié un
+  second singleton avec son propre registre `inFlight`. Enfin, la modale de
+  prompt CSV affichait encore six badges legacy et « étapes 1-6 » alors que la
+  séquence lancée consomme les huit clés `STEP1`…`STEP8` de `constants.js`.
+- **Décision — réponses obsolètes** : dans `WorkerManager.js`, une réponse
+  périmée sur un canal résout la promesse avec `null` et consigne un
+  `console.debug` ; elle ne rejette plus. Le fallback synchrone
+  (`_executeSynchronously`) suit la même convention, avec un retour `null` au
+  lieu du `throw`. Les erreurs réelles du Worker (`success: false`, type
+  inconnu) continuent de rejeter avec un `Error`, donc la distinction entre
+  annulation et panne est préservée. `destroy()` est attaché à `beforeunload`
+  derrière un garde `typeof globalThis.addEventListener === 'function'`, pour
+  rester chargeable dans un contexte Node sans `EventTarget` global.
+- **Décision — consommateurs** : `uiUpdater.js` ignore explicitement `null`
+  dans `updateSpecificLogUI` et `updateMainLogOutputUI` avant de programmer la
+  mutation DOM, afin qu'une réponse périmée n'écrase jamais le panneau courant.
+  Une chaîne vide reste un contenu légitime et continue d'être appliquée.
+- **Décision — cache-busting** : les sept importateurs (`main.js`,
+  `apiService.js`, `sequenceManager.js`, `timerManager.js`, `uiUpdater.js`,
+  `utils/PerformanceMonitor.js` et l'import dynamique de
+  `utils/PerformanceOptimizer.js`) utilisent le spécificateur canonique
+  `PollingManager.js` sans query parameter. Le serveur Axum applique déjà
+  `Cache-Control: no-cache, must-revalidate` aux assets statiques ; le suffixe
+  statique n'apportait aucune fraîcheur et divergeait du reste des modules ES.
+- **Décision — aperçu CSV** : `csvWorkflowPrompt.js` affiche les huit étapes
+  canoniques du pipeline Rust (Extraction, Transitions, Audio, Tracking,
+  Réduction JSON, Pré-traitement AE, Finalisation, Media Solution) et le pied
+  de modale annonce « étapes 1-8 ». `runStepSequence` n'est pas modifié : il
+  consomme déjà `defaultSequenceableStepsKeys` (`STEP1`…`STEP8`).
+- **Portée / invariants** : aucun changement de `parseWorker.js`, de contrat
+  HTTP/JSON/CSV, de sélecteur DOM contractuel, de `config/config.toml`, de
+  `runtime/` ou de `/mnt/cache`. Aucun package npm, bundler ou préprocesseur
+  introduit ; l'architecture zéro-build est conservée. Le legacy Python n'est
+  pas modifié.
+- **Validation** : `node --check` sur les neuf modules ; harnais Node jetables
+  sous `/tmp/opencode` : 6/6 sur le fallback synchrone (deux requêtes
+  concurrentes sur un canal, canaux isolés, requêtes sans canal, `destroy()`
+  sur `beforeunload`) et 5/5 sur un Worker simulé (réponses hors ordre, rejet
+  réel préservé, purge des registres), `unhandledrejection` vide dans les deux
+  cas ; `grep -rn "20261025a" assets/web/static/` vide ; `cargo test
+  -p workflow-server --lib` (46 tests), les deux tests de rendu Minijinja,
+  `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés, 0 échec),
+  `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`
+  et `git diff --check` verts.
+- **Rollback** : un revert de `WorkerManager.js`, `uiUpdater.js`,
+  `csvWorkflowPrompt.js` et des sept imports restaure le comportement
+  précédent (rejets sur réponses périmées, badge à 6 étapes). Aucune migration
+  de données ni de configuration n'est nécessaire.
+
+## 2026-11-16 — D-077 : syntaxe CSS Color 4 des ombres `rgb(var(...) / alpha)` (AUD-FE-08)
+
+- **Contexte** : `assets/web/static/css/variables.css` déclare les couleurs
+  sous forme de composantes RGB séparées par des espaces
+  (`--accent-primary-rgb: 121 134 203;`, `--status-running-rgb: 77 171 247;`),
+  conformément à CSS Color 4. Six déclarations `box-shadow` héritées du legacy
+  mélangeaient toutefois cette forme avec la virgule de `rgba()` :
+  `rgba(var(--accent-primary-rgb), 0.3)` se résout en
+  `rgba(121 134 203, 0.3)`. La spécification interdit de mélanger espaces et
+  virgules dans une même fonction de couleur : la déclaration est invalide et le
+  moteur la rejette en silence. Les halos de survol, de focus, de sélection et
+  de statut `running` des cartes d'étapes, ainsi que l'ombre de
+  `.workflow-launch-btn` et de son survol, n'étaient donc jamais rendus.
+  `components/logs.css` appliquait déjà la forme conforme
+  `rgb(var(--accent-primary-rgb) / 0.16)`.
+- **Décision — forme unique** : les six occurrences passent à
+  `rgb(var(--*-rgb) / <alpha>)` (`rgb(121 134 203 / 0.3)`), forme moderne où
+  l'alpha est séparé des composantes par une barre oblique. Les valeurs d'alpha (`0.2`,
+  `0.26`, `0.25`, `0.3`, `0.4`), les géométries d'ombre, les couleurs et
+  l'ordre des déclarations sont inchangés. Aucun fallback codé en dur, aucune
+  variable dupliquée : les variables `*-rgb` restent la source unique et
+  `variables.css` n'est pas modifié.
+- **Décision — périmètre** : seules
+  `static/css/components/steps.css` (quatre `box-shadow`) et
+  `static/css/components/csv-workflow-prompt.css` (deux `box-shadow`) sont
+  touchés. Les `rgba(0, 0, 0, …)` des ombres neutres restent valides et sont
+  conservés. Aucun préprocesseur, bundler ou dépendance Node/npm n'est
+  introduit : le CSS vanilla est servi tel quel par Axum.
+- **Écart legacy assumé** : `/home/kidpixel/workflow_mediapipe` conserve la
+  syntaxe invalide ; la correction vit uniquement dans `assets/web`. Aucune
+  écriture dans le dépôt Python. L'écart est documenté dans
+  `memory-bank/systemPatterns.md` §14.
+- **Portée / invariants** : sélecteurs contractuels préservés
+  (`.timeline-step`, `.timeline-step.is-selected`, `.timeline-step[data-status]`,
+  `.workflow-launch-btn`), ainsi que les classes d'état `data-status` et
+  `active-for-log-panel`. Aucun changement de HTML, de JS, de contrat
+  HTTP/JSON/CSV, de `runtime/`, `/mnt/cache` ou `config/config.toml`.
+- **Validation** : `grep -rn -- "rgba(var(--" assets/web/static/css/` ne renvoie
+  plus rien ; `tinycss2` analyse les deux feuilles sans erreur (105 et 36
+  règles, 362 et 186 déclarations) et sérialise les six ombres corrigées ;
+  accolades et parenthèses équilibrées (123/123 et 257/257 pour `steps.css`,
+  61/61 et 42/42 pour `csv-workflow-prompt.css`) ; contrôle A/B dans Chromium
+  sur une copie des trois feuilles : l'ancienne forme via variable calcule
+  `none`, la nouvelle calcule les ombres attendues, `.workflow-launch-btn`
+  (`rgba(121, 134, 203, 0.3)`), son survol (`0.4`), le survol d'une carte
+  (`0.2`), `:focus-within` (`0.26`), `.is-selected` (`0.26`) et
+  `data-status="running"` (`rgba(77, 171, 247, 0.25)`) ; `cargo test
+  -p workflow-server --lib` (46 tests), les deux tests de rendu Minijinja,
+  `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés, 0 échec),
+  `cargo fmt --check` et `cargo clippy --workspace --all-targets -- -D warnings`
+  verts.
+- **Rollback** : un revert des deux feuilles restaure les ombres ignorées ;
+  aucun état serveur, artefact ou migration à nettoyer.
+
+## 2026-11-16 — D-076 : comparaison structurelle et immuabilité d'AppState (AUD-FE-03, AUD-FE-04, AUD-FE-11)
+
+- **Contexte** : l'audit frontend du 2026-11-16 relève trois défauts dans
+  `assets/web/static/state/AppState.js`. `subscribeToProperty()` comparait les
+  valeurs par référence alors que `setState()` clone l'arbre à chaque appel :
+  tout abonné à un objet ou tableau (`csvDownloads` de `csvDownloadMonitor.js`,
+  `processInfo`) était notifié à chaque tick de polling de 500 ms (AUD-FE-03).
+  `getStateProperty()` retournait la référence interne, permettant une mutation
+  silencieuse hors `setState()` (AUD-FE-04), et `reset()` fusionnait
+  `processInfo: {}`, `stepTimers: {}` et `pollingIntervals: {}` via
+  `_mergeDeep`, qui conserve les clés absentes de la source ; `initialState.ui`
+  omettait six préférences (AUD-FE-04). Le constructeur initialisait enfin
+  `ui.theme: 'dark'` alors que `themes.css` cible `[data-theme="dark-pro"]`
+  (AUD-FE-11).
+- **Décision — comparaison structurelle** : `subscribeToProperty()` notifie via
+  `!this._areValuesEqual(newValue, oldValue)`. Primitives, objets, tableaux et
+  structures imbriquées ne déclenchent donc le callback que sur un changement
+  réel de contenu ; les cycles restent couverts par la `WeakMap` existante.
+- **Décision — lectures isolées** : `getStateProperty()` retourne
+  `this._deepClone(value)`. Les primitives sont inchangées, les objets et
+  tableaux sont des copies profondes. `_deepClone()` conserve en revanche la
+  référence des objets hôtes non clonables (nœud DOM de
+  `focusedElementBeforePopup`) : un clone plain perdrait `focus()` et casserait
+  la restauration du focus de `popupManager.closePopupUI()`. `_mergeDeep()`
+  traite ces valeurs comme des feuilles et clone les tableaux, ce qui supprime
+  aussi l'alias entre le tableau de l'appelant et `this.state`.
+- **Décision — reset exhaustif** : `reset()` construit l'état initial complet
+  (11 clés `ui`, `pollingIntervals`, `activeStepKeyForLogsPanel`,
+  `isAnySequenceRunning`, `focusedElementBeforePopup`, `stepTimers`,
+  `selectedStepsOrder`, `processInfo`, `performanceMetrics`, `cacheStats`),
+  clone l'ancien et le nouveau état, puis remplace `this.state` en un seul
+  passage avec `_stateChanged`, incrémentation de `stateChangeCount`, mise à
+  jour de `lastStateChange`, `_persistStateChanges()` et
+  `_notifyListeners(newState, oldState, 'reset')`. `processInfo`, `stepTimers`
+  et `pollingIntervals` sont réellement vidés ; les clés dynamiques
+  (`lastCSVDownloadCompletion`, `ui.autoModeLogPanelOpened`) disparaissent aussi,
+  ce qui est le comportement attendu d'une remise à zéro. La purge `try/catch`
+  des `PERSISTED_PATHS` dans `localStorage` est conservée, et un reset sans
+  changement structurel ne notifie plus. `reset()` sur une instance détruite est
+  ignoré avec un avertissement.
+- **Décision — thème par défaut** : `ui.theme` vaut `'dark-pro'` au constructeur
+  et dans `reset()`, en alignement avec `themes.css`. `themeManager.loadTheme()`
+  continue de valider l'identifiant contre `THEMES` avant application.
+- **Écart legacy assumé** : le dépôt Python conserve la comparaison par
+  référence, les lectures non clonées, le `reset()` fusionné et `theme: 'dark'` ;
+  la correction vit uniquement dans `assets/web`. L'écart est documenté dans
+  `memory-bank/systemPatterns.md` §14, sans écriture dans
+  `/home/kidpixel/workflow_mediapipe`.
+- **Portée / invariants** : architecture zéro-build ES Modules, aucune
+  dépendance Node/npm, aucun bundler. `LEGACY_MIGRATIONS`,
+  `STEP_KEYS_MIGRATION_FLAG`, `PERSISTED_PATHS`, les sélecteurs DOM et les
+  contrats HTTP/JSON/CSV sont inchangés ; aucun fichier de `runtime/` ou
+  `/mnt/cache` touché.
+- **Validation** : `node --check` ; harnais Node jetable sur une copie
+  byte-identique du module (SHA-256 vérifié) : 15/15 cas — isolation de
+  `csvDownloads` face aux ticks `processInfo`, absence de notification pour un
+  contenu identique, mutation des clones `ui`/`processInfo`/`selectedStepsOrder`
+  sans effet, référence hôte conservée, égalité structurelle des `Date` de
+  `stepTimers`, `reset()` vidant les dictionnaires d'exécution avec 11 clés `ui`
+  et `theme: 'dark-pro'`, purge `localStorage`, reset idempotent et instance
+  détruite neutralisée ; `cargo test -p workflow-server --lib` (46 tests), les
+  deux tests de rendu Minijinja, `cargo test --workspace` (689 listés, 687
+  exécutés + 2 ignorés, 0 échec), `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts.
+- **Rollback** : un revert d'`AppState.js` restaure le comportement précédent ;
+  aucune migration de données ni état serveur à nettoyer.
+
+## 2026-11-16 — D-075 : réparation de PerformanceMonitor et suspension hors focus (AUD-FE-02, AUD-FE-05)
+
+- **Contexte** : l'audit frontend du 2026-11-16
+  (`docs/validation/audits/2026-11-16-audit-frontend-rust.md`) relève que
+  `generatePerformanceReport()` (`utils/PerformanceMonitor.js`) appelle
+  `errorHandler.getStats()`, méthode inexistante : `ErrorHandler` expose
+  `getErrorStats()`, d'où un `TypeError: errorHandler.getStats is not a
+  function` toutes les 60 s dans `sendPerformanceReport()` et à chaque
+  `getMetrics()` (AUD-FE-02). Les pollers de monitoring
+  (`perf-memory-usage` 10 s, `perf-periodic-reporting` 60 s,
+  `perf-optimizer-stats` 30 s) tournaient sans `pauseWhenHidden: true`, et le
+  POST de télémétrie passait par le `fetch` instrumenté de `monitorApiCalls()`
+  sans `X-Worker-Token` (AUD-FE-05).
+- **Décision — statistiques d'erreurs** : `generatePerformanceReport()` appelle
+  `errorHandler.getErrorStats()` et conserve la clé `components.errorHandler`,
+  dont la structure (`totalErrors`, `recentErrors`, `activeErrorOperations`,
+  `errorsByOperation`) est celle déjà produite par `ErrorHandler`.
+- **Décision — suspension hors focus** : les trois pollers passent
+  `{ pauseWhenHidden: true }` au quatrième argument de
+  `PollingManager.startPolling`. `PollingManager` enregistre alors les noms
+  dans `pauseOnHide`, suspend les intervalles sur `visibilitychange` et
+  rejoue immédiatement un tick au retour au premier plan. Aucun nom de poller
+  ni intervalle n'est modifié.
+- **Décision — découplage de la télémétrie** : `sendPerformanceReport()`
+  sélectionne `this.originalFetch || globalThis.fetch`, donc l'appel
+  `/api/performance/frontend` n'est plus compté dans `metrics.apiCalls` et ne
+  peut plus entretenir de boucle d'auto-surveillance. Le jeton worker est lu
+  dans `<meta name="worker-token">` comme dans `apiService.js` et ajouté en
+  `X-Worker-Token` ; `Content-Type: application/json` et le corps
+  `JSON.stringify(report)` restent inchangés. Le handler serveur
+  `performance_frontend` n'est pas modifié.
+- **Écart legacy assumé** : le dépôt Python conserve `errorHandler.getStats()`
+  et l'absence de `pauseWhenHidden` ; la correction vit uniquement dans la
+  copie Rust `assets/web`. L'écart est documenté dans
+  `memory-bank/systemPatterns.md` §14, sans écriture dans
+  `/home/kidpixel/workflow_mediapipe`.
+- **Portée / invariants** : architecture zéro-build ES Modules, aucune
+  dépendance Node/npm, aucun bundler. Les sélecteurs DOM contractuels, les
+  contrats HTTP/JSON/CSV et la structure du payload de rapport sont préservés ;
+  aucun fichier de `runtime/` ou `/mnt/cache` touché.
+- **Validation** : `node --check` sur les deux modules ; harnais Node jetable
+  (globals DOM/fetch simulés) vérifiant que le rapport ne lève plus,
+  `components.errorHandler` est conforme, les trois pollers figurent dans
+  `pauseOnHide`, la télémétrie ne grossit pas `metrics.apiCalls`, le token est
+  transporté et l'instrumentation des appels applicatifs reste active ;
+  `cargo test -p workflow-server --lib` (46 tests), les deux tests de rendu
+  Minijinja ciblés, `cargo test --workspace` (689 listés, 687 exécutés + 2
+  ignorés, 0 échec), `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts.
+- **Rollback** : un revert des deux modules JS restaure le comportement
+  précédent ; aucune migration de données, aucun état serveur à nettoyer.
+
+## 2026-11-16 — D-074 : assainissement XSS du frontend (AUD-FE-01, AUD-FE-06)
+
+- **Contexte** : l'audit frontend du 2026-11-16
+  (`docs/validation/audits/2026-11-16-audit-frontend-rust.md`) relève deux
+  failles : `handleStepFailure` (`apiService.js`) interpole `errorMessage` non
+  échappé dans un fragment HTML du panneau de logs principal (AUD-FE-01), et
+  `DOMUpdateUtils.escapeHtml` (`utils/DOMBatcher.js`) repose sur
+  `div.textContent`/`div.innerHTML`, qui n'échappe ni `"` ni `'` et alloue un
+  nœud DOM à chaque appel (AUD-FE-06).
+- **Décision — échappement sans allocation DOM** : `escapeHtml` retourne `''`
+  pour `null`/`undefined`, convertit via `String(text)` puis remplace dans
+  l'ordre `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;` et `'` →
+  `&#39;`. L'implémentation est alignée sur `escapeHtmlWorker`
+  (`logParserUtils.js`), conserve le rendu des nombres et couvre désormais les
+  contextes d'attribut, notamment `data-key` dans `downloadsListManager.js`.
+- **Décision — assainissement du message d'erreur** : `apiService.js` importe
+  `DOMUpdateUtils` et calcule `safeMsg` avant
+  `updateMainLogOutputUI(\`<i>Erreur d'initiation: ${safeMsg}</i>\`)`.
+  `showNotification` et `statusEl.textContent` restent inchangés : le second
+  échappe nativement et le premier ne construit pas de HTML.
+- **Portée / invariants** : modification limitée à `assets/web/static/`,
+  architecture zéro-build ES Modules, aucune dépendance Node/npm. Les
+  sélecteurs contractuels (`#step-STEP*`, `.status-badge`, `#status-*`,
+  `#progress-bar-*`, `.run-button`, `.cancel-button`) et les contrats
+  HTTP/JSON/CSV sont inchangés. Le dépôt Python legacy reste en lecture seule ;
+  l'écart est documenté dans `memory-bank/systemPatterns.md` §14.
+- **Validation** : `node --check` sur les deux modules et cas d'échappement
+  (balises, guillemets, apostrophes, `null`, `undefined`, nombres) ;
+  `cargo test -p workflow-server --lib` (46 tests), les deux tests de rendu
+  Minijinja ciblés, `cargo test --workspace` (689 listés, 687 exécutés + 2
+  ignorés, 0 échec), `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts.
+- **Portée / rollback** : un revert des deux modules JS restaure le
+  comportement précédent ; aucune migration de données ni écriture dans
+  `runtime/`, `/mnt/cache` ou le dépôt Python.
 
 ## 2026-11-16 — D-073 : modularisation des règles Antigravity et création de .antigravityignore
 

@@ -5,7 +5,7 @@
 
 import { performanceOptimizer } from './PerformanceOptimizer.js';
 import { domBatcher } from './DOMBatcher.js';
-import { pollingManager } from './PollingManager.js?v=20261025a';
+import { pollingManager } from './PollingManager.js';
 import { errorHandler } from './ErrorHandler.js';
 
 class PerformanceMonitor {
@@ -273,9 +273,10 @@ class PerformanceMonitor {
             }
         };
         
-        // Record immediately and then every 10 seconds
+        // Record immediately and then every 10 seconds. Le poller est suspendu
+        // quand l'onglet/WebView passe en arrière-plan (AUD-FE-05).
         recordMemory();
-        pollingManager.startPolling('perf-memory-usage', recordMemory, 10000);
+        pollingManager.startPolling('perf-memory-usage', recordMemory, 10000, { pauseWhenHidden: true });
         this.observers.set('memoryUsage', { disconnect: () => pollingManager.stopPolling('perf-memory-usage') });
     }
     
@@ -365,7 +366,12 @@ class PerformanceMonitor {
      * Start periodic performance reporting.
      */
     startPeriodicReporting() {
-        pollingManager.startPolling('perf-periodic-reporting', () => this.sendPerformanceReport(), 60000);
+        pollingManager.startPolling(
+            'perf-periodic-reporting',
+            () => this.sendPerformanceReport(),
+            60000,
+            { pauseWhenHidden: true }
+        );
         this.reportingInterval = 'perf-periodic-reporting';
     }
     
@@ -377,13 +383,23 @@ class PerformanceMonitor {
         
         try {
             const report = this.generatePerformanceReport();
-            
-            // Send to backend performance API
-            await fetch('/api/performance/frontend', {
+            // Utilise le fetch d'origine (non instrumenté) pour que la
+            // télémétrie ne se compte pas elle-même dans metrics.apiCalls, et
+            // transporte le jeton worker comme les autres appels API
+            // (AUD-FE-05).
+            const fetchFn = this.originalFetch || globalThis.fetch;
+            const tokenEl = document.querySelector('meta[name="worker-token"]');
+            const token = tokenEl ? tokenEl.getAttribute('content') : '';
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['X-Worker-Token'] = token;
+            }
+
+            await fetchFn('/api/performance/frontend', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify(report)
             });
             
@@ -400,7 +416,7 @@ class PerformanceMonitor {
         const optimizerStats = performanceOptimizer.getPerformanceStats();
         const batcherStats = domBatcher.getStats();
         const pollingStats = pollingManager.getStats();
-        const errorStats = errorHandler.getStats();
+        const errorStats = errorHandler.getErrorStats();
         
         return {
             timestamp: Date.now(),

@@ -188,14 +188,14 @@
     align-items: center;
     gap: 8px;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb), 0.3);
+    box-shadow: 0 4px 12px rgb(var(--accent-primary-rgb) / 0.3);
     position: relative;
     overflow: hidden;
 }
 
 .workflow-launch-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(var(--accent-primary-rgb), 0.4);
+    box-shadow: 0 6px 20px rgb(var(--accent-primary-rgb) / 0.4);
 }
 
 .workflow-launch-btn:active {

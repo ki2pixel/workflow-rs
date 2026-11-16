@@ -3,7 +3,7 @@ import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
 import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLogOverlay } from './state.js';
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
-import { pollingManager } from './utils/PollingManager.js?v=20261025a';
+import { pollingManager } from './utils/PollingManager.js';
 import { parseAndStyleLogContent as _parseAndStyleLogContent } from './utils/logParserUtils.js';
 import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
 export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer };
@@ -732,6 +732,12 @@ export async function updateSpecificLogUI(logName, path, content, isError = fals
             styledContent = await workerManager.parseLogs(content, 'specificLogPanel');
         }
 
+        // `null` signale une réponse obsolète : ne pas écraser le panneau courant.
+        if (styledContent === null) {
+            console.debug('[UI] Log spécifique ignoré : réponse obsolète');
+            return;
+        }
+
         domBatcher.scheduleUpdate('specific-log-ui', () => {
             const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
             const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
@@ -777,6 +783,11 @@ export async function updateMainLogOutputUI(htmlContent) {
     if (mainLogOutputPanel) {
         try {
             const styledContent = await workerManager.parseLogs(htmlContent, 'mainLogPanel');
+            // `null` signale une réponse obsolète : conserver le contenu affiché.
+            if (styledContent === null) {
+                console.debug('[UI] Log principal ignoré : réponse obsolète');
+                return;
+            }
             domBatcher.scheduleUpdate('main-log-output', () => {
                 mainLogOutputPanel.innerHTML = styledContent;
                 mainLogOutputPanel.scrollTop = mainLogOutputPanel.scrollHeight;

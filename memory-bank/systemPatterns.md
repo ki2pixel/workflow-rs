@@ -168,6 +168,88 @@ comportement legacy sont dans `parity/DRIFT.md`.
   « Post-traitement » et le texte du serveur (`Post-traitement A5/A6 : i/N —
   <projet>`) est affiché tel quel, sans réapposer le compteur global.
 - Pas de runner Node dans le dépôt Rust ; tests de rendu côté serveur.
+- Écart assumé de sécurité (D-074, AUD-FE-01/AUD-FE-06) :
+  `DOMUpdateUtils.escapeHtml` (`utils/DOMBatcher.js`) échappe explicitement
+  `&`, `<`, `>`, `"` et `'` par remplacements de chaînes, sans
+  `document.createElement`, ce qui couvre aussi les contextes d'attribut ;
+  `handleStepFailure` (`apiService.js`) échappe `errorMessage` avant
+  `updateMainLogOutputUI`. Les sélecteurs DOM contractuels et les autres
+  contrats HTTP/JSON/CSV sont inchangés. Le legacy Python n'est pas modifié.
+- Écart assumé de monitoring (D-075, AUD-FE-02/AUD-FE-05) : dans la copie
+  Rust, `PerformanceMonitor.generatePerformanceReport()` appelle
+  `errorHandler.getErrorStats()` (le legacy appelle une méthode inexistante
+  `getStats()`), les pollers `perf-memory-usage`, `perf-periodic-reporting` et
+  `perf-optimizer-stats` passent `{ pauseWhenHidden: true }`, et
+  `sendPerformanceReport()` utilise `this.originalFetch` avec l'en-tête
+  `X-Worker-Token` lu dans `<meta name="worker-token">`. Le POST de télémétrie
+  n'entre donc plus dans `metrics.apiCalls`. Le payload de
+  `/api/performance/frontend` et le handler serveur sont inchangés.
+- Écart assumé d'immuabilité (D-076, AUD-FE-03/AUD-FE-04/AUD-FE-11) : dans la
+  copie Rust, `subscribeToProperty()` compare les valeurs via
+  `_areValuesEqual` au lieu de `!==`, donc `csvDownloads` et les autres objets
+  ou tableaux ne sont plus notifiés par les ticks `processInfo`.
+  `getStateProperty()` retourne un clone profond ; `_deepClone()` préserve la
+  référence des objets hôtes non clonables (nœud DOM de
+  `focusedElementBeforePopup`) et `_mergeDeep()` les traite comme des feuilles
+  tout en clonant les tableaux. `reset()` remplace l'état complet (11 clés
+  `ui`, `processInfo`/`stepTimers`/`pollingIntervals` vidés) et `ui.theme` vaut
+  `'dark-pro'` au constructeur comme après reset, en alignement avec
+  `themes.css`. Le legacy Python conserve l'ancien comportement.
+- Écart assumé de syntaxe CSS (D-077, AUD-FE-08) : les variables `*-rgb` de
+  `variables.css` sont écrites en composantes séparées par des espaces
+  (`--accent-primary-rgb: 121 134 203;`). Les `box-shadow` qui les composent
+  utilisent donc exclusivement `rgb(var(--*-rgb) / <alpha>)` et jamais
+  `rgba(var(--*-rgb), <alpha>)`, qui se résoudrait en
+  `rgba(121 134 203, 0.3)` — une forme invalide en CSS Color 4, rejetée en
+  silence par le moteur. `steps.css` (survol, focus, sélection, statut
+  `running`) et `csv-workflow-prompt.css` (`.workflow-launch-btn` et son
+  survol) suivent désormais la convention déjà appliquée par `logs.css`. Les
+  ombres neutres `rgba(0, 0, 0, …)` restent valides et inchangées ; le legacy
+  Python conserve l'ancienne syntaxe.
+- Écart assumé de robustesse Worker (D-078, AUD-FE-07) : dans la copie Rust,
+  `WorkerManager._executeTask` résout `null` (avec `console.debug`) quand une
+  réponse arrive après qu'une requête plus récente a été émise sur le même
+  canal ; le fallback synchrone fait de même, et les vraies erreurs continuent
+  de rejeter. `uiUpdater.js` ignore `null` avant toute mutation DOM, donc un
+  panneau n'est jamais écrasé par une réponse périmée.
+  `workerManager.destroy()` est attaché à `beforeunload`, avec un garde
+  `typeof globalThis.addEventListener === 'function'` pour rester chargeable
+  dans un contexte Node, comme `appState`, `domBatcher` et `pollingManager`.
+- Écart assumé de spécificateurs ES Modules (D-078, AUD-FE-09) : aucun import
+  de `assets/web/static` ne porte de query parameter de cache-busting.
+  `PollingManager.js` est importé sous son chemin canonique par les sept
+  modules concernés, y compris l'import dynamique de `PerformanceOptimizer.js` ;
+  la revalidation est assurée par l'en-tête Axum
+  `Cache-Control: no-cache, must-revalidate`. Un suffixe divergent créerait un
+  second singleton avec son propre registre `inFlight`.
+- Écart assumé d'aperçu CSV (D-078, AUD-FE-11) : `csvWorkflowPrompt.js` décrit
+  les huit étapes canoniques (Extraction, Transitions, Audio, Tracking,
+  Réduction JSON, Pré-traitement AE, Finalisation, Media Solution) et annonce
+  « étapes 1-8 » ; la séquence lancée consomme déjà `STEP1`…`STEP8` via
+  `defaultSequenceableStepsKeys`. Le legacy Python conserve l'aperçu à six
+  étapes.
+- Contrat ARIA de l'overlay de logs (D-079, AUD-FE-12) :
+  `#logs-column-global` (`assets/web/templates/index_new.html`) porte
+  `role="dialog"`, `aria-modal="true"` et `aria-labelledby="log-panel-title"` ;
+  `#log-panel-title` reste le titre « Logs ». `popupManager.js` continue de
+  basculer `aria-hidden`, d'appliquer le focus trap, `Escape` et la restauration
+  du focus par l'ID ; `uiUpdater.js` et les fonctions
+  `openLogPanelUI`/`closeLogPanelUI` sont inchangés. L'overlay suit le même
+  contrat sémantique que `#sequence-summary-popup-overlay` et
+  `#custom-sequence-confirm-popup-overlay`. Toute nouvelle modale plein écran
+  doit déclarer ces trois attributs et un titre référençable.
+- Propriété CSS unique par composant (D-079, AUD-FE-10) :
+  `.local-downloads-section` appartient à `components/downloads.css` (base,
+  `[data-visible="true"|"false"]`, animation GPU, `prefers-reduced-motion`) ;
+  le mode compact `.workflow-wrapper.compact-mode .steps-column` appartient à
+  `components/steps.css` (`display: flex`, `gap`, `transition: opacity`) ;
+  `#run-all-steps-button` appartient à `components/workflow-buttons.css` (base,
+  `min-height: var(--touch-target-min)`, shine, survol, actif, désactivé,
+  dégradé). `layout.css` ne garde que le layout générique (`.workflow-wrapper`,
+  scrollbar, base `.steps-column`) et `controls.css` ne contient plus aucune
+  règle du bouton principal. `features/responsive.css` reste la couche de
+  breakpoints mobile (padding, rayon, ombre), pas un doublon. Toute nouvelle
+  règle sur ces composants doit être ajoutée à la feuille autoritaire.
 - Pas de client desktop natif (D-028) : ne pas ajouter de dépendance
   GTK/WebKit/zbus/Tauri ; `assets/web` est l'unique interface.
 

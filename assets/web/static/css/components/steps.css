@@ -457,6 +457,7 @@
     flex-direction: column;
     align-items: center;
     gap: var(--pipeline-gap);
+    transition: opacity 0.5s ease-in-out;
 }
 
 .workflow-pipeline {
@@ -543,13 +544,13 @@
     transform: translateY(-6px) scale(1.008);
     box-shadow:
         0 20px 40px rgba(0,0,0,0.25),
-        0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
+        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.2);
 }
 
 .timeline-step:focus-within:not(.active-for-log-panel) {
     box-shadow:
         0 16px 34px rgba(0,0,0,0.24),
-        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+        0 0 0 2px rgb(var(--accent-primary-rgb) / 0.26);
     transform: translateY(-2px);
 }
 
@@ -558,7 +559,7 @@
 .timeline-step[data-status="initiated"] {
     background: color-mix(in oklab, var(--status-running) 12%, var(--bg-card));
     border-color: color-mix(in oklab, var(--status-running) 65%, var(--border-color));
-    box-shadow: 0 10px 30px rgba(var(--status-running-rgb), 0.25);
+    box-shadow: 0 10px 30px rgb(var(--status-running-rgb) / 0.25);
 }
 
 .timeline-step[data-status="failed"],
@@ -605,7 +606,7 @@
     border-color: color-mix(in oklab, var(--accent-primary) 65%, var(--border-color));
     box-shadow:
         0 16px 34px rgba(0,0,0,0.24),
-        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+        0 0 0 2px rgb(var(--accent-primary-rgb) / 0.26);
 }
 
 .timeline-step[data-status="running"] .timeline-node,

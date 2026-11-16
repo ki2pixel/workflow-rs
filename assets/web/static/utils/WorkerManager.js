@@ -64,7 +64,8 @@ class WorkerManager {
                 .then(result => {
                     // Vérification de race condition même en synchrone (peu probable mais robuste)
                     if (channel && this.latestRequestForChannel.get(channel) !== id) {
-                        throw new Error(`[WorkerManager] Réponse obsolète ignorée pour le canal: ${channel}`);
+                        console.debug(`[WorkerManager] Réponse obsolète ignorée pour le canal: ${channel}`);
+                        return null;
                     }
                     return result;
                 });
@@ -76,8 +77,11 @@ class WorkerManager {
             this.callbacks.set(id, {
                 resolve: (result) => {
                     if (channel && this.latestRequestForChannel.get(channel) !== id) {
-                        // C'est une réponse périmée, une nouvelle requête a déjà été envoyée sur ce canal
-                        reject(new Error(`[WorkerManager] Réponse obsolète ignorée pour le canal: ${channel}`));
+                        // Réponse périmée : une requête plus récente a déjà été émise sur ce canal.
+                        // On résout avec null au lieu de rejeter, pour ne pas déclencher le
+                        // listener global `unhandledrejection` d'ErrorHandler.js.
+                        console.debug(`[WorkerManager] Réponse obsolète ignorée pour le canal: ${channel}`);
+                        resolve(null);
                     } else {
                         resolve(result);
                     }
@@ -113,7 +117,7 @@ class WorkerManager {
      * Demande au Worker de parser et colorer syntaxiquement un log.
      * @param {string} rawLogContent - Le log brut
      * @param {string} channel - Canal (ex: 'mainLogPanel') pour éviter les out-of-order updates
-     * @returns {Promise<string>}
+     * @returns {Promise<string|null>} HTML stylé, ou null si la réponse est obsolète
      */
     async parseLogs(rawLogContent, channel = null) {
         return this._executeTask('parseLogs', rawLogContent, channel);
@@ -123,7 +127,7 @@ class WorkerManager {
      * Demande au Worker de parser un JSON volumineux.
      * @param {string} jsonString 
      * @param {string} channel 
-     * @returns {Promise<Object>}
+     * @returns {Promise<Object|null>} Objet parsé, ou null si la réponse est obsolète
      */
     async parseJson(jsonString, channel = null) {
         return this._executeTask('parseJson', jsonString, channel);
@@ -140,3 +144,12 @@ class WorkerManager {
 }
 
 export const workerManager = new WorkerManager();
+
+// Nettoyage du singleton à la fermeture de la page (même patron que
+// `domBatcher`, `appState` et `pollingManager`). Le garde `typeof` permet de
+// charger le module dans un contexte sans `addEventListener` global (Node).
+if (typeof globalThis.addEventListener === 'function') {
+    globalThis.addEventListener('beforeunload', () => {
+        workerManager.destroy();
+    });
+}

@@ -2,11 +2,147 @@
 
 ## Tâche en cours
 
-**Modularisation des règles Antigravity et création de `.antigravityignore` (2026-11-16, terminé).**
-Résolution de l'erreur IDE « You have exceeded the maximum token limit for this file » (D-073) :
-création de `.antigravityignore` à la racine (exclusion de `target/`, `runtime/`, `assets/models/`, `assets/mission_overlays/*.mov`, etc.), scission de la section §5 de `.agents/rules/codingstandards.md` vers `.agents/rules/pipeline-standards.md`, et passage du frontmatter en `trigger: model_decision` pour respecter le budget de tokens Antigravity.
+**Correctif 6 de l'audit frontend : ARIA de l'overlay de logs et assainissement
+CSS (2026-11-16, terminé).** Remédiation d'AUD-FE-12 et d'AUD-FE-10 (D-079) :
+`#logs-column-global` déclare `role="dialog"`, `aria-modal="true"` et
+`aria-labelledby="log-panel-title"`, sans changement JS ; `layout.css` perd les
+règles mortes de `.local-downloads-section` et le grid compact `.steps-column`,
+`controls.css` perd les règles écrasées de `#run-all-steps-button`. Les feuilles
+`downloads.css`, `steps.css` et `workflow-buttons.css` deviennent les sources
+uniques, avec les deux déclarations encore effectives déplacées pour conserver
+les styles calculés. Les douze constats AUD-FE-01 → AUD-FE-12 sont clos.
 
 ## Dernière session
+
+- [2026-11-16] **Audit frontend Rust — Correctif 6 (D-079)** :
+  - `assets/web/templates/index_new.html` : `#logs-column-global` reçoit
+    `role="dialog"`, `aria-modal="true"` et
+    `aria-labelledby="log-panel-title"` ; `#log-panel-title` est inchangé ;
+    `popupManager.js` et `uiUpdater.js` ne sont pas modifiés ;
+  - `assets/web/static/css/layout.css` : suppression du bloc
+    `.local-downloads-section` (`opacity: 0`, `.downloads-visible`,
+    `prefers-reduced-motion`) et du grid compact `.steps-column` avec son media
+    query 1200 px ;
+  - `assets/web/static/css/components/controls.css` : suppression des règles
+    `#run-all-steps-button` et `#run-all-steps-button:hover` ;
+  - `assets/web/static/css/components/steps.css` : `transition: opacity` du mode
+    compact conservée ; `components/workflow-buttons.css` :
+    `min-height: var(--touch-target-min)` conservée dans la règle de base ;
+  - validation : reconstruction exacte de l'arbre pré-changement depuis `HEAD`,
+    `tinycss2` 0 erreur sur les cinq feuilles, A/B Firefox 158 headless
+    1400 px et 700 px (styles calculés et tailles identiques, seuls quatre
+    longhands grid inertes diffèrent sous `display: flex`), `grep` ciblés,
+    assertions ARIA dans le test de rendu Minijinja,
+    `cargo test -p workflow-server --lib` (46 tests), les deux tests de rendu,
+    `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés),
+    `cargo fmt --check`, clippy `-D warnings` et `git diff --check` verts ;
+    aucun fichier de production ni dépôt Python legacy modifié ;
+  - documentation : grille et synthèse dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `docs/README.md`, `systemPatterns.md` §14, `progress.md`, D-079.
+
+- [2026-11-16] **Audit frontend Rust — Correctif 5 (D-078)** :
+  - `assets/web/static/utils/WorkerManager.js` : réponse périmée sur un canal
+    → `resolve(null)` + `console.debug` (chemin Worker et fallback synchrone) ;
+    `destroy()` attaché à `beforeunload` derrière un garde `typeof` ;
+  - `assets/web/static/uiUpdater.js` : `updateSpecificLogUI` et
+    `updateMainLogOutputUI` ignorent `null` avant la mutation DOM ;
+  - sept modules (`main.js`, `apiService.js`, `sequenceManager.js`,
+    `timerManager.js`, `uiUpdater.js`, `utils/PerformanceMonitor.js`,
+    `utils/PerformanceOptimizer.js`) importent `PollingManager.js` sans
+    `?v=20261025a` ;
+  - `assets/web/static/csvWorkflowPrompt.js` : huit badges canoniques
+    (Extraction → Media Solution) et texte « étapes 1-8 » ;
+  - validation : `node --check` sur les neuf modules, harnais Node jetables
+    6/6 (fallback) et 5/5 (Worker simulé, `unhandledrejection` vide), `grep`
+    résiduel vide, `cargo test -p workflow-server --lib` (46 tests), les deux
+    tests de rendu Minijinja, `cargo test --workspace` (689 listés, 687
+    exécutés + 2 ignorés), `cargo fmt --check`, clippy `-D warnings` et
+    `git diff --check` verts ; aucun fichier de production ni dépôt Python
+    legacy modifié ;
+  - documentation : grille et plan dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `systemPatterns.md` §14, `progress.md`, D-078.
+
+- [2026-11-16] **Audit frontend Rust — Correctif 4 (D-077)** :
+  - `assets/web/static/css/components/steps.css` : quatre `box-shadow` passent
+    à `rgb(var(--accent-primary-rgb) / 0.2)`, `0.26`, `0.26` et
+    `rgb(var(--status-running-rgb) / 0.25)` (survol, `:focus-within`,
+    `.is-selected`, statuts `running`/`starting`/`initiated`) ;
+  - `assets/web/static/css/components/csv-workflow-prompt.css` :
+    `.workflow-launch-btn` et son survol passent à
+    `rgb(var(--accent-primary-rgb) / 0.3)` et `/ 0.4` ;
+  - aucun changement de `variables.css`, des sélecteurs contractuels, des
+    valeurs d'alpha, du HTML/JS ou des contrats HTTP/JSON/CSV ; aucun
+    préprocesseur ni dépendance Node/npm ;
+  - validation : `grep -rn -- "rgba(var(--" assets/web/static/css/` vide,
+    `tinycss2` sans erreur (105 + 36 règles, 362 + 186 déclarations),
+    accolades/parenthèses équilibrées, A/B Chromium confirmant les six ombres
+    calculées (l'ancienne forme via variable calcule `none`), `cargo test
+    -p workflow-server --lib` (46 tests), les deux tests de rendu Minijinja,
+    `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés),
+    `cargo fmt --check` et clippy `-D warnings` verts ; aucun fichier de
+    production ni dépôt Python legacy modifié ;
+  - documentation : grille et plan dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `systemPatterns.md` §14, `progress.md`, D-077.
+
+- [2026-11-16] **Audit frontend Rust — Correctif 3 (D-076)** :
+  - `assets/web/static/state/AppState.js` : `subscribeToProperty` notifie via
+    `!this._areValuesEqual(newValue, oldValue)` ;
+  - `getStateProperty` retourne `this._deepClone(value)` ; `_deepClone` conserve
+    la référence des objets hôtes (nœud DOM de `focusedElementBeforePopup`) et
+    `_mergeDeep` les traite comme des feuilles en clonant les tableaux ;
+  - `reset()` remplace l'état complet et restaure les 11 clés `ui`, avec
+    `theme: 'dark-pro'` au constructeur comme après reset ; purge
+    `localStorage` conservée ;
+  - validation : `node --check`, harnais Node jetable 15/15 (isolation
+    `csvDownloads`, clones isolés, reset exhaustif et idempotent, référence DOM
+    et horodatages `Date` conservés), `cargo test -p workflow-server --lib`
+    (46 tests), les deux tests de rendu Minijinja, `cargo test --workspace`
+    (689 listés, 687 exécutés + 2 ignorés), `cargo fmt --check` et clippy
+    `-D warnings` verts ; aucun fichier de production ni dépôt Python legacy
+    modifié ;
+  - documentation : grille et plan dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `systemPatterns.md` §14, `progress.md`, D-076.
+
+- [2026-11-16] **Audit frontend Rust — Correctif 2 (D-075)** :
+  - `assets/web/static/utils/PerformanceMonitor.js` :
+    `errorHandler.getStats()` → `getErrorStats()` dans
+    `generatePerformanceReport()` ; `{ pauseWhenHidden: true }` sur
+    `perf-memory-usage` et `perf-periodic-reporting` ; `sendPerformanceReport()`
+    envoie via `this.originalFetch || globalThis.fetch` avec `X-Worker-Token`
+    issu de `<meta name="worker-token">` ;
+  - `assets/web/static/utils/PerformanceOptimizer.js` :
+    `{ pauseWhenHidden: true }` sur le poller de développement
+    `perf-optimizer-stats` ;
+  - validation : `node --check` sur les deux modules, harnais Node jetable
+    (rapport sans exception, `components.errorHandler` conforme, trois pollers
+    dans `pauseOnHide`, télémétrie absente de `metrics.apiCalls`, token
+    transporté, instrumentation applicative intacte), `cargo test
+    -p workflow-server --lib` (46 tests), les deux tests de rendu Minijinja,
+    `cargo test --workspace` (689 listés, 687 exécutés + 2 ignorés),
+    `cargo fmt --check` et clippy `-D warnings` verts ; aucun fichier de
+    production ni dépôt Python legacy modifié ;
+  - documentation : grille et plan de remédiation dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `systemPatterns.md` §14, `progress.md`.
+
+- [2026-11-16] **Audit frontend Rust — Correctif 1 (D-074)** :
+  - `assets/web/static/utils/DOMBatcher.js` : `escapeHtml` remplace le couple
+    `createElement('div')`/`innerHTML` par cinq `replace` successifs (`&`, `<`,
+    `>`, `"`, `'`), avec `null`/`undefined` → `''` et `String(text)` ;
+  - `assets/web/static/apiService.js` : import nommé de `DOMUpdateUtils` et
+    `safeMsg` dans `handleStepFailure` avant `updateMainLogOutputUI` ;
+  - validation : `node --check` sur les deux modules et cas d'échappement
+    (balises, guillemets, apostrophes, `null`, nombres), `cargo test
+    -p workflow-server --lib` (46 tests), les deux tests de rendu Minijinja,
+    `cargo test --workspace`, `cargo fmt --check` et clippy `-D warnings`
+    verts ; aucun fichier de production ni dépôt Python legacy modifié ;
+  - documentation : grille de suivi dans
+    `docs/validation/audits/2026-11-16-audit-frontend-rust.md`,
+    `systemPatterns.md` §14.
 
 - [2026-11-16] **Modularisation règles Antigravity & ignore (D-073)** :
   - Création de `.antigravityignore` pour filtrer les répertoires volumineux du contexte ;
@@ -112,6 +248,11 @@ création de `.antigravityignore` à la racine (exclusion de `target/`, `runtime
 - Audit backend du 2026-11-16 : actions P1 (AUD-01, AUD-02, AUD-03) remédiées
   et testées (D-070) ; constats P2/P3 (AUD-04 → AUD-10) remédiés et testés
   (D-071).
+- Audit frontend du 2026-11-16 : les six correctifs sont remédiés et validés,
+  soit les douze constats AUD-FE-01 → AUD-FE-12 clos — 1 (AUD-FE-01, AUD-FE-06,
+  D-074), 2 (AUD-FE-02, AUD-FE-05, D-075), 3 (AUD-FE-03, AUD-FE-04, AUD-FE-11,
+  D-076), 4 (AUD-FE-08, D-077), 5 (AUD-FE-07, AUD-FE-09, AUD-FE-11, D-078) et
+  6 (AUD-FE-10, AUD-FE-12, D-079).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock`.
 - Runtime : `runtime/` ; sortie finalisée : `/mnt/cache`.

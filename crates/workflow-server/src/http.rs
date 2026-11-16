@@ -831,6 +831,12 @@ mod tests {
             assert!(html.contains(&format!("id=\"step-{}\"", step.as_str())));
         }
         assert!(html.contains("/static/css/base.css"));
+        // AUD-FE-12 : l'overlay de logs porte la même sémantique modale que les
+        // popups de séquence, et `aria-labelledby` cible le titre réel.
+        assert!(html.contains(
+            r#"id="logs-column-global" role="dialog" aria-modal="true" aria-labelledby="log-panel-title""#
+        ));
+        assert!(html.contains(r#"<span id="log-panel-title">Logs</span>"#));
         assert!(!html.contains("url_for("));
         assert!(!html.contains("steps_config | tojson"));
     }

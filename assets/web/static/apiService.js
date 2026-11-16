@@ -4,8 +4,9 @@ import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
 import { showNotification, sendBrowserNotification } from './utils.js';
 import { soundEvents } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js?v=20261025a';
+import { pollingManager } from './utils/PollingManager.js';
 import { errorHandler } from './utils/ErrorHandler.js';
+import { DOMUpdateUtils } from './utils/DOMBatcher.js';
 
 
 /**
@@ -92,7 +93,8 @@ function handleStepFailure(stepKey, error, errorSource) {
     }
 
     if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
+        const safeMsg = DOMUpdateUtils.escapeHtml(errorMessage);
+        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${safeMsg}</i>`);
     }
 
     const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);

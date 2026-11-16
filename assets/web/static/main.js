@@ -8,7 +8,7 @@ import { showSequenceSummaryUI } from './popupManager.js';
 import { scrollToStepImmediate } from './scrollManager.js';
 
 import { initializeSoundManager } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js?v=20261025a';
+import { pollingManager } from './utils/PollingManager.js';
 import { errorHandler } from './utils/ErrorHandler.js';
 import { performanceMonitor } from './utils/PerformanceMonitor.js';
 import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';

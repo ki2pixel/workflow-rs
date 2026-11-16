@@ -159,6 +159,7 @@ maintient la consolidation déterministe avant tout STEP9 agentique.
 | [`validation/VALIDATION-STEP1-8.md`](validation/VALIDATION-STEP1-8.md) | Chaîne complète STEP1 → STEP8 sur `1720 Camille.zip`, isolation et contrôles d'intégrité. | Preuve |
 | [`validation/audits/2026-10-24-audit-backend-rust.md`](validation/audits/2026-10-24-audit-backend-rust.md) | Audit backend : architecture, concurrence, sécurité, contrats, constats P0/P1/P2 et remédiation. | Preuve |
 | [`validation/audits/2026-11-16-audit-backend-rust.md`](validation/audits/2026-11-16-audit-backend-rust.md) | Audit backend : revue d'architecture, sécurité (SSRF), concurrence (SQLite), durabilité I/O et remédiations P1 (D-070) et P2/P3 (D-071). | Preuve |
+| [`validation/audits/2026-11-16-audit-frontend-rust.md`](validation/audits/2026-11-16-audit-frontend-rust.md) | Audit frontend : architecture zéro-build, gestion d'état, performance DOM, réseau, accessibilité et sécurité (XSS) ; les douze constats AUD-FE-01 → AUD-FE-12 sont clos par les Correctifs 1 à 6 (D-074 → D-079). | Preuve |
 
 Les audits futurs suivent la convention
 `validation/audits/AAAA-MM-JJ-<sujet>.md`. Un audit est une photographie datée :

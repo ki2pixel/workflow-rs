@@ -349,13 +349,13 @@ if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname
     // Log performance stats periodically in development using PollingManager
     const startStatsPolling = () => {
         // Use dynamic import to avoid circular dependency at module eval time
-        import('./PollingManager.js?v=20261025a').then(({ pollingManager: pm }) => {
+        import('./PollingManager.js').then(({ pollingManager: pm }) => {
             pm.startPolling('perf-optimizer-stats', () => {
                 const stats = performanceOptimizer.getPerformanceStats();
                 if (stats.api.totalCalls > 0 || stats.dom.totalUpdates > 0) {
                     console.debug('[PerformanceOptimizer] Stats:', stats);
                 }
-            }, 30000);
+            }, 30000, { pauseWhenHidden: true });
         }).catch(() => {
             setTimeout(startStatsPolling, 1000);
         });

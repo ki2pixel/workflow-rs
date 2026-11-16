@@ -236,15 +236,19 @@ function createWorkflowPromptContent(download) {
                     <div class="workflow-steps">
                         <span class="step-badge">1️⃣ Extraction</span>
                         <span class="step-arrow">→</span>
-                        <span class="step-badge">2️⃣ Analyse</span>
+                        <span class="step-badge">2️⃣ Transitions</span>
                         <span class="step-arrow">→</span>
-                        <span class="step-badge">3️⃣ Détection</span>
+                        <span class="step-badge">3️⃣ Audio</span>
                         <span class="step-arrow">→</span>
-                        <span class="step-badge">4️⃣ Audio</span>
+                        <span class="step-badge">4️⃣ Tracking</span>
                         <span class="step-arrow">→</span>
-                        <span class="step-badge">5️⃣ Tracking</span>
+                        <span class="step-badge">5️⃣ Réduction JSON</span>
                         <span class="step-arrow">→</span>
-                        <span class="step-badge">6️⃣ Finalisation</span>
+                        <span class="step-badge">6️⃣ Pré-traitement AE</span>
+                        <span class="step-arrow">→</span>
+                        <span class="step-badge">7️⃣ Finalisation</span>
+                        <span class="step-arrow">→</span>
+                        <span class="step-badge">8️⃣ Media Solution</span>
                     </div>
                 </div>
             </div>
@@ -262,7 +266,7 @@ function createWorkflowPromptContent(download) {
             
             <div class="prompt-footer">
                 <p class="footer-note">
-                    💡 Le workflow traitera automatiquement votre fichier selon la séquence complète (étapes 1-6)
+                    💡 Le workflow traitera automatiquement votre fichier selon la séquence complète (étapes 1-8)
                 </p>
             </div>
         </div>

@@ -21,19 +21,30 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - `PathsConfig::resolve()` dérive `projects`, `archives`, `logs`, `downloads`,
   `history_db` et `finalized_fallback` depuis `base` s'ils sont absents.
   `models`, `cache_root` et `finalized` restent explicites (`finalized` vaut
-  `/mnt/cache` par défaut).
-- Le serveur refuse une base hors `paths.base`, le port 5003, le verrou Python
-  et les jetons par défaut. Un hôte non-loopback exige
-  `server.allow_remote = true`.
+  `/mnt/cache` par défaut). `Config::step1_source_dir()` dérive la source STEP1
+  de `paths.downloads` si elle est vide ; `WORKFLOW_PATHS_BASE` isole donc tout
+  le runtime (D-071).
+- Le serveur et la CLI refusent `history_db`, `projects`, `archives`, `logs` et
+  `downloads` hors `paths.base`, ainsi qu'un `paths.projects` dans le dépôt
+  legacy. `steps.step1.source_dir` suit `paths.downloads` par défaut ; une
+  valeur explicite reste prioritaire. Le serveur refuse en plus le port 5003 ;
+  `validate_common` refuse le verrou Python.
+  Un hôte non-loopback exige `server.allow_remote = true`, et
+  `allow_remote = true` exige une `secret_key` non vide et non préfixée `dev-`.
+- La purge des orphelins se limite aux fichiers `.part`, `.tmp`, `.*.tmp.*` et
+  aux dossiers `_temp_*` émis par le pipeline.
 - `runtime/` est la production locale ; `/mnt/cache` est la sortie finalisée.
 - Les tests utilisent `tempfile` ou `/tmp/opencode`, jamais `runtime/` ni
   `/mnt/cache`.
 
 ## 3. Erreurs
 
-- `thiserror` pour les erreurs de bibliothèque (`workflow-core`,
-  `workflow-tpu`, `workflow-steps`).
-- `anyhow` aux frontières CLI, serveur, ingestion et sync.
+- `thiserror` pour les types publics (`ConfigError`, `MissionError`,
+  `StepError`, `ArchiveError`, `IngestError`, `SyncError`,
+  `WorkflowServerError`) ; `TpuError` implémente `Display` manuellement.
+- `anyhow` pour les détails internes de l'ingestion, de la sync, du CLI et du
+  serveur, et dans les étapes lourdes STEP2/3/4/7/8 (D-026). Les points d'entrée
+  publics d'ingestion et de sync restent typés.
 - Pas de `unwrap()` en production ; `expect()` réservé aux invariants locaux.
 - Les erreurs de config citent la clé et la valeur fautives.
 - Les étapes retournent un rapport avec succès/échec et un code de sortie.
@@ -112,7 +123,7 @@ comportement legacy sont dans `parity/DRIFT.md`.
 ## 11. Tests
 
 - Tests inline `#[cfg(test)]`, pas de dossier `tests/`.
-- `cargo test --workspace` : 678 tests listés (676 exécutés + 2 ignorés).
+- `cargo test --workspace` : 689 tests listés (687 exécutés + 2 ignorés).
 - Pas de CI : exécution manuelle.
 - Les tests ne touchent ni le matériel, ni `/mnt/cache`, ni `runtime/`.
 - La parité se mesure avec les scripts de shadow/validation.
@@ -167,11 +178,11 @@ comportement legacy sont dans `parity/DRIFT.md`.
 - Le panneau CEP et les JSX restent Python (D-022).
 - Ne pas modifier les scripts AE pour adapter une sortie Rust.
 
-## 16. Post-traitement STEP8 (A5/A6)
+## 16. Post-traitement STEP8 (A5/A6/A7)
 
 - `crates/workflow-steps/src/post/` lit le `.ecproj` brut et ne le modifie
-  jamais : il publie toujours un second `<stem>_assist.ecproj` (copie exacte
-  si aucune décision ne s'applique).
+  jamais : hors `--report-only`, il publie un second `<stem>_assist.ecproj`
+  (copie exacte si aucune décision ne s'applique).
 - Les artefacts `post.json`, `review.json`, `audit.json` sont additifs sous
   `<docs>/post/<projet_assisté>/` ; ils ne touchent ni `_ae.json`, ni
   `_audio.json`, ni le CSV, ni le panneau.
@@ -180,6 +191,11 @@ comportement legacy sont dans `parity/DRIFT.md`.
   template SDM mesuré et court-circuite A1–A4.
 - Un conflit A1/A2 part en `review`. Un échec de post-traitement fait échouer
   STEP8 côté CLI.
+- A7 (D-064 → D-069) résout la mission email, écrit `<stem>_mission.json`
+  (`schema: 2`) uniquement si l'assist est publié, et ajoute `requested`,
+  `source` (`local_docs` / `central_fallback`) et `known_absent` de façon
+  additive. `docs/` local gagne ; `assets/mission_overlays` est le repli ;
+  `tail_overlay` ne prolonge jamais la comp et coupe l'audio du MOV.
 - Depuis D-051, A2 dispose d'un gate OCR opt-in (`a2_ocr = false`) : preuve
   additive sous `details.ocr`, veto si le texte change, override de
   géométrie borné, bandeaux sombres laissés en `review` avec scale proposé.
@@ -193,4 +209,4 @@ comportement legacy sont dans `parity/DRIFT.md`.
   garde son JSON sur `stdout`. `POST_CURRENT` change le texte,
   `POST_PROGRESS` avance la barre après le projet ; le serveur expose
   `progress_phase = "post"`.
-- Détail : `docs/lots/LOT-9-POST-STEP8.md`.
+- Détail : `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md`.

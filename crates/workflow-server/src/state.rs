@@ -149,7 +149,7 @@ struct StepRecord {
     progress_total: u64,
     progress_current_fractional: Option<f64>,
     progress_text: String,
-    /// Phase explicite de progression, par exemple `post` pour A5/A6.
+    /// Phase explicite de progression, par exemple `post` pour A5/A6/A7.
     progress_phase: Option<String>,
     duration_str: Option<String>,
     log: VecDeque<String>,
@@ -695,7 +695,7 @@ pub struct StepStatus {
     pub progress_total: u64,
     pub progress_current_fractional: Option<f64>,
     pub progress_text: String,
-    /// Phase explicite, absente hors phase connue (`post` pour A5/A6).
+    /// Phase explicite, absente hors phase connue (`post` pour A5/A6/A7).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress_phase: Option<String>,
     pub duration_str: Option<String>,

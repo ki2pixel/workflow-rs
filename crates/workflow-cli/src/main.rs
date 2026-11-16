@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
@@ -902,7 +902,7 @@ fn default_video_output(input: &std::path::Path) -> PathBuf {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("");
-    if name.ends_with("_tracking.json") {
+    if name.to_ascii_lowercase().ends_with("_tracking.json") {
         return input.to_path_buf();
     }
     let stem = input
@@ -910,6 +910,35 @@ fn default_video_output(input: &std::path::Path) -> PathBuf {
         .and_then(|stem| stem.to_str())
         .unwrap_or("tracking");
     input.with_file_name(format!("{stem}_tracking.json"))
+}
+
+/// Construit un runtime Tokio `current_thread` pour les commandes CLI.
+fn cli_runtime() -> Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("création du runtime Tokio CLI impossible")
+}
+
+/// Exécute une future sur un runtime Tokio `current_thread`.
+///
+/// Les sous-commandes ponctuelles du CLI (webhook, email, téléchargement) sont
+/// séquentielles : un pool multi-thread complet est inutile et coûteux à
+/// instancier à chaque appel.
+fn block_on_cli<F>(future: F) -> Result<F::Output>
+where
+    F: std::future::Future,
+{
+    Ok(cli_runtime()?.block_on(future))
+}
+
+/// Variante pour les appels réseau qui renvoient déjà un `Result` typé.
+fn block_on_cli_result<T, E, F>(future: F) -> Result<T>
+where
+    F: std::future::Future<Output = std::result::Result<T, E>>,
+    E: Into<anyhow::Error>,
+{
+    block_on_cli(future)?.map_err(Into::into)
 }
 
 fn retention_options(
@@ -1183,7 +1212,7 @@ fn audit_missions(json_dir: &Path, assets: Option<&Path>) -> Result<Value> {
             cohort.with_logos += 1;
             format_cohort.with_logos += 1;
             let mut index = 0usize;
-            let mut seen: Vec<String> = Vec::new();
+            let mut seen: HashSet<String> = HashSet::new();
             while index < video.logos.len() {
                 let (resolution, requested, consumed) = match &resolver {
                     Some(resolver) => resolver.resolve_sequence(&video.logos, index),
@@ -1191,10 +1220,9 @@ fn audit_missions(json_dir: &Path, assets: Option<&Path>) -> Result<Value> {
                 };
                 index += consumed;
                 let key = filename_key(&requested);
-                if key.is_empty() || seen.contains(&key) {
+                if key.is_empty() || !seen.insert(key) {
                     continue;
                 }
-                seen.push(key);
                 tokens += 1;
                 cohort.tokens += 1;
                 format_cohort.tokens += 1;
@@ -1409,25 +1437,20 @@ fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<Client
             return Vec::new();
         }
     };
-    match tokio::runtime::Runtime::new() {
-        Ok(runtime) => {
-            match runtime.block_on(client.sync(&store, config.email_proxy.index_limit, false)) {
-                Ok(report) => tracing::info!(
-                    "email: {} entrée(s), {} détail(s), {} erreur(s)",
-                    report.index_entries,
-                    report.fetched,
-                    report.errors.len()
-                ),
-                Err(error) => tracing::warn!("email: synchronisation impossible: {error:#}"),
-            }
-        }
-        Err(error) => tracing::warn!("email: runtime indisponible: {error:#}"),
+    match block_on_cli_result(client.sync(&store, config.email_proxy.index_limit, false)) {
+        Ok(report) => tracing::info!(
+            "email: {} entrée(s), {} détail(s), {} erreur(s)",
+            report.index_entries,
+            report.fetched,
+            report.errors.len()
+        ),
+        Err(error) => tracing::warn!("email: synchronisation impossible: {error:#}"),
     }
     if let Err(error) = store.purge_retention(config.email_proxy.retention_days) {
         tracing::warn!("email: purge impossible: {error:#}");
     }
     let mut missions = Vec::new();
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for lot in lots {
         for mission in store.list_for_lot(lot).unwrap_or_default() {
             if !seen.insert(mission.id.clone()) {
@@ -1578,8 +1601,7 @@ fn run() -> Result<()> {
                 plan,
             } => {
                 let client = WebhookClient::new(&config.webhook)?;
-                let runtime = tokio::runtime::Runtime::new()?;
-                let records = runtime.block_on(client.fetch());
+                let records = block_on_cli(client.fetch())?;
                 let status = client.status();
                 let Some(records) = records else {
                     anyhow::bail!(
@@ -1688,7 +1710,7 @@ fn run() -> Result<()> {
             } => {
                 let store = open_email_store(&config)?;
                 let client = email_client(&config)?;
-                let runtime = tokio::runtime::Runtime::new()?;
+                let runtime = cli_runtime()?;
                 let limit = limit.unwrap_or(config.email_proxy.index_limit);
                 if dry_run {
                     let entries = runtime.block_on(client.index(limit))?;
@@ -1725,8 +1747,7 @@ fn run() -> Result<()> {
             }
             EmailCommand::Test { id } => {
                 let client = email_client(&config)?;
-                let runtime = tokio::runtime::Runtime::new()?;
-                let mission = runtime.block_on(client.detail(&id))?;
+                let mission = block_on_cli_result(client.detail(&id))?;
                 println!("{}", serde_json::to_string_pretty(&mission)?);
             }
             EmailCommand::Match {
@@ -1737,8 +1758,7 @@ fn run() -> Result<()> {
                 let store = open_email_store(&config)?;
                 if !offline && config.email_proxy.enabled {
                     let client = email_client(&config)?;
-                    let runtime = tokio::runtime::Runtime::new()?;
-                    match runtime.block_on(client.sync(
+                    match block_on_cli_result(client.sync(
                         &store,
                         config.email_proxy.index_limit,
                         false,
@@ -1899,14 +1919,13 @@ fn run() -> Result<()> {
                 .timestamp
                 .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
             let downloader = Downloader::new(&config.download)?;
-            let runtime = tokio::runtime::Runtime::new()?;
-            let result = runtime.block_on(downloader.download(
+            let result = block_on_cli(downloader.download(
                 &args.url,
                 &timestamp,
                 &output_dir,
                 args.filename.as_deref(),
                 None,
-            ));
+            ))?;
             println!("{}", serde_json::to_string_pretty(&result)?);
             if !result.success {
                 std::process::exit(1);
@@ -2692,5 +2711,25 @@ mod tests {
     fn given_default_invocation_when_parsed_then_relative_config_is_used() {
         let cli = Cli::try_parse_from(["workflow-cli", "config", "show"]).unwrap();
         assert_eq!(cli.config, PathBuf::from("config/config.toml"));
+    }
+
+    #[test]
+    fn given_uppercase_tracking_suffix_when_default_video_output_then_unchanged() {
+        // Given: un export dont le suffixe est en majuscules.
+        // When:  la sortie par défaut est calculée.
+        // Then:  le fichier est reconnu comme un tracking, sans suffixe ajouté.
+        for name in ["VIDEO_TRACKING.JSON", "video_tracking.json"] {
+            let input = PathBuf::from("/tmp").join(name);
+            assert_eq!(default_video_output(&input), input);
+        }
+    }
+
+    #[test]
+    fn given_video_when_default_video_output_then_tracking_suffix_is_added() {
+        let input = PathBuf::from("/tmp/clip.mp4");
+        assert_eq!(
+            default_video_output(&input),
+            PathBuf::from("/tmp/clip_tracking.json")
+        );
     }
 }

@@ -51,10 +51,11 @@ pub fn validate_monitor_startup(config: &Config, history_count: u64) -> Result<(
         ));
     }
     let resolved = config.paths.resolve();
-    if config.steps.step1.source_dir != resolved.downloads {
+    let step1_source_dir = config.step1_source_dir();
+    if step1_source_dir != resolved.downloads {
         return Err(IngestError::Message(format!(
             "webhook activé mais steps.step1.source_dir ({}) diffère de paths.downloads ({}): STEP1 ne verrait pas les archives téléchargées",
-            config.steps.step1.source_dir.display(),
+            step1_source_dir.display(),
             resolved.downloads.display()
         )));
     }

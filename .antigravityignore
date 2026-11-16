@@ -1,0 +1,34 @@
+# Antigravity context ignore file
+# Évite l'indexation de gros volumes binaires, de runtime et de compilation
+
+/target/
+/vendor/*.so*
+__pycache__/
+*.py[cod]
+
+# Runtime local et production (bases SQLite, logs, archives de prod)
+/runtime/
+
+# Fichiers volumineux (vidéos, modèles)
+/assets/mission_overlays/*.mov
+/assets/models/*
+!/assets/models/README.md
+!/assets/models/manifest.toml
+!/assets/models/qa/
+/assets/models/qa/*
+!/assets/models/qa/manifest.toml
+!/assets/models/qa/dinov2_logo_probe.json
+!/assets/models/qa/source_logos.toml
+
+# Corpus de parité et tests lourds
+/parity/cases/*
+!/parity/cases/corpus.lock.json
+/parity/work/
+/parity/baseline/
+/parity/fixtures/*
+!/parity/fixtures/README.md
+!/parity/fixtures/checksums.json
+
+# Configuration locale et secrets
+/config/launcher.env
+

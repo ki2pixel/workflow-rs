@@ -24,7 +24,7 @@ est mis à jour à chaque mesure de parité.
 | D-016 | basse | STEP1 | Le scan Python teste `Path.suffix` contre une liste contenant `.tar.gz`, `.tar.bz2` et `.tar.xz` : ces trois formes ne matchent jamais, car seul le dernier suffixe est comparé. | Le port Rust reproduit le scan effectif (`.zip`, `.zipx`, `.rar`, `.tgz`, `.7z`, `.tar`). Les décodeurs gzip/bzip2/xz restent testés au niveau module, mais le scan ne les sélectionne pas. |
 | D-017 | basse | STEP1 | Python décode les noms de membres TAR avec `surrogateescape` ; Rust utilise un décodage UTF-8 lossy. | Écart limité aux archives dont les noms ne sont pas en UTF-8. Les noms concernés restent visibles dans les journaux, avec un caractère de remplacement. |
 | D-018 | haute | Téléchargement | Le moniteur webhook, l'historique SQLite, le téléchargement R2/Dropbox et les statuts CSV n'étaient pas portés avant le lot 8. | Résolu au lot 8 : moniteur, normalisation d'URL, historique, échecs/cooldown, téléchargement reprenable et routes de statut. Le moniteur reste désactivé par défaut et refuse une base vide (`require_history`). |
-| D-019 | moyenne | Téléchargement | Python télécharge dans `~/Téléchargements`, aussi utilisé par STEP1. Le Rust utilise `runtime/downloads` pour rester isolé. | `LOCAL_DOWNLOADS_DIR` n'est volontairement pas repris ; `WORKFLOW_PATHS_DOWNLOADS` et `WORKFLOW_STEP1_SOURCE_DIR` permettent de choisir un dossier commun lors d'une bascule explicite. Quand le moniteur est actif, le serveur exige `steps.step1.source_dir == paths.downloads`. |
+| D-019 | moyenne | Téléchargement | Python télécharge dans `~/Téléchargements`, aussi utilisé par STEP1. Le Rust utilise `runtime/downloads` pour rester isolé. | `LOCAL_DOWNLOADS_DIR` n'est volontairement pas repris ; `WORKFLOW_PATHS_DOWNLOADS` et `WORKFLOW_STEP1_SOURCE_DIR` permettent de choisir un dossier commun lors d'une bascule explicite. Quand le moniteur est actif, le serveur exige `steps.step1.source_dir == paths.downloads` (un champ vide reprend `paths.downloads`). |
 | D-020 | basse | Téléchargement | Python lance un thread par lien, déplace un téléchargement en historique dès qu'une tentative échoue (même si le repli Dropbox réussit ensuite), et conserve l'ancien `error` du moniteur après un succès. | Le port borne la concurrence (`download.max_concurrent`, défaut 4), ne publie le statut final qu'après le repli, remet `error` à null après un passage réussi, et classe une fermeture de corps prématurée en `incomplete`. |
 | D-021 | haute | Migration | Le moniteur Rust ne peut pas deviner l'historique Python. Une base vide ferait télécharger tous les liens du webhook. | Import explicite `workflow-cli history import --from <base>` (lecture seule, 911 URL identiques au 2026-10-23), audit `history audit`, puis `webhook.enabled = true`. Les échecs Python ne sont pas importés : ils sont transitoires et liés à des URL R2 expirées. |
 | D-022 | info | Validation | La compilation Windows de `workflow-bridge.exe`, le basculement du JSX After Effects et la validation STEP8 sur la machine Windows étaient listés comme restant. | Abandonnés : la production cible Linux, STEP8 est validé en headless avec `effectcraft-cli`, et le JSX/CEP continue d'appeler Python. Aucun chemin Rust ne dépend de cette validation. |
@@ -253,6 +253,9 @@ pas ces deux codes. Un middleware dédié n'a pas été ajouté pour éviter de
 transformer une réponse statique standard en contrat spécifique ; le 403
 documenté reste un attendu théorique du contrat Python.
 
+Vérifié le 2026-11-16 (audit AUD-09) : comportement inchangé, aucun chemin hors
+racine n'est divulgué.
+
 ### D-026 — `anyhow` interne, `thiserror` aux frontières
 
 `workflow-ingest` expose `IngestError` et `workflow-sync` expose `SyncError`
@@ -262,6 +265,12 @@ STEP2, STEP3, STEP4, STEP7 et STEP8 gardent des `anyhow::Result` internes :
 leurs erreurs traversent le serveur comme un code de sortie de sous-processus,
 sans consommateur typé. Cette dérogation est assumée et limitée à ces modules ;
 toute nouvelle API publique d'étape doit préférer `StepError`.
+
+Vérifié le 2026-11-16 (audit AUD-09) : aucune nouvelle signature publique de
+`workflow-steps` n'expose `anyhow::Result`. STEP1 reste typé (`StepError`), et
+les helpers publics de `post`/`qa` qui conservent `anyhow` ne sont pas des
+points d'entrée d'étape. Toute nouvelle entrée d'étape doit utiliser
+`StepError`.
 
 ### D-027 — Arrêt manuel d'une étape et descendants
 

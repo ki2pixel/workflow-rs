@@ -4,7 +4,7 @@ Ce document enregistre les décisions architecturales et techniques durables de
 workflow-rs. Les écarts de comportement legacy sont détaillés dans
 `parity/DRIFT.md`.
 
-> **Politique de conservation** : les décisions actives D-041 → D-070 restent
+> **Politique de conservation** : les décisions actives D-041 → D-072 restent
 > en texte intégral. L'historique de bootstrap, les audits d'octobre 2026, les
 > décisions fondatrices D-028 → D-040 et les brouillons D-058 sont conservés
 > dans
@@ -17,7 +17,7 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-070 → D-060 | ci-dessous |
+| Journal actif récent | D-073 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
@@ -25,10 +25,143 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
 
+## 2026-11-16 — D-073 : modularisation des règles Antigravity et création de .antigravityignore
+
+- **Contexte** : Dans l'IDE Google Antigravity, `.agents/rules/codingstandards.md`
+  dépassait le plafond pratique de contexte par fichier et saturait le budget
+  global des règles permanentes (`alwaysApply: true`, 17,4 Ko), provoquant
+  l'erreur `You have exceeded the maximum token limit for this file`.
+- **Décision — découpage et densification** :
+  - `.agents/rules/codingstandards.md` a été refactorisé et densifié à 59 lignes
+    (4,8 Ko, 572 mots) pour rester sous le seuil d'alerte IDE (~1 000 tokens), en
+    éliminant les redondances avec `AGENTS.md` tout en conservant 100 % des
+    invariants normatifs (stack, erreurs, atomicités, JSON, arrondis, isolation
+    D-071, réseau, read-only du brut, verrou, qualité, anti-patrons). Le
+    frontmatter legacy `alwaysApply: true` est remplacé par
+    `trigger: model_decision`.
+  - La section pipeline (§5) est extraite dans une règle dédiée
+    `.agents/rules/pipeline-standards.md` (42 lignes, 4,0 Ko, 509 mots, `trigger: model_decision`)
+    couvrant STEP1 à STEP8, les templates directs (SDM/LPHDF), le post-traitement
+    A5/A6/A7 et le QA.
+  - `.agents/rules/v5.md` a été refactorisé et condensé à 43 lignes (2,9 Ko, 380 mots)
+    en fusionnant la classification et les flux d'exécution et en éliminant les
+    redondances.
+  - `.agents/rules/prompt-injection-guard.md` a été condensé à 54 lignes (3,2 Ko,
+    439 mots) en synthétisant la défense contre les injections et le protocole
+    destructif sans perte d'exigence.
+  - Tous les fichiers de règles du dépôt sont désormais strictement sous 5,4 Ko.
+- **Décision — exclusion Antigravity** : création de `.antigravityignore` à la
+  racine pour exclure `target/`, `runtime/`, `assets/mission_overlays/*.mov`,
+  `assets/models/*`, `parity/cases/*` et `vendor/*.so*` de l'indexation et du
+  contexte de l'agent.
+
+## 2026-11-16 — D-072 : alignement du standard de codage sur le dépôt
+
+- **Contexte** : `.agents/rules/codingstandards.md` datait d'avant les modules
+  `post/`, `qa/`, `vision/`, `template`, les sous-commandes CLI étendues et les
+  décisions D-062 → D-071. L'audit section par section a relevé des omissions
+  sur la structure des crates, les types d'erreurs, l'isolation `paths.base`, le
+  post-traitement et le contrat QA.
+- **Décision — structure et CLI (§2)** : `workflow-steps` documente désormais
+  `template` (bypass SDM/LPHDF), `post/` (A5/A6/A7), `qa/` (read-only) et
+  `vision/` ; `workflow-cli` liste `step1`…`step8`, `post`, `qa`, `retention`,
+  `sync`, `webhook`, `email`, `download`, `history` et `config`. `workflow-core`
+  porte aussi l'isolation, le parseur de missions et les écritures atomiques ;
+  `workflow-ingest` porte le cache des missions email.
+- **Décision — erreurs et sorties (§3)** : `thiserror` couvre les types publics
+  `ConfigError`, `MissionError`, `StepError`, `ArchiveError`, `IngestError`,
+  `SyncError` et `WorkflowServerError` ; `TpuError` garde son `Display` manuel ;
+  `anyhow` reste aux frontières et dans STEP2/3/4/7/8 (D-026). Les sorties
+  `POST_*`, `DIRECT_TEMPLATE_TOTAL`, `ARCHIVE_ONLY_TOTAL` et les JSON de
+  commande sont des exceptions documentées ; les champs de contrat sont
+  additifs.
+- **Décision — isolation et exposition (§4, §8)** : le standard reprend D-071
+  (chemins dérivés de `paths.base`, `WORKFLOW_PATHS_BASE`, purge limitée aux
+  motifs du pipeline `.part`/`.tmp`/`.*.tmp.*`/`_temp_*`) et la règle
+  `allow_remote = true` avec `secret_key` non vide et non préfixée `dev-`. Il
+  interdit d'écraser le `.ecproj` brut, d'écrire hors des racines prévues et de
+  contourner les gardes réseau.
+- **Décision — pipeline (§5)** : ajout de deux sous-sections : template direct
+  SDM/LPHDF (D-034, D-035, D-061), post-traitement A1–A7 avec `_assist.ecproj`,
+  artefacts additifs, sidecar mission `schema: 2` (D-063, D-065, D-066, D-069),
+  et QA read-only (`qa.json` 1.5.0, cache 12, masque MOV alpha, D-067).
+- **Validation** : `cargo fmt --check`, `cargo clippy --workspace --all-targets
+  -- -D warnings` et `cargo test --workspace` (689 tests listés, 687 exécutés +
+  2 ignorés, 0 échec) exécutés. Aucun changement de comportement : seuls des
+  commentaires de module ont été alignés (`post/`, `qa/`, `step8`, `state`).
+  Aucun `.ecproj`, `runtime/`, `/mnt/cache` ni dépôt Python legacy modifié. Les
+  commandes et modules cités ont été vérifiés dans
+  `crates/workflow-cli/src/main.rs` et `crates/workflow-steps/src/`.
+- **Portée / rollback** : documentaire et commentaires. Un revert restaure la
+  version précédente du standard ; aucun contrat JSON/CSV/HTTP n'est modifié.
+
+## 2026-11-16 — D-071 : durcissement P2/P3 et isolation du runtime
+
+- **Contexte** : l'audit backend du 2026-11-16
+  (`docs/validation/audits/2026-11-16-audit-backend-rust.md`) laisse ouverts les constats
+  P2/P3 AUD-04 à AUD-10 : découpage UTF-8 par octets, chemins absolus qui
+  neutralisent `WORKFLOW_PATHS_BASE`, purge d'orphelins trop large, absence de
+  PID dans le verrou, runtimes Tokio multi-thread répétés, `secret_key` non
+  validée en accès distant et déduplications quadratiques.
+- **Décision — parseur de missions (AUD-04, AUD-10)** : `parse_lenient_logos`
+  retire les préfixes par nombre de caractères (`strip_chars` +
+  `char_indices()`), jamais par longueur d'octets. `split_logo_tokens`,
+  `extract_delivery_links` et `audit_missions` utilisent `HashSet` pour la
+  déduplication ; `extract_delivery_links` emprunte les URL au corps au lieu de
+  les cloner avant le test.
+- **Décision — chemins dérivés (AUD-05)** : `config/config.toml` n'écrit plus
+  `projects`, `archives`, `logs`, `downloads`, `history_db` ni
+  `steps.step1.source_dir` lorsque les valeurs standard s'appliquent.
+  `PathsConfig::resolve()` dérive les cinq premiers de `paths.base` ;
+  `Config::step1_source_dir()` dérive le dernier de `paths.downloads` et reste
+  prioritaire s'il est explicite. `WORKFLOW_PATHS_BASE` isole donc tout le
+  runtime, y compris la source STEP1, sans réécriture textuelle du TOML. Le
+  serveur, le moniteur d'ingestion et STEP1 consomment le getter ; la
+  validation d'égalité `source_dir == downloads` est conservée. Le moniteur
+  webhook reste activé en production : la recommandation retenue est
+  l'isolation des chemins, pas la désactivation du moniteur.
+- **Décision — orphelins et verrou (AUD-06)** : `purge_orphans_with` ne purge
+  que `.part`, `.tmp` final et `.<name>.tmp.<pid>` ; un `.tmp` au milieu d'un
+  nom client est conservé. `HardwareLock::acquire` écrit le PID courant après
+  `flock` (`set_len`, `seek`, `flush`, `sync_all`) ; `Drop` conserve la
+  libération exclusive. Le fichier de verrou reste un artefact de diagnostic,
+  jamais une source de vérité pour l'exclusion.
+- **Décision — CLI (AUD-07)** : `default_video_output` compare le suffixe en
+  ASCII minuscule, comme `default_ae_output`. Les sous-commandes ponctuelles
+  `webhook`, `email`, `download` et `load_missions_for_folders` passent par
+  `block_on_cli`/`block_on_cli_result`, qui instancient un runtime Tokio
+  `Builder::new_current_thread().enable_all()` au lieu d'un pool multi-thread.
+- **Décision — accès distant (AUD-08)** : `validate_server` exige, lorsque
+  `server.allow_remote = true`, une `server.secret_key` non vide, non blanche
+  et non préfixée `dev-` ; le rejet des `worker_token` vides, par défaut ou
+  `dev-` reste inchangé. En écoute loopback, une clé vide reste acceptée.
+- **Décision — dette documentée (AUD-09)** : aucune nouvelle signature
+  publique `anyhow::Result` n'est introduite dans `workflow-steps` ; D-025 et
+  D-026 sont vérifiées et datées dans `parity/DRIFT.md`. Le contrat
+  d'environnement passe en 1.10 pour la règle `secret_key`/`allow_remote`.
+- **Conséquences** : `config show` affiche désormais `null` pour les chemins
+  dérivés et une chaîne vide pour `steps.step1.source_dir` ; c'est attendu, la
+  résolution se fait à l'usage. Les configurations qui explicitaient ces
+  chemins restent valides et prioritaires. `validate_isolation()` est
+  inchangé ; `scripts/validate-step1.py` continue de fonctionner puisque son
+  remplacement textuel de `runtime` porte encore sur `paths.base` et que
+  `WORKFLOW_PATHS_BASE` couvre le reste.
+- **Validation** : `cargo test --workspace` 689 tests listés (687 exécutés +
+  2 ignorés), 0 échec ; `workflow-core` 68/68 ; `cargo fmt --check` et
+  `cargo clippy --workspace --all-targets -- -D warnings` verts ;
+  `WORKFLOW_PATHS_BASE=/tmp/opencode/audit-p2-runtime ... config check`
+  valide ; `scripts/validate-step1.py` exécuté avec succès. Aucune écriture
+  dans `runtime/`, `/mnt/cache` ou le dépôt Python legacy.
+- **Portée / rollback** : correctifs locaux. Réintroduire les chemins
+  explicites et l'ancien prédicat `contains(".tmp")` rétablit le comportement
+  précédent ; retirer la validation `secret_key` et le runtime current-thread
+  rétablit AUD-08/AUD-07. Aucun format JSON, CSV, `.ecproj` ni code HTTP n'est
+  modifié.
+
 ## 2026-11-16 — D-070 : durcissement P1 de workflow-ingest
 
 - **Contexte** : l'audit de robustesse du backend Rust
-  (`docs/audits/2026-11-16-audit-backend-rust.md`) identifie trois constats P1
+  (`docs/validation/audits/2026-11-16-audit-backend-rust.md`) identifie trois constats P1
   dans `workflow-ingest` : contournement du filtre anti-SSRF par IP littérale
   (AUD-01), `std::sync::Mutex` avec `.expect()` et SQLite bloquant dans un
   contexte async (AUD-02), absence de `fsync` avant et après le renommage

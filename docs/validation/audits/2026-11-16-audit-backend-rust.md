@@ -337,7 +337,45 @@ dans `runtime/`, `/mnt/cache` ou le dépôt Python legacy.
 
 ### **Chantiers d'optimisation et de durcissement recommandés (P2 / P3)**
 
-> 1. **Corriger le découpage UTF-8 dans parse\_lenient\_logos (AUD-04)** : Utiliser char\_indices() au lieu de rest.get(label.len()..) dans crates/workflow-core/src/mission.rs et ajouter un test unitaire avec préfixe accentué majuscule ("Chaîne : gulli.png", "Émission : top chef.png").  
-> 2. **Assainir la résolution des chemins dans config/config.toml (AUD-05)** : Laisser projects, archives, logs, downloads et history\_db se résoudre automatiquement depuis paths.base lorsque leurs noms standard sont utilisés, afin que WORKFLOW\_PATHS\_BASE suffise à isoler tout l'environnement.  
-> 3. **Affiner purge\_orphans et HardwareLock (AUD-06)** : Cibler uniquement les fichiers temporaires cachés .\*.tmp.\* ou suffixés par .tmp/.part dans crates/workflow-core/src/fsutil.rs, et inscrire le PID courant dans HardwareLock::acquire (crates/workflow-core/src/lock.rs).  
-> 4. **Uniformiser workflow-cli (AUD-07, AUD-10)** : Rendre default\_video\_output insensible à la casse, utiliser un runtime Tokio current\_thread léger pour les commandes CLI ponctuelles, et remplacer les Vec\<String\> de déduplication par HashSet\<String\>.
+> 1. ✅ **Implémenté (D-071)** — **Corriger le découpage UTF-8 dans parse\_lenient\_logos (AUD-04)** : Utiliser char\_indices() au lieu de rest.get(label.len()..) dans crates/workflow-core/src/mission.rs et ajouter un test unitaire avec préfixe accentué majuscule ("Chaîne : gulli.png", "Émission : top chef.png").
+> 2. ✅ **Implémenté (D-071)** — **Assainir la résolution des chemins dans config/config.toml (AUD-05)** : Laisser projects, archives, logs, downloads et history\_db se résoudre automatiquement depuis paths.base lorsque leurs noms standard sont utilisés, afin que WORKFLOW\_PATHS\_BASE suffise à isoler tout l'environnement.
+> 3. ✅ **Implémenté (D-071)** — **Affiner purge\_orphans et HardwareLock (AUD-06)** : Cibler uniquement les fichiers temporaires cachés .\*.tmp.\* ou suffixés par .tmp/.part dans crates/workflow-core/src/fsutil.rs, et inscrire le PID courant dans HardwareLock::acquire (crates/workflow-core/src/lock.rs).
+> 4. ✅ **Implémenté (D-071)** — **Uniformiser workflow-cli (AUD-07, AUD-10)** : Rendre default\_video\_output insensible à la casse, utiliser un runtime Tokio current\_thread léger pour les commandes CLI ponctuelles, et remplacer les Vec\<String\> de déduplication par HashSet\<String\>.
+
+### **État d'implémentation des actions P2/P3 (2026-11-16)**
+
+Les constats P2 et P3 sont traités (D-071) et couverts par la suite unitaire :
+
+- **AUD-04** : `parse_lenient_logos` retire les préfixes par nombre de
+  caractères (`strip_chars`, `char_indices()`), sans index d'octet ni
+  troncature silencieuse. Tests : `Chaîne`, `Émission` et `Animé` en
+  minuscules et majuscules, avec et sans espace avant `:`.
+- **AUD-05** : `config/config.toml` ne déclare plus `projects`, `archives`,
+  `logs`, `downloads`, `history_db` ni `steps.step1.source_dir`. Ils sont
+  dérivés de `paths.base` via `PathsConfig::resolve()` et
+  `Config::step1_source_dir()`, donc `WORKFLOW_PATHS_BASE` isole tout le
+  runtime sans réécriture textuelle. `validate_isolation()` reste inchangé et
+  `scripts/validate-step1.py` passe sur le TOML ainsi allégé. Le moniteur reste
+  activé en production (`enabled = true`) : la recommandation retenue porte sur
+  l'isolation, pas sur la désactivation.
+- **AUD-06** : `purge_orphans_with` ne cible que `.part`, `.tmp` final et
+  `.*.tmp.*` ; `HardwareLock::acquire` inscrit le PID courant après `flock`
+  (`set_len`, `seek`, `flush`, `sync_all`). Tests : `projet.tmp.archive.zip`
+  conservé, `.fichier.tmp.1234` purgé, contenu du verrou vérifié.
+- **AUD-07 / AUD-10** : `default_video_output` normalise en ASCII minuscule ;
+  `block_on_cli`/`block_on_cli_result` utilisent
+  `Builder::new_current_thread().enable_all()` pour webhook, email,
+  téléchargement et `load_missions_for_folders` ; `split_logo_tokens`,
+  `extract_delivery_links` et `audit_missions` dédupliquent via `HashSet`.
+- **AUD-08** : `validate_server` refuse `allow_remote = true` avec une
+  `secret_key` vide, blanche ou préfixée `dev-` ; le rejet des `worker_token`
+  invalides est conservé. Tests : secret absent, blanc ou `dev-` refusé,
+  secret réel accepté.
+- **AUD-09** : aucune nouvelle signature publique `anyhow::Result` dans
+  `workflow-steps` ; les entrées D-025 et D-026 de `parity/DRIFT.md` sont
+  vérifiées et datées du 2026-11-16.
+
+**Validation** : `cargo test --workspace` 689 tests listés (687 exécutés +
+2 ignorés), 0 échec ; `cargo fmt --check` et
+`cargo clippy --workspace --all-targets -- -D warnings` verts. Aucune écriture
+dans `runtime/`, `/mnt/cache` ou le dépôt Python legacy.

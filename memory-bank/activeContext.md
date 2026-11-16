@@ -2,16 +2,45 @@
 
 ## Tâche en cours
 
-**Remédiation des constats P1 de l'audit backend Rust (2026-11-16, terminé).**
-Les trois actions immédiates de `docs/audits/2026-11-16-audit-backend-rust.md`
-sont implémentées dans `workflow-ingest` (D-070) : validation anti-SSRF des IP
-littérales sur l'URL initiale et chaque redirection, `parking_lot::Mutex` sans
-empoisonnement avec SQLite déporté hors des workers Tokio dans
-`EmailProxyClient::sync`, et `sync_all`/`sync_parent` des archives
-téléchargées. Suite workspace : 678 tests listés (676 exécutés + 2 ignorés).
-Aucun `.ecproj`, `runtime/`, `config/config.toml` ni `/mnt/cache` modifié.
+**Modularisation des règles Antigravity et création de `.antigravityignore` (2026-11-16, terminé).**
+Résolution de l'erreur IDE « You have exceeded the maximum token limit for this file » (D-073) :
+création de `.antigravityignore` à la racine (exclusion de `target/`, `runtime/`, `assets/models/`, `assets/mission_overlays/*.mov`, etc.), scission de la section §5 de `.agents/rules/codingstandards.md` vers `.agents/rules/pipeline-standards.md`, et passage du frontmatter en `trigger: model_decision` pour respecter le budget de tokens Antigravity.
 
 ## Dernière session
+
+- [2026-11-16] **Modularisation règles Antigravity & ignore (D-073)** :
+  - Création de `.antigravityignore` pour filtrer les répertoires volumineux du contexte ;
+  - Densification générale de l'ensemble des règles (`pipeline-standards.md` à 4,0 Ko, `v5.md` à 2,9 Ko, `prompt-injection-guard.md` à 3,2 Ko, `codingstandards.md` à 4,8 Ko) ;
+  - 100 % des règles du dépôt sont désormais strictement sous 5,4 Ko, éliminant les alertes IDE de limite de tokens.
+- [2026-11-16] **Alignement du standard de codage (D-072)** :
+  - §2 : `workflow-steps` expose `template`, `post/`, `qa/`, `vision/` ;
+    `workflow-cli` documente `step1`…`step8`, `post`, `qa`, `retention`, `sync`,
+    `webhook`, `email`, `download`, `history`, `config` ;
+  - §3 : répartition `thiserror`/`anyhow` vérifiée dans le code (`TpuError` en
+    `Display` manuel), exceptions de sortie `POST_*`/JSON, champs additifs ;
+  - §4/§8 : dérivation `paths.base` (D-071), purge `.part`/`.tmp`/`.*.tmp.*`/
+    `_temp_*`, `allow_remote` avec `secret_key` robuste, interdits post/QA ;
+  - §5 : template direct SDM/LPHDF, post A1–A7 (`_assist.ecproj`, sidecar
+    `schema: 2`, `tail_overlay`, banque D-066), QA `1.5.0`/cache 12 (D-067) ;
+  - `fmt`, clippy et 689 tests listés (687 + 2 ignorés) verts ; seuls des
+    commentaires de module alignés, aucun artefact de production modifié.
+
+- [2026-11-16] **Audit backend Rust — actions P2/P3 (D-071)** :
+  - `mission.rs` : `strip_chars`/`char_indices()` pour les préfixes accentués
+    (`Chaîne`, `Émission`, `Animé`), tests minuscules/majuscules ; `HashSet`
+    dans `split_logo_tokens` et `extract_delivery_links` ;
+  - `config/config.toml` : `projects`, `archives`, `logs`, `downloads`,
+    `history_db` et `steps.step1.source_dir` dérivés de `paths.base` ;
+    `Config::step1_source_dir()` consommé par STEP1, le serveur et le moniteur ;
+  - `fsutil.rs` : purge limitée à `.part`, `.tmp` et `.*.tmp.*` ;
+    `lock.rs` : PID écrit et synchronisé après `flock` ;
+  - `workflow-cli` : suffixe `_tracking.json` insensible à la casse,
+    `block_on_cli` current-thread, `audit_missions` en `HashSet` ;
+  - `validate_server` : `allow_remote = true` exige une `secret_key` non vide
+    et non préfixée `dev-` ; contrat d'environnement 1.10 ;
+  - 11 tests ajoutés ; suite workspace 689 listés (687 + 2 ignorés) ;
+  - `fmt`, clippy et `cargo test --workspace` verts ;
+    `scripts/validate-step1.py` passe ; aucun fichier de production modifié.
 
 - [2026-11-16] **Audit backend Rust — actions P1 (D-070)** :
   - `download.rs` : `validate_url_host` sur l'URL initiale, `probe` et
@@ -76,11 +105,12 @@ Aucun `.ecproj`, `runtime/`, `config/config.toml` ni `/mnt/cache` modifié.
   natif (D-028).
 - Webhook Rust activé dans la configuration depuis le 2026-10-23
   (`enabled = true`) ; il ne tourne que si le serveur est démarré.
-- 678 tests unitaires listés (676 exécutés + 2 ignorés) ; pas de CI.
+- 689 tests unitaires listés (687 exécutés + 2 ignorés) ; pas de CI.
 - Audit backend du 2026-10-24 remédié : 33 corrigés, 3 documentés
   (C3 → D-025, C4 → D-015, C8 → D-024).
 - Audit backend du 2026-11-16 : actions P1 (AUD-01, AUD-02, AUD-03) remédiées
-  et testées (D-070) ; constats P2/P3 ouverts.
+  et testées (D-070) ; constats P2/P3 (AUD-04 → AUD-10) remédiés et testés
+  (D-071).
 - Dernière validation : STEP1 → STEP8 sur `1720 Camille`, shadow `162/162`.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock`.
 - Runtime : `runtime/` ; sortie finalisée : `/mnt/cache`.

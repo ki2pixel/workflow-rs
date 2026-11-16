@@ -40,11 +40,10 @@ models = "/home/kidpixel/workflow-rs/assets/models"
 # Banque centrale de repli A7. Vide : seuls les assets de <projet>/docs sont utilisés.
 # Relatif au répertoire de lancement (workdir du serveur = racine du dépôt).
 mission_overlays = "assets/mission_overlays"
-projects = "/home/kidpixel/workflow-rs/runtime/projets_extraits"
-archives = "/home/kidpixel/workflow-rs/runtime/archives"
-logs = "/home/kidpixel/workflow-rs/runtime/logs"
-downloads = "/home/kidpixel/workflow-rs/runtime/downloads"
-history_db = "/home/kidpixel/workflow-rs/runtime/download_history.sqlite3"
+# projects, archives, logs, downloads et history_db sont dérivés de `base`
+# (respectivement projets_extraits/, archives/, logs/, downloads/ et
+# download_history.sqlite3). Les laisser absents permet à WORKFLOW_PATHS_BASE
+# d'isoler tout le runtime sans réécrire ce fichier.
 cache_root = "/mnt/cache"
 finalized = "/mnt/cache"
 
@@ -108,9 +107,9 @@ keyword = "Camille"
 docs_subfolder = "docs"
 
 [steps.step1]
-# Dossier isolé du moniteur Rust. Il doit rester égal à paths.downloads quand
-# webhook.enabled = true, sinon STEP1 ne verrait pas les archives téléchargées.
-source_dir = "/home/kidpixel/workflow-rs/runtime/downloads"
+# Omis : dérivé de paths.downloads (donc de WORKFLOW_PATHS_BASE). Il doit rester
+# égal à paths.downloads quand webhook.enabled = true, sinon STEP1 ne verrait
+# pas les archives téléchargées. Une valeur explicite reste prioritaire.
 normalize = true
 fps = 25
 use_gpu = true

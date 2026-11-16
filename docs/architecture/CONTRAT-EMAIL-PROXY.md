@@ -1,4 +1,16 @@
-### 1. Format de l'Index récapitulatif
+# Contrat de l'API email_proxy
+
+| Champ | Valeur |
+| --- | --- |
+| Type | Spécification d'intégration |
+| Statut | Référence |
+| Date | 2026-11-11 |
+| Portée | Points d'entrée HTTP et schémas JSON fournis par `email_proxy.php` pour la résolution des missions A7 (D-064) |
+| Voir aussi | [`CONTRAT-ENVIRONNEMENT.md`](CONTRAT-ENVIRONNEMENT.md), [`../lots/LOT-12-A7-MISSIONS.md`](../lots/LOT-12-A7-MISSIONS.md) |
+
+Ce document décrit le contrat d'intégration du service distant `email_proxy.php` consommé par le client `EmailProxyClient` de `workflow-ingest`.
+
+## 1. Format de l'Index récapitulatif
 > **URL :** `GET https://webhook.kidpixel.fr/email_proxy.php`  
 > *(ou avec pagination : `GET /email_proxy.php?limit=10`)*
 
@@ -81,7 +93,7 @@ Ce point d'entrée renvoie un tableau JSON léger ordonné du plus récent au pl
 
 ---
 
-### 2. Format du Détail complet d'une mission
+## 2. Format du Détail complet d'une mission
 > **URL :** `GET https://webhook.kidpixel.fr/email_proxy.php?id=recadrage_lot_136`  
 > *(ou avec l'ID complet : `?id=recadrage_lot_136_20261110`)*
 
@@ -119,7 +131,7 @@ Ce point d'entrée renvoie l'objet JSON unique du lot ciblé, avec le corps brut
 
 ---
 
-### 3. Exemple sur un Lot Urgent (Lot 80)
+## 3. Exemple sur un Lot Urgent (Lot 80)
 > **URL :** `GET https://webhook.kidpixel.fr/email_proxy.php?id=recadrage_lot_80`
 
 Pour une mission urgente, `"urgent": true` est activé, et les deux blocs d'instructions sont préservés :
@@ -156,7 +168,7 @@ Pour une mission urgente, `"urgent": true` est activé, et les deux blocs d'inst
 
 ---
 
-### 4. Synthèse des types et clés pour votre intégration
+## 4. Synthèse des types et clés pour votre intégration
 
 | Clé | Type | Description |
 |---|---|---|

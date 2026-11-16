@@ -2,8 +2,8 @@
 
 | Champ | Valeur |
 | --- | --- |
-| Version | 1.9 |
-| Date | 2026-11-13 |
+| Version | 1.10 |
+| Date | 2026-11-16 |
 | Source | `workflow_mediapipe` à l'état du dépôt |
 | Portée | Ce que l'application Rust doit reproduire pour remplacer l'application Flask sans régression |
 
@@ -599,7 +599,9 @@ Correspondance complète dans `config/env.map.toml`. Les règles de validation s
 - Refus de démarrer si `worker_token` est vide, égal à `dev-internal-worker-token`, ou commence par `dev-`.
 - Refus de démarrer si `server.host` n'est pas une adresse loopback, sauf avec `server.allow_remote = true`.
 - Refus de tout `hardware.lock_path` dont le nom de fichier est `workflow-hw.lock`, quel que soit le répertoire.
-- `server.secret_key` est optionnel : aucun mécanisme de session ne l'utilise.
+- `server.secret_key` est optionnel en écoute locale ; avec
+  `server.allow_remote = true`, il doit être non vide et ne pas commencer par
+  `dev-` (le jeton worker est exposé dans `GET /`).
 - Refus de démarrer si un chemin obligatoire n'existe pas ou n'est pas accessible en écriture.
 - `port` entre 1024 et 65535, `fps` entier positif, `threshold` dans `[0, 1]`.
 - `require_edgetpu = true` par défaut pour STEP3 et STEP4.

@@ -1,4 +1,5 @@
-//! Orchestration du post-traitement : A5 (rapport) + A6 (template SDM).
+//! Orchestration du post-traitement : A5 (rapport), A6 (template SDM) et A7
+//! (missions email).
 //!
 //! Invariant central : le `.ecproj` brut n'est jamais modifié. Un second
 //! projet `_assist.ecproj` est toujours publié (copie du brut si aucune

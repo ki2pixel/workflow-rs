@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use unicode_normalization::char::is_combining_mark;
 use unicode_normalization::UnicodeNormalization;
@@ -692,7 +693,8 @@ fn parse_lenient_logos(parenthetical: &str) -> Option<Vec<String>> {
     } else {
         return None;
     };
-    let mut rest = normalized.get(prefix_len..)?.trim();
+    let mut rest = strip_chars(&normalized, prefix_len).trim();
+    let lower = rest.to_lowercase();
     for label in [
         "chaîne",
         "chaine",
@@ -704,9 +706,12 @@ fn parse_lenient_logos(parenthetical: &str) -> Option<Vec<String>> {
         "animé",
         "anime",
     ] {
-        let lower = rest.to_lowercase();
         if lower.starts_with(label) {
-            rest = rest.get(label.len()..).unwrap_or_default().trim();
+            // `label` est en minuscules : sa longueur en octets ne correspond
+            // pas forcément au préfixe d'origine (`İ` se décompose en deux
+            // caractères en minuscules). On coupe donc par caractères.
+            let char_count = label.chars().count();
+            rest = strip_chars(rest, char_count).trim();
             break;
         }
     }
@@ -715,6 +720,15 @@ fn parse_lenient_logos(parenthetical: &str) -> Option<Vec<String>> {
         return None;
     }
     Some(split_logo_tokens(rest))
+}
+
+/// Retire `count` caractères en respectant les frontières UTF-8.
+fn strip_chars(input: &str, count: usize) -> &str {
+    input
+        .char_indices()
+        .nth(count)
+        .map(|(offset, _)| &input[offset..])
+        .unwrap_or_default()
 }
 
 /// Extrait le nom de fichier vidéo et le reste de la ligne.
@@ -799,7 +813,7 @@ pub fn parse_logos(parenthetical: &str) -> Vec<String> {
 
 fn split_logo_tokens(list: &str) -> Vec<String> {
     let mut logos = Vec::new();
-    let mut seen = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
     for token in list.split([',', ';']) {
         for part in token.split(" et ") {
             let cleaned = part
@@ -813,10 +827,9 @@ fn split_logo_tokens(list: &str) -> Vec<String> {
                 continue;
             }
             let token_key = filename_key(&cleaned);
-            if token_key.is_empty() || seen.contains(&token_key) {
+            if token_key.is_empty() || !seen.insert(token_key) {
                 continue;
             }
-            seen.push(token_key);
             logos.push(cleaned);
         }
     }
@@ -1475,7 +1488,7 @@ pub fn strip_video_extension(key: &str) -> &str {
 /// `delivery_links`, qui reste prioritaire.
 pub fn extract_delivery_links(body: &str) -> Vec<MissionLink> {
     let mut links = Vec::new();
-    let mut seen = Vec::new();
+    let mut seen: HashSet<&str> = HashSet::new();
     for token in body.split_whitespace() {
         let trimmed = token.trim_matches(|character: char| {
             character.is_whitespace()
@@ -1487,10 +1500,9 @@ pub fn extract_delivery_links(body: &str) -> Vec<MissionLink> {
         if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
             continue;
         }
-        if seen.contains(&trimmed.to_string()) {
+        if !seen.insert(trimmed) {
             continue;
         }
-        seen.push(trimmed.to_string());
         let provider = if trimmed.contains("dropbox.com") {
             "dropbox"
         } else if trimmed.contains("r2.dev") || trimmed.contains("workers.dev") {
@@ -1962,6 +1974,42 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.code == "logo_form_inferred"));
+    }
+
+    #[test]
+    fn parses_lenient_logo_prefixes_with_accents_and_case() {
+        // Given: des libellés accentués en minuscules et en majuscules.
+        // When:  le corps est analysé.
+        // Then:  le préfixe est retiré par caractères, jamais au milieu d'un
+        //        point de code UTF-8, et le logo reste résolu.
+        let body = "Recadrage à faire pour 10h00 :\n\
+                    - a.mp4 (Logo Chaîne : gulli.png)\n\
+                    - b.mp4 (Logo chaîne : gulli.png)\n\
+                    - c.mp4 (Logo Émission : top chef.png)\n\
+                    - d.mp4 (Logo émission : top chef.png)\n\
+                    - e.mp4 (Logo Animé : m6.png)\n\
+                    - f.mp4 (Logo anime: m6.png)\n\
+                    - g.mp4 (Logo Chaîne: gulli.png)";
+        let mission = ClientMission::from_body("x", 1, "Lot 1", body);
+        assert_eq!(mission.videos.len(), 7);
+        assert_eq!(mission.videos[0].logos, vec!["gulli.png"]);
+        assert_eq!(mission.videos[1].logos, vec!["gulli.png"]);
+        assert_eq!(mission.videos[2].logos, vec!["top chef.png"]);
+        assert_eq!(mission.videos[3].logos, vec!["top chef.png"]);
+        assert_eq!(mission.videos[4].logos, vec!["m6.png"]);
+        assert_eq!(mission.videos[5].logos, vec!["m6.png"]);
+        assert_eq!(mission.videos[6].logos, vec!["gulli.png"]);
+        assert!(mission
+            .videos
+            .iter()
+            .all(|video| !video.logo_unresolved && !video.logos.is_empty()));
+    }
+
+    #[test]
+    fn strip_chars_respects_utf8_boundaries() {
+        assert_eq!(strip_chars("émission : top chef.png", 8), " : top chef.png");
+        assert_eq!(strip_chars("logo", 4), "");
+        assert_eq!(strip_chars("logo", 10), "");
     }
 
     #[test]

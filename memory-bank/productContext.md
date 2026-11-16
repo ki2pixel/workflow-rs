@@ -39,12 +39,12 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 | Crate | Rôle |
 | --- | --- |
-| `workflow-core` | Config TOML typée, chemins résolus, verrou matériel. |
+| `workflow-core` | Config TOML typée, chemins résolus et dérivés, isolation, missions, verrou matériel. |
 | `workflow-schema` | Schémas JSON, arrondis Python. |
-| `workflow-steps` | STEP1–STEP8, rétention. |
-| `workflow-cli` | Entrée opérationnelle des étapes, ingestion, sync. |
+| `workflow-steps` | STEP1–STEP8, `template`, post A5/A6/A7, QA read-only, vision, rétention. |
+| `workflow-cli` | Entrée opérationnelle des étapes, post, QA, ingestion, sync, rétention, config. |
 | `workflow-server` | Orchestrateur axum `:5004`. |
-| `workflow-ingest` | Webhook, URL, SQLite, téléchargements. |
+| `workflow-ingest` | Webhook, URL, SQLite, téléchargements, cache des missions email. |
 | `workflow-sync` | Fusion Python ↔ Rust. |
 | `workflow-bridge` | Pont JSON After Effects. |
 | `workflow-tpu` | FFI TFLite/Edge TPU et spike. |
@@ -63,7 +63,12 @@ artefacts compatibles et permettre une bascule contrôlée.
 6. **STEP6** : `_ae.json`, index par frame, recommandations de segments.
 7. **STEP7** : archivage SHA-256, copie finalisée, manifeste
    `finalized_projects_<ts>.json`.
-8. **STEP8** : génération `<video>_9x16.ecproj` via `effectcraft-cli`.
+8. **STEP8** : génération `<video>_9x16.ecproj` via `effectcraft-cli` ; le
+   post A5/A6/A7 publie `<video>_9x16_assist.ecproj` et les artefacts
+   `post.json`/`review.json`/`audit.json`, sans modifier le brut.
+
+Après l'export humain, `workflow-cli qa run` contrôle le MP4 en lecture seule
+et écrit `qa.json` (D-036 → D-049, D-067).
 
 ## Intégrations
 
@@ -78,7 +83,7 @@ artefacts compatibles et permettre une bascule contrôlée.
 ## Interface
 
 - Timeline 8 étapes, sélection de séquence, progression (y compris le post
-  A5/A6 de STEP8), logs.
+  A5/A6/A7 de STEP8), logs.
 - Overlay de logs avec focus trap et auto-ouverture configurable.
 - Polling via `PollingManager`.
 - Frontend copié du legacy ; écarts assumés : auto-ouverture des logs
@@ -101,7 +106,7 @@ artefacts compatibles et permettre une bascule contrôlée.
 
 ## État de validation
 
-- 678 tests unitaires listés (676 exécutés + 2 ignorés), sans matériel.
+- 689 tests unitaires listés (687 exécutés + 2 ignorés), sans matériel.
 - QA read-only étape B : Stage 0 35/35, OCR 12/12 synthétiques, logos
   34/39 sur la galerie d'assets, DINOv2 actif par défaut (opt-out) 39/39 en
   union, 0 nouveau faux positif sur les exports GOOD ; validation réelle par

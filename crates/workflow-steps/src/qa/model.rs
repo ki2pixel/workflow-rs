@@ -1,6 +1,7 @@
 //! Modèles sérialisables du contrôle qualité scénario B.
 //!
-//! Le contrat `qa.json` est volontairement séparé de l'`audit.json` de A5/A6 :
+//! Le contrat `qa.json` est volontairement séparé de l'`audit.json` du post
+//! A5/A6/A7 :
 //! il décrit un contrôle en lecture seule de l'export final, pas une décision
 //! de post-traitement. Les champs sont ordonnés comme dans le fichier publié.
 

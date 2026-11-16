@@ -42,7 +42,7 @@ pub struct Step8Options {
     pub max_drivers_kept: usize,
     /// 0 désactive le timeout interne.
     pub timeout_s: u64,
-    /// Post-traitement A5/A6 (second `.ecproj` `_assist`).
+    /// Post-traitement A5/A6/A7 (second `.ecproj` `_assist`).
     pub post: PostOptions,
 }
 

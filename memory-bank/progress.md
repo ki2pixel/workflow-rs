@@ -5,13 +5,14 @@
 | Composant | État au 2026-11-16 | Référence |
 | --- | --- | --- |
 | Pipeline STEP1 → STEP8 | Huit étapes portées et validées ; STEP7 publie et archive, STEP8 est headless (`effectcraft-cli`). | `docs/lots/LOT-*.md`, `parity/DRIFT.md` |
-| Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` toujours publié. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
+| Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` publié hors `--report-only`. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
 | Bypass SDM/LPHDF | Bascule directe opt-in pour les profils 1920×1080 25 fps H.264 ; préfixes `M6 - SDM - `, `SDM - ` et `W9 - LPHDF`. | D-034, D-035, D-061 |
-| Ingestion | Webhook Rust, normalisation d'URL, historique SQLite, téléchargements R2/Dropbox ; un seul moniteur actif. Audit P1 remédié (D-070) : anti-SSRF sur IP littérales et redirections, `parking_lot`, SQLite hors workers Tokio, `fsync` des archives. | `docs/lots/LOT-8-INGESTION.md`, `docs/audits/2026-11-16-audit-backend-rust.md` |
+| Ingestion | Webhook Rust, normalisation d'URL, historique SQLite, téléchargements R2/Dropbox ; un seul moniteur actif. Audit P1 remédié (D-070) : anti-SSRF sur IP littérales et redirections, `parking_lot`, SQLite hors workers Tokio, `fsync` des archives. Audit P2/P3 remédié (D-071) : chemins dérivés de `paths.base`, purge d'orphelins ciblée, PID du verrou. | `docs/lots/LOT-8-INGESTION.md`, `docs/validation/audits/2026-11-16-audit-backend-rust.md` |
 | Serveur `:5004` | axum, une étape à la fois (409), arrêt `stopping` puis SIGTERM/SIGKILL ; Python `:5003` arrêté, rollback disponible. | `docs/lots/LOT-5-ORCHESTRATOR.md` |
-| QA read-only | Schéma `1.5.0`, cache 12, masque des `.mov` alpha (12–24 frames), DINOv2 opt-in. | D-049, D-051, D-067 |
+| QA read-only | Schéma `1.5.0`, cache 12, masque des `.mov` alpha (12–24 frames), DINOv2 actif par défaut (opt-out). | D-049, D-051, D-067 |
 | Parité | STEP2/3/4 à `1e-6`, shadow `162/162`, CSV/JSON contractuels préservés. | `parity/DRIFT.md`, `docs/validation/VALIDATION-STEP1-8.md` |
-| Tests et outillage | 678 tests listés (676 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
+| Tests et outillage | 689 tests listés (687 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
+| Standards agents | `codingstandards.md` aligné sur `template`, `post/`, `qa/`, `vision/`, les sous-commandes CLI et les décisions D-062 → D-072. | D-072 |
 
 - Backend de production : Rust `:5004` headless via `scripts/switch-rust.sh` ;
   interface web legacy `assets/web` uniquement (D-028).
@@ -19,6 +20,18 @@
   si le serveur est démarré.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock` ; runtime `runtime/`, sortie
   finalisée `/mnt/cache`.
+- 2026-11-16 : alignement du standard de codage (D-072) — §2 structure des
+  crates et sous-commandes, §3 `thiserror`/`anyhow` et sorties contractuelles,
+  §4/§8 isolation `paths.base` et exposition réseau, §5 template direct,
+  post-traitement A1–A7 et QA read-only. Aucun changement de comportement ni
+  fichier de production modifié ; seuls des commentaires de module ont été
+  alignés. `fmt`, clippy et 689 tests listés (687 + 2 ignorés) verts.
+- 2026-11-16 : remédiation des constats P2/P3 de l'audit backend Rust (D-071) —
+  parseur UTF-8 par caractères, chemins dérivés de `paths.base` (isolation
+  complète par `WORKFLOW_PATHS_BASE`), purge d'orphelins ciblée, PID dans
+  `HardwareLock`, runtime Tokio `current_thread` et `HashSet` dans le CLI,
+  `secret_key` exigée avec `allow_remote = true`. Suite workspace : 689 tests
+  listés (687 exécutés + 2 ignorés), 0 échec.
 - 2026-11-16 : remédiation des constats P1 de l'audit backend Rust (D-070) —
   anti-SSRF sur IP littérales et chaîne de redirections, `parking_lot::Mutex`
   sans empoisonnement, SQLite déporté hors des workers Tokio dans

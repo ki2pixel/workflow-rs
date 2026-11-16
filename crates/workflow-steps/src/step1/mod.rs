@@ -98,7 +98,7 @@ impl Step1Options {
         source_override: Option<PathBuf>,
     ) -> Result<Self, StepError> {
         let resolved = config.paths.resolve();
-        let source_dir = source_override.unwrap_or_else(|| config.steps.step1.source_dir.clone());
+        let source_dir = source_override.unwrap_or_else(|| config.step1_source_dir());
         if source_dir.as_os_str().is_empty() {
             return Err(StepError::Schema(
                 "steps.step1.source_dir est vide et aucune source n'a été fournie".into(),

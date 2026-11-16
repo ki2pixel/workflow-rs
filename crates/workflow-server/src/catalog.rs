@@ -155,7 +155,7 @@ impl StepKey {
         match self {
             Self::Step1 => {
                 command.extend(["step1", "run", "--source-dir"].map(OsString::from));
-                command.push(config.steps.step1.source_dir.clone().into_os_string());
+                command.push(config.step1_source_dir().into_os_string());
             }
             Self::Step2 => {
                 command.extend(["step2", "detect", "--input-dir"].map(OsString::from));

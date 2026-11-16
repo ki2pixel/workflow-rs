@@ -1,8 +1,8 @@
 //! Contrôle qualité en lecture seule de l'export final (scénario B).
 //!
 //! `qa run` intervient **après** l'export humain, pas dans STEP8. Le module ne
-//! modifie ni le `.ecproj`, ni le MP4, ni `docs/` ; il écrit uniquement
-//! `qa.json` sous `--out`.
+//! modifie ni le `.ecproj`, ni le MP4, ni `docs/` ; il n'écrit que sous `--out`
+//! (`qa.json`, frames de preuve WebP et `summary.json` en lot).
 //!
 //! État v1 : Stage 0 déterministe (specs, durée, timeline, template A6,
 //! noir/gel), Stage 1 OCR sous-titres et logos (PP-OCRv6) et visage (YuNet),

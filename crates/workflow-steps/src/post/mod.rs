@@ -1,4 +1,4 @@
-//! Post-traitement déterministe après STEP8 (A5 + A6).
+//! Post-traitement déterministe après STEP8 (A5 + A6 + A7).
 //!
 //! Le module lit le `.ecproj` brut, écrit un second projet `_assist.ecproj`
 //! (copie du brut si aucune décision n'est applicable) et publie trois

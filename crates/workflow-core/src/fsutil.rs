@@ -53,7 +53,8 @@ pub fn sync_parent(path: &Path) {
 }
 
 /// Purge les résidus d'exécutions interrompues (`_temp_*`, `*.part`,
-/// `*.tmp*`) plus vieux que `max_age_hours`, uniquement sous `base`.
+/// `*.tmp` et `.*.tmp.*`) plus vieux que `max_age_hours`, uniquement sous
+/// `base`.
 ///
 /// Les fichiers récents sont conservés : un téléchargement ou une extraction
 /// en cours dans un autre processus ne doit pas être supprimé.
@@ -86,8 +87,14 @@ fn purge_orphans_with(base: &Path, max_age_hours: u64, now: SystemTime) -> usize
             let name = entry.file_name();
             let name = name.to_string_lossy();
             let is_temp_dir = file_type.is_dir() && name.starts_with("_temp_");
-            let is_partial =
-                file_type.is_file() && (name.ends_with(".part") || name.contains(".tmp"));
+            // Motifs réellement émis par le pipeline : `.part` des
+            // téléchargements, `.tmp` final et `.<name>.tmp.<pid>` de
+            // `hidden_temp_path`. Un `.tmp` au milieu d'un nom client reste
+            // un fichier légitime.
+            let is_partial = file_type.is_file()
+                && (name.ends_with(".part")
+                    || name.ends_with(".tmp")
+                    || (name.starts_with('.') && name.contains(".tmp.")));
             if is_temp_dir || is_partial {
                 let old = entry
                     .metadata()
@@ -166,6 +173,36 @@ mod tests {
         fs::write(&partial, b"in progress").unwrap();
         assert_eq!(purge_orphans(&base, 24), 0);
         assert!(partial.exists());
+    }
+
+    #[test]
+    fn given_tmp_in_the_middle_when_purged_then_legitimate_file_kept() {
+        // Given: un fichier client contenant `.tmp` au milieu de son nom, à
+        //        côté des motifs réels du pipeline.
+        // When:  la purge s'exécute sur des fichiers anciens.
+        // Then:  seul le fichier légitime survit.
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("runtime");
+        fs::create_dir_all(base.join("downloads")).unwrap();
+        let legitimate = base.join("downloads").join("projet.tmp.archive.zip");
+        fs::write(&legitimate, b"keep").unwrap();
+        fs::write(base.join("downloads").join("archive.zip.part"), b"partial").unwrap();
+        fs::write(base.join("downloads").join("archive.zip.tmp"), b"temp").unwrap();
+        fs::write(
+            base.join("downloads").join(".tracking.json.tmp.1234"),
+            b"temp",
+        )
+        .unwrap();
+
+        let removed = purge_orphans_with(&base, 1, SystemTime::now() + Duration::from_secs(7_200));
+        assert_eq!(removed, 3);
+        assert!(legitimate.exists());
+        assert!(!base.join("downloads").join("archive.zip.part").exists());
+        assert!(!base.join("downloads").join("archive.zip.tmp").exists());
+        assert!(!base
+            .join("downloads")
+            .join(".tracking.json.tmp.1234")
+            .exists());
     }
 
     #[test]

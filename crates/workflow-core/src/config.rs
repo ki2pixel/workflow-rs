@@ -39,6 +39,20 @@ impl Config {
         Ok(config)
     }
 
+    /// Répertoire source de STEP1.
+    ///
+    /// Vide, il reprend `paths.downloads` résolu : `WORKFLOW_PATHS_BASE` isole
+    /// ainsi l'ingestion et STEP1 sans réécriture textuelle du TOML. Une
+    /// valeur explicite (TOML ou `WORKFLOW_STEP1_SOURCE_DIR`) reste
+    /// prioritaire.
+    pub fn step1_source_dir(&self) -> PathBuf {
+        if self.steps.step1.source_dir.as_os_str().is_empty() {
+            self.paths.resolve().downloads
+        } else {
+            self.steps.step1.source_dir.clone()
+        }
+    }
+
     /// Surcharges d'environnement. Les secrets utilisent `WORKFLOW_*` en
     /// priorité, puis les anciens noms pour la période de transition.
     ///
@@ -466,11 +480,6 @@ impl Config {
                 "server.workdir ne peut pas être vide".into(),
             ));
         }
-        if self.steps.step1.source_dir.as_os_str().is_empty() {
-            return Err(ConfigError::Invalid(
-                "steps.step1.source_dir ne peut pas être vide".into(),
-            ));
-        }
         if self.server.max_step_log_bytes < 1024 {
             return Err(ConfigError::Invalid(
                 "server.max_step_log_bytes doit être supérieur ou égal à 1024".into(),
@@ -481,6 +490,17 @@ impl Config {
                 "server.host ({}) n'est pas une adresse loopback; définir server.allow_remote = true pour exposer le serveur",
                 self.server.host
             )));
+        }
+        if self.server.allow_remote {
+            // Le jeton worker est injecté dans la page `GET /` : un accès
+            // distant sans secret exploitable exposerait les routes mutantes.
+            let secret = self.server.secret_key.trim();
+            if secret.is_empty() || secret.starts_with("dev-") {
+                return Err(ConfigError::Invalid(
+                    "server.allow_remote = true exige un server.secret_key non vide et non préfixé dev-"
+                        .into(),
+                ));
+            }
         }
         let token = self.server.worker_token.trim();
         if token.is_empty() || token == "dev-internal-worker-token" || token.starts_with("dev-") {
@@ -842,6 +862,7 @@ impl Default for FilterConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct Step1Config {
     /// Répertoire des archives à extraire (aucun parcours récursif).
+    /// Vide : `paths.downloads` résolu (voir `Config::step1_source_dir`).
     pub source_dir: PathBuf,
     pub skip_preserved_mov: bool,
     pub preserved_mov_names: Vec<String>,
@@ -1613,10 +1634,30 @@ mod tests {
     fn non_loopback_host_requires_allow_remote() {
         let mut config = Config::default();
         config.server.worker_token = "token".into();
-        config.steps.step1.source_dir = PathBuf::from("/tmp/downloads");
         config.server.host = "0.0.0.0".into();
         assert!(config.validate_server().is_err());
         config.server.allow_remote = true;
+        // L'accès distant exige aussi un secret exploitable.
+        assert!(config.validate_server().is_err());
+        config.server.secret_key = "runtime-secret".into();
+        assert!(config.validate_server().is_ok());
+    }
+
+    #[test]
+    fn allow_remote_rejects_missing_or_trivial_secret_key() {
+        // Given: un serveur distant avec un jeton worker valide.
+        // When:  secret_key est vide, blanc ou préfixé dev-.
+        // Then:  la validation refuse ; un secret réel est accepté.
+        let mut config = Config::default();
+        config.server.worker_token = "runtime-token".into();
+        config.server.host = "0.0.0.0".into();
+        config.server.allow_remote = true;
+        assert!(config.validate_server().is_err());
+        config.server.secret_key = "   ".into();
+        assert!(config.validate_server().is_err());
+        config.server.secret_key = "dev-secret-key".into();
+        assert!(config.validate_server().is_err());
+        config.server.secret_key = "runtime-secret-key".into();
         assert!(config.validate_server().is_ok());
     }
 
@@ -1624,7 +1665,74 @@ mod tests {
     fn empty_secret_key_is_accepted() {
         let mut config = Config::default();
         config.server.worker_token = "token".into();
-        config.steps.step1.source_dir = PathBuf::from("/tmp/downloads");
         assert!(config.validate_server().is_ok());
+    }
+
+    #[test]
+    fn step1_source_dir_defaults_to_the_resolved_downloads() {
+        // Given: une configuration sans steps.step1.source_dir explicite.
+        // When:  le répertoire est demandé.
+        // Then:  il suit paths.base, donc WORKFLOW_PATHS_BASE isole STEP1.
+        let mut config = Config::default();
+        config.paths.base = PathBuf::from("/srv/workflow/runtime");
+        assert_eq!(
+            config.step1_source_dir(),
+            PathBuf::from("/srv/workflow/runtime/downloads")
+        );
+        config
+            .apply_env_lookup(|name| {
+                (name == "WORKFLOW_PATHS_BASE").then(|| "/tmp/workflow-isole".into())
+            })
+            .unwrap();
+        assert_eq!(
+            config.step1_source_dir(),
+            PathBuf::from("/tmp/workflow-isole/downloads")
+        );
+        config
+            .apply_env_lookup(|name| {
+                (name == "WORKFLOW_PATHS_DOWNLOADS").then(|| "/tmp/inbox".into())
+            })
+            .unwrap();
+        assert_eq!(config.step1_source_dir(), PathBuf::from("/tmp/inbox"));
+    }
+
+    #[test]
+    fn explicit_step1_source_dir_wins_over_the_derived_default() {
+        let mut config = Config::default();
+        config.paths.base = PathBuf::from("/srv/runtime");
+        config.steps.step1.source_dir = PathBuf::from("/srv/archives");
+        assert_eq!(config.step1_source_dir(), PathBuf::from("/srv/archives"));
+    }
+
+    #[test]
+    fn workflow_paths_base_isolates_all_derived_paths() {
+        // Given: une configuration dont seuls base et les chemins non
+        //        dérivables restent explicites.
+        // When:  WORKFLOW_PATHS_BASE est injecté.
+        // Then:  projets, archives, logs, téléchargements et base d'historique
+        //        suivent la nouvelle racine sans édition du TOML.
+        let mut config = Config::default();
+        config.paths.base = PathBuf::from("/srv/runtime");
+        config
+            .apply_env_lookup(|name| {
+                (name == "WORKFLOW_PATHS_BASE").then(|| "/tmp/isolated".into())
+            })
+            .unwrap();
+        let resolved = config.paths.resolve();
+        assert_eq!(
+            resolved.projects,
+            PathBuf::from("/tmp/isolated/projets_extraits")
+        );
+        assert_eq!(resolved.archives, PathBuf::from("/tmp/isolated/archives"));
+        assert_eq!(resolved.logs, PathBuf::from("/tmp/isolated/logs"));
+        assert_eq!(resolved.downloads, PathBuf::from("/tmp/isolated/downloads"));
+        assert_eq!(
+            resolved.history_db,
+            PathBuf::from("/tmp/isolated/download_history.sqlite3")
+        );
+        assert_eq!(
+            config.step1_source_dir(),
+            PathBuf::from("/tmp/isolated/downloads")
+        );
     }
 }

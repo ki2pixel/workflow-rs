@@ -755,7 +755,12 @@ fn build_driver_js(
         ),
         "var msResult = JSON.parse(mediasolutionEC.runBatch(JSON.stringify(MS_FOLDERS), null, 0));"
             .to_string(),
-        "writeLn(\"MS_BATCH_RESULT: \" + JSON.stringify(msResult));".to_string(),
+        // `$.writeln` passe par le tee installé plus haut : le résultat est donc
+        // aussi écrit dans le fichier de progression avant l'éventuel `throw`.
+        // Le thread Rust peut ainsi rapporter `ok: false` et le détail des
+        // erreurs même quand `file.runScript` échoue.
+        "try { $.writeln(\"MS_BATCH_RESULT: \" + JSON.stringify(msResult)); } catch (__msResultError) { }"
+            .to_string(),
         "if (!msResult.ok || (msResult.errors && msResult.errors.length > 0)) {".to_string(),
         "  throw new Error(\"Batch Media Solution en échec\");".to_string(),
         "}".to_string(),
@@ -918,6 +923,21 @@ fn run_cli(
             String::from_utf8_lossy(&output.stdout)
         )
     })?;
+    // Une commande en échec fait répondre un objet `{"error": "..."}` au lieu
+    // du tableau des résultats. Distinguer l'étape 0 (`prefs.set`) de l'étape 1
+    // (`file.runScript`) évite de confondre un échec du batch avec un refus de
+    // la préférence scripting et masque sinon le rapport STEP8.
+    if let Some(error_msg) = payload.get("error").and_then(Value::as_str) {
+        if error_msg.starts_with("prefs.set") || error_msg.contains("(step 0)") {
+            bail!("effectcraft-cli n'a pas activé scripting.allowScriptsWriteFiles: {error_msg}");
+        }
+        tracing::error!("effectcraft-cli run en échec: {error_msg}");
+        return Ok(CliOutcome {
+            return_code: output.status.code().unwrap_or(1),
+            result,
+            timed_out: false,
+        });
+    }
     let prefs_ok = command_result(&payload, "prefs.set")
         .and_then(|result| result.get("scripting.allowScriptsWriteFiles"))
         .and_then(Value::as_bool)
@@ -1215,6 +1235,7 @@ mod tests {
         assert!(driver.contains("var MS_FOLDERS = [\"/tmp/a\",\"/tmp/b\"];"));
         assert!(driver.contains("runBatch(JSON.stringify(MS_FOLDERS), null, 0)"));
         assert!(driver.contains("var __msProgressPath = \"/tmp/step8-progress.log\";"));
+        assert!(driver.contains("$.writeln(\"MS_BATCH_RESULT: \" + JSON.stringify(msResult))"));
         assert!(!driver.contains("app.run(\"prefs.set\""));
         assert!(driver.ends_with("\"step8-ok\";\n"));
     }
@@ -1404,6 +1425,115 @@ printf '%s' '[{"command":"prefs.set","result":{"scripting.allowScriptsWriteFiles
         assert_eq!(report["cli_version"], "0.13.0");
         assert_eq!(report["result"]["ok"], true);
         assert_eq!(report["folders"].as_array().unwrap().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cli_script_error_writes_failure_report_with_batch_details() {
+        // Given: un CLI qui reproduit l'échec de production (objet {"error": ...})
+        // et publie le MS_BATCH_RESULT dans le fichier de progression avant de
+        // sortir en erreur.
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("122 Camille");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        let script = format!(
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.24.1'; exit 0; fi
+progress=$(ls "{logs}"/step8/drivers/step8_progress_*.log 2>/dev/null | head -1)
+if [ -n "$progress" ]; then
+  printf '%s\n' 'MS_BATCH_RESULT: {{"ok":false,"total":5,"processed":0,"errors":["URIError: invalid hexadecimal digit found"]}}' >> "$progress"
+fi
+printf '%s' '{{"error":"file.runScript: step8_driver_20261119_211421.jsx (line 2112): Batch Media Solution en échec (step 1)"}}'
+exit 1
+"#,
+            logs = dir.path().join("logs").display()
+        );
+        crate::test_support::write_executable(&cli, &script);
+
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions::default(),
+        };
+
+        // When: STEP8 exécute le CLI.
+        let outcome = run_step8(&options).expect("le rapport d'échec doit être écrit");
+
+        // Then: l'erreur du script n'est plus confondue avec la préférence
+        // scripting et le rapport contient le détail du batch.
+        assert!(!outcome.success);
+        assert_eq!(outcome.exit_code, 1);
+        assert!(!outcome.timed_out);
+        let report: Value =
+            serde_json::from_slice(&fs::read(outcome.report.unwrap()).unwrap()).unwrap();
+        assert_eq!(report["success"], false);
+        assert_eq!(report["cli_return_code"], 1);
+        assert_eq!(report["timed_out"], false);
+        assert_eq!(report["result"]["ok"], false);
+        assert_eq!(
+            report["result"]["errors"][0],
+            "URIError: invalid hexadecimal digit found"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cli_prefs_error_still_mentions_scripting_preference() {
+        // Given: un CLI dont l'étape 0 (`prefs.set`) échoue.
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("projet");
+        fs::create_dir_all(folder.join("docs")).unwrap();
+        let panel = dir.path().join("MediaSolution.jsx");
+        fs::write(&panel, "var mediasolutionEC = {};\n").unwrap();
+        let config = dir.path().join("mediasolution_ec.json");
+        fs::write(&config, "{\"docsSubFolderName\":\"docs\"}").unwrap();
+        let cli = dir.path().join("effectcraft-cli");
+        crate::test_support::write_executable(
+            &cli,
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo 'effectcraft-cli 0.24.1'; exit 0; fi
+printf '%s' '{"error":"prefs.set: invalid parameters for `prefs.set`: unknown setting `nope` (step 0)"}'
+exit 1
+"#,
+        );
+
+        let options = Step8Options {
+            manifest: None,
+            folders: vec![folder],
+            cli,
+            panel_jsx: panel,
+            panel_config: Some(config),
+            docs_subfolder: "docs".into(),
+            logs_dir: dir.path().join("logs"),
+            cwd: dir.path().to_path_buf(),
+            dry_run: false,
+            max_drivers_kept: 10,
+            timeout_s: 0,
+            post: PostOptions::default(),
+        };
+
+        // When: STEP8 exécute le CLI.
+        let error = run_step8(&options).expect_err("l'échec de prefs.set doit rester bloquant");
+
+        // Then: le message conserve la cause réelle de l'étape 0.
+        let message = error.to_string();
+        assert!(message.contains("scripting.allowScriptsWriteFiles"));
+        assert!(message.contains("(step 0)"));
+        assert!(message.contains("unknown setting `nope`"));
     }
 
     #[cfg(unix)]

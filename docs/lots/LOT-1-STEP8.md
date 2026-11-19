@@ -99,6 +99,48 @@ comparaison porte donc sur la composition et les 82 segments, pas sur une
 Aucune écriture n'a été faite dans `/mnt/cache` ni dans les dossiers de
 production. Les seuls fichiers créés sont sous `/tmp/opencode`.
 
+## Correctif 2026-11-19 — `URIError` et objet d'erreur `effectcraft-cli`
+
+Le batch STEP8 du 2026-11-19 (26 dossiers, 72 projets) a produit 67 projets
+puis a échoué sur les 5 vidéos de `/mnt/cache/122 Camille`. Deux causes
+distinctes se cumulaient :
+
+1. `MediaSolution.jsx` appelait `decodeURI(csvFiles[k].name)` sans garde dans
+   `findMatchingCsv`. Un nom de CSV contenant `%` suivi d'une espace
+   (`… 92% des enfants …`) lève une `URIError: invalid hexadecimal digit
+   found` ; la recherche de CSV échouait pour toutes les vidéos du dossier.
+2. `effectcraft-cli` répond `{"error": "… (step 1)"}` (objet, pas tableau)
+   quand `file.runScript` échoue. Le wrapper cherchait `prefs.set` dans ce
+   tableau absent, concluait à tort que la préférence scripting n'était pas
+   activée et sortait avant d'écrire `step8_run_*.json`.
+
+Correctifs :
+
+- `safeDecodeURI` protège `decodeURI` par `try/catch` et retombe sur le nom
+  brut ; `findMatchingCsv` compare d'abord le nom décodé puis le nom brut.
+  `decodeNameForLog` réutilise `safeDecodeURI`. La copie installée
+  `~/.config/effectcraft/Scripts/ScriptUI Panels/MediaSolution.jsx` est
+  synchronisée.
+- `run_cli` distingue l'erreur de l'étape 0 (`prefs.set`, message conservé et
+  bloquant) de l'étape 1 (`file.runScript`) : cette dernière journalise
+  l'erreur et retourne `CliOutcome { return_code, result, timed_out: false }`,
+  ce qui laisse `run_step8` écrire le rapport d'échec.
+- Le driver écrit `MS_BATCH_RESULT` via `$.writeln` (tee du fichier de
+  progression) et non plus `writeLn`, afin que le résultat `ok: false` et le
+  détail des erreurs soient disponibles même quand le script lève ensuite.
+
+Validation :
+
+- `cargo test -p workflow-steps step8 --lib` : 17 tests, dont
+  `cli_script_error_writes_failure_report_with_batch_details` et
+  `cli_prefs_error_still_mentions_scripting_preference` ;
+- évaluation réelle `effectcraft-cli 0.24.1` sur
+  `/mnt/cache/122 Camille/docs` : les 5 CSV sont appariés, y compris
+  `… 92% …` ;
+- reprise ciblée `workflow-cli step8 run --folder "/mnt/cache/122 Camille"` :
+  5/5 projets bruts et 5/5 `_assist.ecproj`, `MS_BATCH_RESULT` avec
+  `ok: true`, rapport `success: true`, `cli_return_code: 0`, aucun `URIError`.
+
 ## Post-traitement A5/A6
 
 Depuis le 2026-10-27, un STEP8 réussi enchaîne le post-traitement déterministe

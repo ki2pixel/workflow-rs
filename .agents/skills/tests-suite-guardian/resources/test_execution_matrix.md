@@ -4,7 +4,7 @@
 | --- | --- | --- | --- |
 | Format | `cargo fmt --check` | `rustfmt` | Aucun diff |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` | Dépendances compilées | Aucun warning |
-| Suite complète | `cargo test --workspace` | Aucun matériel | 704 tests listés (702 exécutés + 2 ignorés) |
+| Suite complète | `cargo test --workspace` | Aucun matériel | 706 tests listés (704 exécutés + 2 ignorés) |
 | STEP1 | `cargo test -p workflow-steps step1 --lib` | Aucun matériel | Tests module step1 |
 | STEP2 | `cargo test -p workflow-steps step2 --lib` | Aucun GPU | Tests fenêtres/CSV/CPU |
 | STEP3 | `cargo test -p workflow-steps step3 --lib` | Aucun TPU | Tests mel/VAD/AHC/writer |

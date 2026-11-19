@@ -2,18 +2,35 @@
 
 ## Tâche en cours
 
-**Déclenchement du template SDM par mission (2026-11-16, terminé).** Le lot 216
-(`Alice et Sofiane.mp4`, `Liliane et José.mp4`) a été livré sans préfixe
-`SDM - ` mais avec une mission unique demandant exclusivement `sdm.png` ; le
-pipeline lourd s'est exécuté et A7 a posé un logo statique. D-080 ajoute
-`steps.step8.post.mission_template` (activé en production) : `SdmTemplateIndex`
-résout le couple lot/vidéo, `template::Bypass` et A6 partagent ce match, STEP2
-synchronise le cache email une fois, STEP3–STEP7 le relisent. Le nom reste
-prioritaire, un lot ambigu ou une mission avec un autre logo conserve le
-comportement historique. `template.trigger` et `template.mission` sont
-additifs ; `template.prefix` reste vide pour une mission.
+**Correctif STEP8 `URIError` et erreur CLI (2026-11-19, terminé).** Le batch du
+2026-11-19 a échoué sur les 5 vidéos de `/mnt/cache/122 Camille` : `decodeURI`
+levait une `URIError` sur le CSV `… 92% …`, puis l'objet
+`{"error": "… (step 1)"}` de `effectcraft-cli` était confondu avec un refus de
+`scripting.allowScriptsWriteFiles`, ce qui empêchait l'écriture du rapport.
+D-081 protège le décodage (`safeDecodeURI` + repli sur le nom brut) et
+distingue l'erreur de l'étape 0 (bloquante) de l'étape 1 (rapport d'échec). Le
+driver publie `MS_BATCH_RESULT` via `$.writeln` pour que le détail des erreurs
+soit disponible. Reprise ciblée : 5/5 bruts et 5/5 `_assist.ecproj`, rapport
+`success: true`.
 
 ## Dernière session
+
+- [2026-11-19] **Correctif STEP8 `URIError` et erreur CLI (D-081)** :
+  - `assets/effectcraft/MediaSolution.jsx` : `safeDecodeURI` avec `try/catch`,
+    `findMatchingCsv` compare le nom décodé puis le nom brut,
+    `decodeNameForLog` réutilise `safeDecodeURI` ; copie installée synchronisée ;
+  - `workflow-steps/src/step8.rs` : objet d'erreur de premier niveau distingué
+    entre `prefs.set`/`(step 0)` (bloquant, message conservé) et
+    `file.runScript`/`(step 1)` (journalisé, `CliOutcome` en échec) ; le driver
+    écrit `MS_BATCH_RESULT` via `$.writeln` (tee progression) ;
+  - tests : `cli_script_error_writes_failure_report_with_batch_details`,
+    `cli_prefs_error_still_mentions_scripting_preference` ; suite workspace
+    706 listés (704 exécutés + 2 ignorés), fmt, clippy et build release verts ;
+  - validation réelle `effectcraft-cli 0.24.1` sur `/mnt/cache/122 Camille` :
+    5 CSV appariés (dont `92%`), 5 bruts + 5 assists,
+    `step8_run_20261119_213656.json` avec `success: true` et
+    `cli_return_code: 0` ;
+  - documentation : D-081, `docs/lots/LOT-1-STEP8.md`.
 
 - [2026-11-16] **Template SDM par mission (D-080)** :
   - `workflow-core/src/mission.rs` : `SdmTemplateIndex`, `SdmTemplateMatch`,

@@ -2,7 +2,7 @@
 
 ## Statut actuel
 
-| Composant | État au 2026-11-16 | Référence |
+| Composant | État au 2026-11-19 | Référence |
 | --- | --- | --- |
 | Pipeline STEP1 → STEP8 | Huit étapes portées et validées ; STEP7 publie et archive, STEP8 est headless (`effectcraft-cli`). | `docs/lots/LOT-*.md`, `parity/DRIFT.md` |
 | Post-traitement A5/A6/A7 | A5/A6 en production depuis D-032 ; A7 résout les missions, la banque centrale, le masque QA MOV (D-064 → D-067) et reprend un asset local corrompu sur la banque (D-069). Brut jamais modifié ; `_assist.ecproj` publié hors `--report-only`. | `docs/lots/LOT-9-POST-STEP8.md`, `docs/lots/LOT-12*.md` |
@@ -11,7 +11,7 @@
 | Serveur `:5004` | axum, une étape à la fois (409), arrêt `stopping` puis SIGTERM/SIGKILL ; Python `:5003` arrêté, rollback disponible. | `docs/lots/LOT-5-ORCHESTRATOR.md` |
 | QA read-only | Schéma `1.5.0`, cache 12, masque des `.mov` alpha (12–24 frames), DINOv2 actif par défaut (opt-out). | D-049, D-051, D-067 |
 | Parité | STEP2/3/4 à `1e-6`, shadow `162/162`, CSV/JSON contractuels préservés. | `parity/DRIFT.md`, `docs/validation/VALIDATION-STEP1-8.md` |
-| Tests et outillage | 704 tests listés (702 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
+| Tests et outillage | 706 tests listés (704 exécutés + 2 ignorés), `fmt` et `clippy -D warnings` verts ; pas de CI. | `AGENTS.md` |
 | Standards agents | `codingstandards.md` aligné sur `template`, `post/`, `qa/`, `vision/`, les sous-commandes CLI et les décisions D-062 → D-072. | D-072 |
 
 - Backend de production : Rust `:5004` headless via `scripts/switch-rust.sh` ;
@@ -20,6 +20,17 @@
   si le serveur est démarré.
 - Verrou matériel : `/tmp/workflow-rs-hw.lock` ; runtime `runtime/`, sortie
   finalisée `/mnt/cache`.
+- 2026-11-19 : correctif STEP8 `URIError` et erreur CLI (D-081) — le CSV
+  `… 92% …` de `/mnt/cache/122 Camille` levait une `URIError` dans
+  `findMatchingCsv` (`decodeURI` non protégé), puis l'objet
+  `{"error": "… (step 1)"}` de `effectcraft-cli` était confondu avec un refus
+  de `scripting.allowScriptsWriteFiles`, empêchant le rapport. `safeDecodeURI`
+  et un repli sur le nom brut corrigent l'appariement ; `run_cli` distingue
+  l'étape 0 (bloquante) de l'étape 1 (rapport d'échec) ; le driver publie
+  `MS_BATCH_RESULT` via `$.writeln`. Reprise ciblée : 5/5 bruts et 5/5
+  `_assist.ecproj`, `step8_run_20261119_213656.json` avec `success: true`,
+  `cli_return_code: 0`, aucun `URIError`. Suite workspace 706 listés
+  (704 exécutés + 2 ignorés), `fmt`, clippy et build release verts.
 - 2026-11-16 : template SDM par mission (D-080) — lot 216 livré sans préfixe
   `SDM - ` mais avec `sdm.png` dans la mission unique. `SdmTemplateIndex`
   (workflow-core) indexe les couples lot/vidéo éligibles ; `Bypass` et A6 le

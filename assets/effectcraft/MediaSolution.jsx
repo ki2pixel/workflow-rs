@@ -118,8 +118,16 @@
     try { return JSON.parse(trimmed); } catch (e) { return null; }
   }
 
+  // `decodeURI` lève une URIError sur un `%` non suivi de deux chiffres
+  // hexadécimaux (ex. « 92% des enfants »). Un nom de fichier n'est pas une URI :
+  // on retombe sur le nom brut pour ne jamais interrompre un batch.
+  function safeDecodeURI(str) {
+    if (!str) return "";
+    try { return decodeURI(String(str)); } catch (e) { return String(str); }
+  }
+
   function decodeNameForLog(name) {
-    try { return decodeURI(String(name)); } catch (e) { return String(name); }
+    return safeDecodeURI(name);
   }
 
   function readText(fileObj) {
@@ -959,11 +967,19 @@
     var baseName = compName;
     if (baseName.indexOf(cfg.compNameSuffix) > -1) baseName = baseName.replace(cfg.compNameSuffix, "");
     for (var k = 0; k < csvFiles.length; k++) {
-      var csvName = decodeURI(csvFiles[k].name);
+      var csvName = safeDecodeURI(csvFiles[k].name);
       var csvBase = csvName;
       var lastDot = csvBase.lastIndexOf(".");
       if (lastDot > 0) csvBase = csvBase.substring(0, lastDot);
       if (csvBase === baseName) return { file: csvFiles[k], baseName: baseName, count: csvFiles.length };
+
+      // Second essai sur le nom brut : si le décodage a réussi mais changé le
+      // nom (séquences %XX), la comparaison directe reste possible.
+      var rawName = String(csvFiles[k].name);
+      var rawBase = rawName;
+      var rawLastDot = rawBase.lastIndexOf(".");
+      if (rawLastDot > 0) rawBase = rawBase.substring(0, rawLastDot);
+      if (rawBase === baseName) return { file: csvFiles[k], baseName: baseName, count: csvFiles.length };
     }
     return { file: null, baseName: baseName, count: csvFiles.length };
   }

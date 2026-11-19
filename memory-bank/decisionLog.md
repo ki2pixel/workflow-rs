@@ -4,7 +4,7 @@ Ce document enregistre les décisions architecturales et techniques durables de
 workflow-rs. Les écarts de comportement legacy sont détaillés dans
 `parity/DRIFT.md`.
 
-> **Politique de conservation** : les décisions actives D-041 → D-079 restent
+> **Politique de conservation** : les décisions actives D-041 → D-081 restent
 > en texte intégral. L'historique de bootstrap, les audits d'octobre 2026, les
 > décisions fondatrices D-028 → D-040 et les brouillons D-058 sont conservés
 > dans
@@ -17,13 +17,59 @@ workflow-rs. Les écarts de comportement legacy sont détaillés dans
 
 | Bloc | Décisions | Emplacement |
 | --- | --- | --- |
-| Journal actif récent | D-080 → D-060 | ci-dessous |
+| Journal actif récent | D-081 → D-060 | ci-dessous |
 | Journal actif consolidé | D-058 → D-041 | ci-dessous |
 | Numéro réservé | D-059 (option C A1, non ouverte) | voir D-058 |
 | Fondations, QA et bypass | D-040 → D-028 | [archive](file:///home/kidpixel/workflow-rs/memory-bank/archives/decisionLog-archive-2026-10.md) |
 | Écarts legacy | D-027 → D-001 | tableau ci-dessous ; détail `parity/DRIFT.md` |
 | Bootstrap, migration et audits | 2026-10-22 → 2026-10-24 | archive |
 | Brouillons D-058 | calibration v2, proposition | archive |
+
+## 2026-11-19 — D-081 : décodage URI tolérant et erreur CLI non confondue avec la préférence scripting
+
+- **Contexte** : le batch STEP8 du 2026-11-19 (26 dossiers, 72 projets) a
+  produit 67 projets puis s'est arrêté sur les 5 vidéos de
+  `/mnt/cache/122 Camille`. `MediaSolution.jsx` appelait
+  `decodeURI(csvFiles[k].name)` sans garde dans `findMatchingCsv` ; le CSV
+  `TEVA_Doc mères protectrices_Edouard Durand  92% des enfants…csv` contient
+  `%` suivi d'une espace, séquence hexadécimale invalide, et lève une
+  `URIError` qui faisait échouer la recherche de CSV pour tout le dossier.
+  Ensuite, `effectcraft-cli` a répondu un objet `{"error": "… (step 1)"}` au
+  lieu du tableau `prefs.set` / `file.runScript` ; le wrapper cherchait
+  `prefs.set` dans cet objet, concluait à tort à un refus de la préférence
+  scripting et sortait avant d'écrire `step8_run_*.json`, masquant la cause
+  réelle.
+- **Décision** :
+  1. `safeDecodeURI` protège `decodeURI` par `try/catch` et retombe sur le nom
+     brut ; `findMatchingCsv` compare le nom décodé puis le nom brut ;
+     `decodeNameForLog` réutilise la même fonction. La copie installée du
+     panel est synchronisée avec `assets/effectcraft/MediaSolution.jsx`.
+  2. `run_cli` inspecte l'objet d'erreur de premier niveau : une erreur de
+     l'étape 0 (`prefs.set` ou `(step 0)`) reste bloquante avec le message
+     d'origine ; une erreur de l'étape 1 (`file.runScript`) est journalisée et
+     retournée comme `CliOutcome` en échec (`return_code` du CLI,
+     `timed_out: false`), ce qui laisse `run_step8` publier le rapport.
+  3. Le driver écrit `MS_BATCH_RESULT` via `$.writeln`, donc dans le tee du
+     fichier de progression : le rapport contient `ok: false` et le détail des
+     erreurs même lorsque le script lève ensuite.
+- **Validation** : `cargo test -p workflow-steps step8 --lib` (17 tests, dont
+  `cli_script_error_writes_failure_report_with_batch_details` et
+  `cli_prefs_error_still_mentions_scripting_preference`),
+  `cargo test --workspace` (706 listés, 704 exécutés + 2 ignorés, 0 échec),
+  `cargo fmt --check`, clippy `-D warnings` et build release verts. Évaluation
+  réelle `effectcraft-cli 0.24.1` sur `/mnt/cache/122 Camille/docs` : les 5 CSV
+  sont appariés, y compris celui à `92%`. Reprise ciblée
+  `workflow-cli step8 run --folder "/mnt/cache/122 Camille"` : 5/5 bruts,
+  5/5 `_assist.ecproj`, `MS_BATCH_RESULT` `ok: true`, rapport
+  `step8_run_20261119_213656.json` avec `success: true`,
+  `cli_return_code: 0`, `post.failures: []`.
+- **Portée / rollback** : correctif local, aucun champ JSON ni contrat modifié.
+  Le décodage tolérant ne change la correspondance que pour les noms qui
+  faisaient échouer `decodeURI` ; le chemin d'erreur `prefs.set` conserve son
+  message bloquant. Aucun artefact existant n'est réécrit.
+- **Références** : `docs/lots/LOT-1-STEP8.md`,
+  `assets/effectcraft/MediaSolution.jsx`,
+  `crates/workflow-steps/src/step8.rs`, `runtime/logs/step8/step8_run_20261119_213656.json`.
 
 ## 2026-11-16 — D-080 : déclenchement du template SDM par mission `sdm.png`
 

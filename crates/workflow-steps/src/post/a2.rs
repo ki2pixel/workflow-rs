@@ -14,7 +14,7 @@
 
 use crate::post::detect::{band_candidates, probe_video, BandCandidate, VideoSpecs};
 use crate::post::ecproj::{CompMeta, Segment};
-use crate::post::model::Decision;
+use crate::post::model::{Action, Decision};
 use crate::post::overlay::OverlayMask;
 use crate::vision::frame::{grab_frame, sample_time, FrameCache, SAMPLE_COUNT};
 use crate::vision::ocr::{DetEngine, RecEngine};
@@ -80,11 +80,26 @@ pub struct A2OcrOptions {
     pub intra_threads: usize,
 }
 
+/// Politique A2 attachée à une émission (shadow Corpus 4).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct A2EmissionPrior {
+    /// Toute promotion A2 de l'émission repasse en revue.
+    pub review_only: bool,
+    /// Une revue de bandeau confirmée par OCR, à ±8 pts de 200 %, devient apply.
+    pub review_banner_apply: bool,
+}
+
 /// Politique A2 : marge de scale et gate OCR optionnel.
 #[derive(Debug, Clone)]
 pub struct A2Options {
     pub margin: f64,
     pub ocr: Option<A2OcrOptions>,
+    /// Triage conservateur des revues validé par le shadow Corpus 4.
+    pub triage: bool,
+    /// Prior de l'émission courante, résolu par le registre de logos source.
+    pub emission_prior: Option<A2EmissionPrior>,
+    /// Nom d'émission, conservé dans les détails pour l'audit.
+    pub emission_name: Option<String>,
     /// Prior spatial du logo de programme, déjà remis à l'échelle source.
     /// Il documente le candidat, retire le texte du logo du groupe OCR
     /// dominant et peut déclencher un `review` « logo seul » ; il ne recadre
@@ -346,6 +361,12 @@ pub(crate) fn decide_a2(
         margin,
         gate.as_ref().map(|gate| gate as &dyn OcrEvidenceSource),
     );
+    if options.triage {
+        triage_reviews(&mut decisions, source_height, meta.height as f64, margin);
+    }
+    if let Some(prior) = options.emission_prior {
+        apply_emission_prior(&mut decisions, prior, options.emission_name.as_deref());
+    }
     if let Some(prior) = options.logo_prior.as_ref() {
         annotate_source_logo(
             &mut decisions,
@@ -356,6 +377,155 @@ pub(crate) fn decide_a2(
         );
     }
     decisions
+}
+
+/// Triage conservateur des revues A2 (shadow Corpus 4).
+///
+/// - `décor bas` sans OCR et cible hors 190–300 % -> noop ;
+/// - `logo étroit` avec OCR `logo_only` -> noop ;
+/// - `bande sombre` confirmée par OCR, géométrie stable et cible ≤ 300 % ->
+///   apply.
+///
+/// Tout le reste conserve la décision d'origine. Le triage ne touche jamais
+/// un apply existant.
+fn triage_reviews(decisions: &mut [Decision], source_height: u32, comp_height: f64, margin: f64) {
+    let scale_ratio = source_height as f64 / 1080.0;
+    let geom_std = 12.0 * scale_ratio;
+    for decision in decisions {
+        if decision.code != "A2" || decision.action != Action::Review {
+            continue;
+        }
+        let reason = decision.reason.as_str();
+        let has_ocr = decision.details.get("ocr").is_some();
+        if reason.starts_with("zone basse haute (") && !has_ocr {
+            let height = decision
+                .details
+                .get("height")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            let active = source_height as f64 - height;
+            if height > 200.0 * scale_ratio && active > 0.0 {
+                let scale = round_to(comp_height / active * 100.0 * margin, 1);
+                if !(190.0..=300.0).contains(&scale) {
+                    if let Value::Object(object) = &mut decision.details {
+                        object.insert("scale_target".into(), json!(scale));
+                        object.insert("triage".into(), json!("decor_bas_hors_bande"));
+                    }
+                    decision.action = Action::Noop;
+                    decision.reason = format!(
+                        "zone basse haute ({height:.0} px), cible {scale}% hors bandeau 190–300 % : \
+                         aucun recadrage"
+                    );
+                    decision.confidence = 0.6;
+                    continue;
+                }
+            }
+        }
+        if reason.starts_with("zone basse étroite")
+            && reason.contains("texte du logo source uniquement")
+        {
+            if let Value::Object(object) = &mut decision.details {
+                object.insert("triage".into(), json!("logo_etroit_logo_only"));
+            }
+            decision.action = Action::Noop;
+            decision.reason =
+                "zone basse étroite, texte du logo source uniquement : aucun recadrage".into();
+            decision.confidence = 0.6;
+            continue;
+        }
+        if reason.starts_with("bande basse sombre (")
+            && reason.contains("texte persistant confirmé")
+        {
+            let scale = decision
+                .details
+                .get("scale_target")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::INFINITY);
+            let center_std = decision
+                .details
+                .get("center_y_std")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::INFINITY);
+            let height_std = decision
+                .details
+                .get("height_std")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::INFINITY);
+            if scale <= 300.0 && center_std <= geom_std && height_std <= geom_std {
+                let height = decision
+                    .details
+                    .get("height")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                if let Value::Object(object) = &mut decision.details {
+                    object.insert("triage".into(), json!("bande_sombre_ocr_confirme"));
+                }
+                decision.action = Action::Apply;
+                decision.reason = format!(
+                    "bande basse sombre ({height:.0} px), texte persistant confirmé par OCR \
+                     -> {scale}%"
+                );
+                decision.confidence = 0.85;
+            }
+        }
+    }
+}
+
+/// Applique le prior d'émission sans jamais contourner un veto géométrique.
+fn apply_emission_prior(decisions: &mut [Decision], prior: A2EmissionPrior, name: Option<&str>) {
+    let Some(name) = name else {
+        return;
+    };
+    for decision in decisions {
+        if decision.code != "A2" {
+            continue;
+        }
+        if prior.review_only && decision.action == Action::Apply {
+            if let Value::Object(object) = &mut decision.details {
+                object.insert("emission_prior".into(), json!(name));
+                object.insert("emission_prior_rule".into(), json!("review_only"));
+            }
+            decision.action = Action::Review;
+            decision.reason = format!("prior d'émission {name} : revue systématique");
+            decision.confidence = 0.4;
+            continue;
+        }
+        if prior.review_banner_apply && decision.action == Action::Review {
+            let Some(ocr) = decision.details.get("ocr") else {
+                continue;
+            };
+            let confirmed = ocr
+                .get("text_persistence")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+                >= 0.60
+                && ocr
+                    .get("dominant_ratio")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+                    >= 0.80
+                && ocr.get("score").and_then(Value::as_f64).unwrap_or(0.0) >= 0.55;
+            let scale = decision
+                .details
+                .get("scale_target")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::INFINITY);
+            let banner = decision.reason.starts_with("bande basse sombre (")
+                || decision.reason.starts_with("bannière ");
+            if confirmed && banner && (192.0..=208.0).contains(&scale) {
+                if let Value::Object(object) = &mut decision.details {
+                    object.insert("emission_prior".into(), json!(name));
+                    object.insert("emission_prior_rule".into(), json!("review_banner_apply"));
+                }
+                decision.action = Action::Apply;
+                decision.reason = format!(
+                    "bandeau confirmé par OCR, cible {scale}% à ±8 pts de 200 % \
+                     (prior {name})"
+                );
+                decision.confidence = 0.85;
+            }
+        }
+    }
 }
 
 pub fn decide_from_candidates(
@@ -2180,5 +2350,127 @@ mod tests {
         let decisions = decide_from_candidates(&[], &[candidate], 1080, 1920.0, 1.05);
         assert_eq!(decisions[0].action, crate::post::model::Action::Review);
         assert!(decisions[0].reason.contains("animée"));
+    }
+
+    fn decision(action: Action, reason: &str, details: Value) -> Decision {
+        Decision::new("A2", action, "comp", reason, 0.4, details)
+    }
+
+    #[test]
+    fn triage_noops_only_far_from_banner_range() {
+        // Given: un décor bas sans OCR, cible 347 % puis 243 %.
+        // When:  le triage conservateur s'applique.
+        // Then:  seule la cible hors 190–300 % devient noop.
+        let mut far = decision(
+            Action::Review,
+            "zone basse haute (500 px), décor statique probable",
+            json!({"height": 500.0, "bbox": [0, 580, 1920, 500]}),
+        );
+        let mut near = decision(
+            Action::Review,
+            "zone basse haute (250 px), décor statique probable",
+            json!({"height": 250.0, "bbox": [0, 830, 1920, 250]}),
+        );
+        triage_reviews(std::slice::from_mut(&mut far), 1080, 1920.0, 1.05);
+        triage_reviews(std::slice::from_mut(&mut near), 1080, 1920.0, 1.05);
+        assert_eq!(far.action, Action::Noop);
+        assert_eq!(far.details["triage"], "decor_bas_hors_bande");
+        assert_eq!(near.action, Action::Review);
+    }
+
+    #[test]
+    fn triage_keeps_logo_confirmed_in_review() {
+        // Given: un logo étroit confirmé (texte persistant) et un logo seul.
+        // When:  le triage s'applique.
+        // Then:  seul le logo seul devient noop.
+        let mut confirmed = decision(
+            Action::Review,
+            "zone basse étroite, texte persistant : logo ou watermark fixe, jamais recadré",
+            json!({"height": 116.0, "width_frac": 0.16, "ocr": {}}),
+        );
+        let mut logo_only = decision(
+            Action::Review,
+            "zone basse étroite, texte du logo source uniquement : jamais recadré",
+            json!({"height": 116.0, "width_frac": 0.16, "ocr": {}}),
+        );
+        triage_reviews(std::slice::from_mut(&mut confirmed), 1080, 1920.0, 1.05);
+        triage_reviews(std::slice::from_mut(&mut logo_only), 1080, 1920.0, 1.05);
+        assert_eq!(confirmed.action, Action::Review);
+        assert_eq!(logo_only.action, Action::Noop);
+    }
+
+    #[test]
+    fn triage_promotes_stable_dark_banner_only() {
+        // Given: une bande sombre confirmée stable (cible 200 %) et une instable.
+        // When:  le triage s'applique.
+        // Then:  seule la stable devient apply.
+        let mut stable = decision(
+            Action::Review,
+            "bande basse sombre (104), texte persistant confirmé par OCR ; revue avec scale proposé",
+            json!({
+                "height": 104.0,
+                "scale_target": 200.0,
+                "center_y_std": 2.0,
+                "height_std": 3.0,
+                "ocr": {"text_persistence": 1.0},
+            }),
+        );
+        let mut unstable = decision(
+            Action::Review,
+            "bande basse sombre (104), texte persistant confirmé par OCR ; revue avec scale proposé",
+            json!({
+                "height": 104.0,
+                "scale_target": 200.0,
+                "center_y_std": 40.0,
+                "height_std": 3.0,
+                "ocr": {"text_persistence": 1.0},
+            }),
+        );
+        triage_reviews(std::slice::from_mut(&mut stable), 1080, 1920.0, 1.05);
+        triage_reviews(std::slice::from_mut(&mut unstable), 1080, 1920.0, 1.05);
+        assert_eq!(stable.action, Action::Apply);
+        assert_eq!(unstable.action, Action::Review);
+    }
+
+    #[test]
+    fn emission_prior_can_downgrade_and_promote() {
+        // Given: un apply A2 et une revue de bandeau confirmée à 200 %.
+        // When:  le prior `review_only` puis `review_banner_apply` s'applique.
+        // Then:  l'apply repasse en revue et la revue devient apply.
+        let ocr = json!({
+            "text_persistence": 1.0,
+            "dominant_ratio": 1.0,
+            "score": 0.9,
+        });
+        let mut apply = decision(
+            Action::Apply,
+            "bannière 104 px, largeur 56% -> 200%, texte persistant confirmé par OCR",
+            json!({"height": 104.0, "scale_target": 200.0, "ocr": ocr}),
+        );
+        let mut review = decision(
+            Action::Review,
+            "bande basse sombre (104), texte persistant confirmé par OCR ; revue avec scale proposé",
+            json!({"height": 104.0, "scale_target": 200.0, "ocr": ocr}),
+        );
+        apply_emission_prior(
+            std::slice::from_mut(&mut apply),
+            A2EmissionPrior {
+                review_only: true,
+                review_banner_apply: false,
+            },
+            Some("Les Marseillais"),
+        );
+        apply_emission_prior(
+            std::slice::from_mut(&mut review),
+            A2EmissionPrior {
+                review_only: false,
+                review_banner_apply: true,
+            },
+            Some("Un Jour Un Doc"),
+        );
+        assert_eq!(apply.action, Action::Review);
+        assert_eq!(apply.details["emission_prior_rule"], "review_only");
+        assert_eq!(review.action, Action::Apply);
+        assert_eq!(review.details["emission_prior_rule"], "review_banner_apply");
     }
 }

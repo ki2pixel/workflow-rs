@@ -22,8 +22,8 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 use workflow_core::mission::{
-    filename_key, ClientMission, LogoProvenance, LogoResolver, LogoTarget, MissionWarning,
-    VideoInstruction, VideoMatch,
+    filename_key, strip_video_extension, ClientMission, LogoProvenance, LogoResolver, LogoTarget,
+    MissionWarning, VideoInstruction, VideoMatch,
 };
 use workflow_schema::round::round_to;
 
@@ -126,7 +126,24 @@ pub struct A7Options<'a> {
     pub mission_overlays: Option<&'a Path>,
     pub end_card_max_s: f64,
     pub ffprobe: &'a Path,
+    /// Recherche une mission globale par titre quand le lot ne couvre pas le
+    /// projet. Désactivé par défaut.
+    pub global_fallback: bool,
+    /// Borne haute (Unix) des missions acceptées par le fallback :
+    /// génération du projet + 1 jour. `None` : pas de borne haute.
+    pub cutoff_ts: Option<i64>,
+    /// Borne basse (Unix) : génération du projet − ancienneté maximale.
+    /// Une mission plus ancienne est ignorée, car les titres et les lots sont
+    /// réutilisés au fil de l'année. `None` : pas de borne basse.
+    pub window_start_ts: Option<i64>,
 }
+
+/// Ancienneté maximale d'une mission acceptée par le fallback global.
+///
+/// Validation Corpus 4 : 299 des 313 « nouveaux candidats » du shadow
+/// correspondaient à des missions de plus de 90 jours, donc à des titres
+/// réutilisés. 30 jours conservent les seules récupérations plausibles.
+pub const GLOBAL_FALLBACK_MAX_AGE_S: i64 = 30 * 86_400;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct A7Added {
@@ -148,6 +165,18 @@ pub struct A7Outcome {
     pub sidecar: Option<Value>,
     pub tail_s: f64,
     pub changed: bool,
+    /// `lot` ou `global_fallback`, pour l'audit.
+    pub match_source: Option<&'static str>,
+}
+
+/// Résultat de la sélection mission/instruction.
+enum Selection<'a> {
+    Mission(&'a ClientMission, &'a VideoInstruction, &'static str),
+    AmbiguousLot { count: usize },
+    AmbiguousVideo(&'a ClientMission),
+    AmbiguousGlobal { missions: Vec<String> },
+    NotFound,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,18 +208,10 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
         doc: doc.clone(),
         ..A7Outcome::default()
     };
-    let Some(lot) = options.lot else {
-        return outcome;
-    };
-    let missions: Vec<&ClientMission> = options
-        .missions
-        .iter()
-        .filter(|mission| mission.lot == lot)
-        .collect();
-    match missions.len() {
-        0 => return outcome,
-        1 => {}
-        count => {
+    let (mission, instruction, match_source) = match select_mission(options) {
+        Selection::Mission(mission, instruction, source) => (mission, instruction, source),
+        Selection::AmbiguousLot { count } => {
+            let lot = options.lot.unwrap_or(0);
             outcome.decisions.push(Decision::review(
                 "A7",
                 "comp",
@@ -209,11 +230,7 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
             }));
             return outcome;
         }
-    }
-    let mission = missions[0];
-    let instruction = match mission.match_video(options.stem) {
-        VideoMatch::Matched(instruction) => instruction.clone(),
-        VideoMatch::Ambiguous => {
+        Selection::AmbiguousVideo(mission) => {
             outcome.decisions.push(Decision::review(
                 "A7",
                 "comp",
@@ -233,7 +250,28 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
             ));
             return outcome;
         }
-        VideoMatch::NotFound => {
+        Selection::AmbiguousGlobal { missions } => {
+            outcome.decisions.push(Decision::review(
+                "A7",
+                "comp",
+                format!(
+                    "plusieurs missions globales pour {} : sélection refusée",
+                    options.stem
+                ),
+                0.3,
+                json!({
+                    "severity": "high",
+                    "reason": "ambiguous_global_video",
+                    "stem": options.stem,
+                    "missions": missions,
+                }),
+            ));
+            return outcome;
+        }
+        Selection::NotFound => {
+            let mission = options
+                .lot
+                .and_then(|lot| options.missions.iter().find(|mission| mission.lot == lot));
             outcome.decisions.push(Decision::review(
                 "A7",
                 "comp",
@@ -241,19 +279,24 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
                 0.2,
                 json!({"severity": "medium", "reason": "video_not_in_mission", "stem": options.stem}),
             ));
-            outcome.mission = Some(mission_block(
-                mission,
-                None,
-                "review",
-                vec!["video_not_in_mission"],
-                0.0,
-                &[],
-                &[],
-                &[],
-            ));
+            outcome.mission = mission.map(|mission| {
+                mission_block(
+                    mission,
+                    None,
+                    "review",
+                    vec!["video_not_in_mission"],
+                    0.0,
+                    &[],
+                    &[],
+                    &[],
+                )
+            });
             return outcome;
         }
+        Selection::None => return outcome,
     };
+    outcome.match_source = Some(match_source);
+    let instruction = instruction.clone();
 
     if instruction.no_logo {
         let conflict = options.overlay && comp_has_named_layer(&outcome.doc, "sdm.png");
@@ -491,6 +534,231 @@ pub fn apply(doc: &Value, options: &A7Options<'_>) -> A7Outcome {
         }
     }
     outcome
+}
+
+/// Sélectionne la mission et l'instruction du projet.
+///
+/// Ordre : mission du lot (comportement historique), puis, si le titre n'y
+/// figure pas et que le fallback est actif, mission globale par titre exact ou
+/// par tokens identiques. Un lot porteur de plusieurs missions reste ambigu.
+fn select_mission<'a>(options: &A7Options<'a>) -> Selection<'a> {
+    let Some(lot) = options.lot else {
+        return if options.global_fallback {
+            global_match(options).unwrap_or(Selection::None)
+        } else {
+            Selection::None
+        };
+    };
+    let lot_missions: Vec<&ClientMission> = options
+        .missions
+        .iter()
+        .filter(|mission| mission.lot == lot)
+        .collect();
+    match lot_missions.len() {
+        0 => {
+            if options.global_fallback {
+                global_match(options).unwrap_or(Selection::None)
+            } else {
+                Selection::None
+            }
+        }
+        1 => {
+            let mission = lot_missions[0];
+            match mission.match_video(options.stem) {
+                VideoMatch::Matched(instruction) => Selection::Mission(mission, instruction, "lot"),
+                VideoMatch::Ambiguous => Selection::AmbiguousVideo(mission),
+                VideoMatch::NotFound if options.global_fallback => {
+                    global_match(options).unwrap_or(Selection::NotFound)
+                }
+                VideoMatch::NotFound => Selection::NotFound,
+            }
+        }
+        count => Selection::AmbiguousLot { count },
+    }
+}
+
+/// Cherche une mission globale par titre, sous cutoff temporel.
+///
+/// Le titre exact (`match_video`) prime. À défaut, une correspondance par
+/// tokens identiques (Jaccard ≥ 0,85, au moins 5 tokens) couvre les variantes
+/// d'ordre des mots. Plusieurs missions ne sont acceptées que si leurs
+/// instructions sont équivalentes ; sinon la sélection est refusée.
+fn global_match<'a>(options: &A7Options<'a>) -> Option<Selection<'a>> {
+    let mut exact: Vec<(&ClientMission, &VideoInstruction)> = Vec::new();
+    let mut fuzzy: Vec<(&ClientMission, &VideoInstruction)> = Vec::new();
+    let mut ambiguous: Option<&ClientMission> = None;
+    for mission in options.missions {
+        if !within_window(mission, options.window_start_ts, options.cutoff_ts) {
+            continue;
+        }
+        let exact_instructions = exact_instructions(mission, options.stem);
+        match exact_instructions.len() {
+            0 => {
+                if let Some(instruction) = fuzzy_instruction(mission, options.stem) {
+                    fuzzy.push((mission, instruction));
+                }
+            }
+            1 => exact.push((mission, exact_instructions[0])),
+            _ => {
+                ambiguous.get_or_insert(mission);
+            }
+        }
+    }
+    if let Some(selection) = choose_match(exact) {
+        return Some(selection);
+    }
+    if let Some(selection) = choose_match(fuzzy) {
+        return Some(selection);
+    }
+    ambiguous.map(Selection::AmbiguousVideo)
+}
+
+fn choose_match<'a>(
+    mut candidates: Vec<(&'a ClientMission, &'a VideoInstruction)>,
+) -> Option<Selection<'a>> {
+    candidates.sort_by(|left, right| left.0.id.cmp(&right.0.id));
+    candidates.dedup_by(|left, right| left.0.id == right.0.id);
+    match candidates.len() {
+        0 => None,
+        1 => Some(Selection::Mission(
+            candidates[0].0,
+            candidates[0].1,
+            "global_fallback",
+        )),
+        _ => {
+            let first = instruction_signature(candidates[0].1);
+            if candidates
+                .iter()
+                .all(|(_, instruction)| instruction_signature(instruction) == first)
+            {
+                let best = candidates
+                    .iter()
+                    .max_by_key(|(mission, _)| mission_timestamp(mission).unwrap_or(0))
+                    .copied()
+                    .unwrap_or(candidates[0]);
+                Some(Selection::Mission(best.0, best.1, "global_fallback"))
+            } else {
+                Some(Selection::AmbiguousGlobal {
+                    missions: candidates
+                        .iter()
+                        .map(|(mission, _)| mission.id.clone())
+                        .collect(),
+                })
+            }
+        }
+    }
+}
+
+fn instruction_signature(instruction: &VideoInstruction) -> (bool, bool, Vec<String>) {
+    let mut logos: Vec<String> = instruction
+        .logos
+        .iter()
+        .map(|logo| filename_key(logo))
+        .collect();
+    logos.sort();
+    logos.dedup();
+    (instruction.no_logo, instruction.logo_unresolved, logos)
+}
+
+/// Instructions dont le titre correspond exactement au projet, avec la
+/// normalisation du fallback (suffixe `_TAT_<chaîne>` retiré).
+fn exact_instructions<'a>(mission: &'a ClientMission, stem: &str) -> Vec<&'a VideoInstruction> {
+    let candidate = filename_key(stem);
+    let candidate_stem = strip_video_extension(&candidate);
+    let candidate_fallback = fallback_key(stem);
+    let mut found: Vec<&VideoInstruction> = Vec::new();
+    for instruction in &mission.videos {
+        let direct = instruction.key == candidate
+            || instruction.stem_key == candidate
+            || instruction.stem_key == candidate_stem;
+        let fallback = !candidate_fallback.is_empty()
+            && fallback_key(&instruction.filename) == candidate_fallback;
+        if (direct || fallback)
+            && !found
+                .iter()
+                .any(|existing| std::ptr::eq(*existing, instruction))
+        {
+            found.push(instruction);
+        }
+    }
+    found
+}
+
+/// Clé de comparaison du fallback : `filename_key` sans extension et sans
+/// suffixe `_TAT_<chaîne>` (nommage interne des médias de mission).
+fn fallback_key(value: &str) -> String {
+    let key = filename_key(value);
+    let key = strip_video_extension(&key);
+    let Some(index) = key.rfind("_tat_") else {
+        return key.trim().to_string();
+    };
+    let suffix = &key[index + 5..];
+    if !suffix.is_empty() && suffix.chars().all(|character| character.is_alphanumeric()) {
+        key[..index].trim().to_string()
+    } else {
+        key.trim().to_string()
+    }
+}
+
+/// Variante d'ordre des mots : mêmes tokens (Jaccard ≥ 0,85).
+fn fuzzy_instruction<'a>(mission: &'a ClientMission, stem: &str) -> Option<&'a VideoInstruction> {
+    let stem_tokens = token_set(&fallback_key(stem));
+    if stem_tokens.len() < 5 {
+        return None;
+    }
+    let mut found: Option<&VideoInstruction> = None;
+    for instruction in &mission.videos {
+        let tokens = token_set(&fallback_key(&instruction.filename));
+        if tokens.len() < 5 {
+            continue;
+        }
+        let intersection = tokens.intersection(&stem_tokens).count();
+        let union = tokens.union(&stem_tokens).count();
+        if union == 0 || intersection as f64 / (union as f64) < 0.85 {
+            continue;
+        }
+        if found.is_some() {
+            return None;
+        }
+        found = Some(instruction);
+    }
+    found
+}
+
+fn token_set(value: &str) -> std::collections::HashSet<String> {
+    value
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn within_window(mission: &ClientMission, start: Option<i64>, end: Option<i64>) -> bool {
+    if start.is_none() && end.is_none() {
+        return true;
+    }
+    let Some(timestamp) = mission_timestamp(mission) else {
+        return true;
+    };
+    start.is_none_or(|start| timestamp >= start) && end.is_none_or(|end| timestamp <= end)
+}
+
+fn mission_timestamp(mission: &ClientMission) -> Option<i64> {
+    [mission.received_at.as_str(), mission.stored_at.as_str()]
+        .into_iter()
+        .filter_map(parse_timestamp)
+        .max()
+}
+
+fn parse_timestamp(value: &str) -> Option<i64> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|value| value.timestamp())
+        .ok()
+        .or_else(|| {
+            chrono::DateTime::parse_from_rfc2822(value)
+                .map(|value| value.timestamp())
+                .ok()
+        })
 }
 
 #[derive(Debug, Clone)]
@@ -1449,6 +1717,9 @@ mod tests {
             mission_overlays: None,
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         }
     }
 
@@ -1486,6 +1757,156 @@ mod tests {
         assert_eq!(outcome.doc, doc);
         assert_eq!(outcome.mission.as_ref().unwrap()["no_logo"], true);
         assert_eq!(outcome.mission.as_ref().unwrap()["added"], json!([]));
+    }
+
+    #[test]
+    fn global_fallback_resolves_no_logo_across_lots() {
+        // Given: le lot 1 ne porte aucune mission, le lot 2 porte `clip.mp4`.
+        // When:  le fallback global est actif.
+        // Then:  la mission est retrouvée et produit un noop `no_logo`.
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mission = ClientMission::from_body(
+            "recadrage_lot_2_20260101",
+            2,
+            "Lot 2",
+            "Recadrage à faire pour 10h00 :\n- clip_TAT_M6.mp4 (Pas de logo)",
+        );
+        let missions = vec![mission];
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let docs = dir.path().join("docs");
+        let mut options = options(&project, &docs, &meta, &missions);
+        options.global_fallback = true;
+        let outcome = apply(&doc, &options);
+        assert_eq!(outcome.match_source, Some("global_fallback"));
+        let block = outcome.mission.as_ref().unwrap();
+        assert_eq!(block["decision"], "noop");
+        assert_eq!(block["no_logo"], true);
+        assert!(outcome
+            .decisions
+            .iter()
+            .any(|decision| decision.details["reason"] == "no_logo"));
+    }
+
+    #[test]
+    fn global_fallback_respects_cutoff() {
+        // Given: une mission datée après la génération du projet.
+        // When:  le cutoff est antérieur.
+        // Then:  aucune mission n'est retenue.
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut mission = ClientMission::from_body(
+            "recadrage_lot_2_20260101",
+            2,
+            "Lot 2",
+            "Recadrage à faire pour 10h00 :\n- clip.mp4 (Pas de logo)",
+        );
+        mission.received_at = "2026-11-20T12:00:00+00:00".into();
+        let missions = vec![mission];
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let docs = dir.path().join("docs");
+        let mut options = options(&project, &docs, &meta, &missions);
+        options.global_fallback = true;
+        options.cutoff_ts = Some(1_700_000_000);
+        let outcome = apply(&doc, &options);
+        assert!(outcome.mission.is_none());
+        assert!(outcome.decisions.is_empty());
+    }
+
+    #[test]
+    fn global_fallback_rejects_stale_mission() {
+        // Given: une mission de janvier et un projet de novembre.
+        // When:  la fenêtre basse est fixée à 30 jours avant le projet.
+        // Then:  la mission est ignorée, même si le titre correspond.
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut mission = ClientMission::from_body(
+            "recadrage_lot_2_20260123",
+            2,
+            "Lot 2",
+            "Recadrage à faire pour 10h00 :\n- clip.mp4 (Pas de logo)",
+        );
+        mission.received_at = "2026-01-23T10:00:00+01:00".into();
+        let missions = vec![mission];
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let docs = dir.path().join("docs");
+        let mut options = options(&project, &docs, &meta, &missions);
+        options.global_fallback = true;
+        options.window_start_ts = Some(
+            chrono::DateTime::parse_from_rfc3339("2026-10-20T00:00:00+00:00")
+                .unwrap()
+                .timestamp(),
+        );
+        options.cutoff_ts = Some(
+            chrono::DateTime::parse_from_rfc3339("2026-11-21T00:00:00+00:00")
+                .unwrap()
+                .timestamp(),
+        );
+        let outcome = apply(&doc, &options);
+        assert!(outcome.mission.is_none());
+        assert!(outcome.decisions.is_empty());
+    }
+
+    #[test]
+    fn global_fallback_refuses_divergent_missions() {
+        // Given: deux missions du même titre, l'une no_logo, l'autre avec logo.
+        // When:  le fallback global les trouve toutes les deux.
+        // Then:  la sélection est refusée en revue.
+        let doc = minimal_doc();
+        let meta = comp_meta(&doc).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let no_logo = ClientMission::from_body(
+            "recadrage_lot_2_20260101",
+            2,
+            "Lot 2",
+            "Recadrage à faire pour 10h00 :\n- clip.mp4 (Pas de logo)",
+        );
+        let with_logo = ClientMission::from_body(
+            "recadrage_lot_3_20260101",
+            3,
+            "Lot 3",
+            "Recadrage à faire pour 10h00 :\n- clip.mp4 (Logos requis: central.png)",
+        );
+        let missions = vec![no_logo, with_logo];
+        let project = dir.path().join("projets/clip_assist.ecproj");
+        let docs = dir.path().join("docs");
+        let mut options = options(&project, &docs, &meta, &missions);
+        options.global_fallback = true;
+        let outcome = apply(&doc, &options);
+        assert!(outcome.mission.is_none());
+        assert!(outcome
+            .decisions
+            .iter()
+            .any(|decision| decision.details["reason"] == "ambiguous_global_video"));
+    }
+
+    #[test]
+    fn fallback_key_strips_tat_suffix() {
+        assert_eq!(fallback_key("COUPLE LIBRE_TAT_Téva.mp4"), "couple libre");
+        assert_eq!(fallback_key("clip.mp4"), "clip");
+        assert_eq!(fallback_key("Maeva_TAT_M6_v2.mp4"), "maeva_tat_m6_v2");
+    }
+
+    #[test]
+    fn fuzzy_instruction_matches_reordered_title() {
+        // Given: un titre réordonné qui partage 8 tokens sur 9.
+        // When:  la variante floue est évaluée.
+        // Then:  elle est reconnue.
+        let mission = ClientMission::from_body(
+            "recadrage_lot_277_20261120",
+            277,
+            "Lot 277",
+            "Recadrage à faire pour 10h00 :\n\
+             - Greg fait une déclaration d'amour à Maeva.mp4 (Pas de logo)",
+        );
+        let found = fuzzy_instruction(
+            &mission,
+            "Maeva fait une grosse déclaration d’amour à Greg Greg fait une déclaration d’amour à Maeva",
+        );
+        assert!(found.is_some());
     }
 
     #[test]
@@ -1714,6 +2135,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1755,6 +2179,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1789,6 +2216,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1827,6 +2257,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1878,6 +2311,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1915,6 +2351,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -1969,6 +2408,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -2006,6 +2448,9 @@ mod tests {
             mission_overlays: Some(&bank),
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let outcome = apply(&doc, &options);
         let block = outcome.mission.as_ref().unwrap();
@@ -2144,6 +2589,9 @@ mod tests {
             mission_overlays: None,
             end_card_max_s: 5.0,
             ffprobe: Path::new("ffprobe"),
+            global_fallback: false,
+            cutoff_ts: None,
+            window_start_ts: None,
         };
         let (output, added, _) = insert_assets(&doc, &plan.additions, &options).unwrap();
         assert_eq!(added.len(), 1);

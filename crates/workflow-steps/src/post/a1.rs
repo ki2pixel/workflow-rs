@@ -16,6 +16,7 @@ use anyhow::Result;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 use std::path::Path;
+use workflow_core::mission::filename_key;
 use workflow_schema::round::round_to;
 
 const ACTIVE_NOOP: u32 = 1072;
@@ -40,6 +41,12 @@ pub struct A1Options {
     /// natif. Désactivé par défaut ; le natif ne peut jamais créer un `apply`
     /// ni changer un `review`/`noop`.
     pub refine_native: bool,
+    /// Garde-fou natif sur la bande ambiguë 950–990 px (shadow Corpus 4).
+    /// Un `apply` de cette bande n'est conservé que si le natif le confirme.
+    pub native_ambiguous_guard: bool,
+    /// Prior d'émission : tout `apply` A1 d'un projet identifié `66 Minutes`
+    /// repasse en revue (inserts letterboxés récurrents).
+    pub review_prior: bool,
 }
 
 impl Default for A1Options {
@@ -48,8 +55,47 @@ impl Default for A1Options {
             margin: DEFAULT_A1_MARGIN,
             defer_targets: HashSet::new(),
             refine_native: false,
+            native_ambiguous_guard: false,
+            review_prior: false,
         }
     }
+}
+
+/// Vrai si le nom de projet désigne l'émission `66 Minutes`.
+///
+/// Le corpus utilise le préfixe `66M -` ; le libellé complet reste accepté.
+/// La comparaison est insensible à la casse et aux accents.
+pub fn is_66_minutes(stem: &str) -> bool {
+    let key = filename_key(stem);
+    key.starts_with("66m") || key.starts_with("66 minutes")
+}
+
+/// Bande ambiguë validée par le shadow run : hauteur active normalisée
+/// 1080p dans 950–990 px et peu de frames barrées.
+pub fn ambiguous_letterbox(details: &Value) -> bool {
+    let active = details
+        .get("active_height")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as f64;
+    let bars = details.get("bars");
+    let top = bars
+        .and_then(|bars| bars.get("top"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as f64;
+    let bottom = bars
+        .and_then(|bars| bars.get("bottom"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as f64;
+    let total = active + top + bottom;
+    if active <= 0.0 || total <= 0.0 {
+        return false;
+    }
+    let active_1080 = active * 1080.0 / total;
+    let barred_frac = details
+        .get("barred_frac")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    (950.0..=990.0).contains(&active_1080) && barred_frac < 0.20
 }
 
 pub fn decide_a1(
@@ -101,6 +147,7 @@ pub fn decide_a1(
         };
         let (mut decision, mut delta) =
             decide_segment(segment, &crops, meta, source_width, source_height, options);
+        let mut native_confirmed = false;
         if options.refine_native && decision.action == Action::Apply {
             match refine_native(
                 segment,
@@ -114,6 +161,7 @@ pub fn decide_a1(
                 options,
             ) {
                 Ok(Some((refined, refined_delta))) => {
+                    native_confirmed = true;
                     decision = refined;
                     delta = refined_delta;
                 }
@@ -124,6 +172,65 @@ pub fn decide_a1(
                     "A1: raffinement natif ignoré, décision cropdetect conservée"
                 ),
             }
+        }
+        if options.native_ambiguous_guard
+            && decision.action == Action::Apply
+            && ambiguous_letterbox(&decision.details)
+        {
+            let confirmed = native_confirmed
+                || match refine_native(
+                    segment,
+                    &crops,
+                    &decision,
+                    video,
+                    ffmpeg,
+                    meta,
+                    source_width,
+                    source_height,
+                    options,
+                ) {
+                    Ok(Some((refined, refined_delta))) => {
+                        decision = refined;
+                        delta = refined_delta;
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(error) => {
+                        tracing::warn!(
+                            segment = %segment.name,
+                            error = %error,
+                            "A1: garde-fou ambigu, natif indisponible"
+                        );
+                        false
+                    }
+                };
+            if !confirmed {
+                if let Value::Object(object) = &mut decision.details {
+                    object.insert("a1_ambiguous_guard".into(), json!(true));
+                    object.insert("a1_ambiguous_reason".into(), json!("native_not_confirmed"));
+                }
+                decision = Decision::review(
+                    "A1",
+                    decision.target.clone(),
+                    "bande 950–990 px ambiguë (scène sombre ou letterbox), natif non confirmé",
+                    0.35,
+                    decision.details.clone(),
+                );
+                delta = None;
+            }
+        }
+        if options.review_prior && decision.action == Action::Apply {
+            if let Value::Object(object) = &mut decision.details {
+                object.insert("a1_emission_prior".into(), json!("66 Minutes"));
+            }
+            decision = Decision::review(
+                "A1",
+                decision.target.clone(),
+                "prior d'émission 66 Minutes : insert letterboxé, revue systématique",
+                0.35,
+                decision.details.clone(),
+            );
+            delta = None;
         }
         if let Some(delta) = delta {
             position_deltas.push(delta);
@@ -1243,5 +1350,40 @@ mod tests {
     #[test]
     fn native_refinement_is_opt_in() {
         assert!(!A1Options::default().refine_native);
+        assert!(!A1Options::default().native_ambiguous_guard);
+        assert!(!A1Options::default().review_prior);
+    }
+
+    #[test]
+    fn ambiguous_band_matches_shadow_definition() {
+        // Given: une scène sombre 960 px actifs, barres 60/60, barred_frac 0.
+        // When:  la bande ambiguë est évaluée.
+        // Then:  elle est reconnue ; 1024 px ou barred_frac 0,4 ne le sont pas.
+        let dark = json!({
+            "active_height": 960,
+            "bars": {"top": 60, "bottom": 60, "left": 0, "right": 0},
+            "barred_frac": 0.0,
+        });
+        assert!(ambiguous_letterbox(&dark));
+        let clear = json!({
+            "active_height": 1024,
+            "bars": {"top": 28, "bottom": 28, "left": 0, "right": 0},
+            "barred_frac": 0.0,
+        });
+        assert!(!ambiguous_letterbox(&clear));
+        let intermittent = json!({
+            "active_height": 960,
+            "bars": {"top": 60, "bottom": 60, "left": 0, "right": 0},
+            "barred_frac": 0.4,
+        });
+        assert!(!ambiguous_letterbox(&intermittent));
+    }
+
+    #[test]
+    fn sixty_six_minutes_prior_matches_known_prefixes() {
+        assert!(is_66_minutes("66M - MAMIE BOITE DE NUIT_TAT_M6"));
+        assert!(is_66_minutes("66 Minutes - Park la Brea"));
+        assert!(!is_66_minutes("M6 - Capital - 66 minutes de reportage"));
+        assert!(!is_66_minutes("Les Marseillais"));
     }
 }

@@ -238,7 +238,21 @@ a1_margin = 1.015
 # D-058 option A : raffine un apply A1 avec le détecteur natif (Sobel 20,
 # couverture sombre 0,45, cluster >= 60 %). Désactivé : cropdetect décide seul.
 a1_refine_native = false
+# Shadow Corpus 4 : sur la bande ambiguë 950–990 px, un apply A1 n'est
+# conservé que si le détecteur natif le confirme. Désactivé par défaut.
+a1_native_ambiguous_guard = false
+# Prior d'émission : les applies A1 des projets `66M - ...` repassent en revue.
+a1_66m_prior = false
 a2_margin = 1.05
+# Triage conservateur des revues A2 : décor bas hors cible 190–300 % -> noop,
+# logo seul -> noop, bande sombre confirmée stable -> apply. Désactivé.
+a2_review_triage = false
+# Priors A2 par émission (noms du registre `a2_logo_catalog`). Vide : aucune
+# émission n'est privilégiée. Exemple :
+# [steps.step8.post.a2_emission_priors."Les Marseillais"]
+# review_only = true
+# [steps.step8.post.a2_emission_priors."Un Jour Un Doc"]
+# review_banner_apply = true
 # Gate OCR A2 (D-051) : confirme un bandeau clair par texte persistant et
 # oppose un veto si le texte change. Activé en production le 2026-11-08
 # après staging (D-055) ; le défaut du code reste false.
@@ -265,6 +279,11 @@ mission_end_card_max_s = 5.0
 # A2 : masque les calques de mission (PNG) dans l'analyse source. Activé
 # après comparatif A2, indépendamment de mission_overlay.
 a2_mission_mask = false
+# A7 : fallback global par titre quand aucune mission du lot ne couvre le
+# projet. Fenêtre : date du `.ecproj` − 30 jours à + 1 jour (les titres sont
+# réutilisés au fil de l'année). Une mission `Pas de logo` retrouvée produit
+# un noop, jamais une revue `video_not_in_mission`.
+a7_global_fallback = false
 
 [retention]
 # Projets sources : `steps.step7.cleanup_threshold_hours` (48 h) est utilisé.

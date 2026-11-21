@@ -1,5 +1,6 @@
 use crate::error::ConfigError;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -1165,6 +1166,20 @@ impl Default for Step7Config {
     }
 }
 
+/// Prior A2 attaché à une émission (programme), indexé par nom normalisé.
+///
+/// Le prior ne remplace jamais la géométrie : il ne peut que rétrograder un
+/// `apply` en revue (`review_only`) ou promouvoir une revue de bandeau déjà
+/// confirmée par OCR et proche de la cible 200 % (`review_banner_apply`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct A2EmissionPriorConfig {
+    /// Toute promotion A2 de cette émission repasse en revue.
+    pub review_only: bool,
+    /// Une revue de bandeau confirmée par OCR, à ±8 pts de 200 %, devient apply.
+    pub review_banner_apply: bool,
+}
+
 /// Post-traitement déterministe A5/A6/A7 après STEP8.
 ///
 /// Le projet brut n'est jamais modifié : un second `.ecproj` suffixé
@@ -1207,7 +1222,24 @@ pub struct PostConfig {
     /// (Sobel 20, couverture sombre 0,45, cluster ≥ 60 %). Désactivé par
     /// défaut : `cropdetect` reste le seul décideur.
     pub a1_refine_native: bool,
+    /// Garde-fou natif sur la bande ambiguë 950–990 px : un `apply` A1 dont la
+    /// hauteur active normalisée tombe dans cette bande et dont `barred_frac`
+    /// est faible n'est conservé que si `native_letterbox` le confirme.
+    /// Désactivé par défaut ; le shadow run a validé 32/32 rejets sur 363 et
+    /// 58/58 confirmations sur 361.
+    pub a1_native_ambiguous_guard: bool,
+    /// Prior d'émission `66 Minutes` : un `apply` A1 sur un projet dont le nom
+    /// commence par `66M` repasse en revue (inserts letterboxés récurrents).
+    /// Désactivé par défaut.
+    pub a1_66m_prior: bool,
     pub a2_margin: f64,
+    /// Triage conservateur des revues A2 : `décor bas` hors cible 190–300 %
+    /// sans OCR -> noop ; `logo étroit` avec OCR `logo_only` -> noop ;
+    /// `bande sombre` confirmée stable -> apply. Désactivé par défaut.
+    pub a2_review_triage: bool,
+    /// Priors A2 par émission, indexés par nom d'émission du registre
+    /// `a2_logo_catalog`. Vide par défaut : aucune émission n'est privilégiée.
+    pub a2_emission_priors: BTreeMap<String, A2EmissionPriorConfig>,
     /// Autorise `gap < 0,70` en revue A3 pour une amplitude ≥ 200 px
     /// (R6, validation sur copies). Désactivé par défaut.
     pub a3_relaxed_gap: bool,
@@ -1252,6 +1284,8 @@ pub struct PostConfig {
     pub mission_end_card_max_s: f64,
     /// A2 : utilise les calques de mission comme masque de logos.
     pub a2_mission_mask: bool,
+    /// A7 : fallback global par titre (−30 j / +1 j) ; une mission `no_logo` retrouvée produit un noop, jamais une revue `video_not_in_mission`. Désactivé par défaut.
+    pub a7_global_fallback: bool,
 }
 
 impl Default for PostConfig {
@@ -1270,7 +1304,11 @@ impl Default for PostConfig {
             a1_margin: 1.015,
             a1_defer_on_a3: false,
             a1_refine_native: false,
+            a1_native_ambiguous_guard: false,
+            a1_66m_prior: false,
             a2_margin: 1.05,
+            a2_review_triage: false,
+            a2_emission_priors: BTreeMap::new(),
             a3_relaxed_gap: false,
             a2_ocr: false,
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
@@ -1291,6 +1329,7 @@ impl Default for PostConfig {
             mission_overlay: false,
             mission_end_card_max_s: 5.0,
             a2_mission_mask: false,
+            a7_global_fallback: false,
         }
     }
 }
@@ -1408,7 +1447,12 @@ mod tests {
         assert_eq!(post.a1_margin, 1.015);
         assert!(!post.a1_defer_on_a3);
         assert!(!post.a1_refine_native);
+        assert!(!post.a1_native_ambiguous_guard);
+        assert!(!post.a1_66m_prior);
+        assert!(!post.a2_review_triage);
+        assert!(post.a2_emission_priors.is_empty());
         assert!(!post.a3_relaxed_gap);
+        assert!(!post.a7_global_fallback);
         assert!(!post.a2_logo_detector);
         assert_eq!(post.a2_logo_detector_size, 416);
         assert_eq!(post.a2_logo_detector_conf, 0.30);
@@ -1417,6 +1461,38 @@ mod tests {
         assert_eq!(post.a2_logo_detector_roi, "full");
         assert_eq!(post.a2_logo_detector_device, "cuda");
         assert!(!post.mission_template);
+    }
+
+    #[test]
+    fn post_corpus4_flags_are_typed_and_opt_in() {
+        // Given: un TOML explicite avec les correctifs validés par le shadow run.
+        // When:  la configuration est chargée.
+        // Then:  tous les flags sont typés et le défaut reste désactivé.
+        let config = Config::from_toml(
+            "[steps.step8.post]\n\
+             a1_native_ambiguous_guard = true\n\
+             a1_66m_prior = true\n\
+             a2_review_triage = true\n\
+             a7_global_fallback = true\n\
+             [steps.step8.post.a2_emission_priors.\"Les Marseillais\"]\n\
+             review_only = true\n\
+             [steps.step8.post.a2_emission_priors.\"Un Jour Un Doc\"]\n\
+             review_banner_apply = true\n",
+        )
+        .unwrap();
+        let post = &config.steps.step8.post;
+        assert!(post.a1_native_ambiguous_guard);
+        assert!(post.a1_66m_prior);
+        assert!(post.a2_review_triage);
+        assert!(post.a7_global_fallback);
+        assert!(post.a2_emission_priors["Les Marseillais"].review_only);
+        assert!(post.a2_emission_priors["Un Jour Un Doc"].review_banner_apply);
+        let defaults = PostConfig::default();
+        assert!(!defaults.a1_native_ambiguous_guard);
+        assert!(!defaults.a1_66m_prior);
+        assert!(!defaults.a2_review_triage);
+        assert!(!defaults.a7_global_fallback);
+        assert!(defaults.a2_emission_priors.is_empty());
     }
 
     #[test]

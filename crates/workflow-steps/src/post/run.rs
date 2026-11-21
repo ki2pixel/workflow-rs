@@ -23,13 +23,13 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 use serde_json::{json, Map, Serializer, Value};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use workflow_core::fsutil::write_atomic;
-use workflow_core::mission::{ClientMission, SdmTemplateIndex};
+use workflow_core::mission::{filename_key, ClientMission, SdmTemplateIndex};
 use workflow_schema::round::round_to;
 
 const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "avi", "mkv", "webm"];
@@ -55,7 +55,15 @@ pub struct PostOptions {
     pub a1_defer_on_a3: bool,
     /// D-058 option A : raffine un `apply` A1 avec le détecteur natif.
     pub a1_refine_native: bool,
+    /// Garde-fou natif sur la bande ambiguë 950–990 px (shadow Corpus 4).
+    pub a1_native_ambiguous_guard: bool,
+    /// Prior d'émission : apply A1 des projets `66 Minutes` -> revue.
+    pub a1_66m_prior: bool,
     pub a2_margin: f64,
+    /// Triage conservateur des revues A2 (shadow Corpus 4).
+    pub a2_review_triage: bool,
+    /// Priors A2 par émission (nom normalisé -> politique).
+    pub a2_emission_priors: BTreeMap<String, a2::A2EmissionPrior>,
     /// R6 : autorise `gap < 0,7` en revue A3. Désactivé par défaut.
     pub a3_relaxed_gap: bool,
     /// Gate OCR A2 : désactivé, aucune session ONNX n'est ouverte.
@@ -93,6 +101,8 @@ pub struct PostOptions {
     pub mission_end_card_max_s: f64,
     /// A2 : utilise les calques de mission comme masque.
     pub a2_mission_mask: bool,
+    /// A7 : fallback global par titre sous cutoff temporel.
+    pub a7_global_fallback: bool,
     /// Missions résolues par la CLI pour les lots du run.
     pub missions: Vec<ClientMission>,
 }
@@ -114,7 +124,11 @@ impl Default for PostOptions {
             a1_margin: 1.015,
             a1_defer_on_a3: false,
             a1_refine_native: false,
+            a1_native_ambiguous_guard: false,
+            a1_66m_prior: false,
             a2_margin: 1.05,
+            a2_review_triage: false,
+            a2_emission_priors: BTreeMap::new(),
             a3_relaxed_gap: false,
             a2_ocr: false,
             a2_ocr_det: PathBuf::from("qa/PP-OCRv6_det_small.onnx"),
@@ -139,6 +153,7 @@ impl Default for PostOptions {
             mission_overlays: None,
             mission_end_card_max_s: 5.0,
             a2_mission_mask: false,
+            a7_global_fallback: false,
             missions: Vec::new(),
         }
     }
@@ -169,7 +184,23 @@ impl PostOptions {
             a1_margin: post.a1_margin,
             a1_defer_on_a3: post.a1_defer_on_a3,
             a1_refine_native: post.a1_refine_native,
+            a1_native_ambiguous_guard: post.a1_native_ambiguous_guard,
+            a1_66m_prior: post.a1_66m_prior,
             a2_margin: post.a2_margin,
+            a2_review_triage: post.a2_review_triage,
+            a2_emission_priors: post
+                .a2_emission_priors
+                .iter()
+                .map(|(name, prior)| {
+                    (
+                        name.clone(),
+                        a2::A2EmissionPrior {
+                            review_only: prior.review_only,
+                            review_banner_apply: prior.review_banner_apply,
+                        },
+                    )
+                })
+                .collect(),
             a3_relaxed_gap: post.a3_relaxed_gap,
             a2_ocr: post.a2_ocr,
             a2_ocr_det: resolve_models_path(&config.paths.models, &post.a2_ocr_det),
@@ -201,6 +232,7 @@ impl PostOptions {
             mission_overlays: config.paths.resolve().mission_overlays,
             mission_end_card_max_s: post.mission_end_card_max_s,
             a2_mission_mask: post.a2_mission_mask,
+            a7_global_fallback: post.a7_global_fallback,
             missions: Vec::new(),
         }
     }
@@ -664,6 +696,41 @@ fn run_post_project_inner(
         } else {
             None
         };
+        // Priors d'émission : le nom vient du registre de logos source, seule
+        // source de vérité disponible dans le projet (le manifeste STEP8 n'est
+        // pas accessible ici).
+        let (emission_name, emission_prior) = if options.a2_emission_priors.is_empty() {
+            (None, None)
+        } else {
+            let name = video
+                .as_deref()
+                .and_then(|path| path.file_name())
+                .and_then(|name| name.to_str())
+                .and_then(
+                    |source_name| match SourceLogoCatalog::load(&options.a2_logo_catalog) {
+                        Ok(catalog) => catalog
+                            .resolve_source(source_name)
+                            .map(|emission| emission.name.clone()),
+                        Err(error) => {
+                            tracing::debug!(
+                                catalog = %options.a2_logo_catalog.display(),
+                                error = %error,
+                                "A2: priors d'émission ignorés, registre indisponible"
+                            );
+                            None
+                        }
+                    },
+                );
+            let prior = name.as_ref().and_then(|name| {
+                let key = filename_key(name);
+                options
+                    .a2_emission_priors
+                    .iter()
+                    .find(|(candidate, _)| filename_key(candidate) == key)
+                    .map(|(_, prior)| *prior)
+            });
+            (name, prior)
+        };
         // Un logo caché par un habillage déclaré ne doit pas déclencher le
         // veto « logo seul » d'A2. Le masque n'est lu que si le prior est
         // actif : sans flag, aucun travail supplémentaire.
@@ -709,6 +776,8 @@ fn run_post_project_inner(
                 HashSet::new()
             },
             refine_native: options.a1_refine_native,
+            native_ambiguous_guard: options.a1_native_ambiguous_guard,
+            review_prior: options.a1_66m_prior && a1::is_66_minutes(&stem),
         };
         decisions.extend(a1::decide_a1(
             &segments,
@@ -729,6 +798,9 @@ fn run_post_project_inner(
                 onnxruntime: options.a2_ocr_onnxruntime.clone(),
                 intra_threads: options.a2_ocr_threads.max(1),
             }),
+            triage: options.a2_review_triage,
+            emission_prior,
+            emission_name,
             logo_prior: source_logo_prior,
             overlay: overlay_mask,
         };
@@ -1063,7 +1135,17 @@ fn run_a7(
 ) -> a7::A7Outcome {
     let folder = project_folder(project);
     let lot = ClientMission::lot_from_folder(&folder);
-    a7::apply(
+    let cutoff_ts = if options.a7_global_fallback {
+        std::fs::metadata(project)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs() as i64 + 86_400)
+    } else {
+        None
+    };
+    let window_start_ts = cutoff_ts.map(|cutoff| cutoff - 86_400 - a7::GLOBAL_FALLBACK_MAX_AGE_S);
+    let mut outcome = a7::apply(
         doc,
         &a7::A7Options {
             project,
@@ -1077,8 +1159,17 @@ fn run_a7(
             mission_overlays: options.mission_overlays.as_deref(),
             end_card_max_s: options.mission_end_card_max_s,
             ffprobe: &options.ffprobe,
+            global_fallback: options.a7_global_fallback,
+            cutoff_ts,
+            window_start_ts,
         },
-    )
+    );
+    if let (Some(Value::Object(object)), Some(source)) =
+        (outcome.mission.as_mut(), outcome.match_source)
+    {
+        object.insert("match_source".into(), json!(source));
+    }
+    outcome
 }
 
 fn project_folder(project: &Path) -> PathBuf {

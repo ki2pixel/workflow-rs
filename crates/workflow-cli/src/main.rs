@@ -1412,7 +1412,11 @@ fn folder_for_project(project: &Path) -> PathBuf {
 
 /// Charge les missions des lots présents dans les dossiers. Toute erreur
 /// réseau est journalisée et ne bloque jamais le pipeline.
-fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<ClientMission> {
+fn load_missions_for_folders(
+    config: &Config,
+    folders: &[PathBuf],
+    global_fallback: bool,
+) -> Vec<ClientMission> {
     if !config.email_proxy.enabled || folders.is_empty() {
         return Vec::new();
     }
@@ -1427,7 +1431,7 @@ fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<Client
         .iter()
         .filter_map(|folder| ClientMission::lot_from_folder(folder))
         .collect();
-    if lots.is_empty() {
+    if lots.is_empty() && !global_fallback {
         return Vec::new();
     }
     let client = match EmailProxyClient::new(&config.email_proxy) {
@@ -1453,24 +1457,43 @@ fn load_missions_for_folders(config: &Config, folders: &[PathBuf]) -> Vec<Client
     let mut seen = HashSet::new();
     for lot in lots {
         for mission in store.list_for_lot(lot).unwrap_or_default() {
-            if !seen.insert(mission.id.clone()) {
-                continue;
+            if seen.insert(mission.id.clone()) && mission_allowed(config, &mission) {
+                missions.push(mission);
             }
-            if config.email_proxy.require_media_solution
-                && !mission.sender_masked.is_empty()
-                && !mission.sender_masked.ends_with("@media-solution.fr")
-            {
-                tracing::warn!(
-                    mission = %mission.id,
-                    sender = %mission.sender_masked,
-                    "email: expéditeur hors média-solution, mission ignorée"
-                );
-                continue;
-            }
-            missions.push(mission);
         }
     }
+    if global_fallback {
+        // Le fallback par titre a besoin des missions des autres lots. La purge
+        // de rétention borne déjà la fenêtre ; le cutoff temporel A7 protège
+        // les rejeux.
+        for mission in store.list(2_000).unwrap_or_default() {
+            if seen.insert(mission.id.clone()) && mission_allowed(config, &mission) {
+                missions.push(mission);
+            }
+        }
+    }
+    tracing::info!(
+        "email: {} mission(s) chargée(s) pour {} dossier(s) (fallback global: {global_fallback})",
+        missions.len(),
+        folders.len()
+    );
     missions
+}
+
+/// Vrai si l'expéditeur respecte le garde-fou média-solution.
+fn mission_allowed(config: &Config, mission: &ClientMission) -> bool {
+    if config.email_proxy.require_media_solution
+        && !mission.sender_masked.is_empty()
+        && !mission.sender_masked.ends_with("@media-solution.fr")
+    {
+        tracing::warn!(
+            mission = %mission.id,
+            sender = %mission.sender_masked,
+            "email: expéditeur hors média-solution, mission ignorée"
+        );
+        return false;
+    }
+    true
 }
 
 /// Applique le même filtre d'expéditeur que `load_missions_for_folders`, pour
@@ -2454,7 +2477,9 @@ fn run() -> Result<()> {
                 let mission_folders =
                     mission_folders_for_step8(&folders, manifest.as_deref(), &logs_dir);
                 if !no_email {
-                    post.missions = load_missions_for_folders(&config, &mission_folders);
+                    let global_fallback = post.a7_global_fallback;
+                    post.missions =
+                        load_missions_for_folders(&config, &mission_folders, global_fallback);
                 }
                 let options = Step8Options {
                     manifest,
@@ -2531,7 +2556,9 @@ fn run() -> Result<()> {
                 let mut mission_folders = folders.clone();
                 mission_folders.extend(projects.iter().map(|project| folder_for_project(project)));
                 if !no_email {
-                    options.missions = load_missions_for_folders(&config, &mission_folders);
+                    let global_fallback = options.a7_global_fallback;
+                    options.missions =
+                        load_missions_for_folders(&config, &mission_folders, global_fallback);
                 }
                 let mut results = Vec::new();
                 let mut failures = 0usize;
